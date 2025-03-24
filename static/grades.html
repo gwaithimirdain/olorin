@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olorin Grades Download</title>
+</head>
+<body>
+  <h1 style="text-align: center">Olorin Grades Download</h1>
+
+  <div style="max-width: 800px; margin-left: auto; margin-right: auto">
+  <p>
+    Enter your course ID and password to download all grades in CSV format, which can be imported into a spreadsheet program like Excel or LibreOffice.
+    The columns will be the level names in "world-stage-level" format, the rows will be labeled by student email addresses, and each entry will be 0 if the student has not completed that level, and otherwise 1, 2, or 3 according to whether they have completed it on novice, adept, or master difficulty setting.
+  </p>
+
+<!--
+  <p>
+    Your browser will probably warn you about submitting a password on this form since it is not encrypted.
+    Don't worry about that because the course password is not the same as any other password.
+  </p>
+-->
+
+  <div style="display: flex; flex-direction: row; padding: 5px; justify-content: center">
+    <div style="display: flex; flex-direction: column; padding: 5px">
+      <div style="padding: 5px">Course ID:</div>
+      <div style="padding: 5px">Password:</div>
+    </div>
+    <div style="display: flex; flex-direction: column; padding: 5px">
+      <input style="margin: 5px" type="text" id="loginCourse">
+      <input style="margin: 5px" type="password" id="loginPassword">
+    </div>
+  </div>
+  <div style="text-align: center; margin: 5px; color: #ff0000; visibility: hidden" id="loginError">
+    Login error
+  </div>
+  <div style="text-align: center">
+    <button id="submit" style="font-size: 16px">Submit</button><br/>
+  </div>
+</div>
+
+  <script src="grades.bundle.js"></script>
+</body>
+</html>

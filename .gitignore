@@ -1,0 +1,43 @@
+*.annot
+*.cmo
+*.cma
+*.cmi
+*.a
+*.o
+*.cmx
+*.cmxs
+*.cmxa
+
+# ocamlbuild working directory
+_build/
+
+# ocamlbuild targets
+*.byte
+*.native
+
+# oasis generated files
+setup.data
+setup.log
+
+# Merlin configuring file for Vim and Emacs
+.merlin
+
+# Dune generated files
+*.install
+*.opam
+
+# Local OPAM switch
+_opam/
+
+# Emacs backups
+*~
+
+# Javascript dependencies
+node_modules/
+package-lock.json
+
+# Javascript compiled files
+static/*.bundle.js
+
+# Linked bytecode files from static directory
+static/*.bc.js

@@ -1,0 +1,3 @@
+[submodule "narya"]
+	path = narya
+	url = git@github.com:gwaithimirdain/narya.git

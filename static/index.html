@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olorin</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="olorin.bc.js"></script>
+</head>
+<body>
+    <div id="paletteBar">
+      <div id="palette">
+        <div class="basic logical intro rule" id="andI" data-rule="andI">∧</div>
+        <div class="basic logical elim rule" id="andE" data-rule="andE">∧</div>
+        <div class="basic logical intro rule" id="orI1" data-rule="orI1">∨<sub>L</sub></div>
+        <div class="basic logical intro rule" id="orI2" data-rule="orI2">∨<sub>R</sub></div>
+        <div class="container rule" id="orE" data-rule="orE">
+          <div class="mid bar"></div>
+          <div class="doubleleft assumption"><div class="subgoallabel">∨</div></div>
+          <div class="doubleright subgoal"></div>
+          <div class="mid midleft"></div>
+          <div class="mid midright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; top: -7px; transform: scaleY(-1)">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; top: -7px; transform: scaleX(-1) scaleY(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
+        <div class="container rule" id="impI" data-rule="impI">
+          <div class="bottom bar"></div>
+          <div class="singleleft assumption"></div>
+          <div class="singleright subgoal"><div class="subgoallabel">⇒</div></div>
+          <div class="bottomleft"></div>
+          <div class="bottomright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
+        <div class="basic logical elim rule" id="impE" data-rule="impE">⇒</div>
+        <div class="container rule" id="iffI" data-rule="iffI">
+          <div class="mid bar"></div>
+          <div class="doubleleft assumption"></div>
+          <div class="doubleright subgoal"><div class="subgoallabel">⇔</div></div>
+          <div class="mid midleft"></div>
+          <div class="mid midright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; top: -7px; transform: scaleY(-1)">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; top: -7px; transform: scaleX(-1) scaleY(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
+        <div class="basic logical elim rule" id="iffE1" data-rule="iffE1">⇔<sub>L→R</sub></div>
+        <div class="basic logical elim rule" id="iffE2" data-rule="iffE2">⇔<sub>R→L</sub></div>
+        <div class="basic logical intro rule" id="exI" data-rule="exI"> ∃</div>
+        <div class="basic logical elim rule" id="exE" data-rule="exE">∃</div>
+        <div class="container rule" id="allI" data-rule="allI">
+          <div class="bottom bar"></div>
+          <div class="singleleft assumption"></div>
+          <div class="singleright subgoal"><div class="subgoallabel">∀</div></div>
+          <div class="bottomleft"></div>
+          <div class="bottomright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
+        <div class="basic logical elim rule" id="allE" data-rule="allE">∀</div>
+        <div class="basic logical elim rule" id="negE" data-rule="negE">¬</div>
+        <div class="container rule" id="negI" data-rule="negI">
+          <div class="bottom bar"></div>
+          <div class="singleleft assumption"></div>
+          <div class="singleright subgoal"><div class="subgoallabel">¬</div></div>
+          <div class="bottomleft"></div>
+          <div class="bottomright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
+        <div class="container rule" id="cnegI" data-rule="cnegI">
+          <div class="bottom bar"></div>
+          <div class="singleleft assumption"></div>
+          <div class="singleright subgoal"><div class="subgoallabel">¬</div></div>
+          <div class="bottomleft"></div>
+          <div class="bottomright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
+        <div class="basic logical rule" style="text-align: left" id="botE" data-rule="botE">⊥</div>
+        <div class="basic logical rule" style="text-align: right" id="topI" data-rule="topI">⊤</div>
+      </div>
+        <!-- <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc">🏷</div> -->
+      <div style="height: 80px; display: block; align-items: end" id="buttons">
+        <button id="clearProof" class="proofOption">Clear</button>
+        <button id="selectLevel" class="proofOption">Select Level</button>
+      </div>
+    </div>
+    <div id="diagram"></div>
+    <div id="selectionBox"></div>
+
+    <div id="currentLevelAndDifficulty">
+      <div id="currentLevel"></div>
+      <div id="currentDifficulty"></div>
+      <div id="reduceDifficulty"></div>
+      <div id="showHint">Show Hint</div>
+      <div>
+        <input type="radio" name="connectors" id="angleConnectors" checked="1"> Angle
+        <input type="radio" name="connectors" id="curvedConnectors"> Curved
+      </div>
+    </div>
+
+    <div id="levelChooseBG" class="modalbg">
+      <div class="modal" id="levelChooseModal">
+        <div style="text-align: center; font-size: 24px; display: grid; grid-template-columns: 1fr 20px 500px 20px 1fr">
+          <div></div>
+          <div id="backWorld" style="cursor: pointer">◀</div>
+          <div id="worldName">Select a level</div>
+          <div id="forwardWorld" style="cursor: pointer">▶</div>
+          <div></div>
+        </div>
+        <p id="chooseLevelWarning" style="visibility: hidden; text-align: center">(Choosing a new level clears any existing proof)</p>
+        <div id="worlds"></div>
+        <div id="chooseLevelButtons">
+          <div style="text-align: center; display: flex">
+            <div id="noviceRadio" class="difficultyRadio"><div id="noviceBox">☐</div>&nbsp;Novice</div>
+            <div id="adeptRadio" class="difficultyRadio"><div id="adeptBox">☐</div>&nbsp;Adept</div>
+            <div id="masterRadio" class="difficultyRadio"><div id="masterBox">☐</div>&nbsp;Master</div>
+          </div>
+          <div style="text-align: center; margin-top: 20px">
+            <button id="cancelChooseLevel" style="font-size: 16px; display: none">Cancel</button>
+            <button id="clearHistory" style="font-size: 16px">Clear History</button>
+            <button id="about" style="font-size: 16px">About</button>
+            <br/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="levelSelectBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">What do you want to prove?</h3>
+        <span id="setLevelWarning" style="display: none">(Choosing a new level clears any existing proof)</span>
+        <p>Parameters, as <tt>name : type</tt>, one per line:</p>
+        <textarea id="parameters" style="width: 100%" rows="3"></textarea>
+        <div id="paramPalette"></div>
+        <p>Variables, as <tt>name : type</tt>, one per line:</p>
+        <textarea id="variables" style="width: 100%" rows="3"></textarea>
+        <div id="varPalette"></div>
+        <p>Hypotheses, types only (i.e. propositions), one per line:</p>
+        <textarea id="hypotheses" style="width: 100%" rows="3"></textarea>
+        <div id="hypPalette"></div>
+        <p>Conclusion:</p>
+        <input type="text" id="conclusion" style="width: 100%; font-family: monospace"/>
+        <div id="conclPalette"></div>
+        <div style="text-align: center; display: flex; margin-left: auto; margin-right: auto; margin-top: 20px">
+          <div id="noviceRadioCustom" class="difficultyRadio"><div id="noviceBoxCustom">☐</div>&nbsp;Novice</div>
+          <div id="adeptRadioCustom" class="difficultyRadio"><div id="adeptBoxCustom">☐</div>&nbsp;Adept</div>
+          <div id="masterRadioCustom" class="difficultyRadio"><div id="masterBoxCustom">☐</div>&nbsp;Master</div>
+        </div>
+        <div style="text-align: center; margin-top: 30px">
+          <button id="submitLevel" style="font-size: 16px">Submit</button>
+          <button id="backLevel" style="font-size: 16px">Back</button>
+          <button id="cancelSetLevel" style="font-size: 16px; display: none">Cancel</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="variableBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Choose a new variable name</h3>
+        <p>Variables currently in use:</p>
+        <div id="variableList"></div>
+        <p>New variable:</p>
+        <input type="text" id="newvar" style="width: 100%"/>
+        <div style="text-align: center; margin-top: 30px">
+          <button id="submitVariable" style="font-size: 16px">Submit</button>
+          <button id="cancelVariable" style="font-size: 16px">Cancel</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="ascribeBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Ascribe a wire</h3>
+        <p>Ascribe this wire to the following:</p>
+        <input type="text" id="ascribe" style="width: 100%"/>
+        <div id="ascPalette"></div>
+        <div style="text-align: center; margin-top: 30px">
+          <button id="submitAscribe" style="font-size: 16px">Submit</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="wireBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Label this wire</h3>
+        <p>Label this wire with the following set or proposition:</p>
+        <input type="text" id="wire" style="width: 100%"/>
+        <div id="wirePalette"></div>
+        <div style="text-align: center; margin-top: 30px">
+          <button id="submitWire" style="font-size: 16px">Submit</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="shortcutsBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Shortcut keys</h3>
+        <p>You can use the following key sequences to enter mathematical symbols.
+        Letter sequences starting with a backslash "\" must end with a space.</p>
+        <table id="shortcuts" ></table>
+      </div>
+    </div>
+
+    <div id="aboutBG" class="modalbg">
+      <div id="aboutModal" class="modal">
+        <h1 style="text-align: center">Welcome to Olorin!</h1>
+        <div style="flex: 1; overflow-y: scroll; background-color: #ffffff; padding: 10px">
+          <h2>What is Olorin?</h2>
+          <p class="about">
+            Olorin is a game where you prove abstract theorems in classical predicate logic by connecting boxes with wires.
+            It's a fun collection of puzzles, and also an educational tool for learning to write proofs.
+            There are over a hundred levels, divided into four "worlds" with several stages each, and three difficulty settings.
+            You can also create and solve custom levels, although this is not well-documented.
+          </p>
+          <p class="about">
+            If you're just getting started, you should probably close this box now and try it out, <b>starting from level 1-1-1 on Novice difficulty</b> and proceeding in order.
+            The game will prompt you with hints at the beginning of each level when new features are introduced, and you can come back to this overview at any time by clicking "About" on the "Select Level" screen.
+            Currently you're allowed to skip around rather than playing the levels in order, but when first learning I highly recommend you go in order on Novice difficulty; some guidelines about progressing through the worlds and increasing the difficulty level are given below.
+          </p>
+          <h2>How do the graphs work?</h2>
+          <p class="about">
+            In each level you have some number (perhaps zero) of "assumptions" or "givens" that appear in boxes on the left, and one desired "conclusion" appearing in a box on the right.
+            Your goal is to connect the assumptions to the conclusion: logic flows from left to right.
+          </p>
+          <p class="about">
+            You can add new boxes to the graph by dragging and dropping them from the "palette" bar on the left; more options will be added to the palette as you progress through the levels.
+            Each box represents a "proof rule", and has some number of "input ports" on the left and "output ports" on the right.
+            You can drag a connection from any output port to any input port, and it will be valid as long as they "carry" the same statement or value.
+            Wires carrying "values" rather than "truth" are colored blue.
+            Some boxes also give you "local assumptions" that act like output ports, but can only be used to prove the corresponding "subgoal" input port; these are matched visually with "brackets".
+          </p>
+          <p class="about">
+            Boxes already in the graph can be dragged around to organize the proof visually.
+            You can drag multiple boxes at once by first "selecting" several of them with shift-click, or by dragging a rectangle around them, and then dragging one of them.
+            Furthermore, boxes with brackets can be resized horizontally by dragging the left or right edges.
+            I highly encourage you to arrange the boxes so that all the wires travel only left-to-right, and make brackets large enough that the "subproofs" fit entirely inside.
+          </p>
+          <p class="about">
+            For the proof to be correct, every input port must have something coming into it, and all wires must connect ports carrying the same statement or value.
+            (Not every output port needs to be used, but usually most will be.)
+            When your proof is correct, the conclusion and background will turn a color (according to the difficulty level), as will that level in the level-selection dialog, with one to three stars awarded according to the difficulty setting.
+            If you make a mistake, you can remove boxes and wires by clicking on the red "X" that appears when you hover over them.
+          </p>
+          <h2>What do the difficulty settings mean?</h2>
+          <p class="about">
+            At Novice difficulty (<span class="noviceColor" style="padding:1px">★☆☆</span>), most unconnected ports are automatically labeled with the statement or value they carry (red for input ports, which are missing something to connect to them).
+            In addition, all wires are automatically labeled with the statement or value they carry, and incorrectly connected wires are colored red.
+            At any given point during the construction of a proof, the labeled output ports can be thought of as "givens" (known or assumed facts), and the red-labeled input ports can be thought of as "goals" (statements to prove).
+            (However, not all givens are available for all goals; hypotheses introduced on the left side of a bracket are only usable to prove the corresponding subgoal on the right side of that bracket.)
+            <i>A proof novice can choose the rule to apply next, guided by the logical structure of the givens and the goals.</i>
+          </p>
+          <p class="about">
+            At Adept difficulty (<span class="adeptColor" style="padding:1px">★★☆</span>), ports are not labeled, and most wires are not labeled automatically.
+            Instead, you are prompted for a label for each wire.
+            (The exceptions are wires connected directly to a hypothesis or the conclusion, since it is obvious what those should be labeled, and wires that carry values.)
+            Wires with incorrect labels, or that are incorrectly connected, are colored red, and both prevent the proof from being marked correct.
+            In particular, even if your proof would be correct in Novice mode according to the connections only, it is rejected in Adept mode if you labeled the wires incorrectly.
+            <i>A proof adept knows how each applied rule affects the current givens and goals.</i>
+          </p>
+          <p class="about">
+            At Master difficulty (<span class="masterColor" style="padding:1px">★★★</span>), you are still required to label all the wires yourself (with the same exceptions), but incorrectly connected or labeled wires are not colored red any more.
+            The only information you get about the correctness of the proof (including your labels on the wires) is whether the conclusion turns purple!
+            <i>A proof master can plan and execute an entire proof alone, and find and fix their own mistakes.</i>
+          </p>
+          <p class="about">
+            I recommend that you work up in difficulty setting "one world behind" your most advanced levels.
+            For instance, start by completing Proposition World at Novice setting.
+            Then complete Advanced Proposition World at Novice setting.  Then go back and re-do Proposition World at Adept setting.
+            Next, work on Quantifier World at Novice setting, Advanced Proposition World at Adept setting, and Proposition World at Master setting, and so on.
+            By inserting a delay before you go back to re-do each level at a higher difficulty, you will reinforce your learning and make the challenge more meaningful.
+            Similarly, when you are working through a given world at a higher difficulty setting, it would be easy to "cheat" by doing each level again at Novice setting and then copying the proof and wire labels from your short-term memory at the higher difficulty, but you won't learn as much that way.
+            If you start working on a higher difficulty setting and get stuck, you can downgrade the difficulty without losing your partial proof using the button in the upper-right corner, but of course then you'll only get credit for completing the level at the lower difficulty.
+          </p>
+          <p class="about">
+            It's worth noting that whether a given wire is colored red as "incorrect" in Novice and Adept modes can depend not only on that wire and its label, but on the other wires in the diagram.
+            A wire in an incomplete proof may be colored black at first, but become red when <i>another</i> wire is added, since the second wire gives additional information about what must be carried by the first wire.
+            A valid proof can also not contain cycles (loops), and of course a cycle usually involves more than one wire.
+          </p>
+          <p class="about">
+            Somewhat more surprisingly, the opposite can also happen: a wire can be colored red at first but become black when another wire is added.
+            This generally happens if you connect a "proposition" wire to a quantifier rule (∀ or ∃) without first connecting the corresponding "value" wire, since until Olorin knows what the value is, it can't tell that the proposition wire is correct.
+            This is arguably a bug, since in other contexts "not yet known to be incorrect" wires are colored black rather than red, but the prospects of fixing it in the near future are slim, due to Narya's current lack of a full unification algorithm.
+            Just make a habit of always connecting the value (blue) wires first, or don't worry about the temporarily red wire if you do it the other way.
+          </p>
+          <h2>Where do these graphs come from?</h2>
+          <p class="about">
+            Many people have represented proofs graphically, starting with Charles Sanders Peirce, one of the inventors of predicate logic.
+            More recently, the physicist Roger Penrose introduced string diagrams for tensors, mathematicians such as Andre Joyal and Ross Street formalized them to describe monoidal categories, and the logician Jean-Yves Girard introduced proof nets for linear logic.
+          </p>
+          <p class="about">
+            The specific style of graphical proofs used by Olorin is based heavily on the graphs used by <a href="https://incredible.pm/">The Incredible Proof Machine</a> by Joachim Breitner, which is essentially a graphical representation of Gentzen-style <a href="https://en.wikipedia.org/wiki/Natural_deduction">natural deduction</a>.
+            The Incredible Proof Machine is, well, incredible!
+            In particular, relative to other graphical languages, it introduced "expandable brackets" for local assumptions.
+            Although perhaps obvious in hindsight (they correspond to "discharged assumptions" in Gentzen's trees), I believe these are a big improvement over anything previously available, at least for informal and pedagogical purposes.
+            Olorin borrows not only these expandable brackets, but other aspects of the look and feel of The Incredible Proof Machine.
+          </p>
+          <p class="about">
+            The main enhancement added by Olorin over what The Incredible Proof Machine can do is <i>value-carrying wires</i> for predicate logic.
+            The Incredible Proof Machine does support predicate logic, but the elements are managed only by unification rather than visually with wires (and also its rules are single-sorted and don't support empty domains).
+            Olorin also includes some other features that could probably also be added to The Incredible Proof Machine with less work, such as if-and-only-if blocks and classical proof by contradiction, and some additional pedagogical and gamification features such as Adept and Master difficulty levels.
+            In addition, although Olorin is currently restricted to proofs about abstract sets, propositions, and predicates like The Incredible Proof Machine, since its underlying logic is a full-spectrum dependent type theory, it should be possible to extend it to proofs using algebra and mathematical induction.
+          </p>
+          <p class="about">
+            On the other hand, the underlying logic of the The Incredible Proof Machine is more configurable than Olorin's.
+            For instance, in addition to predicate logic, it supports Hilbert systems and NAND calculus.
+            Moreover, The Incredible Proof Machine has other nice features that Olorin currently lacks: it saves your proof for each level when you switch to another one, and its unification algorithm can infer labels for more wires and ports in an incomplete proof than Olorin's (in fact, Olorin doesn't currently use unification <i>per se</i> at all, only bidirectional typechecking).
+            If you like Olorin, you should check out <a href="https://incredible.pm/">The Incredible Proof Machine</a> too!
+          </p>
+          <h2>What's under the hood?</h2>
+          <p class="about">
+            The underlying proof-checker of Olorin is <a href="https://github.com/gwaithimirdain/narya">Narya</a>.
+            Narya is an experimental proof assistant for higher-dimensional dependent type theory such as higher observational type theory (HOTT) and internally parametric type theories.
+            Olorin doesn't currently use very much of the power of Narya, but in principle it could be extended to be a full-fledged graphical proof assistant for dependent type theory using the same core.
+          </p>
+          <p class="about">
+            Narya is written in OCaml, which through the magic of <tt>js_of_ocaml</tt> is compiled to run in your browser underneath Olorin.
+            If you'd like to try Narya directly, its ordinary interactive mode is also available in your browser as <a href="https://mikeshulman.github.io/jsnarya/">jsNarya</a>.
+            If Olorin and jsNarya whet your appetite, you can download the full Narya proof assistant to run locally on your computer from its <a href="https://github.com/gwaithimirdain/narya">github page</a>.
+          </p>
+          <h2>Narya? Olorin?</h2>
+          <p class="about">
+            Narya is the third elven-ring in J.R.R. Tolkien's Legendarium, the ring of fire.
+            Fire is HOT(T).
+            Narya was given by C&iacute;rdan the Shipwright to Gandalf when Gandalf arrived in Middle-Earth.
+            Olorin is a name of Gandalf himself: a kindly helper who secretly uses the power of Narya to save the world.
+          </p>
+          <p class="about">
+            The Gwaith-i-M&iacute;rdain (I know you didn't ask about them, but that's the name of our <a href="https://github.com/gwaithimirdain/">github organization</a>), or Brotherhood of Jewel-Smiths, were the master Elven craftsmen of the Second Age who created the Rings of Power, including Narya.
+          </p>
+          <h2>Who wrote all this?</h2>
+          <p class="about">
+            Mike Shulman, a mathematician at the University of San Diego.
+            <a href="https://home.sandiego.edu/~shulman/">Here's</a> my web page.
+            Send me your questions, suggestions, complaints, and other thoughts!
+            I look forward to hearing from you.
+          </p>
+        </div>
+        <div style="text-align: center; margin-top: 30px">
+          <button id="doneAbout" style="font-size: 16px">Close</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="loginBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Login to Olorin</h3>
+        <div style="text-align: center; margin: 5px; color: #ff0000; visibility: hidden" id="loginError">
+          Login error
+        </div>
+        <div style="display: flex; flex-direction: row; padding: 5px">
+          <div style="display: flex; flex-direction: column; padding: 5px">
+            <div style="padding: 5px">Email address:</div>
+            <div style="padding: 5px">Course ID:</div>
+          </div>
+          <div style="display: flex; flex-direction: column; padding: 5px">
+            <input style="margin: 5px" type="text" id="loginEmail">
+            <input style="margin: 5px" type="text" id="loginCourse">
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="submitLogin" style="font-size: 16px">Submit</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="hintBG" class="modalbg">
+      <div id="wiresHint" class="modal hint" style="width: 600px">
+        <p>
+          The boxes on the left are <i>assumptions</i> or <i>hypotheses</i>.
+          The box on the right is the desired <i>conclusion</i>.
+          Your goal is to connect them with wires so that all the labels match, thereby proving the conclusion.
+        </p>
+        <p>
+          A dot on the right of a box is an <i>output port</i>.
+          If I know what the label of the wire coming out of an output port would be, I'll label it in black:
+          <img src="hints/hypothesis.png" style="margin-left: auto; margin-right:auto; display:block">
+          A dot on the left of a box is an <i>input port</i>.
+          If I know what the label of the wire coming into of an input port must be, I'll label it in red:
+          <img src="hints/conclusion.png" style="margin-left: auto; margin-right:auto; display:block">
+          Create a wire connection by clicking on an output port and dragging it to an input port:
+          <img src="hints/wire.png" style="margin-left: auto; margin-right:auto; display:block">
+        </p>
+        <p>
+          To view this hint again during this level, click "Show Hint" in the upper-right corner.
+        </p>
+      </div>
+      <div id="muxHint" class="modal hint">
+        Every input port must have a wire connected to it, but you don't have to use every output port.
+      </div>
+      <div id="introHint" class="modal hint" style="width: 600px">
+        <p>
+          You can add new boxes to the proof by dragging them from the palette on the left.
+        </p>
+        <p>
+          If a box has a symbol on the <i>right</i>, it is called a <i>prove rule</i>, and you should connect its <i>output port</i> to something first.
+          That will give me more information about what its other ports must be.
+          The output port should be connected to an input port whose label uses the same symbol:
+          <img src="hints/andI.png" style="margin-left: auto; margin-right:auto; display:block">
+          Therefore, if you have an open input port using some symbol, you probably want to add a box that has that symbol on the right.
+        </p>
+        <p>
+          The symbol ∧ means "and".  Mnemonic: it looks like a capital "A" for And, or like a lowercase "n" as in "salt 'n pepper".
+        </p>
+      </div>
+      <div id="elimHint" class="modal hint" style="width: 600px">
+          If a box has a symbol on the <i>left</i>, it is called a <i>use rule</i>, and you should connect one of its <i>input ports</i> to something first.
+          That will give me more information about what its other ports must be.
+          The input port should be connected to an output port whose label uses the same symbol:
+          <img src="hints/andE.png" style="margin-left: auto; margin-right:auto; display:block">
+          Therefore, if you have an open output port using some symbol, you may want to add a box that has that symbol on the left.
+      </div>
+      <div id="multiHint" class="modal hint">
+        If you have both input and output ports using symbols, you'll probably want to add both "prove rules" and "use rules", and then try to connect them up in the middle.
+      </div>
+      <div id="impHint" class="modal hint" style="width: 600px">
+        When a "use rule" with its symbol on the left has more than one input port, the one you should connect first is the one whose shape involves that symbol:
+        <img src="hints/impE.png" style="margin-left: auto; margin-right:auto; display:block">
+        The symbol ⇒ means "implies", so that P⇒Q means "P implies Q" or equivalently "if P, then Q".
+      </div>
+      <div id="bracketHint" class="modal hint" style="width: 600px">
+        Remember that a "prove rule" with its symbol on the right should have its <i>output port</i> connected to something using the same symbol:
+        <img src="hints/impI.png" style="margin-left: auto; margin-right:auto; display:block">
+        When a box has a "bracket" like this, the output coming from the left inside the bracket is a <i>hypothetical assumption</i>, which can <i>only</i> be used to derive the corresponding <i>subgoal</i> on the right of the same bracket.
+        <img src="hints/bracket.png" style="margin-left: auto; margin-right:auto; display:block">
+        You can also stretch the bracket by clicking on either side and dragging it out, so that the entire <i>subproof</i> fits inside.
+        <img src="hints/longimpI.png" style="margin-left: auto; margin-right:auto; display:block">
+      </div>
+      <div id="headHint" class="modal hint" style="width: 600px">
+        If a port label involves more than one symbol, the one <i>outside</i> all the parentheses tells you which kind of box to connect it to first.
+        <img src="hints/head.png" style="margin-left: auto; margin-right:auto; display:block">
+      </div>
+      <div id="orHint" class="modal hint">
+        The symbol ∨ means "or".  Mnemonic: it's the dual of ∧.
+      </div>
+      <div id="casesHint" class="modal hint" style="width: 600px">
+        This box needs <i>both</i> its input and output ports connected right away, but only the input port requires a specific symbol; the output port can connect to anything.
+        <img src="hints/orE.png" style="margin-left: auto; margin-right:auto; display:block">
+        Now there are two brackets.
+        Each hypothetical assumption on the left can only be used to derive the subgoal at the right on the <i>same side</i>.
+        As before, you can resize the box so that the entire subproofs fit inside.
+      </div>
+      <div id="casesGoalHint" class="modal hint" style="width: 600px">
+        Remember the output port of this box must be connected right away:
+        <img src="hints/orE.png" style="margin-left: auto; margin-right:auto; display:block">
+        Almost always, this output port should be connected <i>directly</i> to your current goal: either the overall conclusion, or the subgoal of some bracket that this block is inside.
+        Don't use the ∨<sub>L</sub> or ∨<sub>R</sub> blocks too soon and paint yourself into a corner.
+      </div>
+      <div id="multiUseHint" class="modal hint" style="width: 600px">
+        Wires can't go in a loop; that's circular reasoning.
+        <img src="hints/cyclic.png" style="margin-left: auto; margin-right:auto; display:block">
+        Local assumptions also can't "escape" from a bracket; they can only be used to prove the subgoal of that bracket.
+        <img src="hints/escape.png" style="margin-left: auto; margin-right:auto; display:block">
+        However, remember that assumptions you already have can be brought into a bracket from the left, and that assumptions can be used more than once.
+      </div>
+      <div id="iffHint" class="modal hint">
+        The symbol ⇔ means "if and only if".  By definition, P⇔Q means (P⇒Q)∧(Q⇒P).
+      </div>
+      <div id="topHint" class="modal hint">
+        The symbol ⊤ mean "true".  Mnemonic: it looks like a capital "T" for True.
+      </div>
+      <div id="botHint" class="modal hint">
+        The symbol ⊥ means "false" or "a contradiction".
+        Mnemonic: it's the dual of ⊤.
+      </div>
+      <div id="valueHint" class="modal hint" style="width: 600px">
+        <p>
+          Blue ports and wires carry <i>values</i>, and are labeled by the name of the value along with the set it belongs to:
+          <img src="hints/value.png" style="margin-left: auto; margin-right:auto; display:block">
+          means the value <i>a</i> belongs to the set <i>A</i>.
+        </p>
+        <p>
+          The symbol ∀ means "for all" or "for every".
+          Menomnic: it's an upside-down "A" for "for all".
+        </p>
+      </div>
+      <div id="variableHint" class="modal hint">
+        When you add a box that introduces a new hypothetical value, you need to name that value with a new variable, which can't be the same as any other variable name.
+      </div>
+      <div id="exHint" class="modal hint">
+        The symbol ∃ means "there exists".
+        Mnemonic: it's a backwards "E" for "there Exists".
+      </div>
+      <div id="negationHint" class="modal hint" style="width: 630px">
+        <p>
+          The symbol ¬ means "not".
+          Mnemonic: it's like − for negating a number, but instead it negates a statement.
+        </p>
+        <p>
+          When using a negation, either input port can be the negated statement, and either one can be connected first:
+          <div style="margin-left: auto; margin-right:auto; display:block">
+            <img src="hints/neg1.png">
+            <img src="hints/neg2.png">
+            <img src="hints/neg3.png">
+            <img src="hints/neg4.png">
+          </div>
+        </p>
+      </div>
+      <div id="contradictionHint" class="modal hint" style="width: 600px">
+        Any statement at all can be proven by contradiction:
+        <img src="hints/contradiction.png" style="margin-left: auto; margin-right:auto; display:block">
+      </div>
+    </div>
+
+    <script src="main.bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+(executable
+  (libraries bwd js_of_ocaml zarith_stubs_js uutf narya.core narya.parser narya.top)
+  (name olorin)
+  (modes js)
+  (preprocess (pps js_of_ocaml-ppx)))
+
+(env (_ (flags (:standard -w -69 -w -32))))
