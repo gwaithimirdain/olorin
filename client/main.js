@@ -180,6 +180,9 @@ ready(() => {
         // We add a close button to the node.  (Variable, hypothesis, and conclusion nodes aren't closeable.)
         addBoxCloseButton(box);
 
+        // Some new rules display a modal box, and we shouldn't typecheck until it is submitted.
+        var typecheck_now = true;
+
         // Now we add endpoints appropriately for its rule type, if necessary make it larger and resizable, and prompt for variables or ascription types.
         if (id === 'andE') {
             instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "?∧?"}} );
@@ -228,6 +231,7 @@ ready(() => {
             makeResizable(box);
             if(id === 'allI') {
                 getVariable(box.id);
+                typecheck_now = false;
             }
         } else if (id === 'orE') {
             instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "?∨?"} });
@@ -259,6 +263,7 @@ ready(() => {
             });
             instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
             getVariable(box.id);
+            typecheck_now = false;
         } else if (id === 'exI') {
             instance.addEndpoint(box, {
                 anchor: [0, 0.2, -1, 0],
@@ -293,8 +298,11 @@ ready(() => {
             const ascribe = document.getElementById('ascribe');
             ascribe.dataset.name = box.id;
             ascribe.focus();
+            typecheck_now = false;
         }
-        typecheck();
+        if(typecheck_now) {
+            typecheck();
+        }
     });
 
     // Whenever the graph changes, we recompute it and pass to Narya to typecheck it.
@@ -809,7 +817,7 @@ document.getElementById('newvar').onkeypress = function(event) {
 document.getElementById("submitAscribe").onclick = submitAscription;
 document.getElementById('ascribe').onkeypress = function(event) {
     if(event.key == 'Enter') {
-        submitAscribe();
+        submitAscription();
     }
 }
 
@@ -953,6 +961,8 @@ function submitNewVariable() {
         // And empty and hide the modal dialog
         newvar.value = '';
         variableBG.style.display = "none";
+        // And typecheck, since that was delayed
+        typecheck();
     }
 }
 
@@ -973,19 +983,27 @@ function submitAscription() {
     const ascribeBG = document.getElementById("ascribeBG");
     const ascribe = document.getElementById('ascribe');
     const box = document.getElementById(ascribe.dataset.name);
+    const ty = ascribe.value;
+    if(ty === "") {
+        alert("Invalid ascription");
+        return;
+    }
     // We attach it to the node that asked for it, and label that node with it as well
     for (var i in nodes) {
         if (nodes[i].id === ascribe.dataset.name) {
-            nodes[i].value = ascribe.value;
+            nodes[i].value = ty;
         }
     }
     box.innerHTML = "🏷&nbsp;" + ascribe.value;
+    box.style.width = 'fit-content';
     // That blew away the close button, so we add it back.
     addBoxCloseButton(box);
     box.style.padding = "0px 8px 0px 8px"
     // And empty and hide the modal dialog
     ascribe.value = '';
     ascribeBG.style.display = "none";
+    // And typecheck, since that was delayed when the rule was added.
+    typecheck();
 }
 
 // And the modal box that prompts for a wire label

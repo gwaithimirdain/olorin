@@ -479,25 +479,22 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     Named.Match { tm; sort = `Implicit; branches; refutables = None });
               } in
           ({ bindables; term = Synth (Var (`Port source, None)) }, variables)
-      (* | Asc ->
-             let tm, variables =
-               check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
-             in
-             let ty =
-               match source_vertex.value with
-               | Some x -> x
-               | None -> fatal (Anomaly "missing ascription type") in
-             let (Term ty) =
-               Parse.Term.final
-                 (Parse.Term.parse (`String { title = Option.map Id.to_string id; content = ty }))
-             in
-             (\* TODO: bindables and variables need to include the ones that appear in the parsed term. *\)
-             ( {
-                 bindables = tm.value.bindables;
-                 term = Synth (Named.Asc (locate_opt tm.loc tm.value.term, Postprocess.process ctx ty));
-               },
-               variables ) *)
-    in
+      | Asc ->
+          let tm, variables =
+            check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
+          in
+          let ty = source_vertex.value <|> Anomaly "missing ascription type" in
+          (* TODO: Should really locate this on the *rule*. *)
+          let tyloc = Loc.make ~content:ty [ `Port source ] in
+          let ty =
+            Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
+            Named.Embed (Parse.Term.final (Parse.Term.parse (Asai.Range.source tyloc))) in
+          (* TODO: bindables and variables need to include the ones that appear in the parsed term. *)
+          ( {
+              bindables = tm.value.bindables;
+              term = Named.Synth (Asc (locate_opt tm.loc tm.value.term, locate tyloc ty));
+            },
+            variables ) in
     (locate !loc tm, variables)
 
 (* Subroutine to factor out common behavior for the 'App' and 'Neg' cases. *)

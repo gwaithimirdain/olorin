@@ -28,7 +28,7 @@ type rule =
       (* Allow testing for the presence of a field in the goal type, and if it isn't there, insert a specified function (with implicit first argument).  The intended example is so that a single rule can be both proof-of-negation and proof-by-contradiction. *)
       implicit_post : (string * string) option;
     }
-  (* | Asc *)
+  | Asc
   | Var
   | Conclusion
 
@@ -87,5 +87,5 @@ let rules =
           } );
       ("botE", Match { branches = []; asc_pre = Some "⊥" });
       ("topI", Tuple { inputs = [] });
-      (* ("asc", Asc); *)
+      ("asc", Asc);
     ]
