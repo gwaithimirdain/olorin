@@ -318,7 +318,28 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               (Bindables.empty, PortSet.empty, []) in
           ({ bindables; term = Named.Constr (locate_opt None constr, args) }, variables)
       | App { inputs = fn, arg; field } ->
-          app_of_output_port ~seen vertices graph ~fn ~arg field source
+          let fn, fn_variables =
+            check_of_input_port ~seen vertices graph { source with sort = Input; label = Some fn }
+          in
+          let fn, fn_bindables = ensure_synth fn "function" in
+          let ( ({ value = { bindables = arg_bindables; term = argtm }; loc = argloc } :
+                  term_with_bindables located),
+                arg_variables ) =
+            check_of_input_port ~seen vertices graph { source with sort = Input; label = Some arg }
+          in
+          let arg = locate_opt argloc argtm in
+          let term =
+            Named.Synth
+              (match field with
+              | Some fld ->
+                  (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
+                  Named.App
+                    ( locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld)),
+                      arg,
+                      locate_opt None `Explicit )
+              | None -> App (fn, arg, locate_opt None `Explicit)) in
+          ( { bindables = Bindables.union fn_bindables arg_bindables; term },
+            PortSet.union fn_variables arg_variables )
       | Neg { inputs = fn, arg; field; implicit_pre } ->
           (* Get the two inputs, which we will allow to appear in either order *)
           let get_tm lbl =
@@ -502,31 +523,6 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             },
             variables ) in
     (locate !loc tm, variables)
-
-(* Subroutine to factor out common behavior for the 'App' and 'Neg' cases. *)
-and app_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : bwd_graph)
-    ~(fn : string) ~(arg : string) (field : (string * int list) option) (source : Port.t) :
-    term_with_bindables * PortSet.t =
-  let fn, fn_variables =
-    check_of_input_port ~seen vertices graph { source with sort = Input; label = Some fn } in
-  let fn, fn_bindables = ensure_synth fn "function" in
-  let ( ({ value = { bindables = arg_bindables; term = argtm }; loc = argloc } :
-          term_with_bindables located),
-        arg_variables ) =
-    check_of_input_port ~seen vertices graph { source with sort = Input; label = Some arg } in
-  let arg = locate_opt argloc argtm in
-  let term =
-    Named.Synth
-      (match field with
-      | Some fld ->
-          (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
-          Named.App
-            ( locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld)),
-              arg,
-              locate_opt None `Explicit )
-      | None -> App (fn, arg, locate_opt None `Explicit)) in
-  ( { bindables = Bindables.union fn_bindables arg_bindables; term },
-    PortSet.union fn_variables arg_variables )
 
 (* Subroutine for abstractions and tuples with binding arguments *)
 and lam_of_output_port ~seen vertices graph assumption subgoal source_vertex =
