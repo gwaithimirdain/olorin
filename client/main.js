@@ -2,7 +2,6 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, saveable } from "./levels.js"
 import { SERVER } from "./config.js"
 
-const ELEMENT_OF = "∈";
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
 // COLOR[difficulty][darkness] gives a color and backgroundColor, where difficulty is 0=novice, 1=adept, 2=master, and darkness is 0=light, 1=dark.
@@ -1740,7 +1739,7 @@ function setLevel(level, rulesAllowed) {
     // The difference between variables and hypotheses is that variables are labeled with their name as well as a type, and they are colored.
     for(const v of variables) {
         const vbx = document.createElement("div");
-        vbx.innerHTML = v.name + "&nbsp;" + ELEMENT_OF + "&nbsp;" + v.ty;
+        vbx.innerHTML = v.name + "&nbsp;∈&nbsp;" + v.ty;
         vbx.dataset.name = v.name;
         vbx.dataset.rule = "variable";
         vbx.style.position = 'absolute';
