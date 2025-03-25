@@ -84,11 +84,11 @@ let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
   match body with
   | Wrap { value = Notn ((Builtins.Parens, _), n); _ } -> (
       match args n with
-      | [ Term body ] -> get_abs quant (Wrap body)
+      | [ Token (LParen, _); Term body; Token (RParen, _) ] -> get_abs quant (Wrap body)
       | _ -> Builtins.invalid quant)
   | Wrap { value = Notn ((Builtins.Abs, _), n); _ } -> (
       match args n with
-      | [ Term { value = Ident ([ x ], _); _ }; Term body ] -> (
+      | [ Term { value = Ident ([ x ], _); _ }; Token (Mapsto, _); Term body ] -> (
           match body.value with
           | Notn ((Exists, _), _) | Notn ((Forall, _), _) | Notn ((Neg, _), _) -> (Some x, Wrap body)
           | Notn _ -> (Some x, Wrap (Unparse.parenthesize body))
@@ -114,7 +114,7 @@ let pp_quant qname obs =
     | [
      Token (quant, wsquant);
      Term x;
-     Token (Op "∈", wsin);
+     Token (Ident [ "∈" ], wsin);
      Term ty;
      Token (Op ",", wscomma);
      Term body;
@@ -234,7 +234,7 @@ let install_notations () =
           notn = Wrap qnotn;
           pat_vars = [ "A"; "P" ];
           val_vars = [ "A"; "P" ];
-          inner_symbols = `Multiple (Op qname, [], Op ",");
+          inner_symbols = `Multiple (Op qname, [ None ], Op ",");
         })
     quantifiers;
   Situation.Current.add_with_print
