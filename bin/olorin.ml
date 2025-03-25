@@ -45,7 +45,7 @@ end
 
 module TargetMap = Map.Make (Target)
 
-type bwd_graph = Edge.t TargetMap.t
+type bwd_graph = Edge.t list TargetMap.t
 
 (* Global variables saved by initialization. *)
 
@@ -192,7 +192,7 @@ module Bindables = struct
   let union (xs : t) (ys : t) =
     Bwd.fold_left (fun bs (a, b) -> if Abwd.mem a bs then bs else Snoc (bs, (a, b))) xs ys
 
-  (* Remove all the pars in 'xs' whose names all appear in 'scope'. *)
+  (* Remove all the pairs in 'xs' whose names all appear in 'scope'. *)
   let remove (xs : t) (scope : name list) : t =
     Bwd.filter (fun (n, _) -> not (List.for_all (fun x -> List.mem x scope) n)) xs
 end
@@ -511,7 +511,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let ty = source_vertex.value <|> Anomaly "missing ascription type" in
-          (* TODO: Should really locate this on the *rule*. *)
+          (* TODO: Should locate this on the *rule*.  The output port doesn't get labeled. *)
           let tyloc = Loc.make ~content:ty [ `Port source ] in
           let ty =
             Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
@@ -521,7 +521,16 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               bindables = tm.value.bindables;
               term = Named.Synth (Asc (locate_opt tm.loc tm.value.term, locate tyloc ty));
             },
-            variables ) in
+            variables )
+      | Expr ->
+          let e = source_vertex.value <|> Anomaly "missing expression" in
+          (* TODO: Should locate this on the *rule*.  The output port doesn't get labeled.  In addition, if it succeeds, we should label the box with its synthesized type.  *)
+          let eloc = Loc.make ~content:e [ `Port source ] in
+          let e =
+            Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
+            Named.Embed (Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc))) in
+          (* TODO: bindables and variables need to include the ones that appear in the parsed term. *)
+          ({ bindables = Bindables.empty; term = e }, PortSet.empty) in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments *)

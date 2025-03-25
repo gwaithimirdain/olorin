@@ -2,6 +2,8 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, saveable } from "./levels.js"
 import { SERVER } from "./config.js"
 
+var Algebrite = require('algebrite');
+
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
 // COLOR[difficulty][darkness] gives a color and backgroundColor, where difficulty is 0=novice, 1=adept, 2=master, and darkness is 0=light, 1=dark.
@@ -298,6 +300,30 @@ ready(() => {
             const ascribe = document.getElementById('ascribe');
             ascribe.dataset.name = box.id;
             ascribe.focus();
+            typecheck_now = false;
+        } else if (id === 'alg') {
+            instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
+            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+        } else if (id === 'expr') {
+            instance.addEndpoint(box, {
+                anchor: "Left",
+                target: true,
+                maxConnections: -1,
+                parameters: { sort: "input", hasValue: true },
+                paintStyle: { fill: VALUECOLOR },
+            });
+            instance.addEndpoint(box, {
+                anchor: "Right",
+                source: true,
+                maxConnections: -1,
+                parameters: { sort: "output", hasValue: true },
+                paintStyle: { fill: VALUECOLOR },
+            });
+            // Prompt for the expression
+            document.getElementById("expressionBG").style.display = "flex";
+            const expr = document.getElementById('expression');
+            expr.dataset.name = box.id;
+            expr.focus();
             typecheck_now = false;
         }
         if(typecheck_now) {
@@ -821,6 +847,13 @@ document.getElementById('ascribe').onkeypress = function(event) {
     }
 }
 
+document.getElementById("submitExpression").onclick = submitExpr;
+document.getElementById('expression').onkeypress = function(event) {
+    if(event.key == 'Enter') {
+        submitExpr();
+    }
+}
+
 document.getElementById("submitWire").onclick = submitWireLabel;
 document.getElementById('wire').onkeypress = function(event) {
     if(event.key == 'Enter') {
@@ -1006,6 +1039,34 @@ function submitAscription() {
     typecheck();
 }
 
+// And the modal box that prompts for an expression
+function submitExpr() {
+    const exprBG = document.getElementById("expressionBG");
+    const expr = document.getElementById('expression');
+    const box = document.getElementById(expr.dataset.name);
+    const e = expr.value;
+    if(e === "") {
+        alert("Invalid expression");
+        return;
+    }
+    // We attach it to the node that asked for it, and label that node with it as well
+    for (var i in nodes) {
+        if (nodes[i].id === expr.dataset.name) {
+            nodes[i].value = e;
+        }
+    }
+    box.innerHTML = expr.value;
+    box.style.width = 'fit-content';
+    // That blew away the close button, so we add it back.
+    addBoxCloseButton(box);
+    box.style.padding = "0px 8px 0px 8px"
+    // And empty and hide the modal dialog
+    expr.value = '';
+    exprBG.style.display = "none";
+    // And typecheck, since that was delayed when the rule was added.
+    typecheck();
+}
+
 // And the modal box that prompts for a wire label
 function submitWireLabel() {
     const wire = document.getElementById('wire');
@@ -1105,6 +1166,7 @@ makePalette('varPalette', 'variables');
 makePalette('hypPalette', 'hypotheses');
 makePalette('conclPalette', 'conclusion');
 makePalette('ascPalette', 'ascribe');
+makePalette('expressionPalette', 'expression');
 makePalette('wirePalette', 'wire');
 
 var shortcuts = document.getElementById('shortcuts');
@@ -1593,7 +1655,7 @@ function typecheck() {
                             instance.revalidate(node);
                         } else {
                             // If the diagnostic doesn't have a location that corresponds to an edge or a vertex, we don't report it to the user.  For instance, this is the case for the "Nonsynthesizing" error reported for the hole that's put in an unconnected input that should be synthesizing.  But for now, we log it.
-                            console.log("error at empty location:");
+                            console.log("error at empty location or non-input port:");
                             console.log(d.text);
                         }
                     });
