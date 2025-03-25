@@ -1,52 +1,52 @@
 /* Difficulty colors */
 
 @property --novice-color {
-		syntax: "<color>";
+    syntax: "<color>";
 }
 
 @property --adept-color {
-		syntax: "<color>";
+    syntax: "<color>";
 }
 
 @property --master-color {
-		syntax: "<color>";
+    syntax: "<color>";
 }
 
 @property --novice-bg {
-		syntax: "<color>";
+    syntax: "<color>";
 }
 
 @property --adept-bg {
-		syntax: "<color>";
+    syntax: "<color>";
 }
 
 @property --master-bg {
-		syntax: "<color>";
+    syntax: "<color>";
 }
 
 /* These are re-set by Javascript, to ensure consistency. */
 :root {
-		--novice-color: black;
-		--adept-color: black;
-		--master-color: black;
-		--novice-bg: white;
-		--adept-bg: white;
-		--master-bg: white;
+    --novice-color: black;
+    --adept-color: black;
+    --master-color: black;
+    --novice-bg: white;
+    --adept-bg: white;
+    --master-bg: white;
 }
 
 .noviceColor {
-		color: var(--novice-color);
-		background-color: var(--novice-bg);
+    color: var(--novice-color);
+    background-color: var(--novice-bg);
 }
 
 .adeptColor {
-		color: var(--adept-color);
-		background-color: var(--adept-bg);
+    color: var(--adept-color);
+    background-color: var(--adept-bg);
 }
 
 .masterColor{
-		color: var(--master-color);
-		background-color: var(--master-bg);
+    color: var(--master-color);
+    background-color: var(--master-bg);
 }
 
 /* Body */
@@ -63,15 +63,15 @@ body {
     background-color: #f0f0f0;
     padding: 10px;
     box-sizing: border-box;
-		width: 100px;
-		display: flex;
-		flex-direction: column;
+    width: 100px;
+    display: flex;
+    flex-direction: column;
 }
 
 #palette {
-		padding-top: 5px;
-		flex: 1;
-		overflow-y: auto;
+    padding-top: 5px;
+    flex: 1;
+    overflow-y: auto;
 }
 
 #diagram {
@@ -88,154 +88,154 @@ body {
     line-height: 35px;
     margin-bottom: 10px;
     cursor: grab;
-		padding: 0;
-		z-index: 3;
-		position: relative;
+    padding: 0;
+    z-index: 3;
+    position: relative;
 }
 
 .basic {
-		background-color: #dddddd;
-		padding: 0px 8px 0px 8px;
-		border-radius: 5px;
-		border-style: solid;
-		border-width: 1px;
-}		
+    background-color: #dddddd;
+    padding: 0px 8px 0px 8px;
+    border-radius: 5px;
+    border-style: solid;
+    border-width: 1px;
+}    
 
 .logical {
-		width: 42px;
+    width: 42px;
 }
 
 .contextual {
-		min-width: 42px;
+    min-width: 42px;
 }
 
 .container {
-		width: 58px;								/* 58 = 4 + 50 + 4 for the padding */
-		background-color: rgba(255,255,255,0.0);
+    width: 58px;                /* 58 = 4 + 50 + 4 for the padding */
+    background-color: rgba(255,255,255,0.0);
 }
 
 .intro {
-		text-align: right;
+    text-align: right;
 }
 
 .elim {
-		text-align: left;
+    text-align: left;
 }
 
 /* A bunch of classes for the sligthly kludgy pieces of binding rules */
 
 .assumption {
-		float: left;
-		height: 100%;
-		width: 22px;
-		margin-left: 0px;
-		border-style: solid;
-		border-width: 1px;
-		top: -2px;
-		position: absolute;
-		background-color: #dddddd;
+    float: left;
+    height: 100%;
+    width: 22px;
+    margin-left: 0px;
+    border-style: solid;
+    border-width: 1px;
+    top: -2px;
+    position: absolute;
+    background-color: #dddddd;
 }
 
 .singleleft {
-		border-radius: 5px 5px 0px 5px;
+    border-radius: 5px 5px 0px 5px;
 }
 
 .doubleleft {
-		border-radius: 5px;
+    border-radius: 5px;
 }
 
 .bar {
-		width: 100%;
-		height: 20px;
-		border-style: solid;
-		border-width: 1px;
-		border-radius: 0px 0px 5px 5px;
-		position: absolute;
-		background-color: #dddddd;
+    width: 100%;
+    height: 20px;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 0px 0px 5px 5px;
+    position: absolute;
+    background-color: #dddddd;
 }
 
 .bottom {
-		bottom: 0px;
-		margin-bottom: 0px;
+    bottom: 0px;
+    margin-bottom: 0px;
 }
 
 .mid {
-		top: 50%;
-		-ms-transform: translateY(-50%);
-		transform: translateY(-50%);
+    top: 50%;
+    -ms-transform: translateY(-50%);
+    transform: translateY(-50%);
 }
 
 .subgoal {
-		float: right;
-		height: 100%;
-		width: 22px;
-		margin-right: 0px;
-		border-style: solid;
-		border-width: 1px;
-		top: -2px;
-		right: -2px;
-		position: absolute;
-		background-color: #dddddd;
+    float: right;
+    height: 100%;
+    width: 22px;
+    margin-right: 0px;
+    border-style: solid;
+    border-width: 1px;
+    top: -2px;
+    right: -2px;
+    position: absolute;
+    background-color: #dddddd;
 }
 
 .singleright {
-		border-radius: 5px 5px 5px 0px;
+    border-radius: 5px 5px 5px 0px;
 }
 
 .doubleright {
-		border-radius: 5px;
+    border-radius: 5px;
 }
 
 .subgoallabel {
-		position: absolute;
-		top: 50%;
-		transform: translateY(-50%);
-		text-align: center;
-		width: 100%;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    width: 100%;
 }
 
 .assumptionlabel {
-		position: absolute;
-		top: 20%;
-		transform: translateY(-50%);
-		text-align: center;
-		width: 100%;
+    position: absolute;
+    top: 20%;
+    transform: translateY(-50%);
+    text-align: center;
+    width: 100%;
 }
 
 .bottomright {
-		width: 4px;
-		height: 20px;
-		margin-bottom: 0px;
-		position: absolute;
-		bottom: 1px;
-		right: 18px;
-		background-color: #dddddd;
+    width: 4px;
+    height: 20px;
+    margin-bottom: 0px;
+    position: absolute;
+    bottom: 1px;
+    right: 18px;
+    background-color: #dddddd;
 }
 
 .bottomleft {
-		width: 20px;
-		height: 20px;
-		margin-bottom: 0px;
-		position: absolute;
-		bottom: 1px;
-		left: 10px;
-		background-color: #dddddd;
+    width: 20px;
+    height: 20px;
+    margin-bottom: 0px;
+    position: absolute;
+    bottom: 1px;
+    left: 10px;
+    background-color: #dddddd;
 }
 
 .midright {
-		width: 8px;
-		height: 20px;
-		position: absolute;
-		right: 18px;
-		background-color: #dddddd;
+    width: 8px;
+    height: 20px;
+    position: absolute;
+    right: 18px;
+    background-color: #dddddd;
 }
 
 .midleft {
-		width: 8px;
-		height: 20px;
-		position: absolute;
-		left: 18px;
-		background-color: #dddddd;
+    width: 8px;
+    height: 20px;
+    position: absolute;
+    left: 18px;
+    background-color: #dddddd;
 }
 
 /* Dragging boxes from the palette */
@@ -247,9 +247,9 @@ body {
 /* Drag selection */
 
 .jtk-drag-selected {
-		outline-style: solid;
-		outline-width: 5px;
-		outline-color: #CCCC00;
+    outline-style: solid;
+    outline-width: 5px;
+    outline-color: #CCCC00;
 }
 
 .jtk-drag-select * {
@@ -274,8 +274,8 @@ body {
 /* Resizing bracket rules */
 
 .resize-image {
-		position: absolute;
-		display: none;							/* Don't display in palette */
+    position: absolute;
+    display: none;              /* Don't display in palette */
 }
 
 .resize-handle-right {
@@ -283,7 +283,7 @@ body {
       height: 100%;
       position: absolute;
       right: 0;
-			/* Added later by javascript, so it doesn't happen in the palette */
+      /* Added later by javascript, so it doesn't happen in the palette */
       /* cursor: ew-resize; */
 }
 
@@ -292,22 +292,22 @@ body {
       height: 100%;
       position: absolute;
       left: 0;
-			/* Added later by javascript, so it doesn't happen in the palette */
+      /* Added later by javascript, so it doesn't happen in the palette */
       /* cursor: ew-resize; */
 }
 
 /* jsPlumb objects */
 
 .jtk-connector {
-		z-index: 4;
+    z-index: 4;
 }
 
 .jtk-endpoint {
-		z-index: 3;
+    z-index: 3;
 }
 
 .jtk-overlay {
-		z-index: 6;
+    z-index: 6;
 }
 
 /* The X button on each rule and connector */
@@ -319,8 +319,8 @@ body {
     text-align: center;
     line-height: 20px;
     cursor: pointer;
-		font-family: sans-serif;
-		font-weight: bold;
+    font-family: sans-serif;
+    font-weight: bold;
     width: 20px;
     height: 20px;
     display: none;
@@ -356,153 +356,153 @@ body {
     padding: 20px;
     border-radius: 10px;
     width: 400px;
-		overflow-y: scroll;
-		max-height: 90%;
+    overflow-y: scroll;
+    max-height: 90%;
 }
 
 .hint {
-		display: none;
+    display: none;
 }
 
 /* Unicode insert buttons */
 
 .unicode-button {
-		background-color: #dddddd;
-		position: relative;
-		display: inline-block;
-		margin: 2px;
-		width: 16px;
-		text-align: center;
-		border-style: solid;
-		border-width: 1px;
+    background-color: #dddddd;
+    position: relative;
+    display: inline-block;
+    margin: 2px;
+    width: 16px;
+    text-align: center;
+    border-style: solid;
+    border-width: 1px;
     cursor: pointer;
 }
 
 #shortcuts {
-		margin-left: auto;
-		margin-right: auto;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .symbol {
-		text-align: center;
+    text-align: center;
 }
 
 .keyseq {
-		font-family: monospace;
-		padding-left: 20px;
+    font-family: monospace;
+    padding-left: 20px;
 }
 
 /* Level choices */
 
 #worlds {
-		flex: 1;
-		overflow-x: clip;
-		overflow-y: auto;
-		display: grid;
-		align-items: top;
+    flex: 1;
+    overflow-x: clip;
+    overflow-y: auto;
+    display: grid;
+    align-items: top;
 }
 
 .stage {
-		width: 100%;
-		display: grid;
-		grid-template-columns: repeat(12, 70px);
-		grid-auto-rows: 50px;
-		gap: 10px;
-		padding: 5px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(12, 70px);
+    grid-auto-rows: 50px;
+    gap: 10px;
+    padding: 5px;
 }
 
 .stage-label {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 3px;
-		background-color: #ffffff;
-		font-size: 18px;
-		font-family: sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    background-color: #ffffff;
+    font-size: 18px;
+    font-family: sans-serif;
 }
 
 .level {
-		display: flex;
-		align-items: center;
-		text-align: center;
-		justify-content: center;
-		padding: 3px;
-		background-color: #dddddd;
-		font-size: 16px;
-		font-family: sans-serif;
-		border: 2px solid #000000;
-		border-radius: 5px;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    justify-content: center;
+    padding: 3px;
+    background-color: #dddddd;
+    font-size: 16px;
+    font-family: sans-serif;
+    border: 2px solid #000000;
+    border-radius: 5px;
     cursor: pointer;
 }
 
 .proofOption {
-		font-size: 18px;
-		white-space: normal;
-		width: 65px;
-		text-align: center;
+    font-size: 18px;
+    white-space: normal;
+    width: 65px;
+    text-align: center;
 }
 
 #currentLevelAndDifficulty {
-		position: absolute;
-		top: 10px;
-		right: 10px;
-		font-family: sans-serif;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: sans-serif;
 }
 
 #reduceDifficulty {
-		display: none;
-		border: 1px solid #000000;
-		border-radius: 2px;
-		background-color: #eeeeee;
-		cursor: pointer;
+    display: none;
+    border: 1px solid #000000;
+    border-radius: 2px;
+    background-color: #eeeeee;
+    cursor: pointer;
 }
 
 #showHint {
-		display: none;
-		border: 1px solid #000000;
-		border-radius: 2px;
-		background-color: #eeeeee;
-		cursor: pointer;
+    display: none;
+    border: 1px solid #000000;
+    border-radius: 2px;
+    background-color: #eeeeee;
+    cursor: pointer;
 }
 
 #levelChooseModal {
-		max-height: 90%;
-		position: relative;
-		display: flex;
-		flex-direction: column;
+    max-height: 90%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 #chooseLevelButtons {
-		margin-left: auto;
-		margin-right: auto;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* Difficulty choices */
 
 .difficultyRadio {
-		padding: 5px;
-		margin: 5px;
-		border-radius: 8px;
-		border-style: solid;
-		border-width: 2px;
-		width: 100px;
-		border-color: #000000;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+    padding: 5px;
+    margin: 5px;
+    border-radius: 8px;
+    border-style: solid;
+    border-width: 2px;
+    width: 100px;
+    border-color: #000000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* labels on connections */
 
 .connLabel {
-		background-color: #ffffff;
-		padding: 5px;
-		margin: 2px;
+    background-color: #ffffff;
+    padding: 5px;
+    margin: 2px;
 }
 
 .connLabelValue {
-		color: #0000ff;
+    color: #0000ff;
 }
 
 .userLabel {
@@ -512,45 +512,45 @@ body {
 /* labels on endpoints */
 
 .lowerInputLabel {
-		position: absolute;
-		right: 10px;
-		color: #ff0000;
-		white-space: nowrap;
+    position: absolute;
+    right: 10px;
+    color: #ff0000;
+    white-space: nowrap;
 }
 
 .upperInputLabel {
-		position: absolute;
-		right: 10px;
-		bottom: 0px;
-		color: #ff0000;
-		white-space: nowrap;
+    position: absolute;
+    right: 10px;
+    bottom: 0px;
+    color: #ff0000;
+    white-space: nowrap;
 }
 
 .lowerOutputLabel {
-		position: absolute;
-		left: 10px;
-		white-space: nowrap;
+    position: absolute;
+    left: 10px;
+    white-space: nowrap;
 }
 
 .upperOutputLabel {
-		position: absolute;
-		left: 10px;
-		bottom: 0px;
-		white-space: nowrap;
+    position: absolute;
+    left: 10px;
+    bottom: 0px;
+    white-space: nowrap;
 }
 
 /* About text */
 
 #aboutModal {
-		max-width: 90%;
-		width: 1000px;
-		height: 80%;
-		background-color: #cccccc;
+    max-width: 90%;
+    width: 1000px;
+    height: 80%;
+    background-color: #cccccc;
     box-sizing: border-box;
-		display: flex;
-		flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }
 
 .about {
-		font-size: 18px;
+    font-size: 18px;
 }
