@@ -151,6 +151,12 @@ module Resolver = struct
     type t = wrapped_scope list
   end)
 
+  (* Possibly this doesn't work in js_of_ocaml? *)
+  let () =
+    Scopes.register_printer (function
+      | `Get -> Some "unhandled Resolver.Scopes get effect"
+      | `Set _ -> Some "unhandled Resolver.Scopes set effect")
+
   let visit scope tm = Scopes.modify (fun scopes -> Scope (tm, scope) :: scopes)
 
   let embed : ('a1, 'a2) scope -> 'a1 I1.embed -> ('a1 T1.check, 'a2 T2.check) Either.t =
