@@ -1052,6 +1052,127 @@ export const LEVELS = [
           },
       ]
     },
+    { name: "Algebra world",
+      stages: [
+          { name: "=",
+            rules: [ "alg" ],
+            levels: [
+                {
+                    parameters: [ { name: "x", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "x=x" },
+                    trivial: true,
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty : "x=y"} ],
+                    conclusion: { ty: "y=x" },
+                    trivial: true,
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" }, { name: "z", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty : "x=y"}, { ty : "y=z"} ],
+                    conclusion: { ty: "x=z" },
+                    trivial: true,
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(x+1)²=x²+2*x+1" },
+                    trivial: true,
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty : "x=y+1" } ],
+                    conclusion: { ty: "x²=y²+2*y+1" },
+                    trivial: true,
+                },
+            ],
+          },
+          { name: "∨=",
+            rules: [ "orI1", "orI2", "orE", "alg" ],
+            levels: [
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty : "(x=1−y)∨(x=1+y)" } ],
+                    conclusion: { ty: "x²+1=y²+2*x" },
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty : "(y=x−1)∨(y=3−2*x)" } ],
+                    conclusion: { ty: "2*x²−x*y−y²=5*x−2*y−3" },
+                },
+            ],
+          },
+          { name: "∃=",
+            rules: [ "exE", "exI", "expr", "alg" ],
+            levels: [
+                // 0 is not synthesizing )-:
+                // {
+                //     parameters: [ ],
+                //     variables: [ { name: "a", ty: "ℤ" } ],
+                //     hypotheses: [ ],
+                //     conclusion: { ty: "∃k∈ℤ,(0=k*a)" },
+                // },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃k∈ℤ,(b=k*1)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(2*b=k*a)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(b+a=k*a)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(b²=k*a²)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(b*c=k*a*c)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(b*c=k*a)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" }, { ty : "∃k∈ℤ,(c=k*a)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(b+c=k*a)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                    hypotheses: [ { ty : "∃k∈ℤ,(b=k*a)" }, { ty : "∃k∈ℤ,(c=k*b)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(c=k*a)" },
+                },
+            ],
+          }
+      ],
+    },
 ]
 
 // Take an object that may have extra fields and strip out everything but the intrinsic properties of a level, so that we can JSON.stringify it and use it as a key into localStorage or CouchDB.

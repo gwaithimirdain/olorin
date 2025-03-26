@@ -95,6 +95,7 @@
         <div class="basic logical rule" style="text-align: right" id="topI" data-rule="topI">⊤</div>
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc">🏷</div>
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr">expr</div>
+        <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg">alg</div>
       </div>
       <div style="height: 80px; display: block; align-items: end" id="buttons">
         <button id="clearProof" class="proofOption">Clear</button>
@@ -158,15 +159,17 @@
         <p>Conclusion:</p>
         <input type="text" id="conclusion" style="width: 100%; font-family: monospace"/>
         <div id="conclPalette"></div>
-        <div style="text-align: center; display: flex; margin-left: auto; margin-right: auto; margin-top: 20px">
-          <div id="noviceRadioCustom" class="difficultyRadio"><div id="noviceBoxCustom">☐</div>&nbsp;Novice</div>
-          <div id="adeptRadioCustom" class="difficultyRadio"><div id="adeptBoxCustom">☐</div>&nbsp;Adept</div>
-          <div id="masterRadioCustom" class="difficultyRadio"><div id="masterBoxCustom">☐</div>&nbsp;Master</div>
-        </div>
-        <div style="text-align: center; margin-top: 30px">
-          <button id="submitLevel" style="font-size: 16px">Submit</button>
-          <button id="backLevel" style="font-size: 16px">Back</button>
-          <button id="cancelSetLevel" style="font-size: 16px; display: none">Cancel</button><br/>
+        <div style="margin-left: auto; margin-right: auto">
+          <div style="text-align: center; display: flex; margin-top: 20px">
+            <div id="noviceRadioCustom" class="difficultyRadio"><div id="noviceBoxCustom">☐</div>&nbsp;Novice</div>
+            <div id="adeptRadioCustom" class="difficultyRadio"><div id="adeptBoxCustom">☐</div>&nbsp;Adept</div>
+            <div id="masterRadioCustom" class="difficultyRadio"><div id="masterBoxCustom">☐</div>&nbsp;Master</div>
+          </div>
+          <div style="text-align: center; margin-top: 20px">
+            <button id="submitLevel" style="font-size: 16px">Submit</button>
+            <button id="backLevel" style="font-size: 16px">Back</button>
+            <button id="cancelSetLevel" style="font-size: 16px; display: none">Cancel</button><br/>
+          </div>
         </div>
       </div>
     </div>

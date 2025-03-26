@@ -30,6 +30,7 @@ type rule =
     }
   | Asc
   | Expr
+  | Algebra
   | Var
   | Conclusion
 
@@ -90,4 +91,5 @@ let rules =
       ("topI", Tuple { inputs = [] });
       ("asc", Asc);
       ("expr", Expr);
+      ("alg", Algebra);
     ]

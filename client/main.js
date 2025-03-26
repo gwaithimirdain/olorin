@@ -2,6 +2,8 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, saveable } from "./levels.js"
 import { SERVER } from "./config.js"
 
+var Algebrite = require('algebrite');
+
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
 // COLOR[difficulty][darkness] gives a color and backgroundColor, where difficulty is 0=novice, 1=adept, 2=master, and darkness is 0=light, 1=dark.
@@ -26,7 +28,7 @@ document.documentElement.style.setProperty('--master-bg', COLORS[2][1].backgroun
 const VALUECOLOR = "#0000ff";
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', 'ℤ', '²', '³', '⁴'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
@@ -49,6 +51,11 @@ const KEYS = [
     { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
+    { unicode: '−', keys: [ '-' ] },
+    { unicode: 'ℤ', keys: [ '\\Z ' ] },
+    { unicode: '²', keys: [ '^2', '**2' ] },
+    { unicode: '³', keys: [ '^3', '**3' ] },
+    { unicode: '³', keys: [ '^4', '**4' ] },
 ].map(function (entry) {
     entry.regexes = entry.keys.map(function (str) { return new RegExp(escapeRegex(str), 'g'); });
     return entry
@@ -299,6 +306,9 @@ ready(() => {
             ascribe.dataset.name = box.id;
             ascribe.focus();
             typecheck_now = false;
+        } else if (id === 'alg') {
+            instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
+            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
         } else if (id === 'expr') {
             instance.addEndpoint(box, {
                 anchor: "Left",
@@ -1438,7 +1448,7 @@ function typecheck() {
     });
 
     // Call to Narya to do the typechecking.  The result is an object of type {complete:bool, error:string opt, labels, diagnostics}.
-    const result = Narya.check(nodes, edges);
+    const result = Narya.check(Algebrite.run, nodes, edges);
 
     // Display results
     if(result.error) {
