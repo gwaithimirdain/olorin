@@ -11,7 +11,6 @@
     "dependencies": {
         "@json2csv/plainjs": "^7.0.6",
         "@jsplumb/browser-ui": "^6.2.10",
-        "algebrite": "^1.4.0",
         "webpack": "^5.95.0"
     },
     "devDependencies": {

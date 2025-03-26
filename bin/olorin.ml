@@ -978,73 +978,8 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
       val mutable diagnostics = Js.array (Array.of_list [])
     end
 
-let ask (oracle : (Js.js_string Js.t -> Js.js_string Js.t) Js.callback Js.t)
-    (q : Check.OracleData.question) =
-  let oracle cmd = Js.to_string (Js.Unsafe.fun_call oracle [| Js.Unsafe.inject (Js.string cmd) |]) in
-  let go_kinetic ctx tm =
-    let module E = Monad.Error (struct
-      type t = Code.t
-    end) in
-    let open Monad.Ops (E) in
-    let rec split_app : type b s. (b, s) term -> ((b, s) term * (b, s) term) E.t = function
-      | App (fn, arg) -> return (fn, CubeOf.find_top arg)
-      | Act (t, _) -> split_app t
-      | t ->
-          let buf = Buffer.create 20 in
-          Buffer.add_string buf "malformed oracle query: ";
-          PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf (Dump.term t);
-          Error (Code.Anomaly (Buffer.contents buf)) in
-    let rec is_app : type b s. (b, s) term -> ((b, s) term * (b, s) term) option = function
-      | App (fn, arg) -> Some (fn, CubeOf.find_top arg)
-      | Act (t, _) -> is_app t
-      | _ -> None in
-    let rec go tm =
-      match is_app tm with
-      | Some (tm, _) ->
-          let* tm, rest = split_app tm in
-          let* tm, _ = split_app tm in
-          let* _cons_eqs, first = split_app tm in
-          let* first, rhs = split_app first in
-          let* _, lhs = split_app first in
-          let* rest = go rest in
-          return ((lhs, rhs) :: rest)
-      | None -> return [] in
-    let* tm, goal = split_app tm in
-    let* tm, _ = split_app tm in
-    let* _oracle, givens = split_app tm in
-    let* givens = go givens in
-    let* goal, rhs = split_app goal in
-    let* _, lhs = split_app goal in
-    (* Print only with ASCII characters, for the benefit of algebrite *)
-    let s = Display.State.get () in
-    Display.run ~init:{ s with chars = `ASCII } @@ fun () ->
-    (* Turn the terms into strings, to pass to algebrite *)
-    let stringify tm =
-      let buf = Buffer.create 20 in
-      PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf (print (Printable.PTerm (ctx, tm)));
-      Buffer.contents buf in
-    let lhs, rhs = (stringify lhs, stringify rhs) in
-    let givens = List.map (fun (l, r) -> (stringify l, stringify r)) givens in
-    (* Try rewriting both sides left-to-right with all the givens until it stops or seems to be going nowhere *)
-    let rec rewrite count tm =
-      if count > 3 then tm
-      else
-        let newtm =
-          List.fold_left
-            (fun tm (l, r) -> oracle (Printf.sprintf "subst(%s,%s,%s)" r l tm))
-            tm givens in
-        if newtm = tm then tm else rewrite (count + 1) newtm in
-    let lhs, rhs = (rewrite 0 lhs, rewrite 0 rhs) in
-    (* Now check whether the difference LHS - RHS simplifies to 0 *)
-    if oracle (Printf.sprintf "simplify((%s)-(%s))" lhs rhs) = "0" then Ok ()
-    else Error Code.Oracle_failed in
-  match q with
-  | Ask (ctx, Realize tm) -> go_kinetic ctx tm
-  | Ask (ctx, tm) -> go_kinetic ctx tm
-
 (* "Parse" the current graph into one or more terms and typecheck them all. *)
-let check (oracle : (Js.js_string Js.t -> Js.js_string Js.t) Js.callback Js.t)
-    (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.js_array Js.t) :
+let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.js_array Js.t) :
     js_checked Js.t =
   let labels : (Locable.t, Label.t) Hashtbl.t = Hashtbl.create 20 in
   let diagnostics : Diagnostic.js Js.t Dynarray.t = Dynarray.create () in
@@ -1073,8 +1008,8 @@ let check (oracle : (Js.js_string Js.t -> Js.js_string Js.t) Js.callback Js.t)
     Scopes.run ~init:[] @@ fun () ->
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
-    (* Supply the Algebrite oracle *)
-    Check.Oracle.run ~ask:(ask oracle) @@ fun () ->
+    (* Supply the Buchberger oracle *)
+    Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
     let contexts = ref [] in
     (* Count the executed "commands", so we can undo them all at the end. *)
     let command_count = ref 0 in
@@ -1158,10 +1093,9 @@ let _ =
            (hypotheses : Variable.js Js.t Js.js_array Js.t) (conclusion : Variable.js Js.t) =
          start parameters variables hypotheses conclusion
 
-       method check (oracle : (Js.js_string Js.t -> Js.js_string Js.t) Js.callback Js.t)
-           (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.js_array Js.t) :
-           js_checked Js.t =
-         check oracle vertices edges
+       method check (vertices : Vertex.js Js.t Js.js_array Js.t)
+           (edges : Edge.js Js.t Js.js_array Js.t) : js_checked Js.t =
+         check vertices edges
 
        (* Check validity of a new local variable name.  We do this in OCaml rather than JavaScript so that we can actually call the lexer, ensuring it remains as consistent as possible with Narya. *)
        method checkVariable (str : Js.js_string Js.t) =

@@ -2,8 +2,6 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, saveable } from "./levels.js"
 import { SERVER } from "./config.js"
 
-var Algebrite = require('algebrite');
-
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
 // COLOR[difficulty][darkness] gives a color and backgroundColor, where difficulty is 0=novice, 1=adept, 2=master, and darkness is 0=light, 1=dark.
@@ -1448,7 +1446,7 @@ function typecheck() {
     });
 
     // Call to Narya to do the typechecking.  The result is an object of type {complete:bool, error:string opt, labels, diagnostics}.
-    const result = Narya.check(Algebrite.run, nodes, edges);
+    const result = Narya.check(nodes, edges);
 
     // Display results
     if(result.error) {
