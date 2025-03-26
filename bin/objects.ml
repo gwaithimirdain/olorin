@@ -4,6 +4,8 @@ open Core.Reporter
 open Js_of_ocaml
 open Rules
 
+let carp str = Js_of_ocaml.Console.console##log (Js.string str)
+
 (* This file defines a bunch of types and objects with conversion functions for passing data back and forth to Javascript. *)
 
 exception Jserror of string
@@ -182,7 +184,8 @@ end
 (* Parameters, variables, and hypotheses *)
 
 module Variable = struct
-  type t = { id : Id.t; name : string option; ty : string }
+  type cls = [ `Parameter | `Variable | `Hypothesis ]
+  type t = { id : Id.t; name : string option; ty : string; cls : cls }
 
   class type js = object
     method name : Js.js_string Js.t Js.optdef Js.prop
@@ -190,11 +193,11 @@ module Variable = struct
     method id : Js.js_string Js.t Js.prop
   end
 
-  let of_js vars v =
+  let of_js cls vars v =
     let id, name, ty =
       (Id.Id (Js.to_string v##.id), option_of_string_optdef v##.name, Js.to_string v##.ty) in
     vars := !vars |> IdMap.add id ({ id; name; rule = Var; value = Some ty } : Vertex.t);
-    { id; name; ty }
+    { id; name; ty; cls }
 end
 
 (* Javascript location to display a type (and possibly term): edge ID, or port identified by vertex ID with sort and label. *)

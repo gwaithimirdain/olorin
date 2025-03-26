@@ -94,6 +94,7 @@
         <div class="basic logical rule" style="text-align: left" id="botE" data-rule="botE">⊥</div>
         <div class="basic logical rule" style="text-align: right" id="topI" data-rule="topI">⊤</div>
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc">🏷</div>
+        <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr">expr</div>
       </div>
       <div style="height: 80px; display: block; align-items: end" id="buttons">
         <button id="clearProof" class="proofOption">Clear</button>
@@ -192,6 +193,18 @@
         <div id="ascPalette"></div>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitAscribe" style="font-size: 16px">Submit</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="expressionBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Enter an expression</h3>
+        <p>Introduce the following expression, possibly using other available variables:</p>
+        <input type="text" id="expression" style="width: 100%"/>
+        <div id="expressionPalette"></div>
+        <div style="text-align: center; margin-top: 30px">
+          <button id="submitExpression" style="font-size: 16px">Submit</button><br/>
         </div>
       </div>
     </div>

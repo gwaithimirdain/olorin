@@ -29,6 +29,7 @@ type rule =
       implicit_post : (string * string) option;
     }
   | Asc
+  | Expr
   | Var
   | Conclusion
 
@@ -88,4 +89,5 @@ let rules =
       ("botE", Match { branches = []; asc_pre = Some "⊥" });
       ("topI", Tuple { inputs = [] });
       ("asc", Asc);
+      ("expr", Expr);
     ]
