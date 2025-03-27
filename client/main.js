@@ -61,6 +61,14 @@ const KEYS = [
     return entry
 });
 
+// Allow the expert user to supply a "rules=andE,asc" query string to get extra rules available
+const urlParams = new URLSearchParams(window.location.search);
+const ruleParam = urlParams.get('rules');
+var extraRules = [];
+if(ruleParam) {
+    extraRules = ruleParam.split(",");
+}
+
 // All nodes currently in the diagram, including variables, hypotheses, and conclusion, as {id, name, rule, value, node} objects.  The 'rule' is a string denoting the kind of node it is, while the 'value' (which could be undefined) stores a type or value.  The 'name' is a variable name, for variable nodes.
 var nodes = [];
 
@@ -948,7 +956,7 @@ document.getElementById("doneAbout").onclick = function () {
 };
 
 function selectCurrentLevel(level) {
-    setLevel(level, level.stage.rules);
+    setLevel(level, level.stage.rules.concat(extraRules));
     currentLevel = level;
     currentLevelButton = level.button;
     document.getElementById("currentLevel").innerText = "Level: " + level.name;
