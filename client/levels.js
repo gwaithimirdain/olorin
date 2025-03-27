@@ -1132,18 +1132,35 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ { ty: "(x=y+1)∨(2*x=3−y)" } ],
                     conclusion: { ty: "2*x²−x*y−y²=5*x−2*y−3" },
+                    trivial: true,
                 },
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     variables: [ ],
                     hypotheses: [ { ty: "(x+y=1)∨(x−y=1)" } ],
                     conclusion: { ty: "x²+1=y²+2*x" },
+                    trivial: true,
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x*y=0" } ],
                     conclusion: { ty: "(x=0)∨(y=0)" },
+                    trivial: true,
+                    hint: "integralHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "x²=0" } ],
+                    conclusion: { ty: "x=0" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "x²=x" } ],
+                    conclusion: { ty: "(x=0)∨(x=∸1)" },
+                    hint: "exprHint",
                 },
                 {
                     parameters: [ ],
@@ -1154,12 +1171,12 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "x²=x" } ],
-                    conclusion: { ty: "(x=0)∨(x−1=0)" },
+                    hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3x+2=0)" } ],
+                    conclusion: { ty: "(x=3)∨((x=∸1)∨(x=∸2))" },
                 },
             ],
           },
-          { name: "∣",
+          { name: "∣∃=",
             rules: [ "exE", "exI", "expr", "alg" ],
             levels: [
                 // 0 is not synthesizing )-:
@@ -1219,7 +1236,7 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "≡",
+          { name: "≡∃=",
             rules: [ "exE", "exI", "expr", "alg" ],
             levels: [
                 {
@@ -1284,6 +1301,34 @@ export const LEVELS = [
                 },
             ],
           },
+          { name: "≡∣∃=",
+            rules: [ "exE", "exI", "expr", "alg" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(n=k*m)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a−b=k*m)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(c=k*m)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*(m*n))" },
+                },
+            ],
+          },
+          // { name: "∀=≠",
+          //   rules: [ "allE", "allI", "cnegI", "negE", "expr", "alg" ],
+          //   levels: [
+          //       {
+          //           parameters: [ ],
+          //           variables: [ { name: "a", ty: "ℤ" } ],
+          //           hypotheses: [ { ty: "" } ],
+          //           conclusion: { ty: "" },
+          //       },
+          //   ],
+          // },
       ],
     },
 ]

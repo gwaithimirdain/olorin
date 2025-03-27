@@ -554,7 +554,18 @@
       </div>
       <div id="negateHint" class="modal hint">
         I need to use different symbols for <i>subtraction</i> (of two numbers) and <i>negation</i> (of one number).
-        I'll write "x−y" for subtraction (you can type this with the ordinary hyphen key) and "∸x" for negation (you can type this with a double hyphen, <tt>--</t>).
+        I'll write "x−y" for subtraction (you can type this with the ordinary hyphen key) and "∸x" for negation (you can type this with a double hyphen, <tt>--</tt>).
+      </div>
+      <div id="integralHint" class="modal hint" style="width: 600px">
+        One thing the algebra block doesn't "know" is that if the product of two numbers is zero, one or the other of them must be zero.
+        (Indeed, this is not true for all kinds of "number", but it is true for ordinary integers, real numbers, and so on.)
+        If you need this fact, use the block labeled "xy=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
+        <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block">
+      </div>
+      <div id="exprHint" class="modal hint">
+        If you need an input to a "value" port that isn't just a number, use the "expr" block, which will prompt you for an expression.
+        You must connect the input port of that block to all the variables that occur in your expression.
+        <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block">
       </div>
     </div>
 
