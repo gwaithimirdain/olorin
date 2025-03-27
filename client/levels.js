@@ -1111,7 +1111,7 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∃=",
+          { name: "∣",
             rules: [ "exE", "exI", "expr", "alg" ],
             levels: [
                 // 0 is not synthesizing )-:
@@ -1170,7 +1170,72 @@ export const LEVELS = [
                     conclusion: { ty: "∃k∈ℤ,(c=k*a)" },
                 },
             ],
-          }
+          },
+          { name: "≡",
+            rules: [ "exE", "exI", "expr", "alg" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃k∈ℤ,(a−a=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(b−a=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a−b=k*(∸n))" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃k∈ℤ,(a−b=k*1)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*0)" } ],
+                    conclusion: { ty: "a=b" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a²−b²=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−c=k*n)" }, { ty: "∃k∈ℤ,(b−d=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,((a+b)−(c+d)=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,((a+b)−(c+d)=k*n)" }, { ty: "∃k∈ℤ,(b−d=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
+                },
+            ],
+          },
       ],
     },
 ]
