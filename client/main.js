@@ -873,6 +873,7 @@ document.getElementById('newvar').onkeypress = function(event) {
 
 // Similarly for when the user is prompted for an ascription type
 document.getElementById("submitAscribe").onclick = submitAscription;
+document.getElementById("cancelAscribe").onclick = cancelAscription;
 document.getElementById('ascribe').onkeypress = function(event) {
     if(event.key == 'Enter') {
         submitAscription();
@@ -880,6 +881,7 @@ document.getElementById('ascribe').onkeypress = function(event) {
 }
 
 document.getElementById("submitExpression").onclick = submitExpr;
+document.getElementById("cancelExpression").onclick = cancelExpr;
 document.getElementById('expression').onkeypress = function(event) {
     if(event.key == 'Enter') {
         submitExpr();
@@ -1071,6 +1073,18 @@ function submitAscription() {
     typecheck();
 }
 
+function cancelAscription() {
+    const ascribeBG = document.getElementById("ascribeBG");
+    const ascribe = document.getElementById('ascribe');
+    for (var i in nodes) {
+        if (nodes[i].id === ascribe.dataset.name) {
+            deleteRule(nodes[i].node);
+        }
+    }
+    ascribe.value = '';
+    ascribeBG.style.display = "none";
+}
+
 // And the modal box that prompts for an expression
 function submitExpr() {
     const exprBG = document.getElementById("expressionBG");
@@ -1097,6 +1111,18 @@ function submitExpr() {
     exprBG.style.display = "none";
     // And typecheck, since that was delayed when the rule was added.
     typecheck();
+}
+
+function cancelExpr() {
+    const exprBG = document.getElementById("expressionBG");
+    const expr = document.getElementById('expression');
+    for (var i in nodes) {
+        if (nodes[i].id === expr.dataset.name) {
+            deleteRule(nodes[i].node);
+        }
+    }
+    expr.value = '';
+    exprBG.style.display = "none";
 }
 
 // And the modal box that prompts for a wire label
