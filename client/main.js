@@ -1480,7 +1480,7 @@ function typecheck() {
     // Display results
     if(result.error) {
         console.log(result.error);
-        alert ("Internal error: see console");
+        alert ("Internal error.  Please open the javascript console, take a screenshot, and send them both to the developer.");
         diagram.style.backgroundColor = "";
         conclusion_node.style.backgroundColor = "";
     } else {

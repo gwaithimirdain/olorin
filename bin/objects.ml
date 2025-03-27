@@ -10,6 +10,12 @@ let carp str = Js_of_ocaml.Console.console##log (Js.string str)
 
 exception Jserror of string
 
+let ( <||> ) : type a. a option -> string -> a =
+ fun x e ->
+  match x with
+  | Some x -> x
+  | None -> raise (Jserror e)
+
 let option_of_string_optdef s = Js.Optdef.case s (fun () -> None) (fun x -> Some (Js.to_string x))
 
 (* IDs of DOM objects.  Currently only vertices and edges have IDs, not ports.  (Ports are identified by their vertex ID, their sort, and their label; see below.) *)

@@ -271,11 +271,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
     (locate !loc (without_bindables (Synth (Fail Cyclic_term))), PortSet.empty)
   else
     let source_vertex =
-      match IdMap.find_opt source.vertex vertices with
-      | Some x -> x
-      | None ->
-          raise (Jserror ("IdMap.find in check_of_graph: missing " ^ Id.to_string source.vertex))
-    in
+      IdMap.find_opt source.vertex vertices
+      <||> "IdMap.find in check_of_graph: missing " ^ Id.to_string source.vertex in
     let tm, variables =
       match source_vertex.rule with
       | Var -> (without_bindables (Synth (Var (`Port source, None))), PortSet.singleton source)
@@ -304,14 +301,10 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               inputs in
           ({ bindables; term = Named.Struct (Eta, fields) }, variables)
       | Fields { outputs } ->
-          let label =
-            match source.label with
-            | Some x -> x
-            | None -> raise (Jserror "missing label") in
+          let label = source.label <||> "missing label" in
           let fld, _ =
-            match List.find_opt (fun (_, port) -> port = label) outputs with
-            | Some x -> x
-            | None -> raise (Jserror ("List.find in check_of_graph.Field: missing " ^ label)) in
+            List.find_opt (fun (_, port) -> port = label) outputs
+            <||> "List.find in check_of_graph.Field: missing " ^ label in
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
@@ -386,7 +379,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             Named.App
               ( locate_opt None
                   (Named.ImplicitSApp
-                     ( locate_opt None (Named.Const (Option.get (Scope.lookup [ implicit_pre ]))),
+                     ( locate_opt None
+                         (Named.Const (Scope.lookup [ implicit_pre ] <||> "implicit_pre not found")),
                        None,
                        fn )),
                 arg,
@@ -441,7 +435,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     ( `Any,
                       Named.ImplicitApp
                         (* Hack by looking up the name in the scope at run-time *)
-                        ( locate_opt None (Named.Const (Option.get (Scope.lookup [ fn ]))),
+                        ( locate_opt None
+                            (Named.Const
+                               (Scope.lookup [ fn ] <||> "implicit_post function not found")),
                           [ (None, locate_opt None term) ] ),
                       false );
                   ] in
@@ -458,7 +454,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     (Named.Asc
                        ( locate_opt tm.loc tm.value.term,
                          locate_opt None
-                           (Named.Synth (Const (Option.get (Scope.lookup [ asc_ty ])))) )),
+                           (Named.Synth (Const (Scope.lookup [ asc_ty ] <||> "asc_pre not found")))
+                       )),
                   tm.value.bindables ) in
           let branches, bindables, variables =
             List.fold_left
@@ -533,7 +530,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
-          let ty = source_vertex.value <|> Anomaly "missing ascription type" in
+          let ty = source_vertex.value <||> "missing ascription type" in
           (* TODO: Should locate this on the rule; the output port doesn't get labeled. *)
           let tyloc = Loc.make ~content:ty [ `Port source ] in
           (* We insist that only variables appearing in the inputs can be used. *)
@@ -548,7 +545,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             },
             variables )
       | Expr ->
-          let e = source_vertex.value <|> Anomaly "missing expression" in
+          let e = source_vertex.value <||> "missing expression" in
           (* Get all the bindables and variables from all the input wires connected to this rule. *)
           let bindables, variables =
             vars_of_input_port ~seen vertices graph { source with sort = Input; label = None } in
@@ -562,9 +559,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               (Some variables, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc))) in
           ({ bindables; term = e }, variables)
       | Algebra ->
-          let nil_eqs = Named.Const (Option.get (Scope.lookup [ "nil_eqs" ])) in
-          let cons_eqs = locate_opt None (Named.Const (Option.get (Scope.lookup [ "cons_eqs" ]))) in
-          let oracle = locate_opt None (Named.Const (Option.get (Scope.lookup [ "oracle" ]))) in
+          let nil_eqs = Named.Const (Parser.Scope.lookup [ "nil_eqs" ] <||> "nil_eqs not found") in
+          let cons_eqs =
+            locate_opt None
+              (Named.Const (Parser.Scope.lookup [ "cons_eqs" ] <||> "cons_eqs not found")) in
+          let oracle =
+            locate_opt None (Named.Const (Parser.Scope.lookup [ "oracle" ] <||> "oracle not found"))
+          in
           (* Get all the bindables and variables from all the input wires connected to this rule. *)
           let port = { source with sort = Input; label = None } in
           let givens, bindables, variables =
@@ -609,7 +610,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let term =
             Bwd.fold_left
               (fun tm arg -> Named.App (locate_opt None tm, arg, locate_opt None `Explicit))
-              (Named.Const (Option.get (Scope.lookup [ const ])))
+              (Named.Const (Scope.lookup [ const ] <||> "user constant " ^ const ^ " not found"))
               args in
           ({ bindables; term = Named.Synth term }, variables) in
     (locate !loc tm, variables)
