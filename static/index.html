@@ -550,7 +550,7 @@
         Therefore, I recommend that whenever you use an algebra block, you also do the algebra yourself on paper.
       </div>
       <div id="neqHint" class="modal hint">
-        The expression "x≠y" means the same as "¬(x=y)".
+        The statement "x≠y" means the same as "¬(x=y)".
       </div>
       <div id="negateHint" class="modal hint">
         I need to use different symbols for <i>subtraction</i> (of two numbers) and <i>negation</i> (of one number).
@@ -561,9 +561,12 @@
         (Indeed, this is not true for all kinds of "number", but it is true for ordinary integers, real numbers, and so on.)
         If you need this fact, use the block labeled "xy=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
         <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block">
+        <b>Warning:</b> do not connect blue "value" wires to "alg" boxes!
+        All the inputs to an "alg" box must be <i>equations</i>, as those are the only things I can do algebra with.
+        I can figure out on my own which variables appear in the equations.
       </div>
       <div id="exprHint" class="modal hint">
-        If you need an input to a "value" port that isn't just a number, use the "expr" block, which will prompt you for an expression.
+        If you need an input to a blue "value" port that isn't just a number, use the "expr" block, which will prompt you for an expression.
         You must connect the input port of that block to all the variables that occur in your expression.
         <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block">
       </div>
