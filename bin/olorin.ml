@@ -917,7 +917,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
   (* Now we enter run_top through the coroutine interface. *)
   try
     (* We don't use ANSI codes here, since we're just displaying errors to the user in ordinary text.  When Asai gets custom markers, we can colorize these errors with HTML. *)
-    Pauser.init ~use_ansi:false ~onechar_ops @@ fun () ->
+    Pauser.init ~use_ansi:false ~digit_vars:false ~onechar_ops @@ fun () ->
     install_notations ();
     (* We parse and process the parameters into raw terms.  *)
     let hypcount = ref 0 in
