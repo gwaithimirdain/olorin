@@ -1029,8 +1029,6 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
     let contexts = ref [] in
-    (* Count the executed "commands", so we can undo them all at the end. *)
-    let command_count = ref 0 in
     let run f =
       Global.HolesAllowed.run ~env:(Ok ()) @@ fun () ->
       History.do_command @@ fun () ->
@@ -1038,9 +1036,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
         ~ctx:{ handle = (fun p -> annotate_ctx_handler contexts p) }
         ~tm:(fun p -> annotate_tm_handler labels p)
         ~ty:(fun p -> annotate_ty_handler labels p)
-      @@ fun () ->
-      f ();
-      command_count := !command_count + 1 in
+      @@ fun () -> f () in
     let fatal_error =
       Reporter.try_with
         ~emit:(fun d ->
@@ -1079,7 +1075,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     let ports =
       synth_output_ports run vertices labels fwd_graph bwd_graph contexts ports diagnostics in
     (* Get rid of any created holes. *)
-    History.undo !command_count;
+    History.undo_all ();
     (* Combine all the generated diagnostics. *)
     List.iter (fun (_, ds) -> Dynarray.append diagnostics ds) ports;
     object%js
