@@ -49,6 +49,7 @@ const KEYS = [
     { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
+    { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
     { unicode: 'ℤ', keys: [ '\\Z ' ] },
     { unicode: '²', keys: [ '^2', '**2' ] },

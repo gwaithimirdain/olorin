@@ -43,13 +43,11 @@ axiom plus : ℤ → ℤ → ℤ
 axiom minus : ℤ → ℤ → ℤ
 axiom times : ℤ → ℤ → ℤ
 axiom pow : ℤ → ℤ → ℤ
-axiom zneg : ℤ → ℤ
+axiom negate : ℤ → ℤ
 axiom square : ℤ → ℤ
 axiom cube : ℤ → ℤ
 axiom fourth : ℤ → ℤ
 "
-
-(* TODO: Notation for unary negation, -- or ∸ *)
 
 (* Now we define notations for them.  The propositional connectives could be defined with Narya's built-in notation command, except that we want to have no space around the operator symbols, so we define them custom here.  The quantifiers have to be defined custom because Narya's built-in notation command doesn't yet handle variable-binding notations.  Since we don't have the corresponding constants at compile-time, we hack by looking them up in the Scope at run-time; this depends on using the same names below and above in the startup code.  *)
 
@@ -69,6 +67,7 @@ let onechar_ops =
     (0x22A5, Ident [ "⊥" ]);
     (0x22A4, Ident [ "⊤" ]);
     (0x2212, Ident [ "−" ]);
+    (0x2238, Ident [ "∸" ]);
     (0xB2, Ident [ "²" ]);
     (0xB3, Ident [ "³" ]);
     (0x2074, Ident [ "⁴" ]);
@@ -88,6 +87,7 @@ type (_, _, _) identity +=
   | Plus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Minus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Times : (No.nonstrict opn, No.three, No.strict opn) identity
+  | Negate : (closed, No.three, No.nonstrict opn) identity
   | Pow : (No.nonstrict opn, No.four, No.strict opn) identity
   | Square : (No.strict opn, No.four, closed) identity
   | Cube : (No.strict opn, No.four, closed) identity
@@ -108,6 +108,7 @@ let plus : (No.nonstrict opn, No.two, No.strict opn) notation = (Plus, Infixl No
 let minus : (No.nonstrict opn, No.two, No.strict opn) notation = (Minus, Infixl No.two)
 let times : (No.nonstrict opn, No.three, No.strict opn) notation = (Times, Infixl No.three)
 let pow : (No.nonstrict opn, No.four, No.strict opn) notation = (Pow, Infixl No.four)
+let negate : (closed, No.three, No.nonstrict opn) notation = (Negate, Prefixr No.three)
 let square : (No.strict opn, No.four, closed) notation = (Square, Postfix No.four)
 let cube : (No.strict opn, No.four, closed) notation = (Cube, Postfix No.four)
 let fourth : (No.strict opn, No.four, closed) notation = (Fourth, Postfix No.four)
@@ -343,13 +344,36 @@ let () =
           is_case = (fun _ -> false);
         })
     algebra;
+  make negate
+    {
+      name = "∸";
+      tree =
+        Closed_entry (eops [ (Op "--", Done_closed negate); (Ident [ "∸" ], Done_closed negate) ]);
+      processor =
+        (fun ctx obs loc ->
+          match obs with
+          | [ Token _; Term x ] ->
+              let x = process ctx x in
+              let nc = Option.get (Scope.lookup [ "negate" ]) in
+              locate_opt loc (Synth (App (locate_opt loc (Const nc), x, locate_opt None `Explicit)))
+          | _ -> Builtins.invalid "negate");
+      print_term =
+        Some
+          (function
+          | [ Token (_, wsop); Term x ] ->
+              let px, wsx = pp_term x in
+              (Token.pp (Ident [ "∸" ]) ^^ pp_ws `None wsop ^^ px, wsx)
+          | _ -> Builtins.invalid "negate");
+      print_case = None;
+      is_case = (fun _ -> false);
+    };
   List.iter
     (fun (name, sym, asym, onotn, ostr) ->
       make onotn
         {
           name;
           (* The ASCII can't be parsed here, since it conflicts with Narya's generic degeneracies *)
-          tree = Open_entry (eops [ (sym, done_open onotn) ]);
+          tree = Open_entry (eop sym (done_open onotn));
           processor =
             (fun ctx obs loc ->
               match obs with
@@ -435,4 +459,12 @@ let install_notations () =
           val_vars = [ "x" ];
           inner_symbols = `Single sym;
         })
-    powers
+    powers;
+  Situation.Current.add_with_print
+    {
+      key = `Constant (Option.get (Scope.lookup [ "negate" ]));
+      notn = Wrap negate;
+      pat_vars = [ "x" ];
+      val_vars = [ "x" ];
+      inner_symbols = `Single (Ident [ "∸" ]);
+    }

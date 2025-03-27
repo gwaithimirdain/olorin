@@ -220,7 +220,7 @@ let get_poly (ctx : int) ty tm =
     | Uninst (Neu { head = Const { name; ins }; args = Snoc (Emp, App (Arg x, xins)); _ }, _)
       when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) ->
         let* x = go (CubeOf.find_top x).tm in
-        if Some name = Scope.lookup [ "neg" ] then return (`Neg x)
+        if Some name = Scope.lookup [ "negate" ] then return (`Neg x)
         else if Some name = Scope.lookup [ "square" ] then return (`Times (x, x))
         else if Some name = Scope.lookup [ "cube" ] then return (`Times (`Times (x, x), x))
         else if Some name = Scope.lookup [ "fourth" ] then
