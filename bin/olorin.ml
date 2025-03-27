@@ -101,7 +101,7 @@ module Unresolver = struct
   let reindex (scope : ('a, 'b) scope) (x : 'a I1.index) =
     match (Bwv.nth x scope).name with
     | Some name -> Ok (`Name name)
-    | None -> fatal (Anomaly "access to unnamed variable")
+    | None -> raise (Jserror "access to unnamed variable")
 
   let rename _scope (x : I1.name) : name = { name = x; port = None }
   let rescope _scope _ = ()
@@ -279,7 +279,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
     let tm, variables =
       match source_vertex.rule with
       | Var -> (without_bindables (Synth (Var (`Port source, None))), PortSet.singleton source)
-      | Conclusion -> fatal (Anomaly "conclusion cannot be a source")
+      | Conclusion -> raise (Jserror "conclusion cannot be a source")
       | Tuple { inputs } ->
           let bindables, variables, fields =
             List.fold_left
@@ -307,7 +307,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let label =
             match source.label with
             | Some x -> x
-            | None -> fatal (Anomaly "missing label") in
+            | None -> raise (Jserror "missing label") in
           let fld, _ =
             match List.find_opt (fun (_, port) -> port = label) outputs with
             | Some x -> x
@@ -574,16 +574,16 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 (* We have to do these things that check_of_input_port does, since we're not calling it *)
                 let tm = Loc.append_to_loc tm [ `Edge e.id; `Port port ] in
                 let tm : term_with_bindables located = ascribe_with_user_label tm e in
-                match tm.value.term with
-                | Synth stm ->
-                    ( Named.ImplicitSApp
-                        ( locate_opt None
-                            (Named.ImplicitSApp (cons_eqs, None, locate_opt tm.loc stm)),
-                          None,
-                          locate_opt None givens ),
-                      Bindables.union bindables tm.value.bindables,
-                      PortSet.union variables new_variables )
-                | _ -> fatal (Nonsynthesizing "input to algebra"))
+                let stm =
+                  match tm.value.term with
+                  | Synth stm -> stm
+                  | _ -> Fail (Nonsynthesizing "input to algebra") in
+                ( Named.ImplicitSApp
+                    ( locate_opt None (Named.ImplicitSApp (cons_eqs, None, locate_opt tm.loc stm)),
+                      None,
+                      locate_opt None givens ),
+                  Bindables.union bindables tm.value.bindables,
+                  PortSet.union variables new_variables ))
               (nil_eqs, Bindables.empty, PortSet.empty)
               (Option.value (TargetMap.find_opt port graph) ~default:[]) in
           let term =
@@ -653,7 +653,7 @@ and check_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph :
       (* If the edge has a type label, we ascribe it to that label. *)
       let tm = ascribe_with_user_label tm e in
       (tm, variables)
-  | Some _ -> fatal (Anomaly "unexpected multiple edges")
+  | Some _ -> raise (Jserror "unexpected multiple edges")
   | None ->
       (* If there isn't an edge, then we return a hole.  We force it to be a leaf of the case tree, so it will be displayed as ? rather than an _UNNAMED_CONSTANT. *)
       let loc = Loc.make [ `Port port ] in
@@ -754,8 +754,8 @@ let annotate_ctx_handler : type a b s.
       (Scopes.get ())
   with
   | None ->
-      fatal
-        (Anomaly
+      raise
+        (Jserror
            (Printf.sprintf "no matching scope for context of length %d"
               (N.to_int (Ctx.raw_length ctx))))
   | Some () -> ()
@@ -956,7 +956,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
                   let p = ({ vertex = Id.Id id; sort = Output; label = None } : Port.t) in
                   if isparam <> "" then parameter_ports := PortSet.add p !parameter_ports;
                   Some p
-              | _ -> fatal (Anomaly "unexpected comment"));
+              | _ -> raise (Jserror "unexpected comment"));
           })
         [ varscope; Bwv.append (Raw.bplus_of_tel rawctx) Emp idscope ] in
     (* We parse and process the conclusion, in the scope of variables created by parsing the parameters. *)
