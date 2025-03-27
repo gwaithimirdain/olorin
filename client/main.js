@@ -329,6 +329,25 @@ ready(() => {
             expr.dataset.name = box.id;
             expr.focus();
             typecheck_now = false;
+        } else if (id === 'integral') {
+            instance.addEndpoint(box, {
+                anchor: [0, 0.1, -1, 0],
+                target: true,
+                parameters: { sort: "input", label: "x", hasValue: true, side: "upper" },
+                paintStyle: { fill: VALUECOLOR },
+            });
+            instance.addEndpoint(box, {
+                anchor: [0, 0.5, -1, 0],
+                target: true,
+                parameters: { sort: "input", label: "y", hasValue: true, side: "middle" },
+                paintStyle: { fill: VALUECOLOR },
+            });
+            instance.addEndpoint(box, {
+                anchor: [0, 0.9, -1, 0],
+                target: true,
+                parameters: {sort: "input", label: "xy0", side: "lower"},
+            });
+            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
         }
         if(typecheck_now) {
             typecheck();
@@ -1645,6 +1664,8 @@ function typecheck() {
                                                     }
                                                     if(endpoint.parameters.side === "upper") {
                                                         d.innerHTML = '<div class="upperInputLabel">' + ty + "</div>";
+                                                    } else if(endpoint.parameters.side === "middle") {
+                                                        d.innerHTML = '<div class="middleInputLabel">' + ty + "</div>";
                                                     } else {
                                                         // Lower is the default
                                                         d.innerHTML = '<div class="lowerInputLabel">' + ty + "</div>";

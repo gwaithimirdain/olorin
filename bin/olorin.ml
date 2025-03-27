@@ -592,7 +592,26 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                  (Named.ImplicitApp
                     (locate_opt None (Named.ImplicitSApp (oracle, None, locate_opt None givens)), [])))
           in
-          ({ bindables; term }, variables) in
+          ({ bindables; term }, variables)
+      | User { const; inputs } ->
+          let bindables, variables, args =
+            List.fold_left
+              (fun (bindables, variables, args) label ->
+                let ( ({ value = { term; bindables = tm_bind }; loc } : term_with_bindables located),
+                      newvars ) =
+                  check_of_input_port ~seen vertices graph
+                    { source with sort = Input; label = Some label } in
+                ( Bindables.union bindables tm_bind,
+                  PortSet.union variables newvars,
+                  Snoc (args, locate_opt loc term) ))
+              (Bindables.empty, PortSet.empty, Emp)
+              inputs in
+          let term =
+            Bwd.fold_left
+              (fun tm arg -> Named.App (locate_opt None tm, arg, locate_opt None `Explicit))
+              (Named.Const (Option.get (Scope.lookup [ const ])))
+              args in
+          ({ bindables; term = Named.Synth term }, variables) in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments *)

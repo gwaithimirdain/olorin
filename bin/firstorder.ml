@@ -47,6 +47,8 @@ axiom negate : ℤ → ℤ
 axiom square : ℤ → ℤ
 axiom cube : ℤ → ℤ
 axiom fourth : ℤ → ℤ
+
+axiom integral (x y : ℤ) : eq ℤ (times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
 "
 
 (* Now we define notations for them.  The propositional connectives could be defined with Narya's built-in notation command, except that we want to have no space around the operator symbols, so we define them custom here.  The quantifiers have to be defined custom because Narya's built-in notation command doesn't yet handle variable-binding notations.  Since we don't have the corresponding constants at compile-time, we hack by looking them up in the Scope at run-time; this depends on using the same names below and above in the startup code.  *)
