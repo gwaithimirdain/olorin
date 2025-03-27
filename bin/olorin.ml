@@ -1027,8 +1027,6 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     Scopes.run ~init:[] @@ fun () ->
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
-    (* Supply the Buchberger oracle *)
-    Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
     let contexts = ref [] in
     (* Count the executed "commands", so we can undo them all at the end. *)
     let command_count = ref 0 in
@@ -1052,14 +1050,13 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
           Diagnostic.add diagnostics true d;
           true)
       @@ fun () ->
+      (* Supply the Buchberger oracle.  This has to be inside the Reporter.try_with, since it can raise typechecking errors. *)
+      Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
       (* Starting from the conclusion, turn the graph into a raw term with named variables. *)
       let conclusion_ntm = bind (check_of_graph vertices bwd_graph) in
       (* Then resolve it into one with De Bruijn indices. *)
       let conclusion_tm =
-        RequireScoping.run ~env:false @@ fun () ->
-        (* What?  This can't possibly be doing anything important, why was it here?  Maybe leftover from a debugging trap? *)
-        (* Reporter.try_with ~fatal:(fun d -> fatal_diagnostic d) @@ fun () -> *)
-        Resolve.check scope conclusion_ntm in
+        RequireScoping.run ~env:false @@ fun () -> Resolve.check scope conclusion_ntm in
       (* Now typecheck that term.  Unattached input ports are represented in the raw term by holes.  So if those places in the term are checkable, typechecking will "succeed".  Whereas if they are synthesizing it will fail with a "Nonsynthesizing" error, which will be caught by the above "Reporter.try_with".   *)
       ( run @@ fun () ->
         let _ =
