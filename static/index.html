@@ -532,6 +532,30 @@
         Any statement at all can be proven by contradiction:
         <img src="hints/contradiction.png" style="margin-left: auto; margin-right:auto; display:block">
       </div>
+      <div id="algebraHint" class="modal hint">
+        The "alg" (for "algebra") block can prove algebraic equations.  If the equation is always true, it doesn't need any inputs.
+      </div>
+      <div id="multiplicationHint" class="modal hint">
+        Multiplication is denoted with a <tt>*</tt> as in many programming languages.
+      </div>
+      <div id="algebra2Hint" class="modal hint">
+        If an equation you want to prove isn't always true, but is true because of some assumptions, you can attach those assumptions as inputs to the algebra block.
+      </div>
+      <div id="algebra3Hint" class="modal hint">
+        You can attach as many assumptions as you need to the input port of the algebra block.
+      </div>
+      <div id="algebra4Hint" class="modal hint">
+        My way to check algebraic equations (called "Buchberger's algorithm") is very general and powerful, but it doesn't produce a human-readable proof.
+        When writing a proof for human readers, you should show the algebraic calculations.
+        Therefore, I recommend that whenever you use an algebra block, you also do the algebra yourself on paper.
+      </div>
+      <div id="neqHint" class="modal hint">
+        The expression "x≠y" means the same as "¬(x=y)".
+      </div>
+      <div id="negateHint" class="modal hint">
+        I need to use different symbols for <i>subtraction</i> (of two numbers) and <i>negation</i> (of one number).
+        I'll write "x−y" for subtraction (you can type this with the ordinary hyphen key) and "∸x" for negation (you can type this with a double hyphen, <tt>--</t>).
+      </div>
     </div>
 
     <script src="main.bundle.js"></script>

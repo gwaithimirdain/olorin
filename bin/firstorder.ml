@@ -32,6 +32,7 @@ def coprod (A B : Type) : Type ≔ data [ left. (_:A) | right. (_:B) ]
 axiom negneg (P : Type) : neg (neg P) → P
 
 axiom eq (A : Type) (x y : A) : Type
+def neq (A : Type) (x y : A) : Type ≔ neg (eq A x y)
 axiom Nil_eqs : Type
 axiom nil_eqs : Nil_eqs
 axiom Cons_eqs (x_eq_y : Type) (_ : x_eq_y) (rest : Type) (_ : rest) : Type
@@ -70,6 +71,7 @@ let onechar_ops =
     (0x22A4, Ident [ "⊤" ]);
     (0x2212, Ident [ "−" ]);
     (0x2238, Ident [ "∸" ]);
+    (0x2260, Ident [ "≠" ]);
     (0xB2, Ident [ "²" ]);
     (0xB3, Ident [ "³" ]);
     (0x2074, Ident [ "⁴" ]);
@@ -86,6 +88,7 @@ type (_, _, _) identity +=
   | Coprod : (No.strict opn, No.zero, No.strict opn) identity
   | Neg : (closed, No.one, No.strict opn) identity
   | Equals : (No.strict opn, No.zero, No.strict opn) identity
+  | Neq : (No.strict opn, No.zero, No.strict opn) identity
   | Plus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Minus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Times : (No.nonstrict opn, No.three, No.strict opn) identity
@@ -106,6 +109,7 @@ let prod : (No.strict opn, No.zero, No.strict opn) notation = (Prod, Infix No.ze
 let coprod : (No.strict opn, No.zero, No.strict opn) notation = (Coprod, Infix No.zero)
 let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
 let equals : (No.strict opn, No.zero, No.strict opn) notation = (Equals, Infix No.zero)
+let neq : (No.strict opn, No.zero, No.strict opn) notation = (Neq, Infix No.zero)
 let plus : (No.nonstrict opn, No.two, No.strict opn) notation = (Plus, Infixl No.two)
 let minus : (No.nonstrict opn, No.two, No.strict opn) notation = (Minus, Infixl No.two)
 let times : (No.nonstrict opn, No.three, No.strict opn) notation = (Times, Infixl No.three)
@@ -312,6 +316,41 @@ let () =
       print_case = None;
       is_case = (fun _ -> false);
     };
+  make neq
+    {
+      name = "≠";
+      tree = Open_entry (eop (Ident [ "≠" ]) (done_open neq));
+      processor =
+        (fun ctx obs loc ->
+          match obs with
+          | Term x :: Token (Ident [ "≠" ], _) :: Term y :: _ -> (
+              let x, y = (process ctx x, process ctx y) in
+              match x.value with
+              | Synth sx ->
+                  locate_opt loc
+                    (Synth
+                       (App
+                          ( locate_opt loc
+                              (ImplicitSApp
+                                 ( locate_opt loc (Const (Option.get (Scope.lookup [ "neq" ]))),
+                                   loc,
+                                   locate_opt x.loc sx )),
+                            y,
+                            locate_opt None `Explicit )))
+              | _ -> fatal (Nonsynthesizing "first argument of neq"))
+          | _ -> Builtins.invalid "≠");
+      print_term =
+        Some
+          (fun obs ->
+            match obs with
+            | Term x :: Token (Ident [ "≠" ], wseq) :: Term y :: _ ->
+                let px, wsx = pp_term x in
+                let py, wsy = pp_term y in
+                (px ^^ pp_ws `None wsx ^^ Token.pp (Ident [ "≠" ]) ^^ pp_ws `None wseq ^^ py, wsy)
+            | _ -> Builtins.invalid "≠");
+      print_case = None;
+      is_case = (fun _ -> false);
+    };
   List.iter
     (fun (name, sym, asym, Wrap_infixl onotn, ostr) ->
       make onotn
@@ -439,6 +478,14 @@ let install_notations () =
       pat_vars = [ "x"; "y"; "A" ];
       val_vars = [ "A"; "x"; "y" ];
       inner_symbols = `Multiple (Op "=", [ None ], Op ":>");
+    };
+  Situation.Current.add_with_print
+    {
+      key = `Constant (Option.get (Scope.lookup [ "neq" ]));
+      notn = Wrap neq;
+      pat_vars = [ "x"; "y"; "A" ];
+      val_vars = [ "A"; "x"; "y" ];
+      inner_symbols = `Multiple (Op "≠", [ None ], Op ":>");
     };
   List.iter
     (fun (_, sym, _, Wrap_infixl onotn, ostr) ->

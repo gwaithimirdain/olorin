@@ -26,7 +26,7 @@ document.documentElement.style.setProperty('--master-bg', COLORS[2][1].backgroun
 const VALUECOLOR = "#0000ff";
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', 'ℤ', '²', '³', '⁴'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', 'ℤ'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
@@ -51,6 +51,7 @@ const KEYS = [
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
     { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
+    { unicode: '≠', keys: [ '\\neq' ] },
     { unicode: 'ℤ', keys: [ '\\Z ' ] },
     { unicode: '²', keys: [ '^2', '**2' ] },
     { unicode: '³', keys: [ '^3', '**3' ] },
