@@ -1049,7 +1049,7 @@ function submitAscription() {
     const ascribe = document.getElementById('ascribe');
     const box = document.getElementById(ascribe.dataset.name);
     const ty = ascribe.value;
-    if(ty === "") {
+    if(!Narya.checkParse(ty).complete) {
         alert("Invalid ascription");
         return;
     }
@@ -1077,7 +1077,7 @@ function submitExpr() {
     const expr = document.getElementById('expression');
     const box = document.getElementById(expr.dataset.name);
     const e = expr.value;
-    if(e === "") {
+    if(!Narya.checkParse(e).complete) {
         alert("Invalid expression");
         return;
     }

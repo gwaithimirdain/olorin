@@ -202,11 +202,13 @@
     </div>
 
     <div id="expressionBG" class="modalbg">
-      <div class="modal">
+      <div class="modal" style="width:600px">
         <h3 style="text-align: center">Enter an expression</h3>
-        <p>Introduce the following expression, possibly using other available variables:</p>
-        <input type="text" id="expression" style="width: 100%"/>
+        <p>Enter an expression, possibly using available variables.</p>
+        <input type="text" id="expression" style="width: 97%"/>
         <div id="expressionPalette"></div>
+        <p>Multiplication is denoted by <tt>*</tt> and exponentiation by <tt>**</tt>, so to write 2x²+1 you should type <tt>2*x**2+1</tt> (displayed as 2*x²+1) .
+          Subtraction is denoted with <tt>-</tt> and prefix negation by <tt>--</tt>, so to write −x−1 you should type <tt>--x-1</tt> (displayed as ∸x−1).</p>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitExpression" style="font-size: 16px">Submit</button><br/>
         </div>

@@ -1130,4 +1130,19 @@ let _ =
            val mutable labels = Js.array (Array.of_list [])
            val mutable diagnostics = Js.array (Array.of_list [])
          end
+
+       (* Similarly, check that an expression parses.  (Whether it typechecks, including whether its variables resolve, depends on what wires it connects to and hence is in the scope of.) *)
+       method checkParse (str : Js.js_string Js.t) =
+         Pauser.next @@ fun () ->
+         let str = Js.to_string str in
+         let ok =
+           Reporter.try_with ~fatal:(fun _ -> false) @@ fun () ->
+           let _ = Parse.Term.final (Parse.Term.parse (`String { title = None; content = str })) in
+           true in
+         object%js
+           val mutable complete = Js.bool ok
+           val mutable error = Js.null
+           val mutable labels = Js.array (Array.of_list [])
+           val mutable diagnostics = Js.array (Array.of_list [])
+         end
     end)
