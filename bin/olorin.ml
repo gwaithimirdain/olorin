@@ -256,13 +256,19 @@ let ensure_synth (tm : term_with_bindables located) (err : string) :
 
 (* From graphs to raw terms with named variables *)
 
-(* The fundamental operation takes an output port and produces a raw term with named variables, where as above the "names" might be user-visible strings or hypothesis/assumption ports.  We thread through a set 'seen' that tracks which vertices have been seen, to detect cycles.  We attach Asai "locations" to parts of this term that correspond to *edges* in the graph.  We report as an additional result the set of variable ports on which this term depends.  *)
+(* The fundamental operation takes an output port and produces a raw term with named variables, where as above the "names" might be user-visible strings or hypothesis/assumption ports.  We thread through a set 'seen' that tracks which vertices have been seen, to detect cycles.  We attach Asai "locations" to parts of this term that correspond to *edges* in the graph.  We report as an additional result the set of variable ports on which this term depends.  The optional edge is used to annotate outputs. *)
 let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : bwd_graph)
-    (source : Port.t) : term_with_bindables located * PortSet.t =
+    (source : Port.t) ~(edge : Edge.t option) : term_with_bindables located * PortSet.t =
   let oldseen = seen in
   let seen = oldseen |> IdSet.add source.vertex in
   (* We set the current output port as the only location for the term.  Callers can add to that location with Loc.append_to_loc. *)
-  let loc = ref (Loc.make [ `Port source ]) in
+  let locables =
+    `Port source
+    ::
+    (match edge with
+    | Some e -> [ `Edge e.id ]
+    | None -> []) in
+  let loc = ref (Loc.make locables) in
   (* Assumption ports are technically "cycles" but they are allowed. *)
   if source.sort = Assumption then
     (locate !loc (without_bindables (Synth (Var (`Port source, None)))), PortSet.singleton source)
@@ -391,7 +397,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             | `Synthesizing fn, `Nonsynthesizing arg | `Nonsynthesizing arg, `Synthesizing fn ->
                 Named.SFirst
                   ( [ (`Any, make_direct fn arg, true); (`Any, make_reversed fn arg, true) ],
-                    fn.value )
+                    Some fn.value )
             (* If both are synthesizing, we try all four possibilities. *)
             | `Synthesizing tm1, `Synthesizing tm2 ->
                 SFirst
@@ -401,7 +407,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                       (`Any, make_reversed tm1 (locate_map (fun x -> Named.Synth x) tm2), true);
                       (`Any, make_reversed tm2 (locate_map (fun x -> Named.Synth x) tm1), true);
                     ],
-                    tm1.value )
+                    Some tm1.value )
             (* If neither is synthesizing, we're sunk. *)
             | `Nonsynthesizing fn, `Nonsynthesizing arg ->
                 make_direct
@@ -531,8 +537,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let ty = source_vertex.value <||> "missing ascription type" in
-          (* TODO: Should locate this on the rule; the output port doesn't get labeled. *)
-          let tyloc = Loc.make ~content:ty [ `Port source ] in
+          (* Output ports don't get red-colored with errors, so we also include the output wire -- non-annotating so it doesn't get labeled with an *input* type.  Ideally, we would report errors on the *input* wires when they have the wrong type, but that would require overriding the locations that variables in the parsed term acquire from their parsing.  *)
+          let tyloc = Loc.make ~content:ty ~annotate:false locables in
           (* We insist that only variables appearing in the inputs can be used. *)
           let ty =
             Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
@@ -549,8 +555,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           (* Get all the bindables and variables from all the input wires connected to this rule. *)
           let bindables, variables =
             vars_of_input_port ~seen vertices graph { source with sort = Input; label = None } in
-          (* TODO: Should locate this on the rule; the output port doesn't get labeled.  Currently the output *wire* gets a red label when the expression is invalid, which is better than nothing but not optimal. *)
-          let eloc = Loc.make ~content:e [ `Port source ] in
+          (* See remark about locations in Asc above *)
+          let eloc = Loc.make ~content:e ~annotate:false locables in
           (* Now we insist that only those variables can be used. *)
           let e =
             Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
@@ -571,7 +577,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let givens, bindables, variables =
             List.fold_left
               (fun (givens, bindables, variables) (e : Edge.t) ->
-                let tm, new_variables = check_of_output_port ~seen vertices graph e.source in
+                let tm, new_variables =
+                  check_of_output_port ~seen vertices graph ~edge:(Some e) e.source in
                 (* We have to do these things that check_of_input_port does, since we're not calling it *)
                 let tm = Loc.append_to_loc tm [ `Edge e.id; `Port port ] in
                 let tm : term_with_bindables located = ascribe_with_user_label tm e in
@@ -594,7 +601,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     (locate_opt None (Named.ImplicitSApp (oracle, None, locate_opt None givens)), [])))
           in
           ({ bindables; term }, variables)
-      | User { const; inputs } ->
+      | User { consts; inputs } ->
           let bindables, variables, args =
             List.fold_left
               (fun (bindables, variables, args) label ->
@@ -607,12 +614,19 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                   Snoc (args, locate_opt loc term) ))
               (Bindables.empty, PortSet.empty, Emp)
               inputs in
-          let term =
-            Bwd.fold_left
-              (fun tm arg -> Named.App (locate_opt None tm, arg, locate_opt None `Explicit))
-              (Named.Const (Scope.lookup [ const ] <||> "user constant " ^ const ^ " not found"))
-              args in
-          ({ bindables; term = Named.Synth term }, variables) in
+          let terms =
+            List.map
+              (fun const ->
+                ( `Any,
+                  Bwd.fold_left
+                    (fun tm arg -> Named.App (locate_opt None tm, arg, locate_opt None `Explicit))
+                    (Named.Const
+                       (Scope.lookup const
+                       <||> "user constant " ^ String.concat "." const ^ " not found"))
+                    args,
+                  true ))
+              consts in
+          ({ bindables; term = Synth (SFirst (terms, None)) }, variables) in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments *)
@@ -637,7 +651,7 @@ and vars_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : 
         let ( ({ value = { bindables = new_bindables; term = _ }; loc = _ } :
                 term_with_bindables Range.located),
               new_variables ) =
-          check_of_output_port ~seen vertices graph e.source in
+          check_of_output_port ~seen vertices graph ~edge:(Some e) e.source in
         go (Bindables.union bindables new_bindables) (PortSet.union variables new_variables) edges
   in
   go Bindables.empty PortSet.empty (Option.value (TargetMap.find_opt port graph) ~default:[])
@@ -648,7 +662,7 @@ and check_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph :
   match TargetMap.find_opt port graph with
   | Some [ e ] ->
       (* If there is an edge, we get a term from its source port. *)
-      let tm, variables = check_of_output_port ~seen vertices graph e.source in
+      let tm, variables = check_of_output_port ~seen vertices graph ~edge:(Some e) e.source in
       (* We add that edge and the input port to the location of the resulting term. *)
       let tm = Loc.append_to_loc tm [ `Edge e.id; `Port port ] in
       (* If the edge has a type label, we ascribe it to that label. *)
@@ -772,7 +786,7 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
         match d.message with
         | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
         | _ -> emit_diagnostic d)
-    @@ fun () -> check_of_output_port ~seen:IdSet.empty vertices bwd_graph p in
+    @@ fun () -> check_of_output_port ~seen:IdSet.empty vertices bwd_graph ~edge:None p in
   (* Now we recurse through the supplied contexts/scopes. *)
   let rec look_for_scope contexts =
     match contexts with

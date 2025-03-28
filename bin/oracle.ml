@@ -3,6 +3,7 @@ open Util
 open Dim
 open Core
 open Value
+open Subtype
 open Reporter
 open Parser
 open Printable
@@ -210,7 +211,7 @@ let rec get_givens ctx (ty : normal) givens =
          && Option.is_some (is_id_ins restins) -> (
       let veqty = (CubeOf.find_top eqty).tm in
       let* op, ty', x, y = get_equality_or_inequality ctx veqty in
-      match Equal.equal_at (Ctx.length ctx) ty.tm ty'.tm ty.ty with
+      match subtype_of ctx ty'.tm ty.tm with
       | Some () ->
           let* rest = get_givens ctx ty (CubeOf.find_top rest).tm in
           return ((op, x, y) :: rest)

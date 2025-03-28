@@ -43,6 +43,8 @@ axiom oracle (A : Type) (x : A) (C : Type) : C
 
 axiom lt (A : Type) (x y : A) : Type
 axiom le (A : Type) (x y : A) : Type
+def gt (A : Type) (x y : A) : Type ≔ lt A y x
+def ge (A : Type) (x y : A) : Type ≔ le A y x
 
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 
@@ -57,6 +59,42 @@ axiom ℤ.cube : ℤ → ℤ
 axiom ℤ.fourth : ℤ → ℤ
 
 axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
+
+def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) | quot. (_:ℚ) (_:ℚ) ]
+axiom ℚ.plus : ℚ → ℚ → ℚ
+axiom ℚ.minus : ℚ → ℚ → ℚ
+axiom ℚ.times : ℚ → ℚ → ℚ
+axiom ℚ.pow : ℚ → ℕ → ℚ
+axiom ℚ.negate : ℚ → ℚ
+axiom ℚ.square : ℚ → ℚ
+axiom ℚ.cube : ℚ → ℚ
+axiom ℚ.fourth : ℚ → ℚ
+
+axiom ℚ.integral (x y : ℚ) : eq ℚ (ℚ.times x y) 0 → lor (eq ℚ x 0) (eq ℚ y 0)
+
+def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) | quot. (_:ℝ) (_:ℝ) ]
+axiom ℝ.plus : ℝ → ℝ → ℝ
+axiom ℝ.minus : ℝ → ℝ → ℝ
+axiom ℝ.times : ℝ → ℝ → ℝ
+axiom ℝ.pow : ℝ → ℕ → ℝ
+axiom ℝ.negate : ℝ → ℝ
+axiom ℝ.square : ℝ → ℝ
+axiom ℝ.cube : ℝ → ℝ
+axiom ℝ.fourth : ℝ → ℝ
+
+axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (eq ℝ y 0)
+
+def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | quot. (_:𝕊) (_:𝕊) | omega. ]
+axiom 𝕊.plus : 𝕊 → 𝕊 → 𝕊
+axiom 𝕊.minus : 𝕊 → 𝕊 → 𝕊
+axiom 𝕊.times : 𝕊 → 𝕊 → 𝕊
+axiom 𝕊.pow : 𝕊 → ℕ → 𝕊
+axiom 𝕊.negate : 𝕊 → 𝕊
+axiom 𝕊.square : 𝕊 → 𝕊
+axiom 𝕊.cube : 𝕊 → 𝕊
+axiom 𝕊.fourth : 𝕊 → 𝕊
+
+axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
 "
 
 let get_const parts = Scope.lookup parts <||> String.concat "." parts ^ " not found"
@@ -103,7 +141,9 @@ type (_, _, _) identity +=
   | Neg : (closed, No.one, No.strict opn) identity
   | Equals : (No.strict opn, No.zero, No.strict opn) identity
   | Lt : (No.strict opn, No.zero, No.strict opn) identity
+  | Gt : (No.strict opn, No.zero, No.strict opn) identity
   | Le : (No.strict opn, No.zero, No.strict opn) identity
+  | Ge : (No.strict opn, No.zero, No.strict opn) identity
   | Neq : (No.strict opn, No.zero, No.strict opn) identity
   | Plus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Minus : (No.nonstrict opn, No.two, No.strict opn) identity
@@ -126,7 +166,9 @@ let coprod : (No.strict opn, No.zero, No.strict opn) notation = (Coprod, Infix N
 let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
 let equals : (No.strict opn, No.zero, No.strict opn) notation = (Equals, Infix No.zero)
 let lt : (No.strict opn, No.zero, No.strict opn) notation = (Lt, Infix No.zero)
+let gt : (No.strict opn, No.zero, No.strict opn) notation = (Gt, Infix No.zero)
 let le : (No.strict opn, No.zero, No.strict opn) notation = (Le, Infix No.zero)
+let ge : (No.strict opn, No.zero, No.strict opn) notation = (Ge, Infix No.zero)
 let neq : (No.strict opn, No.zero, No.strict opn) notation = (Neq, Infix No.zero)
 let plus : (No.nonstrict opn, No.two, No.strict opn) notation = (Plus, Infixl No.two)
 let minus : (No.nonstrict opn, No.two, No.strict opn) notation = (Minus, Infixl No.two)
@@ -151,19 +193,21 @@ let binops =
 
 type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -> infixl
 
+let numbers = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
+
 let algebra =
   [
-    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, [ "ℤ"; "plus" ]);
-    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, [ "ℤ"; "minus" ]);
-    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, [ "ℤ"; "times" ]);
-    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "ℤ"; "pow" ]);
+    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, [ "plus" ]);
+    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, [ "minus" ]);
+    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, [ "times" ]);
+    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "pow" ]);
   ]
 
 let powers =
   [
-    ("²", Token.Ident [ "²" ], Token.Ident [ "^2" ], square, [ "ℤ"; "square" ]);
-    ("³", Token.Ident [ "³" ], Token.Ident [ "^3" ], cube, [ "ℤ"; "cube" ]);
-    ("⁴", Token.Ident [ "⁴" ], Token.Ident [ "^4" ], fourth, [ "ℤ"; "fourth" ]);
+    ("²", Token.Ident [ "²" ], Token.Ident [ "^2" ], square, [ "square" ]);
+    ("³", Token.Ident [ "³" ], Token.Ident [ "^3" ], cube, [ "cube" ]);
+    ("⁴", Token.Ident [ "⁴" ], Token.Ident [ "^4" ], fourth, [ "fourth" ]);
   ]
 
 let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
@@ -300,15 +344,17 @@ let () =
 
 let relations =
   [
-    ("=", Token.Op "=", equals, "eq");
-    ("≠", Ident [ "≠" ], neq, "neq");
-    ("<", Op "<", lt, "lt");
-    ("≤", Ident [ "≤" ], le, "le");
+    ("=", Token.Op "=", equals, "eq", "neq");
+    ("≠", Ident [ "≠" ], neq, "neq", "eq");
+    ("<", Op "<", lt, "lt", "gt");
+    (">", Op ">", gt, "gt", "lt");
+    ("≤", Ident [ "≤" ], le, "le", "ge");
+    ("≥", Ident [ "≥" ], ge, "ge", "le");
   ]
 
 let () =
   List.iter
-    (fun (name, tok, notn, str) ->
+    (fun (name, tok, notn, str, opp_str) ->
       make notn
         {
           name;
@@ -316,21 +362,41 @@ let () =
           processor =
             (fun ctx obs loc ->
               match obs with
-              | Term x :: Token _ :: Term y :: _ -> (
+              | Term x :: Token _ :: Term y :: _ ->
                   let x, y = (process ctx x, process ctx y) in
-                  match x.value with
-                  | Synth sx ->
-                      locate_opt loc
-                        (Synth
-                           (App
+                  let xterm =
+                    match x.value with
+                    | Synth sx ->
+                        [
+                          ( `Any,
+                            App
                               ( locate_opt loc
                                   (ImplicitSApp
                                      ( locate_opt loc (Const (get_const [ str ])),
                                        loc,
                                        locate_opt x.loc sx )),
                                 y,
-                                locate_opt None `Explicit )))
-                  | _ -> fatal (Nonsynthesizing ("first argument of " ^ str)))
+                                locate_opt None `Explicit ),
+                            true );
+                        ]
+                    | _ -> [] in
+                  let yterm =
+                    match y.value with
+                    | Synth sy ->
+                        [
+                          ( `Any,
+                            App
+                              ( locate_opt loc
+                                  (ImplicitSApp
+                                     ( locate_opt loc (Const (get_const [ opp_str ])),
+                                       loc,
+                                       locate_opt y.loc sy )),
+                                x,
+                                locate_opt None `Explicit ),
+                            true );
+                        ]
+                    | _ -> [] in
+                  locate_opt loc (Synth (SFirst (xterm @ yterm, None)))
               | _ -> Builtins.invalid name);
           print_term =
             Some
@@ -358,14 +424,24 @@ let () =
               match obs with
               | [ Term x; Token _; Term y ] ->
                   let x, y = (process ctx x, process ctx y) in
-                  let oconst = get_const ostr in
                   locate_opt loc
                     (Synth
-                       (App
-                          ( locate_opt loc
-                              (App (locate_opt loc (Const oconst), x, locate_opt None `Explicit)),
-                            y,
-                            locate_opt None `Explicit )))
+                       (* Try the first (smallest) number system that works for both arguments. *)
+                       (SFirst
+                          ( List.map
+                              (fun ty ->
+                                ( `Any,
+                                  App
+                                    ( locate_opt None
+                                        (App
+                                           ( locate_opt loc (Const (get_const (ty :: ostr))),
+                                             x,
+                                             locate_opt None `Explicit )),
+                                      y,
+                                      locate_opt None `Explicit ),
+                                  true ))
+                              numbers,
+                            None )))
               | _ -> Builtins.invalid name);
           print_term =
             Some
@@ -391,8 +467,20 @@ let () =
           match obs with
           | [ Token _; Term x ] ->
               let x = process ctx x in
-              let nc = get_const [ "ℤ"; "negate" ] in
-              locate_opt loc (Synth (App (locate_opt loc (Const nc), x, locate_opt None `Explicit)))
+
+              locate_opt loc
+                (Synth
+                   (SFirst
+                      ( List.map
+                          (fun ty ->
+                            ( `Any,
+                              App
+                                ( locate_opt loc (Const (get_const [ ty; "negate" ])),
+                                  x,
+                                  locate_opt None `Explicit ),
+                              true ))
+                          numbers,
+                        None )))
           | _ -> Builtins.invalid "negate");
       print_term =
         Some
@@ -415,9 +503,19 @@ let () =
               match obs with
               | [ Term x; Token _ ] ->
                   let x = process ctx x in
-                  let pow = get_const ostr in
                   locate_opt loc
-                    (Synth (App (locate_opt loc (Const pow), x, locate_opt None `Explicit)))
+                    (Synth
+                       (SFirst
+                          ( List.map
+                              (fun ty ->
+                                ( `Any,
+                                  App
+                                    ( locate_opt loc (Const (get_const (ty :: ostr))),
+                                      x,
+                                      locate_opt None `Explicit ),
+                                  true ))
+                              numbers,
+                            None )))
               | _ -> Builtins.invalid name);
           print_term =
             Some
@@ -433,6 +531,12 @@ let () =
         })
     powers
 
+let rec add_subtypes = function
+  | [] | [ _ ] -> ()
+  | subtype :: supertypes ->
+      List.iter (Subtype.add subtype) supertypes;
+      add_subtypes supertypes
+
 (* Finally, here is a function that installs these notations into the current Situation.  This must be run inside the Pauser. *)
 
 let install_notations () =
@@ -440,7 +544,7 @@ let install_notations () =
     (fun (oname, Wrap_infix onotn, ostr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (get_const ostr);
+          keys = [ `Constant (get_const ostr) ];
           notn = Wrap onotn;
           pat_vars = [ "P"; "Q" ];
           val_vars = [ "P"; "Q" ];
@@ -451,7 +555,7 @@ let install_notations () =
     (fun (qname, qnotn, qstr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (get_const [ qstr ]);
+          keys = [ `Constant (get_const [ qstr ]) ];
           notn = Wrap qnotn;
           pat_vars = [ "A"; "P" ];
           val_vars = [ "A"; "P" ];
@@ -460,17 +564,17 @@ let install_notations () =
     quantifiers;
   Situation.Current.add_with_print
     {
-      key = `Constant (get_const [ "neg" ]);
+      keys = [ `Constant (get_const [ "neg" ]) ];
       notn = Wrap neg;
       pat_vars = [ "P" ];
       val_vars = [ "P" ];
       inner_symbols = `Single (Op "¬");
     };
   List.iter
-    (fun (_, tok, notn, str) ->
+    (fun (_, tok, notn, str, _) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (get_const [ str ]);
+          keys = [ `Constant (get_const [ str ]) ];
           notn = Wrap notn;
           pat_vars = [ "x"; "y"; "A" ];
           val_vars = [ "A"; "x"; "y" ];
@@ -481,7 +585,7 @@ let install_notations () =
     (fun (_, _, usym, asym, Wrap_infixl onotn, ostr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (get_const ostr);
+          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];
@@ -492,7 +596,7 @@ let install_notations () =
     (fun (_, sym, _, onotn, ostr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (get_const ostr);
+          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
           notn = Wrap onotn;
           pat_vars = [ "x" ];
           val_vars = [ "x" ];
@@ -501,9 +605,10 @@ let install_notations () =
     powers;
   Situation.Current.add_with_print
     {
-      key = `Constant (get_const [ "ℤ"; "negate" ]);
+      keys = List.map (fun ty -> `Constant (get_const [ ty; "negate" ])) numbers;
       notn = Wrap negate;
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
       inner_symbols = `Single (Ident [ "∸" ]);
-    }
+    };
+  add_subtypes (List.map (fun x -> get_const [ x ]) numbers)

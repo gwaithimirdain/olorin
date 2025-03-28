@@ -33,7 +33,7 @@ type rule =
   | Algebra
   | Var
   | Conclusion
-  | User of { const : string; inputs : string list }
+  | User of { consts : string list list; inputs : string list }
 
 (* Here are the specific rules currently used in graphs.  The port labels used here have to match those used in the JavaScript.  It would be better if the JavaScript could get them from here. *)
 let rules =
@@ -93,5 +93,11 @@ let rules =
       ("asc", Asc);
       ("expr", Expr);
       ("alg", Algebra);
-      ("integral", User { const = "integral"; inputs = [ "x"; "y"; "xy0" ] });
+      ( "integral",
+        User
+          {
+            consts =
+              [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
+            inputs = [ "x"; "y"; "xy0" ];
+          } );
     ]
