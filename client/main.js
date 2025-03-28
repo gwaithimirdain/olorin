@@ -33,6 +33,10 @@ function escapeRegex(string) {
     return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
+function escapeHtml(str) {
+    return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
 // Shortcut key sequences for unicode characters, many TeX-inspired
 const KEYS = [
     { unicode: '∧',  keys: [ '\\land ', '\\wedge ', '/\\' ] },
@@ -594,6 +598,9 @@ function makeLevelSelect(res) {
     var maxcols = 0;
     var maxrows = 0;
     LEVELS.forEach(function (world, x) {
+        // Skip this world if it requires a server and we're not in server mode.
+        if(world.server && !SERVER) { return; }
+
         const worldPane = document.createElement("div");
         worldPane.className = "world";
         worlds.appendChild(worldPane);
@@ -1437,8 +1444,6 @@ function addConnection(params) {
 function typecheck() {
     if(suppressChecking) { return; }
 
-    const diagram = document.getElementById('diagram');
-    
     console.log("typechecking with " + nodes.length + " nodes");
     var connctr = 0;
     var connections = {};
@@ -1500,9 +1505,44 @@ function typecheck() {
         }
     });
 
-    // Call to Narya to do the typechecking.  The result is an object of type {complete:bool, error:string opt, labels, diagnostics}.
-    const result = Narya.check(nodes, edges);
+    // Call to Narya to do the typechecking.  The result is an object of type {complete:bool, callback:string opt, error:string opt, labels, diagnostics}, which we pass off to the "continue" function.
+    continue_typechecking(nodes, edges, connections, Narya.check(nodes, edges));
+}
 
+function continue_typechecking(nodes, edges, connections, result) {
+    // If a callback string was supplied, we pass it off to the server and wait for a response.
+    if(result.callback) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reduce', true);
+        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+        xhr.onload = function() {
+            // When we get a response back...
+            var response;
+            if (xhr.status === 200) {
+                let res = JSON.parse(xhr.responseText);
+                if(res.error) {
+                    console.log ("res.error");
+                    response = false;
+                } else {
+                    console.log ("result");
+                    console.log (res);
+                    response = res.result;
+                }
+            } else {
+                console.log ("wrong code");
+                response = false;
+            }
+            // ...we pass it back to Narya and continue with this function on the result (which might have another callback, etc.)
+            continue_typechecking(nodes, edges, connections, Narya.reenter(response));
+        };
+        const data = { command: result.callback };
+        xhr.send(JSON.stringify(data));
+        // For now, we abort this function; we'll come back to it when the response arrives.
+        return;
+    }
+
+    const diagram = document.getElementById('diagram');
+    
     // Display results
     if(result.error) {
         console.log(result.error);
@@ -1591,7 +1631,7 @@ function typecheck() {
                                         if(endpoint.parameters.hasValue) {
                                             cssClass = cssClass + " connLabelValue";
                                         }
-                                        d.innerHTML = '<div class="' + cssClass + '">' + lbl + "</div>";
+                                        d.innerHTML = '<div class="' + cssClass + '">' + escapeHtml(lbl) + "</div>";
                                         return d;
                                     },
                                 } })
@@ -1697,13 +1737,14 @@ function typecheck() {
                                                     if(endpoint.parameters.hasValue) {
                                                         ty = "? ∈ " + ty;
                                                     }
+                                                    const ety = escapeHtml(ty);
                                                     if(endpoint.parameters.side === "upper") {
-                                                        d.innerHTML = '<div class="upperInputLabel">' + ty + "</div>";
+                                                        d.innerHTML = '<div class="upperInputLabel">' + ety + "</div>";
                                                     } else if(endpoint.parameters.side === "middle") {
-                                                        d.innerHTML = '<div class="middleInputLabel">' + ty + "</div>";
+                                                        d.innerHTML = '<div class="middleInputLabel">' + ety + "</div>";
                                                     } else {
                                                         // Lower is the default
-                                                        d.innerHTML = '<div class="lowerInputLabel">' + ty + "</div>";
+                                                        d.innerHTML = '<div class="lowerInputLabel">' + ety + "</div>";
                                                     }
                                                     return d;
                                                 },

@@ -41,6 +41,9 @@ axiom Cons_eqs (x_eq_y : Type) (_ : x_eq_y) (rest : Type) (_ : rest) : Type
 axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs x_eq_y H rest r
 axiom oracle (A : Type) (x : A) (C : Type) : C
 
+axiom lt (A : Type) (x y : A) : Type
+axiom le (A : Type) (x y : A) : Type
+
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 
 def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) | negsuc. (_:ℤ) ]
@@ -99,6 +102,8 @@ type (_, _, _) identity +=
   | Coprod : (No.strict opn, No.zero, No.strict opn) identity
   | Neg : (closed, No.one, No.strict opn) identity
   | Equals : (No.strict opn, No.zero, No.strict opn) identity
+  | Lt : (No.strict opn, No.zero, No.strict opn) identity
+  | Le : (No.strict opn, No.zero, No.strict opn) identity
   | Neq : (No.strict opn, No.zero, No.strict opn) identity
   | Plus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Minus : (No.nonstrict opn, No.two, No.strict opn) identity
@@ -120,6 +125,8 @@ let prod : (No.strict opn, No.zero, No.strict opn) notation = (Prod, Infix No.ze
 let coprod : (No.strict opn, No.zero, No.strict opn) notation = (Coprod, Infix No.zero)
 let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
 let equals : (No.strict opn, No.zero, No.strict opn) notation = (Equals, Infix No.zero)
+let lt : (No.strict opn, No.zero, No.strict opn) notation = (Lt, Infix No.zero)
+let le : (No.strict opn, No.zero, No.strict opn) notation = (Le, Infix No.zero)
 let neq : (No.strict opn, No.zero, No.strict opn) notation = (Neq, Infix No.zero)
 let plus : (No.nonstrict opn, No.two, No.strict opn) notation = (Plus, Infixl No.two)
 let minus : (No.nonstrict opn, No.two, No.strict opn) notation = (Minus, Infixl No.two)
@@ -291,77 +298,55 @@ let () =
         })
     quantifiers
 
+let relations =
+  [
+    ("=", Token.Op "=", equals, "eq");
+    ("≠", Ident [ "≠" ], neq, "neq");
+    ("<", Op "<", lt, "lt");
+    ("≤", Ident [ "≤" ], le, "le");
+  ]
+
 let () =
-  make equals
-    {
-      name = "=";
-      tree = Open_entry (eop (Op "=") (done_open equals));
-      processor =
-        (fun ctx obs loc ->
-          match obs with
-          | Term x :: Token (Op "=", _) :: Term y :: _ -> (
-              let x, y = (process ctx x, process ctx y) in
-              match x.value with
-              | Synth sx ->
-                  locate_opt loc
-                    (Synth
-                       (App
-                          ( locate_opt loc
-                              (ImplicitSApp
-                                 ( locate_opt loc (Const (get_const [ "eq" ])),
-                                   loc,
-                                   locate_opt x.loc sx )),
-                            y,
-                            locate_opt None `Explicit )))
-              | _ -> fatal (Nonsynthesizing "first argument of equals"))
-          | _ -> Builtins.invalid "=");
-      print_term =
-        Some
-          (fun obs ->
-            match obs with
-            | Term x :: Token (Op "=", wseq) :: Term y :: _ ->
-                let px, wsx = pp_term x in
-                let py, wsy = pp_term y in
-                (px ^^ pp_ws `None wsx ^^ Token.pp (Op "=") ^^ pp_ws `None wseq ^^ py, wsy)
-            | _ -> Builtins.invalid "=");
-      print_case = None;
-      is_case = (fun _ -> false);
-    };
-  make neq
-    {
-      name = "≠";
-      tree = Open_entry (eop (Ident [ "≠" ]) (done_open neq));
-      processor =
-        (fun ctx obs loc ->
-          match obs with
-          | Term x :: Token (Ident [ "≠" ], _) :: Term y :: _ -> (
-              let x, y = (process ctx x, process ctx y) in
-              match x.value with
-              | Synth sx ->
-                  locate_opt loc
-                    (Synth
-                       (App
-                          ( locate_opt loc
-                              (ImplicitSApp
-                                 ( locate_opt loc (Const (get_const [ "neq" ])),
-                                   loc,
-                                   locate_opt x.loc sx )),
-                            y,
-                            locate_opt None `Explicit )))
-              | _ -> fatal (Nonsynthesizing "first argument of neq"))
-          | _ -> Builtins.invalid "≠");
-      print_term =
-        Some
-          (fun obs ->
-            match obs with
-            | Term x :: Token (Ident [ "≠" ], wseq) :: Term y :: _ ->
-                let px, wsx = pp_term x in
-                let py, wsy = pp_term y in
-                (px ^^ pp_ws `None wsx ^^ Token.pp (Ident [ "≠" ]) ^^ pp_ws `None wseq ^^ py, wsy)
-            | _ -> Builtins.invalid "≠");
-      print_case = None;
-      is_case = (fun _ -> false);
-    };
+  List.iter
+    (fun (name, tok, notn, str) ->
+      make notn
+        {
+          name;
+          tree = Open_entry (eop tok (done_open notn));
+          processor =
+            (fun ctx obs loc ->
+              match obs with
+              | Term x :: Token _ :: Term y :: _ -> (
+                  let x, y = (process ctx x, process ctx y) in
+                  match x.value with
+                  | Synth sx ->
+                      locate_opt loc
+                        (Synth
+                           (App
+                              ( locate_opt loc
+                                  (ImplicitSApp
+                                     ( locate_opt loc (Const (get_const [ str ])),
+                                       loc,
+                                       locate_opt x.loc sx )),
+                                y,
+                                locate_opt None `Explicit )))
+                  | _ -> fatal (Nonsynthesizing ("first argument of " ^ str)))
+              | _ -> Builtins.invalid name);
+          print_term =
+            Some
+              (fun obs ->
+                match obs with
+                | Term x :: Token (_, wseq) :: Term y :: _ ->
+                    let px, wsx = pp_term x in
+                    let py, wsy = pp_term y in
+                    (px ^^ pp_ws `None wsx ^^ Token.pp tok ^^ pp_ws `None wseq ^^ py, wsy)
+                | _ -> Builtins.invalid name);
+          print_case = None;
+          is_case = (fun _ -> false);
+        })
+    relations
+
+let () =
   List.iter
     (fun (name, syms, usym, asym, Wrap_infixl onotn, ostr) ->
       make onotn
@@ -481,22 +466,17 @@ let install_notations () =
       val_vars = [ "P" ];
       inner_symbols = `Single (Op "¬");
     };
-  Situation.Current.add_with_print
-    {
-      key = `Constant (get_const [ "eq" ]);
-      notn = Wrap equals;
-      pat_vars = [ "x"; "y"; "A" ];
-      val_vars = [ "A"; "x"; "y" ];
-      inner_symbols = `Multiple (Op "=", [ None ], Op ":>");
-    };
-  Situation.Current.add_with_print
-    {
-      key = `Constant (get_const [ "neq" ]);
-      notn = Wrap neq;
-      pat_vars = [ "x"; "y"; "A" ];
-      val_vars = [ "A"; "x"; "y" ];
-      inner_symbols = `Multiple (Op "≠", [ None ], Op ":>");
-    };
+  List.iter
+    (fun (_, tok, notn, str) ->
+      Situation.Current.add_with_print
+        {
+          key = `Constant (get_const [ str ]);
+          notn = Wrap notn;
+          pat_vars = [ "x"; "y"; "A" ];
+          val_vars = [ "A"; "x"; "y" ];
+          inner_symbols = `Multiple (tok, [ None ], Op ":>");
+        })
+    relations;
   List.iter
     (fun (_, _, usym, asym, Wrap_infixl onotn, ostr) ->
       Situation.Current.add_with_print

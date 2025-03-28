@@ -984,6 +984,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
     (* Assuming all that succeeded, we return no errors to JavaScript to indicate success. *)
     object%js
       val mutable complete = Js.bool false
+      val mutable callback = Js.null
       val mutable error = Js.null
       val mutable labels = Js.array (Array.of_list [])
       val mutable diagnostics = Js.array (Array.of_list [])
@@ -993,6 +994,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
     Out_channel.flush stderr;
     object%js
       val mutable complete = Js.bool false
+      val mutable callback = Js.null
       val mutable error = Js.some (Js.string (Buffer.contents errbuf))
       val mutable labels = Js.array (Array.of_list [])
       val mutable diagnostics = Js.array (Array.of_list [])
@@ -1080,6 +1082,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     List.iter (fun (_, ds) -> Dynarray.append diagnostics ds) ports;
     object%js
       val mutable complete = Js.bool (not fatal_error)
+      val mutable callback = Js.null
       val mutable error = Js.null
       val mutable labels = Label.to_js_array labels
 
@@ -1090,6 +1093,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
   with Jserror msg ->
     object%js
       val mutable complete = Js.bool false
+      val mutable callback = Js.null
       val mutable error = Js.some (Js.string msg)
       val mutable labels = Label.to_js_array labels
 
@@ -1104,11 +1108,15 @@ let _ =
        method start (parameters : Variable.js Js.t Js.js_array Js.t)
            (variables : Variable.js Js.t Js.js_array Js.t)
            (hypotheses : Variable.js Js.t Js.js_array Js.t) (conclusion : Variable.js Js.t) =
+         Oracle.Callback.halt ();
          start parameters variables hypotheses conclusion
 
        method check (vertices : Vertex.js Js.t Js.js_array Js.t)
            (edges : Edge.js Js.t Js.js_array Js.t) : js_checked Js.t =
-         check vertices edges
+         Oracle.Callback.halt ();
+         Oracle.Callback.run @@ fun () -> check vertices edges
+
+       method reenter (response : bool Js.t) = Oracle.Callback.reenter (Js.to_bool response)
 
        (* Check validity of a new local variable name.  We do this in OCaml rather than JavaScript so that we can actually call the lexer, ensuring it remains as consistent as possible with Narya. *)
        method checkVariable (str : Js.js_string Js.t) =
@@ -1126,6 +1134,7 @@ let _ =
          (* And since the Pauser always returns the same type, we have to return a js_checked, so we just put the validity test in the 'complete' field. *)
          object%js
            val mutable complete = Js.bool ok
+           val mutable callback = Js.null
            val mutable error = Js.null
            val mutable labels = Js.array (Array.of_list [])
            val mutable diagnostics = Js.array (Array.of_list [])
@@ -1141,6 +1150,7 @@ let _ =
            true in
          object%js
            val mutable complete = Js.bool ok
+           val mutable callback = Js.null
            val mutable error = Js.null
            val mutable labels = Js.array (Array.of_list [])
            val mutable diagnostics = Js.array (Array.of_list [])

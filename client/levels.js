@@ -1373,6 +1373,22 @@ export const LEVELS = [
           },
       ],
     },
+    { name: "Inequality world",
+      server: true,
+      stages: [
+          { name: "<",
+            rules: [ "alg" ],
+            levels: [
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "x<y+1" } ],
+                    conclusion: { ty: "x−1<y" },
+                },
+            ],
+          },
+      ],
+    },
 ]
 
 // Take an object that may have extra fields and strip out everything but the intrinsic properties of a level, so that we can JSON.stringify it and use it as a key into localStorage or CouchDB.

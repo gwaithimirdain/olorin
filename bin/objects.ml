@@ -395,6 +395,7 @@ end
 
 class type js_checked = object
   method complete : bool Js.t Js.prop
+  method callback : Js.js_string Js.t Js.opt Js.prop
   method error : Js.js_string Js.t Js.opt Js.prop
   method labels : Label.js Js.t Js.js_array Js.t Js.prop
   method diagnostics : Diagnostic.js Js.t Js.js_array Js.t Js.prop

@@ -5,6 +5,54 @@ open Core
 open Value
 open Reporter
 open Parser
+open Printable
+open Objects
+open Js_of_ocaml
+
+module Callback = struct
+  open Effect.Deep
+
+  type _ Effect.t += Callback : string -> bool Effect.t
+
+  exception Halt
+
+  let cont : (bool, js_checked Js.t) continuation option ref = ref None
+
+  let effc : type b. b Effect.t -> ((b, js_checked Js.t) continuation -> js_checked Js.t) option =
+    function
+    | Callback output ->
+        Some
+          (fun k ->
+            cont := Some k;
+            object%js
+              val mutable complete = Js.bool false
+              val mutable callback = Js.some (Js.string output)
+              val mutable error = Js.null
+              val mutable labels = Js.array (Array.of_list [])
+              val mutable diagnostics = Js.array (Array.of_list [])
+            end)
+    | _ -> None
+
+  let halt () =
+    try
+      match !cont with
+      | Some k ->
+          let _ = discontinue k Halt in
+          ()
+      | None -> ()
+    with Halt -> cont := None
+
+  let run f =
+    halt ();
+    try_with f () { effc }
+
+  let reenter response =
+    match !cont with
+    | Some k ->
+        cont := None;
+        continue k response
+    | None -> raise (Jserror "no saved continuation in reenter")
+end
 
 module type Int = sig
   val dim : int
@@ -112,9 +160,11 @@ module E = Monad.Error (struct
   type t = Code.t
 end)
 
-let get_equality ctx tm =
+let get_equality_or_inequality ctx tm =
   let open Monad.Ops (E) in
   let eq = Scope.lookup [ "eq" ] in
+  let lt = Scope.lookup [ "lt" ] in
+  let le = Scope.lookup [ "le" ] in
   match Norm.view_term tm with
   | Uninst
       ( Neu
@@ -127,13 +177,18 @@ let get_equality ctx tm =
             _;
           },
         _ )
-    when Some name = eq
-         && Option.is_some (is_id_ins ins)
+    when Option.is_some (is_id_ins ins)
          && Option.is_some (is_id_ins tyins)
          && Option.is_some (is_id_ins lhsins)
          && Option.is_some (is_id_ins rhsins) ->
-      return (CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
-  | _ -> Error (Code.Oracle_failed ("not an equality", Printable.PVal (ctx, tm)))
+      let* op =
+        if Some name = eq then return `Eq
+        else if Some name = lt then return `Lt
+        else if Some name = le then return `Le
+        else Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
+      in
+      return (op, CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
+  | _ -> Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
 
 let rec get_givens ctx (ty : normal) givens =
   let open Monad.Ops (E) in
@@ -154,11 +209,11 @@ let rec get_givens ctx (ty : normal) givens =
          && Option.is_some (is_id_ins eqtyins)
          && Option.is_some (is_id_ins restins) -> (
       let veqty = (CubeOf.find_top eqty).tm in
-      let* ty', x, y = get_equality ctx veqty in
+      let* op, ty', x, y = get_equality_or_inequality ctx veqty in
       match Equal.equal_at (Ctx.length ctx) ty.tm ty'.tm ty.ty with
       | Some () ->
           let* rest = get_givens ctx ty (CubeOf.find_top rest).tm in
-          return ((x, y) :: rest)
+          return ((op, x, y) :: rest)
       | None ->
           Error
             (Oracle_failed
@@ -227,11 +282,28 @@ let get_poly (ctx : int) ty tm =
         | _ -> var_or_const ctx ty tm)
     (* Unary operation *)
     | Uninst (Neu { head = Const { name; ins }; args = Snoc (Emp, App (Arg x, xins)); _ }, _)
-      when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) ->
+      when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) -> (
         let* x = go (CubeOf.find_top x).tm in
-        if Firstorder.get_root name = "negate" then return (`Neg x) else var_or_const ctx ty tm
+        match Firstorder.get_root name with
+        | "negate" -> return (`Neg x)
+        | "square" -> return (`Times (x, x))
+        | "cube" -> return (`Times (`Times (x, x), x))
+        | "fourth" -> return (`Times (`Times (x, x), `Times (x, x)))
+        | _ -> var_or_const ctx ty tm)
     | _ -> var_or_const ctx ty tm in
   go tm
+
+let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
+  | Permute (_, _, ctx) ->
+      let rec vars_of_ctx : type a b. (a, b) Ctx.Ordered.t -> string Bwd.t = function
+        | Emp -> Emp
+        | Lock ctx -> vars_of_ctx ctx
+        | Snoc (ctx, Invis _, _) -> vars_of_ctx ctx
+        | Snoc (ctx, Vis { vars; _ }, _) -> (
+            match NICubeOf.find_top vars with
+            | Some x -> Snoc (vars_of_ctx ctx, x)
+            | None -> vars_of_ctx ctx) in
+      vars_of_ctx ctx
 
 let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
@@ -251,26 +323,59 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            && Option.is_some (is_id_ins appins) ->
         return (CubeOf.find_top givens, CubeOf.find_top goal)
     | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
-  let* ty, lhs, rhs = get_equality ctx goal.tm in
+  let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
-  let ctx, ty = (Ctx.length ctx, ty.tm) in
-  let (givens, lhs, rhs), (_, count) =
-    (let open Monad.Ops (S) in
-     let* lhs = get_poly ctx ty lhs.tm in
-     let* rhs = get_poly ctx ty rhs.tm in
-     let open Mlist.Monadic (S) in
-     let* givens =
-       mmapM
-         (fun [ ((x : normal), (y : normal)) ] ->
-           let* x = get_poly ctx ty x.tm in
-           let* y = get_poly ctx ty y.tm in
-           return (x, y))
-         [ givens ] in
-     return (givens, lhs, rhs))
-      (Emp, 0) in
-  let module P = Poly (struct
-    let dim = count
-  end) in
-  let ideal = P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
-  if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
-  else Error (Oracle_failed ("can't prove equality", PUnit))
+  (* If everything is an equality, we can use local Buchberger. *)
+  if goal_op = `Eq && List.for_all (fun (o, _, _) -> o = `Eq) givens then
+    let ctx, ty = (Ctx.length ctx, ty.tm) in
+    let (givens, lhs, rhs), (_, count) =
+      (let open Monad.Ops (S) in
+       let* lhs = get_poly ctx ty lhs.tm in
+       let* rhs = get_poly ctx ty rhs.tm in
+       let open Mlist.Monadic (S) in
+       let* givens =
+         mmapM
+           (fun [ (_, (x : normal), (y : normal)) ] ->
+             let* x = get_poly ctx ty x.tm in
+             let* y = get_poly ctx ty y.tm in
+             return (x, y))
+           [ givens ] in
+       return (givens, lhs, rhs))
+        (Emp, 0) in
+    let module P = Poly (struct
+      let dim = count
+    end) in
+    let ideal =
+      P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
+    if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
+    else Error (Oracle_failed ("can't prove equality", PUnit))
+  else
+    (* Otherwise we have to call back to javascript for it to query redlog/reduce-algebra on the server, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
+    Display.run
+      ~init:
+        (let s = Display.get () in
+         { s with chars = `ASCII })
+    @@ fun () ->
+    let open PPrint in
+    let print_eqn (o, x, y) =
+      let o =
+        match o with
+        | `Eq -> "="
+        | `Lt -> "<"
+        | `Le -> "<=" in
+      parens (separate (blank 1) [ print (PNormal (ctx, x)); string o; print (PNormal (ctx, y)) ])
+    in
+    let command =
+      string "rlqe"
+      ^^ parens
+           (Bwd.fold_right
+              (fun x cmd -> string ("all(" ^ x ^ ",") ^^ cmd ^^ char ')')
+              (vars_of_ctx ctx)
+              (separate (string " or ") (List.map (fun e -> string "not" ^^ print_eqn e) givens)
+              ^^ string " or "
+              ^^ print_eqn (goal_op, lhs, rhs))) in
+    let buf = Buffer.create 20 in
+    PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf command;
+    let command = Buffer.contents buf in
+    if Effect.perform (Callback.Callback command) then Ok ()
+    else Error (Code.Oracle_failed ("can't prove inequality", PUnit))
