@@ -49,6 +49,9 @@ axiom ℤ.minus : ℤ → ℤ → ℤ
 axiom ℤ.times : ℤ → ℤ → ℤ
 axiom ℤ.pow : ℤ → ℕ → ℤ
 axiom ℤ.negate : ℤ → ℤ
+axiom ℤ.square : ℤ → ℤ
+axiom ℤ.cube : ℤ → ℤ
+axiom ℤ.fourth : ℤ → ℤ
 
 axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
 "
@@ -151,9 +154,9 @@ let algebra =
 
 let powers =
   [
-    ("²", Token.Ident [ "²" ], Token.Ident [ "^2" ], square, 2);
-    ("²", Token.Ident [ "³" ], Token.Ident [ "^3" ], cube, 3);
-    ("²", Token.Ident [ "⁴" ], Token.Ident [ "^4" ], fourth, 4);
+    ("²", Token.Ident [ "²" ], Token.Ident [ "^2" ], square, [ "ℤ"; "square" ]);
+    ("³", Token.Ident [ "³" ], Token.Ident [ "^3" ], cube, [ "ℤ"; "cube" ]);
+    ("⁴", Token.Ident [ "⁴" ], Token.Ident [ "^4" ], fourth, [ "ℤ"; "fourth" ]);
   ]
 
 let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
@@ -416,9 +419,8 @@ let () =
       print_case = None;
       is_case = (fun _ -> false);
     };
-  let zero, suc = (locate_opt None (Constr.intern "zero"), locate_opt None (Constr.intern "suc")) in
   List.iter
-    (fun (name, sym, asym, onotn, num) ->
+    (fun (name, sym, asym, onotn, ostr) ->
       make onotn
         {
           name;
@@ -428,19 +430,9 @@ let () =
               match obs with
               | [ Term x; Token _ ] ->
                   let x = process ctx x in
-                  let pow = get_const [ "ℤ"; "pow" ] in
-                  let exponent =
-                    List.fold_right
-                      (fun c y -> locate_opt None (Constr (c, [ y ])))
-                      (List.init num (fun _ -> suc))
-                      (locate_opt None (Constr (zero, []))) in
+                  let pow = get_const ostr in
                   locate_opt loc
-                    (Synth
-                       (App
-                          ( locate_opt loc
-                              (App (locate_opt loc (Const pow), x, locate_opt None `Explicit)),
-                            exponent,
-                            locate_opt None `Explicit )))
+                    (Synth (App (locate_opt loc (Const pow), x, locate_opt None `Explicit)))
               | _ -> Builtins.invalid name);
           print_term =
             Some
@@ -516,7 +508,17 @@ let install_notations () =
           inner_symbols = `Single (if Display.chars () = `Unicode then usym else asym);
         })
     algebra;
-  List.iter (fun (_, _, _, onotn, _) -> Situation.Current.add onotn) powers;
+  List.iter
+    (fun (_, sym, _, onotn, ostr) ->
+      Situation.Current.add_with_print
+        {
+          key = `Constant (get_const ostr);
+          notn = Wrap onotn;
+          pat_vars = [ "x" ];
+          val_vars = [ "x" ];
+          inner_symbols = `Single sym;
+        })
+    powers;
   Situation.Current.add_with_print
     {
       key = `Constant (get_const [ "ℤ"; "negate" ]);
