@@ -100,6 +100,14 @@ end = struct
     | `Const n -> const n
 end
 
+let rec print_symbolic = function
+  | `Plus (p, q) -> "Plus(" ^ print_symbolic p ^ ", " ^ print_symbolic q ^ ")"
+  | `Minus (p, q) -> "Minus(" ^ print_symbolic p ^ ", " ^ print_symbolic q ^ ")"
+  | `Times (p, q) -> "Times(" ^ print_symbolic p ^ ", " ^ print_symbolic q ^ ")"
+  | `Neg p -> "Negate(" ^ print_symbolic p ^ ")"
+  | `Var i -> "Var(" ^ string_of_int i ^ ")"
+  | `Const n -> "Const(" ^ Q.to_string n ^ ")"
+
 module E = Monad.Error (struct
   type t = Code.t
 end)
@@ -205,27 +213,23 @@ let get_poly (ctx : int) ty tm =
           _ )
       when Option.is_some (is_id_ins ins)
            && Option.is_some (is_id_ins xins)
-           && Option.is_some (is_id_ins yins) ->
+           && Option.is_some (is_id_ins yins) -> (
         let* px = go (CubeOf.find_top x).tm in
         let* py = go (CubeOf.find_top y).tm in
-        if Some name = Scope.lookup [ "plus" ] then return (`Plus (px, py))
-        else if Some name = Scope.lookup [ "minus" ] then return (`Minus (px, py))
-        else if Some name = Scope.lookup [ "times" ] then return (`Times (px, py))
-        else if Some name = Scope.lookup [ "pow" ] then
-          match get_posint (CubeOf.find_top y).tm with
-          | Some e -> return (pow px e)
-          | None -> var_or_const ctx ty tm
-        else var_or_const ctx ty tm
+        match Firstorder.get_root name with
+        | "plus" -> return (`Plus (px, py))
+        | "minus" -> return (`Minus (px, py))
+        | "times" -> return (`Times (px, py))
+        | "pow" -> (
+            match get_posint (CubeOf.find_top y).tm with
+            | Some e -> return (pow px e)
+            | None -> var_or_const ctx ty tm)
+        | _ -> var_or_const ctx ty tm)
     (* Unary operation *)
     | Uninst (Neu { head = Const { name; ins }; args = Snoc (Emp, App (Arg x, xins)); _ }, _)
       when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) ->
         let* x = go (CubeOf.find_top x).tm in
-        if Some name = Scope.lookup [ "negate" ] then return (`Neg x)
-        else if Some name = Scope.lookup [ "square" ] then return (`Times (x, x))
-        else if Some name = Scope.lookup [ "cube" ] then return (`Times (`Times (x, x), x))
-        else if Some name = Scope.lookup [ "fourth" ] then
-          return (`Times (`Times (x, x), `Times (x, x)))
-        else var_or_const ctx ty tm
+        if Firstorder.get_root name = "negate" then return (`Neg x) else var_or_const ctx ty tm
     | _ -> var_or_const ctx ty tm in
   go tm
 

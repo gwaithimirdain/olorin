@@ -1,3 +1,4 @@
+open Bwd
 open Util
 open Core
 open Reporter
@@ -11,6 +12,7 @@ open PPrint
 let locate_opt = Asai.Range.locate_opt
 
 open Js_of_ocaml
+open Objects
 
 let carp str = Js_of_ocaml.Console.console##log (Js.string str)
 
@@ -39,15 +41,24 @@ axiom Cons_eqs (x_eq_y : Type) (_ : x_eq_y) (rest : Type) (_ : rest) : Type
 axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs x_eq_y H rest r
 axiom oracle (A : Type) (x : A) (C : Type) : C
 
-def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) | negsuc. (_:ℤ) ]
-axiom plus : ℤ → ℤ → ℤ
-axiom minus : ℤ → ℤ → ℤ
-axiom times : ℤ → ℤ → ℤ
-axiom pow : ℤ → ℤ → ℤ
-axiom negate : ℤ → ℤ
+def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 
-axiom integral (x y : ℤ) : eq ℤ (times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
+def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) | negsuc. (_:ℤ) ]
+axiom ℤ.plus : ℤ → ℤ → ℤ
+axiom ℤ.minus : ℤ → ℤ → ℤ
+axiom ℤ.times : ℤ → ℤ → ℤ
+axiom ℤ.pow : ℤ → ℕ → ℤ
+axiom ℤ.negate : ℤ → ℤ
+
+axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
 "
+
+let get_const parts = Scope.lookup parts <||> String.concat "." parts ^ " not found"
+
+let get_root c =
+  match Bwd.of_list (Scope.name_of c) with
+  | Snoc (_, root) -> root
+  | Emp -> raise (Jserror "no name parts")
 
 (* Now we define notations for them.  The propositional connectives could be defined with Narya's built-in notation command, except that we want to have no space around the operator symbols, so we define them custom here.  The quantifiers have to be defined custom because Narya's built-in notation command doesn't yet handle variable-binding notations.  Since we don't have the corresponding constants at compile-time, we hack by looking them up in the Scope at run-time; this depends on using the same names below and above in the startup code.  *)
 
@@ -120,22 +131,22 @@ type infix = Wrap_infix : (No.strict opn, 'tight, No.strict opn) notation -> inf
 
 let binops =
   [
-    ("∧", Wrap_infix andn, "land");
-    ("∨", Wrap_infix orn, "lor");
-    ("⇒", Wrap_infix imp, "imp");
-    ("⇔", Wrap_infix iff, "iff");
-    ("×", Wrap_infix prod, "prod");
-    ("⊔", Wrap_infix coprod, "coprod");
+    ("∧", Wrap_infix andn, [ "land" ]);
+    ("∨", Wrap_infix orn, [ "lor" ]);
+    ("⇒", Wrap_infix imp, [ "imp" ]);
+    ("⇔", Wrap_infix iff, [ "iff" ]);
+    ("×", Wrap_infix prod, [ "prod" ]);
+    ("⊔", Wrap_infix coprod, [ "coprod" ]);
   ]
 
 type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -> infixl
 
 let algebra =
   [
-    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, "plus");
-    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, "minus");
-    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, "times");
-    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, "pow");
+    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, [ "ℤ"; "plus" ]);
+    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, [ "ℤ"; "minus" ]);
+    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, [ "ℤ"; "times" ]);
+    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "ℤ"; "pow" ]);
   ]
 
 let powers =
@@ -209,7 +220,7 @@ let () =
               match obs with
               | [ Term x; Token _; Term y ] ->
                   let x, y = (process ctx x, process ctx y) in
-                  let oconst = Option.get (Scope.lookup [ ostr ]) in
+                  let oconst = get_const ostr in
                   locate_opt loc
                     (Synth
                        (App
@@ -217,7 +228,7 @@ let () =
                               (App (locate_opt loc (Const oconst), x, locate_opt None `Explicit)),
                             y,
                             locate_opt None `Explicit )))
-              | _ -> Builtins.invalid ostr);
+              | _ -> Builtins.invalid name);
           print_term = Some (pp_op name);
           print_case = None;
           is_case = (fun _ -> false);
@@ -232,7 +243,7 @@ let () =
           match obs with
           | [ Token _; Term x ] ->
               let x = process ctx x in
-              let nconst = Option.get (Scope.lookup [ "neg" ]) in
+              let nconst = get_const [ "neg" ] in
               locate_opt loc
                 (Synth (App (locate_opt loc (Const nconst), x, locate_opt None `Explicit)))
           | _ -> Builtins.invalid "¬");
@@ -262,7 +273,7 @@ let () =
                   let x = get_var x in
                   let ty = process ctx ty in
                   let body = process (Bwv.snoc ctx x) body in
-                  let qconst = Option.get (Scope.lookup [ qstr ]) in
+                  let qconst = get_const [ qstr ] in
                   locate_opt loc
                     (Synth
                        (App
@@ -294,7 +305,7 @@ let () =
                        (App
                           ( locate_opt loc
                               (ImplicitSApp
-                                 ( locate_opt loc (Const (Option.get (Scope.lookup [ "eq" ]))),
+                                 ( locate_opt loc (Const (get_const [ "eq" ])),
                                    loc,
                                    locate_opt x.loc sx )),
                             y,
@@ -329,7 +340,7 @@ let () =
                        (App
                           ( locate_opt loc
                               (ImplicitSApp
-                                 ( locate_opt loc (Const (Option.get (Scope.lookup [ "neq" ]))),
+                                 ( locate_opt loc (Const (get_const [ "neq" ])),
                                    loc,
                                    locate_opt x.loc sx )),
                             y,
@@ -359,7 +370,7 @@ let () =
               match obs with
               | [ Term x; Token _; Term y ] ->
                   let x, y = (process ctx x, process ctx y) in
-                  let oconst = Option.get (Scope.lookup [ ostr ]) in
+                  let oconst = get_const ostr in
                   locate_opt loc
                     (Synth
                        (App
@@ -367,7 +378,7 @@ let () =
                               (App (locate_opt loc (Const oconst), x, locate_opt None `Explicit)),
                             y,
                             locate_opt None `Explicit )))
-              | _ -> Builtins.invalid ostr);
+              | _ -> Builtins.invalid name);
           print_term =
             Some
               (fun obs ->
@@ -392,7 +403,7 @@ let () =
           match obs with
           | [ Token _; Term x ] ->
               let x = process ctx x in
-              let nc = Option.get (Scope.lookup [ "negate" ]) in
+              let nc = get_const [ "ℤ"; "negate" ] in
               locate_opt loc (Synth (App (locate_opt loc (Const nc), x, locate_opt None `Explicit)))
           | _ -> Builtins.invalid "negate");
       print_term =
@@ -417,7 +428,7 @@ let () =
               match obs with
               | [ Term x; Token _ ] ->
                   let x = process ctx x in
-                  let pow = Option.get (Scope.lookup [ "pow" ]) in
+                  let pow = get_const [ "ℤ"; "pow" ] in
                   let exponent =
                     List.fold_right
                       (fun c y -> locate_opt None (Constr (c, [ y ])))
@@ -452,7 +463,7 @@ let install_notations () =
     (fun (oname, Wrap_infix onotn, ostr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (Option.get (Scope.lookup [ ostr ]));
+          key = `Constant (get_const ostr);
           notn = Wrap onotn;
           pat_vars = [ "P"; "Q" ];
           val_vars = [ "P"; "Q" ];
@@ -463,7 +474,7 @@ let install_notations () =
     (fun (qname, qnotn, qstr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (Option.get (Scope.lookup [ qstr ]));
+          key = `Constant (get_const [ qstr ]);
           notn = Wrap qnotn;
           pat_vars = [ "A"; "P" ];
           val_vars = [ "A"; "P" ];
@@ -472,7 +483,7 @@ let install_notations () =
     quantifiers;
   Situation.Current.add_with_print
     {
-      key = `Constant (Option.get (Scope.lookup [ "neg" ]));
+      key = `Constant (get_const [ "neg" ]);
       notn = Wrap neg;
       pat_vars = [ "P" ];
       val_vars = [ "P" ];
@@ -480,7 +491,7 @@ let install_notations () =
     };
   Situation.Current.add_with_print
     {
-      key = `Constant (Option.get (Scope.lookup [ "eq" ]));
+      key = `Constant (get_const [ "eq" ]);
       notn = Wrap equals;
       pat_vars = [ "x"; "y"; "A" ];
       val_vars = [ "A"; "x"; "y" ];
@@ -488,7 +499,7 @@ let install_notations () =
     };
   Situation.Current.add_with_print
     {
-      key = `Constant (Option.get (Scope.lookup [ "neq" ]));
+      key = `Constant (get_const [ "neq" ]);
       notn = Wrap neq;
       pat_vars = [ "x"; "y"; "A" ];
       val_vars = [ "A"; "x"; "y" ];
@@ -498,7 +509,7 @@ let install_notations () =
     (fun (_, _, usym, asym, Wrap_infixl onotn, ostr) ->
       Situation.Current.add_with_print
         {
-          key = `Constant (Option.get (Scope.lookup [ ostr ]));
+          key = `Constant (get_const ostr);
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];
@@ -508,7 +519,7 @@ let install_notations () =
   List.iter (fun (_, _, _, onotn, _) -> Situation.Current.add onotn) powers;
   Situation.Current.add_with_print
     {
-      key = `Constant (Option.get (Scope.lookup [ "negate" ]));
+      key = `Constant (get_const [ "ℤ"; "negate" ]);
       notn = Wrap negate;
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
