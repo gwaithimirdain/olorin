@@ -45,9 +45,6 @@ axiom minus : ℤ → ℤ → ℤ
 axiom times : ℤ → ℤ → ℤ
 axiom pow : ℤ → ℤ → ℤ
 axiom negate : ℤ → ℤ
-axiom square : ℤ → ℤ
-axiom cube : ℤ → ℤ
-axiom fourth : ℤ → ℤ
 
 axiom integral (x y : ℤ) : eq ℤ (times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
 "
@@ -135,17 +132,17 @@ type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -
 
 let algebra =
   [
-    ("+", Token.Op "+", Token.Op "+", Wrap_infixl plus, "plus");
-    ("−", Ident [ "−" ], Op "-", Wrap_infixl minus, "minus");
-    ("*", Op "*", Op "*", Wrap_infixl times, "times");
-    ("**", Op "**", Op "^", Wrap_infixl pow, "pow");
+    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, "plus");
+    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, "minus");
+    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, "times");
+    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, "pow");
   ]
 
 let powers =
   [
-    ("²", Token.Ident [ "²" ], Token.Ident [ "^2" ], square, "square");
-    ("²", Token.Ident [ "³" ], Token.Ident [ "^3" ], cube, "cube");
-    ("²", Token.Ident [ "⁴" ], Token.Ident [ "^4" ], fourth, "fourth");
+    ("²", Token.Ident [ "²" ], Token.Ident [ "^2" ], square, 2);
+    ("²", Token.Ident [ "³" ], Token.Ident [ "^3" ], cube, 3);
+    ("²", Token.Ident [ "⁴" ], Token.Ident [ "^4" ], fourth, 4);
   ]
 
 let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
@@ -352,11 +349,11 @@ let () =
       is_case = (fun _ -> false);
     };
   List.iter
-    (fun (name, sym, asym, Wrap_infixl onotn, ostr) ->
+    (fun (name, syms, usym, asym, Wrap_infixl onotn, ostr) ->
       make onotn
         {
           name;
-          tree = Open_entry (eops [ (sym, done_open onotn); (asym, done_open onotn) ]);
+          tree = Open_entry (eops (List.map (fun sym -> (sym, done_open onotn)) syms));
           processor =
             (fun ctx obs loc ->
               match obs with
@@ -374,7 +371,7 @@ let () =
           print_term =
             Some
               (fun obs ->
-                let op = if Display.chars () = `Unicode then sym else asym in
+                let op = if Display.chars () = `Unicode then usym else asym in
                 match obs with
                 | [ Term x; Token (_, wsop); Term y ] ->
                     let px, wsx = pp_term x in
@@ -408,22 +405,32 @@ let () =
       print_case = None;
       is_case = (fun _ -> false);
     };
+  let zero, suc = (locate_opt None (Constr.intern "zero"), locate_opt None (Constr.intern "suc")) in
   List.iter
-    (fun (name, sym, asym, onotn, ostr) ->
+    (fun (name, sym, asym, onotn, num) ->
       make onotn
         {
           name;
-          (* The ASCII can't be parsed here, since it conflicts with Narya's generic degeneracies *)
           tree = Open_entry (eop sym (done_open onotn));
           processor =
             (fun ctx obs loc ->
               match obs with
               | [ Term x; Token _ ] ->
                   let x = process ctx x in
-                  let oconst = Option.get (Scope.lookup [ ostr ]) in
+                  let pow = Option.get (Scope.lookup [ "pow" ]) in
+                  let exponent =
+                    List.fold_right
+                      (fun c y -> locate_opt None (Constr (c, [ y ])))
+                      (List.init num (fun _ -> suc))
+                      (locate_opt None (Constr (zero, []))) in
                   locate_opt loc
-                    (Synth (App (locate_opt loc (Const oconst), x, locate_opt None `Explicit)))
-              | _ -> Builtins.invalid ostr);
+                    (Synth
+                       (App
+                          ( locate_opt loc
+                              (App (locate_opt loc (Const pow), x, locate_opt None `Explicit)),
+                            exponent,
+                            locate_opt None `Explicit )))
+              | _ -> Builtins.invalid name);
           print_term =
             Some
               (fun obs ->
@@ -488,27 +495,17 @@ let install_notations () =
       inner_symbols = `Multiple (Op "≠", [ None ], Op ":>");
     };
   List.iter
-    (fun (_, sym, _, Wrap_infixl onotn, ostr) ->
+    (fun (_, _, usym, asym, Wrap_infixl onotn, ostr) ->
       Situation.Current.add_with_print
         {
           key = `Constant (Option.get (Scope.lookup [ ostr ]));
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];
-          inner_symbols = `Single sym;
+          inner_symbols = `Single (if Display.chars () = `Unicode then usym else asym);
         })
     algebra;
-  List.iter
-    (fun (_, sym, _, onotn, ostr) ->
-      Situation.Current.add_with_print
-        {
-          key = `Constant (Option.get (Scope.lookup [ ostr ]));
-          notn = Wrap onotn;
-          pat_vars = [ "x" ];
-          val_vars = [ "x" ];
-          inner_symbols = `Single sym;
-        })
-    powers;
+  List.iter (fun (_, _, _, onotn, _) -> Situation.Current.add onotn) powers;
   Situation.Current.add_with_print
     {
       key = `Constant (Option.get (Scope.lookup [ "negate" ]));
