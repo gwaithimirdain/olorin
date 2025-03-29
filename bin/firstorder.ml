@@ -136,8 +136,10 @@ type (_, _, _) identity +=
   | Or : (No.strict opn, No.zero, No.strict opn) identity
   | Imp : (No.strict opn, No.zero, No.strict opn) identity
   | Iff : (No.strict opn, No.zero, No.strict opn) identity
-  | Prod : (No.strict opn, No.zero, No.strict opn) identity
-  | Coprod : (No.strict opn, No.zero, No.strict opn) identity
+  | (* We want these to bind tighter than → which is 0 *)
+      Prod :
+      (No.strict opn, No.one_half, No.strict opn) identity
+  | Coprod : (No.strict opn, No.one_half, No.strict opn) identity
   | Neg : (closed, No.one, No.strict opn) identity
   | Equals : (No.strict opn, No.zero, No.strict opn) identity
   | Lt : (No.strict opn, No.zero, No.strict opn) identity
@@ -161,8 +163,8 @@ let orn : (No.strict opn, No.zero, No.strict opn) notation = (Or, Infix No.zero)
 let imp : (No.strict opn, No.zero, No.strict opn) notation = (Imp, Infix No.zero)
 let iff : (No.strict opn, No.zero, No.strict opn) notation = (Iff, Infix No.zero)
 let neg : (closed, No.one, No.strict opn) notation = (Neg, Prefix No.one)
-let prod : (No.strict opn, No.zero, No.strict opn) notation = (Prod, Infix No.zero)
-let coprod : (No.strict opn, No.zero, No.strict opn) notation = (Coprod, Infix No.zero)
+let prod : (No.strict opn, No.one_half, No.strict opn) notation = (Prod, Infix No.one_half)
+let coprod : (No.strict opn, No.one_half, No.strict opn) notation = (Coprod, Infix No.one_half)
 let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
 let equals : (No.strict opn, No.zero, No.strict opn) notation = (Equals, Infix No.zero)
 let lt : (No.strict opn, No.zero, No.strict opn) notation = (Lt, Infix No.zero)
