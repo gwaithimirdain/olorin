@@ -1413,7 +1413,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(u<x-1)" },
+                    conclusion: { ty: "∀u∈ℝ,(u<x−1)" },
                 },
                 {
                     parameters: [ ],
@@ -1472,7 +1472,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x-y)∧(x-y<u)))" },
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x−y)∧(x−y<u)))" },
                 },
             ],
           },

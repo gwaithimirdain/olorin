@@ -48,7 +48,9 @@ def ge (A : Type) (x y : A) : Type ≔ le A y x
 
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 
-def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) | negsuc. (_:ℤ) ]
+def ℕ₊ : Type ≔ data [ one. | suc. (_:ℕ₊) ]
+
+def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) ]
 axiom ℤ.plus : ℤ → ℤ → ℤ
 axiom ℤ.minus : ℤ → ℤ → ℤ
 axiom ℤ.times : ℤ → ℤ → ℤ
@@ -60,7 +62,7 @@ axiom ℤ.fourth : ℤ → ℤ
 
 axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
 
-def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) | quot. (_:ℚ) (_:ℚ) ]
+def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) | quot. (_:ℚ) (_:ℕ₊) ]
 axiom ℚ.plus : ℚ → ℚ → ℚ
 axiom ℚ.minus : ℚ → ℚ → ℚ
 axiom ℚ.times : ℚ → ℚ → ℚ
@@ -72,7 +74,7 @@ axiom ℚ.fourth : ℚ → ℚ
 
 axiom ℚ.integral (x y : ℚ) : eq ℚ (ℚ.times x y) 0 → lor (eq ℚ x 0) (eq ℚ y 0)
 
-def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) | quot. (_:ℝ) (_:ℝ) ]
+def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) | quot. (_:ℝ) (_:ℕ₊) ]
 axiom ℝ.plus : ℝ → ℝ → ℝ
 axiom ℝ.minus : ℝ → ℝ → ℝ
 axiom ℝ.times : ℝ → ℝ → ℝ
@@ -84,7 +86,7 @@ axiom ℝ.fourth : ℝ → ℝ
 
 axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (eq ℝ y 0)
 
-def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | quot. (_:𝕊) (_:𝕊) | omega. ]
+def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | quot. (_:𝕊) (_:ℕ₊) | omega. ]
 axiom 𝕊.plus : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.minus : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.times : 𝕊 → 𝕊 → 𝕊
@@ -150,6 +152,7 @@ type (_, _, _) identity +=
   | Plus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Minus : (No.nonstrict opn, No.two, No.strict opn) identity
   | Times : (No.nonstrict opn, No.three, No.strict opn) identity
+  | Div : (No.nonstrict opn, No.three, No.strict opn) identity
   | Negate : (closed, No.three, No.nonstrict opn) identity
   | Pow : (No.nonstrict opn, No.four, No.strict opn) identity
   | Square : (No.strict opn, No.four, closed) identity
@@ -175,6 +178,7 @@ let neq : (No.strict opn, No.zero, No.strict opn) notation = (Neq, Infix No.zero
 let plus : (No.nonstrict opn, No.two, No.strict opn) notation = (Plus, Infixl No.two)
 let minus : (No.nonstrict opn, No.two, No.strict opn) notation = (Minus, Infixl No.two)
 let times : (No.nonstrict opn, No.three, No.strict opn) notation = (Times, Infixl No.three)
+let div : (No.nonstrict opn, No.three, No.strict opn) notation = (Div, Infixl No.three)
 let pow : (No.nonstrict opn, No.four, No.strict opn) notation = (Pow, Infixl No.four)
 let negate : (closed, No.three, No.nonstrict opn) notation = (Negate, Prefixr No.three)
 let square : (No.strict opn, No.four, closed) notation = (Square, Postfix No.four)
@@ -594,6 +598,16 @@ let install_notations () =
           inner_symbols = `Single (if Display.chars () = `Unicode then usym else asym);
         })
     algebra;
+  let _ =
+    Situation.Current.add_user
+      (User
+         {
+           name = "quot";
+           fixity = Infixl No.three;
+           pattern = Var (("x", `None, []), Var_nil ((Op "/", `None, []), ("y", [])));
+           key = `Constr (Constr.intern "quot", 2);
+           val_vars = [ "x"; "y" ];
+         }) in
   List.iter
     (fun (_, sym, _, onotn, ostr) ->
       Situation.Current.add_with_print
