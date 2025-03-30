@@ -36,8 +36,15 @@ _opam/
 node_modules/
 package-lock.json
 
+# Reduce dependency
+reduce-algebra
+
 # Javascript compiled files
 static/*.bundle.js
 
 # Linked bytecode files from static directory
 static/*.bc.js
+
+# Compiled javascript and webassembly files from reduce
+static/reduce.web.js
+static/reduce.web.wasm

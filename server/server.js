@@ -48,6 +48,7 @@ const server = http.createServer(async (req, res) => {
 		let contentType = 'text/plain';
 		if (ext === '.html') contentType = 'text/html';
 		if (ext === '.js') contentType = 'text/javascript';
+		if (ext === '.wasm') contentType = 'application/wasm';
 		if (ext === '.css') contentType = 'text/css';
 		if (ext === '.svg') contentType = 'image/svg+xml';
 		// Send the data
@@ -127,28 +128,6 @@ function handlePost(res, url, data) {
 		});
 	    }
 	});
-    } else if(url === '/reduce') {
-        const output_file = tmp.tmpNameSync();
-        commands = "load_package redlog;\n" + "rlset ofsf;\n" + "off nat;\n" + 'out "' + output_file + '";\n' + data.command + ";\nbye;\n";
-        const input_file = tmp.fileSync();
-        fs.writeFile(input_file.fd, commands, function (err) {
-            if(err) {
-		res.writeHead(500, { 'Content-Type': 'application/json' });
-		res.end(JSON.stringify({ error: 'Error writing file:' + err }));
-            } else {
-                const redcsl = child_process.spawnSync( 'redcsl', [ input_file.name, '-w' ] );
-                fs.readFile(output_file, { encoding: 'utf8', flag: 'r' }, function (err, data) {
-                    if(err) {
-		        res.writeHead(500, { 'Content-Type': 'application/json' });
-		        res.end(JSON.stringify({ error: 'Error reading file:' + err }));
-                    } else {
-	                res.writeHead(200, { 'Content-Type': 'application/json' });
-                        const result = data.trim().startsWith("true");
-                        res.end(JSON.stringify({ result: result }));
-                    }
-                });
-            }
-        });
     } else {
 	res.writeHead(404, { 'Content-Type': 'text/plain' });
 	res.end('Not Found');

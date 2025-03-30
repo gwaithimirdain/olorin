@@ -351,7 +351,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
     else Error (Oracle_failed ("can't prove equality", PUnit))
   else
-    (* Otherwise we have to call back to javascript for it to query redlog/reduce-algebra on the server, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
+    (* Otherwise we have to call back to javascript for it to query redlog/reduce-algebra, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
     Display.run
       ~init:
         (let s = Display.get () in
@@ -372,8 +372,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            (Bwd.fold_right
               (fun x cmd -> string ("all(" ^ x ^ ",") ^^ cmd ^^ char ')')
               (vars_of_ctx ctx)
-              (separate (string " or ") (List.map (fun e -> string "not" ^^ print_eqn e) givens)
-              ^^ string " or "
+              (concat_map (fun e -> string "not" ^^ print_eqn e ^^ string " or ") givens
               ^^ print_eqn (goal_op, lhs, rhs))) in
     let buf = Buffer.create 20 in
     PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf command;
