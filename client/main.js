@@ -26,7 +26,7 @@ document.documentElement.style.setProperty('--master-bg', COLORS[2][1].backgroun
 const VALUECOLOR = "#0000ff";
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', 'ℤ'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
@@ -56,10 +56,17 @@ const KEYS = [
     { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
     { unicode: '≠', keys: [ '\\neq' ] },
+    { unicode: '≤', keys: [ '\\le' ] },
+    { unicode: '≥', keys: [ '\\ge' ] },
+    { unicode: 'ℕ', keys: [ '\\N ' ] },
     { unicode: 'ℤ', keys: [ '\\Z ' ] },
+    { unicode: 'ℚ', keys: [ '\\Q ' ] },
+    { unicode: 'ℝ', keys: [ '\\R ' ] },
+    { unicode: 'ℂ', keys: [ '\\C ' ] },
+    { unicode: '𝕊', keys: [ '\\S ' ] },
     { unicode: '²', keys: [ '^2', '**2' ] },
     { unicode: '³', keys: [ '^3', '**3' ] },
-    { unicode: '³', keys: [ '^4', '**4' ] },
+    { unicode: '⁴', keys: [ '^4', '**4' ] },
 ].map(function (entry) {
     entry.regexes = entry.keys.map(function (str) { return new RegExp(escapeRegex(str), 'g'); });
     return entry
@@ -1214,7 +1221,12 @@ function makePalette(palid, eltid) {
         document.getElementById("shortcutsBG").style.display = 'flex';
     });
     pal.appendChild(b);
-    // Detect shortcut key sequences
+    addShortcuts(eltid);
+}
+
+// Detect shortcut key sequences in a text box
+function addShortcuts(eltid) {
+    const elt = document.getElementById(eltid);
     elt.addEventListener('input', () => {
         var text = elt.value;
         KEYS.forEach(function (entry) {
@@ -1231,8 +1243,8 @@ makePalette('varPalette', 'variables');
 makePalette('hypPalette', 'hypotheses');
 makePalette('conclPalette', 'conclusion');
 makePalette('ascPalette', 'ascribe');
-makePalette('expressionPalette', 'expression');
 makePalette('wirePalette', 'wire');
+addShortcuts('expression');
 
 var shortcuts = document.getElementById('shortcuts');
 var shortcut_thead = document.createElement('thead');

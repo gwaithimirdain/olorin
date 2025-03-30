@@ -1128,15 +1128,16 @@ export const LEVELS = [
             rules: [ "orI1", "orI2", "orE", "expr", "alg", "integral" ],
             levels: [
                 {
-                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
-                    variables: [ ],
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x=y+1)∨(2*x=3−y)" } ],
                     conclusion: { ty: "2*x²−x*y−y²=5*x−2*y−3" },
                     trivial: true,
+                    hint: "setsHint",
                 },
                 {
-                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
-                    variables: [ ],
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x+y=1)∨(x−y=1)" } ],
                     conclusion: { ty: "x²+1=y²+2*x" },
                     trivial: true,
@@ -1171,7 +1172,7 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3x+2=0)" } ],
+                    hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
                     conclusion: { ty: "(x=3)∨((x=∸1)∨(x=∸2))" },
                 },
             ],

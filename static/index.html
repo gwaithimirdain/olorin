@@ -96,7 +96,7 @@
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc">🏷</div>
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr">expr</div>
         <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg">alg</div>
-        <div class="basic logical rule" style="text-align: center" id="integral" data-rule="integral">xy=0</div>
+        <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral">?*?=0</div>
       </div>
       <div style="height: 80px; display: block; align-items: end" id="buttons">
         <button id="clearProof" class="proofOption">Clear</button>
@@ -191,7 +191,7 @@
 
     <div id="ascribeBG" class="modalbg">
       <div class="modal">
-        <h3 style="text-align: center">Ascribe a wire</h3>
+        <h3 style="text-align: center">Label a wire</h3>
         <p>Enter a statement for the label:</p>
         <input type="text" id="ascribe" style="width: 100%"/>
         <div id="ascPalette"></div>
@@ -207,9 +207,18 @@
         <h3 style="text-align: center">Enter an expression</h3>
         <p>Enter an expression, possibly using available variables.</p>
         <input type="text" id="expression" style="width: 97%"/>
-        <div id="expressionPalette"></div>
-        <p>Multiplication is denoted by <tt>*</tt> and exponentiation by <tt>^</tt>, so to write 2x²+1 you should type <tt>2*x^2+1</tt> (displayed as 2*x²+1) .
-          Subtraction is denoted with <tt>-</tt> and prefix negation by <tt>--</tt>, so to write −x−1 you should type <tt>--x-1</tt> (displayed as ∸x−1).</p>
+        <p>How to write basic algebraic expressions:<p>
+        <table style="margin-left: auto; margin-right: auto; border-spacing: 50px 0">
+          <tbody>
+            <tr><td>Addition</td><td><tt>x+y</tt></td></tr>
+            <tr><td>Subtraction</td><td><tt>x-y</tt></td></tr>
+            <tr><td>Negation</td><td><tt>--x</tt></td><td>(not <tt>-x</tt>)</tr>
+            <tr><td>Multiplication</td><td><tt>x*y</tt></td><td>(not <tt>xy</tt>)</tr>
+            <tr><td>Exponentiation</td><td><tt>x^y</tt></td></tr>
+            <tr><td>Division</td><td><tt>x/2</tt></td><td>(or <tt>1/2*x</tt> or <tt>0.5*x</tt>)</tr>
+          </tbody>
+        </table>
+        <p>At present you can only divide by fixed positive integers, and of course only if the intended type of this expression is a number system that allows division.</p>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitExpression" style="font-size: 16px">Submit</button>
           <button id="cancelExpression" style="font-size: 16px">Cancel</button><br/>
@@ -560,19 +569,34 @@
         I need to use different symbols for <i>subtraction</i> (of two numbers) and <i>negation</i> (of one number).
         I'll write "x−y" for subtraction (you can type this with the ordinary hyphen key) and "∸x" for negation (you can type this with a double hyphen, <tt>--</tt>).
       </div>
+      <div id="setsHint" class="modal hint" style="width: 600px">
+        Now that we are doing algebra, our variables will denote <i>numbers</i> of one kind or another.
+        Thus, they won't belong to abstract sets denoted A or B any more, but rather sets of numbers.
+        Here are the sets of numbers we'll be using:
+        <table style="margin-left: auto; margin-right: auto; border-spacing: 20px 5px">
+          <tbody>
+            <tr><td>ℕ</td><td>The natural numbers: 0,1,2,3,…</td></tr>
+            <tr><td>ℤ</td><td>The integers: …,−3,−2,−1,0,1,2,3,…</td></tr>
+            <tr><td>ℚ</td><td>The rational numbers: fractions p/q where p,q∈ℤ, q≠0</td></tr>
+            <tr><td>ℝ</td><td>The real numbers: finite or infinite decimals, e.g. π, √2</td></tr>
+            <tr><td>ℂ</td><td>The complex numbers: a+bi where a,b∈ℝ and i²=−1</td></tr>
+            <tr><td>𝕊</td><td>The surreal numbers: the real numbers plus "infinite" numbers like ω and "infinitesimal" numbers like 1/ω</td></tr>
+          </tbody>
+        </table>
+      </div>
       <div id="integralHint" class="modal hint" style="width: 600px">
         One thing the algebra block doesn't "know" is that if the product of two numbers is zero, one or the other of them must be zero.
-        (Indeed, this is not true for all kinds of "number", but it is true for ordinary integers, real numbers, and so on.)
-        If you need this fact, use the block labeled "xy=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
+        If you need this fact, use the block labeled "?*?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
         <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block">
         <b>Warning:</b> do not connect blue "value" wires to "alg" boxes!
-        All the inputs to an "alg" box must be <i>equations</i>, as those are the only things I can do algebra with.
+        All the inputs to an "alg" box must be <i>equations</i> (or inequalities), as those are the only things I can do algebra with.
         I can figure out on my own which variables appear in the equations.
       </div>
       <div id="exprHint" class="modal hint">
-        If you need an input to a blue "value" port that isn't just a number, use the "expr" block, which will prompt you for an expression.
+        If you need an input to a blue "value" port that isn't just a variable, use the "expr" block, which will prompt you for an expression.
         You must connect the input port of that block to all the variables that occur in your expression.
         <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block">
+        <b>Warning:</b> do not connect any black "statement" wires to a blue "expr" block!
       </div>
     </div>
 
