@@ -493,7 +493,10 @@ let () =
           (function
           | [ Token (_, wsop); Term x ] ->
               let px, wsx = pp_term x in
-              (Token.pp (Ident [ "∸" ]) ^^ pp_ws `None wsop ^^ px, wsx)
+              ( Token.pp (if Display.chars () = `Unicode then Ident [ "∸" ] else Op "-")
+                ^^ pp_ws `None wsop
+                ^^ px,
+                wsx )
           | _ -> Builtins.invalid "negate");
       print_case = None;
       is_case = (fun _ -> false);
