@@ -161,11 +161,12 @@ module E = Monad.Error (struct
   type t = Code.t
 end)
 
-let get_equality_or_inequality ctx tm =
+let rec get_equality_or_inequality ctx tm =
   let open Monad.Ops (E) in
   let eq = Scope.lookup [ "eq" ] in
   let lt = Scope.lookup [ "lt" ] in
   let le = Scope.lookup [ "le" ] in
+  let neg = Scope.lookup [ "neg" ] in
   match Norm.view_term tm with
   | Uninst
       ( Neu
@@ -189,6 +190,14 @@ let get_equality_or_inequality ctx tm =
         else Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
       in
       return (op, CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
+  | Uninst (Neu { head = Const { name; ins }; args = Snoc (Emp, App (Arg tm, tyins)); _ }, _)
+    when Some name = neg && Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins tyins) -> (
+      let* op, ty, lhs, rhs = get_equality_or_inequality ctx (CubeOf.find_top tm).tm in
+      match op with
+      | `Eq -> return (`Neq, ty, lhs, rhs)
+      | `Neq -> return (`Eq, ty, lhs, rhs)
+      | `Lt -> return (`Le, ty, rhs, lhs)
+      | `Le -> return (`Lt, ty, rhs, lhs))
   | _ -> Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
 
 let rec get_givens ctx (ty : normal) givens =
@@ -218,7 +227,7 @@ let rec get_givens ctx (ty : normal) givens =
       | None ->
           Error
             (Oracle_failed
-               ( "input is not an equation at the same type",
+               ( "input is not an equation or inequality at the same type",
                  Printable.PNormal (ctx, CubeOf.find_top eqty) )))
   | Uninst (Neu { head = Const { name; ins }; args = Emp; _ }, _)
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
@@ -326,32 +335,37 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
   let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
-  (* If everything is an equality, we can use local Buchberger. *)
-  if goal_op = `Eq && List.for_all (fun (o, _, _) -> o = `Eq) givens then
-    let ctx, ty = (Ctx.length ctx, ty.tm) in
-    let (givens, lhs, rhs), (_, count) =
-      (let open Monad.Ops (S) in
-       let* lhs = get_poly ctx ty lhs.tm in
-       let* rhs = get_poly ctx ty rhs.tm in
-       let open Mlist.Monadic (S) in
-       let* givens =
-         mmapM
-           (fun [ (_, (x : normal), (y : normal)) ] ->
-             let* x = get_poly ctx ty x.tm in
-             let* y = get_poly ctx ty y.tm in
-             return (x, y))
-           [ givens ] in
-       return (givens, lhs, rhs))
-        (Emp, 0) in
-    let module P = Poly (struct
-      let dim = count
-    end) in
-    let ideal =
-      P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
-    if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
-    else Error (Oracle_failed ("can't prove equality", PUnit))
+
+  (* The old Buchberger version, that only works for equalities and isn't as powerful as quantifier elimination. *)
+  (* if goal_op = `Eq && List.for_all (fun (o, _, _) -> o = `Eq) givens then
+       let ctx, ty = (Ctx.length ctx, ty.tm) in
+       let (givens, lhs, rhs), (_, count) =
+         (let open Monad.Ops (S) in
+          let* lhs = get_poly ctx ty lhs.tm in
+          let* rhs = get_poly ctx ty rhs.tm in
+          let open Mlist.Monadic (S) in
+          let* givens =
+            mmapM
+              (fun [ (_, (x : normal), (y : normal)) ] ->
+                let* x = get_poly ctx ty x.tm in
+                let* y = get_poly ctx ty y.tm in
+                return (x, y))
+              [ givens ] in
+          return (givens, lhs, rhs))
+           (Emp, 0) in
+       let module P = Poly (struct
+         let dim = count
+       end) in
+       let ideal =
+         P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
+       if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
+       else Error (Oracle_failed ("can't prove equality", PUnit))
+     else *)
+  if goal_op = `Neq then
+    (* The quantifier eliminator can prove disequalities, but we don't let it, since we want the student to prove those by contradiction. *)
+    Error (Code.Oracle_failed ("proving disequalities by algebra not allowed", PUnit))
   else
-    (* Otherwise we have to call back to javascript for it to query redlog/reduce-algebra, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
+    (* We call back to javascript to query redlog/reduce-algebra, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
     Display.run
       ~init:
         (let s = Display.get () in
@@ -362,6 +376,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
       let o =
         match o with
         | `Eq -> "="
+        | `Neq -> "<>"
         | `Lt -> "<"
         | `Le -> "<=" in
       parens (separate (blank 1) [ print (PNormal (ctx, x)); string o; print (PNormal (ctx, y)) ])
@@ -378,4 +393,4 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf command;
     let command = Buffer.contents buf in
     if Effect.perform (Callback.Callback command) then Ok ()
-    else Error (Code.Oracle_failed ("can't prove inequality", PUnit))
+    else Error (Code.Oracle_failed ("can't prove equality/inequality", PUnit))

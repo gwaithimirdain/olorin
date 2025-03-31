@@ -348,6 +348,7 @@ let () =
         })
     quantifiers
 
+(* We don't need separate unicode/ascii versions of these because we detect and print relations specially in the Oracle. *)
 let relations =
   [
     ("=", Token.Op "=", equals, "eq", "neq");
