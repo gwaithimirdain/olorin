@@ -1160,7 +1160,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x²=x" } ],
-                    conclusion: { ty: "(x=0)∨(x=∸1)" },
+                    conclusion: { ty: "(x=0)∨(x=1)" },
                     hint: "exprHint",
                 },
                 {
