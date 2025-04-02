@@ -400,14 +400,28 @@ ready(() => {
             localStorage.setItem("visited",true);
         }
     }
+
+    // Set a saved connector style if any
+    const connectors = localStorage.getItem("connectors");
+    if(connectors === 'angle') {
+        instance.importDefaults({ connector: FlowchartConnector.type });
+        document.getElementById("angleConnectors").checked = true;
+        document.getElementById("curvedConnectors").checked = false;
+    } else if (connectors === 'curved') {
+        instance.importDefaults({ connector: BezierConnector.type });
+        document.getElementById("angleConnectors").checked = false;
+        document.getElementById("curvedConnectors").checked = true;
+    }
 });
 
 // Set connector style
 document.getElementById("angleConnectors").onclick = function() {
     instance.importDefaults({ connector: FlowchartConnector.type });
+    localStorage.setItem("connectors", "angle");
 };
 document.getElementById("curvedConnectors").onclick = function() {
     instance.importDefaults({ connector: BezierConnector.type });
+    localStorage.setItem("connectors", "curved");
 };
 
 // Make palette boxes draggable
