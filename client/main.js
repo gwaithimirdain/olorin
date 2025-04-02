@@ -1528,7 +1528,9 @@ var reduceCallback = false;
 reduceWorker.onmessage = function(event) {
     if (event.data.channel === 'stdout' && event.data.line != '') {
         console.log('reduce: ' + event.data.line);
-        if(reduceCallback) {
+        if(event.data.line.startsWith('Declare ')) {
+            sendToReduce('N');
+        } else if(reduceCallback) {
             const cb = reduceCallback;
             reduceCallback = false;
             const response = (event.data.line === 'true$');
@@ -1552,7 +1554,12 @@ function sendToReduce(str) {
 }
 
 // For some reason it doesn't seem to work to call sendToReduce multiple times; maybe it fills up the queue too quickly without handling responses in between?
-sendToReduce("rlset ofsf; off nat;");
+sendToReduce(`lisp<<
+            !*redefmsg := nil;
+            on errcont;
+            off nat;
+            >>$
+            rlset ofsf;`);
 
 function continue_typechecking(nodes, edges, connections, result) {
     // If Narya gave us a callback string, that's a command to reduce, so we pass it off to the worker and wait for a response.
