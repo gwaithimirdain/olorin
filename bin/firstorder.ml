@@ -127,7 +127,6 @@ let onechar_ops =
     (0x22A5, Ident [ "⊥" ]);
     (0x22A4, Ident [ "⊤" ]);
     (0x2212, Ident [ "−" ]);
-    (0x2238, Ident [ "∸" ]);
     (0x2260, Ident [ "≠" ]);
     (0xB2, Ident [ "²" ]);
     (0xB3, Ident [ "³" ]);
@@ -475,9 +474,9 @@ let () =
     algebra;
   make negate
     {
-      name = "∸";
+      name = "−";
       tree =
-        Closed_entry (eops [ (Op "--", Done_closed negate); (Ident [ "∸" ], Done_closed negate) ]);
+        Closed_entry (eops [ (Op "-", Done_closed negate); (Ident [ "−" ], Done_closed negate) ]);
       processor =
         (fun ctx obs loc ->
           match obs with
@@ -502,7 +501,7 @@ let () =
           (function
           | [ Token (_, wsop); Term x ] ->
               let px, wsx = pp_term x in
-              ( Token.pp (if Display.chars () = `Unicode then Ident [ "∸" ] else Op "-")
+              ( Token.pp (if Display.chars () = `Unicode then Ident [ "−" ] else Op "-")
                 ^^ pp_ws `None wsop
                 ^^ px,
                 wsx )
@@ -637,7 +636,7 @@ let install_notations () =
       notn = Wrap negate;
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
-      inner_symbols = `Single (Ident [ "∸" ]);
+      inner_symbols = `Single (Ident [ "−" ]);
     };
   let _ =
     Situation.Current.add_user

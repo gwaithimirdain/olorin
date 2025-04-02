@@ -1113,8 +1113,13 @@ export const LEVELS = [
                     parameters: [ { name: "x", ty: "ℤ" } ],
                     variables: [ ],
                     hypotheses: [ { ty: "x²≠1"} ],
-                    conclusion: { ty: "(x≠1)∧(x≠∸1)" },
-                    hint: "negateHint",
+                    conclusion: { ty: "(x≠1)∧(x≠−1)" },
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "x²≠1"} ],
+                        conclusion: { ty: "(x≠1)∧(x≠∸1)" },
+                    }
                 },
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -1167,13 +1172,25 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x²−x−2=0)∨(x²−1=0)" } ],
-                    conclusion: { ty: "(x=2)∨((x=1)∨(x=∸1))" },
+                    conclusion: { ty: "(x=2)∨((x=1)∨(x=−1))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "(x²−x−2=0)∨(x²−1=0)" } ],
+                        conclusion: { ty: "(x=2)∨((x=1)∨(x=∸1))" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
-                    conclusion: { ty: "(x=3)∨((x=∸1)∨(x=∸2))" },
+                    conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
+                        conclusion: { ty: "(x=3)∨((x=∸1)∨(x=∸2))" },
+                    }
                 },
             ],
           },
@@ -1258,7 +1275,13 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−b=k*(∸n))" },
+                    conclusion: { ty: "∃k∈ℤ,(a−b=k*(−n))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a−b=k*(∸n))" },
+                    }
                 },
                 {
                     parameters: [ ],
@@ -1341,7 +1364,13 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
-                    conclusion: { ty: "a=∸4" },
+                    conclusion: { ty: "a=−4" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
+                        conclusion: { ty: "a=∸4" },
+                    }
                 },
                 {
                     parameters: [ ],
@@ -1364,8 +1393,14 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(x²≠∸4)" } ],
-                    conclusion: { ty: "∀x∈ℤ,(x²≠∸1)" },
+                    hypotheses: [ { ty: "∀x∈ℤ,(x²≠−4)" } ],
+                    conclusion: { ty: "∀x∈ℤ,(x²≠−1)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "∀x∈ℤ,(x²≠∸4)" } ],
+                        conclusion: { ty: "∀x∈ℤ,(x²≠∸1)" },
+                    }
                 },
                 {
                     parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
@@ -1468,14 +1503,27 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x+y)∧(x+y<u)))" },
+                    hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x+y)∧(x+y<u)))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
+                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x+y)∧(x+y<u)))" },
+                    },
+
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x−y)∧(x−y<u)))" },
+                    hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x−y)∧(x−y<u)))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
+                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x−y)∧(x−y<u)))" },
+                    }
                 },
             ],
           },
@@ -1485,10 +1533,20 @@ export const LEVELS = [
 
 // Take an object that may have extra fields and strip out everything but the intrinsic properties of a level, so that we can JSON.stringify it and use it as a key into localStorage or CouchDB.
 export function saveable(level) {
-    return {
-        parameters: level.parameters,
-        variables: level.variables,
-        hypotheses: level.hypotheses,
-        conclusion: level.conclusion,
+    // For legacy support, so students who completed levels with ∸ will still see them as completed even though we changed the notation to −.
+    if(level.saveable) {
+        return {
+            parameters: level.saveable.parameters,
+            variables: level.saveable.variables,
+            hypotheses: level.saveable.hypotheses,
+            conclusion: level.saveable.conclusion,
+        };
+    } else {
+        return {
+            parameters: level.parameters,
+            variables: level.variables,
+            hypotheses: level.hypotheses,
+            conclusion: level.conclusion,
+        };
     }
 }
