@@ -1198,6 +1198,8 @@ export const LEVELS = [
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
                     conclusion: { ty: "∃k∈ℤ,(2*b=k*a)" },
+                    // hypotheses: [ { ty: "a ∣ b" } ],
+                    // conclusion: { ty: "a ∣ 2*b" },
                 },
                 {
                     parameters: [ ],

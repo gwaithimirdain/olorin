@@ -97,6 +97,9 @@ axiom 𝕊.cube : 𝕊 → 𝕊
 axiom 𝕊.fourth : 𝕊 → 𝕊
 
 axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
+
+def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
+def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus b a) (ℤ.times k n))
 "
 
 let get_const parts = Scope.lookup parts <||> String.concat "." parts ^ " not found"
@@ -129,6 +132,8 @@ let onechar_ops =
     (0xB2, Ident [ "²" ]);
     (0xB3, Ident [ "³" ]);
     (0x2074, Ident [ "⁴" ]);
+    (0x2223, Ident [ "∣" ]);
+    (0x2261, Ident [ "≡" ]);
   |]
 
 type (_, _, _) identity +=
@@ -158,6 +163,8 @@ type (_, _, _) identity +=
   | Square : (No.strict opn, No.four, closed) identity
   | Cube : (No.strict opn, No.four, closed) identity
   | Fourth : (No.strict opn, No.four, closed) identity
+  | Divisible : (No.strict opn, No.zero, No.strict opn) identity
+  | Congruent : (No.strict opn, No.zero, closed) identity
 
 let forall : (closed, No.zero, No.strict opn) notation = (Forall, Prefix No.zero)
 let exists : (closed, No.zero, No.strict opn) notation = (Exists, Prefix No.zero)
@@ -184,6 +191,8 @@ let negate : (closed, No.three, No.nonstrict opn) notation = (Negate, Prefixr No
 let square : (No.strict opn, No.four, closed) notation = (Square, Postfix No.four)
 let cube : (No.strict opn, No.four, closed) notation = (Cube, Postfix No.four)
 let fourth : (No.strict opn, No.four, closed) notation = (Fourth, Postfix No.four)
+let divisible : (No.strict opn, No.zero, No.strict opn) notation = (Divisible, Infix No.zero)
+let congruent : (No.strict opn, No.zero, closed) notation = (Congruent, Postfix No.zero)
 
 type infix = Wrap_infix : (No.strict opn, 'tight, No.strict opn) notation -> infix
 
@@ -474,7 +483,6 @@ let () =
           match obs with
           | [ Token _; Term x ] ->
               let x = process ctx x in
-
               locate_opt loc
                 (Synth
                    (SFirst
@@ -631,4 +639,35 @@ let install_notations () =
       val_vars = [ "x" ];
       inner_symbols = `Single (Ident [ "∸" ]);
     };
+  let _ =
+    Situation.Current.add_user
+      (User
+         {
+           name = "divisible";
+           fixity = Infix No.zero;
+           pattern = Var (("a", `Nobreak, []), Var_nil ((Ident [ "∣" ], `Nobreak, []), ("b", [])));
+           key = `Constant (get_const [ "divisible" ]);
+           val_vars = [ "a"; "b" ];
+         }) in
+  let _ =
+    Situation.Current.add_user
+      (User
+         {
+           name = "congruent";
+           fixity = Postfix No.zero;
+           pattern =
+             Var
+               ( ("a", `None, []),
+                 Op
+                   ( (Ident [ "≡" ], `None, []),
+                     Var
+                       ( ("b", `Nobreak, []),
+                         Op
+                           ( (LParen, `None, []),
+                             Op
+                               ( (Ident [ "mod" ], `Nobreak, []),
+                                 Var (("b", `None, []), Op_nil (RParen, [])) ) ) ) ) );
+           key = `Constant (get_const [ "congruent" ]);
+           val_vars = [ "a"; "b"; "n" ];
+         }) in
   add_subtypes (List.map (fun x -> get_const [ x ]) numbers)
