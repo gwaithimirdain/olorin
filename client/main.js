@@ -1456,6 +1456,8 @@ function addConnection(params) {
 function typecheck() {
     if(suppressChecking) { return; }
 
+    document.getElementById("typecheckingBG").style.display = 'flex';
+
     console.log("typechecking with " + nodes.length + " nodes");
     var connctr = 0;
     var connections = {};
@@ -1786,6 +1788,8 @@ function continue_typechecking(nodes, edges, connections, result) {
             }
         }
     }
+
+    document.getElementById("typecheckingBG").style.display = 'none';
 }
 
 // Check that the parameters and variables have types, split up grouped variables, and associate them to types.
