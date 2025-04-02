@@ -1400,7 +1400,7 @@ export const LEVELS = [
                 // },
             ],
           },
-          { name: "∀⇒<₁",
+          { name: "∀⇒<",
             rules: [ "allI", "allE", "impE", "impI", "expr", "alg" ],
             levels: [
                 {
@@ -1459,8 +1459,8 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∀⇒<₂",
-            rules: [ "allI", "allE", "impE", "impI", "expr", "alg" ],
+          { name: "∀⇒∧<",
+            rules: [ "allI", "allE", "impE", "impI", "andI", "andE", "expr", "alg" ],
             levels: [
                 {
                     parameters: [ ],
