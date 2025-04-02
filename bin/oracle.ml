@@ -315,6 +315,9 @@ let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
             | None -> vars_of_ctx ctx) in
       vars_of_ctx ctx
 
+(* We memorize the results of calls to reduce, so we don't have to re-make them every time. *)
+let answers : (string, bool) Hashtbl.t = Hashtbl.create 20
+
 let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
   let* givens, goal =
@@ -389,5 +392,11 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     let buf = Buffer.create 20 in
     PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf command;
     let command = Buffer.contents buf in
-    if Effect.perform (Callback.Callback command) then Ok ()
-    else Error (Code.Oracle_failed ("can't prove equality/inequality", PUnit))
+    let result =
+      match Hashtbl.find_opt answers command with
+      | Some result -> result
+      | None ->
+          let result = Effect.perform (Callback.Callback command) in
+          Hashtbl.add answers command result;
+          result in
+    if result then Ok () else Error (Code.Oracle_failed ("can't prove equality/inequality", PUnit))
