@@ -335,37 +335,34 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
   let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
-
-  (* The old Buchberger version, that only works for equalities and isn't as powerful as quantifier elimination. *)
-  (* if goal_op = `Eq && List.for_all (fun (o, _, _) -> o = `Eq) givens then
-       let ctx, ty = (Ctx.length ctx, ty.tm) in
-       let (givens, lhs, rhs), (_, count) =
-         (let open Monad.Ops (S) in
-          let* lhs = get_poly ctx ty lhs.tm in
-          let* rhs = get_poly ctx ty rhs.tm in
-          let open Mlist.Monadic (S) in
-          let* givens =
-            mmapM
-              (fun [ (_, (x : normal), (y : normal)) ] ->
-                let* x = get_poly ctx ty x.tm in
-                let* y = get_poly ctx ty y.tm in
-                return (x, y))
-              [ givens ] in
-          return (givens, lhs, rhs))
-           (Emp, 0) in
-       let module P = Poly (struct
-         let dim = count
-       end) in
-       let ideal =
-         P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
-       if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
-       else Error (Oracle_failed ("can't prove equality", PUnit))
-     else *)
-  if goal_op = `Neq then
+  if goal_op = `Eq && List.for_all (fun (o, _, _) -> o = `Eq) givens then
+    let ctx, ty = (Ctx.length ctx, ty.tm) in
+    let (givens, lhs, rhs), (_, count) =
+      (let open Monad.Ops (S) in
+       let* lhs = get_poly ctx ty lhs.tm in
+       let* rhs = get_poly ctx ty rhs.tm in
+       let open Mlist.Monadic (S) in
+       let* givens =
+         mmapM
+           (fun [ (_, (x : normal), (y : normal)) ] ->
+             let* x = get_poly ctx ty x.tm in
+             let* y = get_poly ctx ty y.tm in
+             return (x, y))
+           [ givens ] in
+       return (givens, lhs, rhs))
+        (Emp, 0) in
+    let module P = Poly (struct
+      let dim = count
+    end) in
+    let ideal =
+      P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
+    if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
+    else Error (Oracle_failed ("can't prove equality", PUnit))
+  else if goal_op = `Neq then
     (* The quantifier eliminator can prove disequalities, but we don't let it, since we want the student to prove those by contradiction. *)
     Error (Code.Oracle_failed ("proving disequalities by algebra not allowed", PUnit))
   else
-    (* We call back to javascript to query redlog/reduce-algebra, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
+    (* Otherwise we have to call back to javascript for it to query redlog/reduce-algebra on the server, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
     Display.run
       ~init:
         (let s = Display.get () in

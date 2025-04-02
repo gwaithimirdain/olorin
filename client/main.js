@@ -605,6 +605,9 @@ function makeLevelSelect(res) {
     var maxcols = 0;
     var maxrows = 0;
     LEVELS.forEach(function (world, x) {
+        // Skip this world if it requires a server and we're not in server mode.
+        if(world.server && !SERVER) { return; }
+
         const worldPane = document.createElement("div");
         worldPane.className = "world";
         worlds.appendChild(worldPane);
@@ -1518,59 +1521,35 @@ function typecheck() {
     continue_typechecking(nodes, edges, connections, Narya.check(nodes, edges));
 }
 
-// The javascript version of "reduce" runs as a worker, so when Narya signals that it needs to call reduce, we have to pass the reduce worker a callback that handles its output and returns it to Narya.
-const reduceWorker = new Worker('./reduce.web.js');
-
-// This variable stores the data that the callback will combine with its result to pass back to Narya.
-var reduceCallback = false;
-
-// Here's the callback.
-reduceWorker.onmessage = function(event) {
-    if (event.data.channel === 'stdout' && event.data.line != '') {
-        console.log('reduce: ' + event.data.line);
-        if(event.data.line.startsWith('Declare ')) {
-            sendToReduce('N');
-        } else if(reduceCallback) {
-            const cb = reduceCallback;
-            reduceCallback = false;
-            const response = (event.data.line === 'true$');
-            continue_typechecking(cb.nodes, cb.edges, cb.connections, Narya.reenter(response));
-        }
-    }
-}
-
-// Post a string to Reduce, which treats it rather as if it had been keyboard input.  Copied from the reduce distribution file csl/new-embedded/for-emscripten/toplevel.html.
-function sendToReduce(str) {
-    console.log('sending to reduce: ' + str);
-    let buf = new Uint8Array(str.length+1);
-    for (let i=0; i<str.length; i++)
-        buf[i] = str.charCodeAt(i);
-    buf[str.length] = 0; // nul-terminate for benefit of C/C++.
-    reduceWorker.postMessage({
-        funcName: 'insert_buffer',
-        callbackId: '',
-        data: buf
-    });
-}
-
-// For some reason it doesn't seem to work to call sendToReduce multiple times; maybe it fills up the queue too quickly without handling responses in between?
-sendToReduce(`lisp<<
-            !*redefmsg := nil;
-            on errcont;
-            off nat;
-            >>$
-            rlset ofsf;`);
-
 function continue_typechecking(nodes, edges, connections, result) {
-    // If Narya gave us a callback string, that's a command to reduce, so we pass it off to the worker and wait for a response.
+    // If a callback string was supplied, we pass it off to the server and wait for a response.
     if(result.callback) {
-        reduceCallback = {
-            nodes: nodes,
-            edges: edges,
-            connections: connections,
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reduce', true);
+        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+        xhr.onload = function() {
+            // When we get a response back...
+            var response;
+            if (xhr.status === 200) {
+                let res = JSON.parse(xhr.responseText);
+                if(res.error) {
+                    console.log ("res.error");
+                    response = false;
+                } else {
+                    console.log ("result");
+                    console.log (res);
+                    response = res.result;
+                }
+            } else {
+                console.log ("wrong code");
+                response = false;
+            }
+            // ...we pass it back to Narya and continue with this function on the result (which might have another callback, etc.)
+            continue_typechecking(nodes, edges, connections, Narya.reenter(response));
         };
-        sendToReduce(result.callback + ";\n");
-        // Then we abort this function; it'll be called again when the response arrives.
+        const data = { command: result.callback };
+        xhr.send(JSON.stringify(data));
+        // For now, we abort this function; we'll come back to it when the response arrives.
         return;
     }
 
