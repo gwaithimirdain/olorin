@@ -1416,6 +1416,54 @@ export const LEVELS = [
                 },
             ],
           },
+          { name: "∃∀=",
+            rules: [ "allE", "allI", "exI", "exE", "expr", "alg" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∀x∈ℝ,∃y∈ℝ,(x+y=0)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∀x∈ℝ,∃y∈ℝ,(x+y=x)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x+y=x)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=x)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=y)" },
+                },
+                // TODO: How can we give them 1≠0?  Probably rlqe can prove it... if we allow it to prove ≠s.
+                // {
+                //     parameters: [ ],
+                //     variables: [ ],
+                //     hypotheses: [ ],
+                //     conclusion: { ty: "¬∃y∈ℝ,∀x∈ℝ,(x+y=0)" },
+                // },
+                // {
+                //     parameters: [ ],
+                //     variables: [ ],
+                //     hypotheses: [ ],
+                //     conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x*y=1)" },
+                // },
+            ],
+          },
       ],
     },
     { name: "Inequality world",
@@ -1441,19 +1489,19 @@ export const LEVELS = [
           { name: "∀⇒<",
             rules: [ "allI", "allE", "impE", "impI", "expr", "alg" ],
             levels: [
-                {
+                {               // x pos inf => x+1 pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
                     conclusion: { ty: "∀u∈ℝ,(u<x+1)" },
                 },
-                {
+                {               // x pos inf => x-1 pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
                     conclusion: { ty: "∀u∈ℝ,(u<x−1)" },
                 },
-                {
+                {               // x pos inf => x+q pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
@@ -1465,42 +1513,48 @@ export const LEVELS = [
                 //     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
                 //     conclusion: { ty: "∀u∈ℝ,(u<2*x)" },
                 // },
-                {
+                {               // x,y pos inf => x+y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
                     conclusion: { ty: "∀u∈ℝ,(u<x+y)" },
                 },
-                {
+                {               // x,y pos inf => x*y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
                     conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
                 },
-                {
+                {               // x neg inf => x+q neg inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
                     hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
                     conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
                 },
-                {
+                {               // x,y neg inf => x+y neg inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" }, ],
                     hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
                     conclusion: { ty: "∀u∈ℝ,(x+y<u)" },
                 },
-                {
+                {               // x,y neg inf => x*y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
                     conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
+                },
+                {               // x pos inf, y neg inf => x*y neg inf
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(y<u)" } ],
+                    conclusion: { ty: "∀u∈ℝ,((u<0)⇒(x*y<u))" },
                 },
             ],
           },
           { name: "∀⇒∧<",
             rules: [ "allI", "allE", "impE", "impI", "andI", "andE", "expr", "alg" ],
             levels: [
-                {
+                {               // x,y infinitesimal => x+y infinitesimal
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
@@ -1513,7 +1567,7 @@ export const LEVELS = [
                     },
 
                 },
-                {
+                {               // x,y infinitesimal => x-y infinitesimal
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
@@ -1524,6 +1578,53 @@ export const LEVELS = [
                         hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
                         conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x−y)∧(x−y<u)))" },
                     }
+                },
+                {               // x pos infinitesimal => 2x infinitesimal
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x>0"}, { ty: "∀u∈ℝ,((u>0)⇒(x<u))" }, ],
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒(2*x<u))" },
+                },
+                {               // x,y pos infinitesimal => x*y infinitesimal
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x>0" }, { ty: "y>0" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x*y)∧(x*y<u)))" },
+                },
+            ],
+          },
+          { name: "∃∀∧⇒<",
+            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "alg" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∀x∈ℝ,∃y∈ℝ,(x<y)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∀x∈ℝ,∃y∈ℝ,(y<x)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∀x∈ℝ,((0<x)⇒∃y∈ℝ,((0<y)∧(y<x)))" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "x<y" } ],
+                    conclusion: { ty: "∃z∈ℝ,((x<z)∧(z<y))" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "x<y" } ],
+                    conclusion: { ty: "∃z∈ℝ,∃w∈ℝ,(((x<z)∧(z<w))∧(w<y))" },
                 },
             ],
           },
