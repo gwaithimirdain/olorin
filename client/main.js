@@ -615,7 +615,6 @@ function makeLevelSelect(res) {
     const forwardWorld = document.getElementById('forwardWorld');
 
     const worlds = document.getElementById("worlds");
-    currentWorld = parseInt(localStorage.getItem("world")) || 0;
     var maxcols = 0;
     var maxrows = 0;
     LEVELS.forEach(function (world, x) {
@@ -720,6 +719,11 @@ function makeLevelSelect(res) {
     });
     document.getElementById("levelChooseModal").style.width = (maxcols * 80 + 30) + 'px';
     document.getElementById("levelChooseModal").style.height = (maxrows * 60 + 200) + 'px';
+
+    currentWorld = parseInt(localStorage.getItem("world")) || 0;
+    if(! worldPanes[currentWorld] ) {
+        currentWorld = 0;
+    }
 
     // The forwards and backwards arrows have a different look and cursor if there's nowhere to go in that direction.
     setWorld(currentWorld);
