@@ -168,17 +168,12 @@ let rec get_equality_or_inequality ctx tm =
   let le = Scope.lookup [ "le" ] in
   let neg = Scope.lookup [ "neg" ] in
   match Norm.view_term tm with
-  | Uninst
-      ( Neu
-          {
-            head = Const { name; ins };
-            args =
-              Snoc
-                ( Snoc (Snoc (Emp, App (Arg ty, tyins)), App (Arg lhs, lhsins)),
-                  App (Arg rhs, rhsins) );
-            _;
-          },
-        _ )
+  | Neu
+      {
+        head = Const { name; ins };
+        args = Arg (Arg (Arg (Emp, ty, tyins), lhs, lhsins), rhs, rhsins);
+        _;
+      }
     when Option.is_some (is_id_ins ins)
          && Option.is_some (is_id_ins tyins)
          && Option.is_some (is_id_ins lhsins)
@@ -190,7 +185,7 @@ let rec get_equality_or_inequality ctx tm =
         else Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
       in
       return (op, CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
-  | Uninst (Neu { head = Const { name; ins }; args = Snoc (Emp, App (Arg tm, tyins)); _ }, _)
+  | Neu { head = Const { name; ins }; args = Arg (Emp, tm, tyins); _ }
     when Some name = neg && Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins tyins) -> (
       let* op, ty, lhs, rhs = get_equality_or_inequality ctx (CubeOf.find_top tm).tm in
       match op with
@@ -205,15 +200,12 @@ let rec get_givens ctx (ty : normal) givens =
   let cons_eqs = Scope.lookup [ "Cons_eqs" ] in
   let nil_eqs = Scope.lookup [ "Nil_eqs" ] in
   match Norm.view_term givens with
-  | Uninst
-      ( Neu
-          {
-            head = Const { name; ins };
-            args =
-              Snoc (Snoc (Snoc (Snoc (Emp, App (Arg eqty, eqtyins)), _), App (Arg rest, restins)), _);
-            _;
-          },
-        _ )
+  | Neu
+      {
+        head = Const { name; ins };
+        args = Arg (Arg (Arg (Arg (Emp, eqty, eqtyins), _, _), rest, restins), _, _);
+        _;
+      }
     when Some name = cons_eqs
          && Option.is_some (is_id_ins ins)
          && Option.is_some (is_id_ins eqtyins)
@@ -229,7 +221,7 @@ let rec get_givens ctx (ty : normal) givens =
             (Oracle_failed
                ( "input is not an equation or inequality at the same type",
                  Printable.PNormal (ctx, CubeOf.find_top eqty) )))
-  | Uninst (Neu { head = Const { name; ins }; args = Emp; _ }, _)
+  | Neu { head = Const { name; ins }; args = Emp; _ }
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
   | _ -> Error (Code.Oracle_failed ("not a Cons_eqs or Nil_eqs", Printable.PVal (ctx, givens)))
 
@@ -268,14 +260,7 @@ let get_poly (ctx : int) ty tm =
   let rec go tm =
     match Norm.view_term tm with
     (* Binary operation *)
-    | Uninst
-        ( Neu
-            {
-              head = Const { name; ins };
-              args = Snoc (Snoc (Emp, App (Arg x, xins)), App (Arg y, yins));
-              _;
-            },
-          _ )
+    | Neu { head = Const { name; ins }; args = Arg (Arg (Emp, x, xins), y, yins); _ }
       when Option.is_some (is_id_ins ins)
            && Option.is_some (is_id_ins xins)
            && Option.is_some (is_id_ins yins) -> (
@@ -291,7 +276,7 @@ let get_poly (ctx : int) ty tm =
             | None -> var_or_const ctx ty tm)
         | _ -> var_or_const ctx ty tm)
     (* Unary operation *)
-    | Uninst (Neu { head = Const { name; ins }; args = Snoc (Emp, App (Arg x, xins)); _ }, _)
+    | Neu { head = Const { name; ins }; args = Arg (Emp, x, xins); _ }
       when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) -> (
         let* x = go (CubeOf.find_top x).tm in
         match Firstorder.get_root name with
@@ -322,14 +307,12 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
   let* givens, goal =
     match Norm.view_term tm with
-    | Uninst
-        ( Neu
-            {
-              head = Const { name; ins };
-              args = Snoc (Snoc (Snoc (Emp, App (Arg givens, givins)), _), App (Arg goal, appins));
-              _;
-            },
-          _ )
+    | Neu
+        {
+          head = Const { name; ins };
+          args = Arg (Arg (Arg (Emp, givens, givins), _, _), goal, appins);
+          _;
+        }
       when Some name = Scope.lookup [ "oracle" ]
            && Option.is_some (is_id_ins ins)
            && Option.is_some (is_id_ins givins)

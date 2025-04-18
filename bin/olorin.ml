@@ -994,7 +994,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
     let c = Constant.make (Compunit.Current.read ()) in
     const := Some c;
     let pi_cty = Telescope.pis cparams ty in
-    Global.add c pi_cty (Axiom `Parametric);
+    Global.add c pi_cty (`Axiom, `Parametric);
     (* Assuming all that succeeded, we return no errors to JavaScript to indicate success. *)
     object%js
       val mutable complete = Js.bool false
