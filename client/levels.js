@@ -256,6 +256,12 @@ export const LEVELS = [
                     hypotheses: [ { ty: "R∨(S∨Q)" } ],
                     conclusion: { ty: "(P∨Q)∨(R∨S)" },
                 },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P∨P" } ],
+                    conclusion: { ty: "P∨Q" },
+                },
             ]
           },
           { name: "∧∨",
