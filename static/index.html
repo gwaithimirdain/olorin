@@ -259,7 +259,7 @@
           <p class="about">
             Olorin is a game where you prove abstract theorems in classical predicate logic by connecting boxes with wires.
             It's a fun collection of puzzles, and also an educational tool for learning to write proofs.
-            There are over a hundred levels, divided into four "worlds" with several stages each, and three difficulty settings.
+            There are over a hundred levels, divided into six "worlds" with several stages each, and three difficulty settings.
             You can also create and solve custom levels, although this is not well-documented.
           </p>
           <p class="about">
@@ -289,7 +289,7 @@
             For the proof to be correct, every input port must have something coming into it, and all wires must connect ports carrying the same statement or value.
             (Not every output port needs to be used, but usually most will be.)
             When your proof is correct, the conclusion and background will turn a color (according to the difficulty level), as will that level in the level-selection dialog, with one to three stars awarded according to the difficulty setting.
-            If you make a mistake, you can remove boxes and wires by clicking on the red "X" that appears when you hover over them.
+            If you make a mistake, you can remove boxes and wires by clicking on the red "X" that appears when you hover over them, or you can remove your entire attempted proof with the "Clear" button.
           </p>
           <h2>What do the difficulty settings mean?</h2>
           <p class="about">
@@ -348,7 +348,7 @@
             The main enhancement added by Olorin over what The Incredible Proof Machine can do is <i>value-carrying wires</i> for predicate logic.
             The Incredible Proof Machine does support predicate logic, but the elements are managed only by unification rather than visually with wires (and also its rules are single-sorted and don't support empty domains).
             Olorin also includes some other features that could probably also be added to The Incredible Proof Machine with less work, such as if-and-only-if blocks and classical proof by contradiction, and some additional pedagogical and gamification features such as Adept and Master difficulty levels.
-            In addition, although Olorin is currently restricted to proofs about abstract sets, propositions, and predicates like The Incredible Proof Machine, since its underlying logic is a full-spectrum dependent type theory, it should be possible to extend it to proofs using algebra and mathematical induction.
+            In addition, since its underlying logic is a full-spectrum dependent type theory, Olorin is not restricted to proofs about abstract sets, propositions, and predicates like The Incredible Proof Machine, but includes proofs using algebra; in the future it may also include mathematical induction.
           </p>
           <p class="about">
             On the other hand, the underlying logic of the The Incredible Proof Machine is more configurable than Olorin's.
@@ -367,6 +367,9 @@
             If you'd like to try Narya directly, its ordinary interactive mode is also available in your browser as <a href="https://mikeshulman.github.io/jsnarya/">jsNarya</a>.
             If Olorin and jsNarya whet your appetite, you can download the full Narya proof assistant to run locally on your computer from its <a href="https://github.com/gwaithimirdain/narya">github page</a>.
           </p>
+          <p class="about">
+            The "algebra" blocks that appear in the last couple worlds of Olorin are not actually checked by Narya, but treated as an "oracle" and verified using the SMT solver Z3.
+          </p>
           <h2>Narya? Olorin?</h2>
           <p class="about">
             Narya is the third elven-ring in J.R.R. Tolkien's Legendarium, the ring of fire.
@@ -375,11 +378,11 @@
             Olorin is a name of Gandalf himself: a kindly helper who secretly uses the power of Narya to save the world.
           </p>
           <p class="about">
-            The Gwaith-i-M&iacute;rdain (I know you didn't ask about them, but that's the name of our <a href="https://github.com/gwaithimirdain/">github organization</a>), or Brotherhood of Jewel-Smiths, were the master Elven craftsmen of the Second Age who created the Rings of Power, including Narya.
+            The Gwaith-i-M&iacute;rdain (I know you didn't ask about them, but that's the name of our <a href="https://github.com/gwaithimirdain/">github organization</a> and appears in the URL), or Brotherhood of Jewel-Smiths, were the master Elven craftsmen of the Second Age who created the Rings of Power, including Narya.
           </p>
           <h2>Who wrote all this?</h2>
           <p class="about">
-            Mike Shulman, a mathematician at the University of San Diego.
+            Mike Shulman, a mathematician at the University of San Diego, with help from others.
             <a href="https://home.sandiego.edu/~shulman/">Here's</a> my web page.
             Send me your questions, suggestions, complaints, and other thoughts!
             I look forward to hearing from you.
