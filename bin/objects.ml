@@ -391,11 +391,76 @@ module Diagnostic = struct
     | _ -> Dynarray.add_last diagnostics (to_js isfatal d)
 end
 
+(* Structured algebraic expressions for Z3 *)
+module Symbolic = struct
+  class type js = object
+    method head : Js.js_string Js.t Js.prop
+    method args : js Js.t Js.js_array Js.t Js.prop
+  end
+
+  type t =
+    [ `Plus of t * t | `Minus of t * t | `Times of t * t | `Neg of t | `Var of int | `Const of Q.t ]
+
+  let to_js_head (head : string) (args : js Js.t list) : js Js.t =
+    object%js
+      val mutable head = Js.string head
+      val mutable args = Js.array (Array.of_list args)
+    end
+
+  let rec to_js : t -> js Js.t = function
+    | `Plus (x, y) -> to_js_head "add" [ to_js x; to_js y ]
+    | `Minus (x, y) -> to_js_head "sub" [ to_js x; to_js y ]
+    | `Times (x, y) -> to_js_head "mul" [ to_js x; to_js y ]
+    | `Neg x -> to_js_head "neg" [ to_js x ]
+    | `Const n -> to_js_head "val" [ to_js_head (Q.to_string n) [] ]
+    | `Var x -> to_js_head "const" [ to_js_head ("H" ^ string_of_int x) [] ]
+
+  let rec to_string = function
+    | `Plus (p, q) -> "Plus(" ^ to_string p ^ ", " ^ to_string q ^ ")"
+    | `Minus (p, q) -> "Minus(" ^ to_string p ^ ", " ^ to_string q ^ ")"
+    | `Times (p, q) -> "Times(" ^ to_string p ^ ", " ^ to_string q ^ ")"
+    | `Neg p -> "Negate(" ^ to_string p ^ ")"
+    | `Var i -> "Var(" ^ string_of_int i ^ ")"
+    | `Const n -> "Const(" ^ Q.to_string n ^ ")"
+end
+
+module Relation = struct
+  class type js = object
+    method op : Js.js_string Js.t Js.prop
+    method lhs : Symbolic.js Js.t Js.prop
+    method rhs : Symbolic.js Js.t Js.prop
+  end
+
+  type t = [ `Eq | `Neq | `Lt | `Le ] * Symbolic.t * Symbolic.t
+
+  let to_js ((op, lhs, rhs) : t) : js Js.t =
+    let op =
+      match op with
+      | `Eq -> "eq"
+      | `Neq -> "neq"
+      | `Lt -> "lt"
+      | `Le -> "le" in
+    object%js
+      val mutable op = Js.string op
+      val mutable lhs = Symbolic.to_js lhs
+      val mutable rhs = Symbolic.to_js rhs
+    end
+
+  let to_string op x y =
+    let opstr =
+      match op with
+      | `Eq -> " = "
+      | `Neq -> " ≠ "
+      | `Lt -> " < "
+      | `Le -> " ≤ " in
+    Symbolic.to_string x ^ opstr ^ Symbolic.to_string y
+end
+
 (* Overall return value to JavaScript *)
 
 class type js_checked = object
   method complete : bool Js.t Js.prop
-  method callback : Js.js_string Js.t Js.opt Js.prop
+  method callback : Relation.js Js.t Js.js_array Js.t Js.opt Js.prop
   method error : Js.js_string Js.t Js.opt Js.prop
   method labels : Label.js Js.t Js.js_array Js.t Js.prop
   method diagnostics : Diagnostic.js Js.t Js.js_array Js.t Js.prop

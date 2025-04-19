@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Olorin</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Set up cross-origin isolation for Z3 -->
+    <script src="coi-serviceworker.js"></script>
+    <!-- Load Z3 -->
+    <script src="z3-built.js"></script>
     <script src="olorin.bc.js"></script>
 </head>
 <body>
@@ -558,12 +562,13 @@
         You can attach as many assumptions as you need to the input port of the algebra block.
       </div>
       <div id="algebra4Hint" class="modal hint">
-        My way to check algebraic equations (called "Buchberger's algorithm") is very general and powerful, but it doesn't produce a human-readable proof.
+        My method of checking algebraic equations is very general and powerful, but it doesn't produce a human-readable proof.
         When writing a proof for human readers, you should show the algebraic calculations.
         Therefore, I recommend that whenever you use an algebra block, you also do the algebra yourself on paper.
       </div>
       <div id="neqHint" class="modal hint">
-        The statement "x≠y" means the same as "¬(x=y)".
+        The statement "x≠y" means the same as "¬(x=y)", and is called a <i>disequality</i>.
+        I can't prove disequalities automatically; you have to use the rule blocks for ¬.
       </div>
       <div id="setsHint" class="modal hint" style="width: 600px">
         Now that we are doing algebra, our variables will denote <i>numbers</i> of one kind or another.

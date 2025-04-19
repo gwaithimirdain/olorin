@@ -1473,7 +1473,7 @@ export const LEVELS = [
       ],
     },
     { name: "Inequality world",
-      server: true,
+      // server: true,
       stages: [
           { name: "<",
             rules: [ "alg" ],

@@ -42,8 +42,13 @@ reduce-algebra
 # Javascript compiled files
 static/*.bundle.js
 
-# Linked bytecode files from static directory
+# Copied/linked bytecode files from static directory
 static/*.bc.js
+
+# Copied/linked files from node packages that have to be served directly
+static/coi-serviceworker.js
+static/z3-built.js
+static/z3-built.wasm
 
 # Compiled javascript and webassembly files from reduce
 static/reduce.web.js

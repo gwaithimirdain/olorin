@@ -1,6 +1,3 @@
 [submodule "narya"]
 	path = narya
 	url = git@github.com:gwaithimirdain/narya.git
-[submodule "buchberger"]
-	path = buchberger
-	url = https://github.com/coq-community/buchberger.git

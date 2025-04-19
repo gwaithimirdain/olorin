@@ -6,14 +6,13 @@ open Value
 open Subtype
 open Reporter
 open Parser
-open Printable
 open Objects
 open Js_of_ocaml
 
 module Callback = struct
   open Effect.Deep
 
-  type _ Effect.t += Callback : string -> bool Effect.t
+  type _ Effect.t += Callback : Relation.t list -> bool Effect.t
 
   exception Halt
 
@@ -27,7 +26,10 @@ module Callback = struct
             cont := Some k;
             object%js
               val mutable complete = Js.bool false
-              val mutable callback = Js.some (Js.string output)
+
+              val mutable callback =
+                Js.some @@ Js.array @@ Array.of_list @@ List.map Relation.to_js output
+
               val mutable error = Js.null
               val mutable labels = Js.array (Array.of_list [])
               val mutable diagnostics = Js.array (Array.of_list [])
@@ -54,108 +56,6 @@ module Callback = struct
         continue k response
     | None -> raise (Jserror "no saved continuation in reenter")
 end
-
-module type Int = sig
-  val dim : int
-end
-
-module Poly (Dim : Int) : sig
-  type t
-
-  val add : t -> t -> t
-  val neg : t -> t
-  val sub : t -> t -> t
-  val mul : t -> t -> t
-  val var : int -> t
-  val scal : Q.t -> t -> t
-  val zero : t
-  val one : t
-  val const : Q.t -> t
-  val is_zero : t -> bool
-
-  type ideal
-
-  val ideal : t list -> ideal
-  val reduce : ideal -> t -> t
-  val contains : ideal -> t -> bool
-
-  type symbolic =
-    [ `Plus of symbolic * symbolic
-    | `Minus of symbolic * symbolic
-    | `Times of symbolic * symbolic
-    | `Neg of symbolic
-    | `Var of int
-    | `Const of Q.t ]
-
-  val of_symbolic : symbolic -> t
-end = struct
-  let rec nat_of_int x = if x <= 0 then Sin_num.O else Sin_num.S (nat_of_int (x - 1))
-
-  let rec to_list = function
-    | Sin_num.Nil -> []
-    | Sin_num.Cons (x, y) -> x :: to_list y
-
-  let of_list ps = List.fold_right (fun x y -> Sin_num.Cons (x, y)) ps Sin_num.Nil
-  let dim = nat_of_int Dim.dim
-  let order () = Sin_num.total_orderc_dec dim
-  let div1 x y _ = Q.div x y
-  let eqd x y = if Q.equal x y then Sin_num.Left else Right
-
-  type t = Q.t Sin_num.poly
-
-  let add (p : t) (q : t) : t = Sin_num.pluspf Q.zero Q.add eqd dim (order ()) p q
-
-  let sub (p : t) (q : t) : t =
-    Sin_num.minuspf Q.zero Q.one Q.neg Q.sub Q.mul eqd dim (order ()) p q
-
-  let mul (p : t) (q : t) : t =
-    Sin_num.smult Q.zero Q.one Q.add Q.neg Q.sub Q.mul div1 eqd dim (order ()) p q
-
-  let var (i : int) : t = Sin_num.sgen Q.zero Q.one Q.add Q.neg Q.sub Q.mul div1 dim (nat_of_int i)
-
-  let scal (a : Q.t) (p : t) : t =
-    Sin_num.sscal Q.zero Q.one Q.add Q.neg Q.sub Q.mul div1 eqd dim a p
-
-  let neg (p : t) : t = scal Q.minus_one p
-  let zero : t = Sin_num.spO Q.zero dim
-  let one : t = Sin_num.sp1 Q.zero Q.one Q.add Q.neg Q.sub Q.mul div1 dim
-  let const (a : Q.t) = scal a one
-  let is_zero (p : t) : bool = Sin_num.zerop_dec Q.zero dim p = Left
-
-  type ideal = t Sin_num.list
-
-  let ideal (polys : t list) : ideal =
-    Sin_num.redbuch Q.zero Q.one Q.add Q.neg Q.sub Q.mul div1 eqd dim (order ()) (of_list polys)
-
-  let reduce (basis : ideal) (p : t) : t =
-    Sin_num.reducef Q.zero Q.one Q.add Q.neg Q.sub Q.mul div1 eqd dim (order ()) basis p
-
-  let contains (basis : ideal) (p : t) : bool = is_zero (reduce basis p)
-
-  type symbolic =
-    [ `Plus of symbolic * symbolic
-    | `Minus of symbolic * symbolic
-    | `Times of symbolic * symbolic
-    | `Neg of symbolic
-    | `Var of int
-    | `Const of Q.t ]
-
-  let rec of_symbolic = function
-    | `Plus (p, q) -> add (of_symbolic p) (of_symbolic q)
-    | `Minus (p, q) -> sub (of_symbolic p) (of_symbolic q)
-    | `Times (p, q) -> mul (of_symbolic p) (of_symbolic q)
-    | `Neg p -> neg (of_symbolic p)
-    | `Var i -> var i
-    | `Const n -> const n
-end
-
-let rec print_symbolic = function
-  | `Plus (p, q) -> "Plus(" ^ print_symbolic p ^ ", " ^ print_symbolic q ^ ")"
-  | `Minus (p, q) -> "Minus(" ^ print_symbolic p ^ ", " ^ print_symbolic q ^ ")"
-  | `Times (p, q) -> "Times(" ^ print_symbolic p ^ ", " ^ print_symbolic q ^ ")"
-  | `Neg p -> "Negate(" ^ print_symbolic p ^ ")"
-  | `Var i -> "Var(" ^ string_of_int i ^ ")"
-  | `Const n -> "Const(" ^ Q.to_string n ^ ")"
 
 module E = Monad.Error (struct
   type t = Code.t
@@ -231,6 +131,10 @@ let rec get_posint tm =
       match D.compare_zero dim with
       | Zero -> Some 0
       | Pos _ -> None)
+  | Constr (name, dim, []) when name = Constr.intern "one" -> (
+      match D.compare_zero dim with
+      | Zero -> Some 1
+      | Pos _ -> None)
   | Constr (name, dim, [ arg ]) when name = Constr.intern "suc" -> (
       match D.compare_zero dim with
       | Zero -> Option.map (fun n -> n + 1) (get_posint (CubeOf.find_top arg))
@@ -285,6 +189,15 @@ let get_poly (ctx : int) ty tm =
         | "cube" -> return (`Times (`Times (x, x), x))
         | "fourth" -> return (`Times (`Times (x, x), `Times (x, x)))
         | _ -> var_or_const ctx ty tm)
+    (* Fraction with positive integer denominator *)
+    | Constr (constr, dim, [ num; den ]) when constr = Constr.intern "quot" -> (
+        match D.compare_zero dim with
+        | Zero -> (
+            let* num = go (CubeOf.find_top num) in
+            match get_posint (CubeOf.find_top den) with
+            | Some n -> return (`Times (`Const (Q.make Z.one (Z.of_int n)), num))
+            | None -> var_or_const ctx ty tm)
+        | Pos _ -> var_or_const ctx ty tm)
     | _ -> var_or_const ctx ty tm in
   go tm
 
@@ -301,7 +214,7 @@ let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
       vars_of_ctx ctx
 
 (* We memorize the results of calls to reduce, so we don't have to re-make them every time. *)
-let answers : (string, bool) Hashtbl.t = Hashtbl.create 20
+let answers : (Relation.t list, bool) Hashtbl.t = Hashtbl.create 20
 
 let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
@@ -321,60 +234,34 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
   let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
-  if goal_op = `Eq && List.for_all (fun (o, _, _) -> o = `Eq) givens then
+  (* The quantifier eliminator can prove disequalities, but we don't let it, since we want the student to prove those by contradiction. *)
+  if goal_op = `Neq then
+    Error (Code.Oracle_failed ("proving disequalities by algebra not allowed", PUnit))
+  else
+    (* Otherwise we call back to javascript for it to query z3. *)
     let ctx, ty = (Ctx.length ctx, ty.tm) in
-    let (givens, lhs, rhs), (_, count) =
+    let (givens, lhs, rhs), (_vars, _count) =
       (let open Monad.Ops (S) in
        let* lhs = get_poly ctx ty lhs.tm in
        let* rhs = get_poly ctx ty rhs.tm in
        let open Mlist.Monadic (S) in
        let* givens =
          mmapM
-           (fun [ (_, (x : normal), (y : normal)) ] ->
+           (fun [ (op, (x : normal), (y : normal)) ] ->
              let* x = get_poly ctx ty x.tm in
              let* y = get_poly ctx ty y.tm in
-             return (x, y))
+             return (op, x, y))
            [ givens ] in
        return (givens, lhs, rhs))
         (Emp, 0) in
-    let module P = Poly (struct
-      let dim = count
-    end) in
-    let ideal =
-      P.ideal (List.map (fun (x, y) -> P.sub (P.of_symbolic x) (P.of_symbolic y)) givens) in
-    if P.contains ideal (P.sub (P.of_symbolic lhs) (P.of_symbolic rhs)) then return ()
-    else Error (Oracle_failed ("can't prove equality", PUnit))
-  else if goal_op = `Neq then
-    (* The quantifier eliminator can prove disequalities, but we don't let it, since we want the student to prove those by contradiction. *)
-    Error (Code.Oracle_failed ("proving disequalities by algebra not allowed", PUnit))
-  else
-    (* Otherwise we have to call back to javascript for it to query redlog/reduce-algebra on the server, which requires printing everything to a string.  We don't currently deal with "atomic terms" other than variables in inequalities: they have to be completely polynomials in the variables. *)
-    Display.run
-      ~init:
-        (let s = Display.get () in
-         { s with chars = `ASCII })
-    @@ fun () ->
-    let open PPrint in
-    let print_eqn (o, x, y) =
-      let o =
-        match o with
-        | `Eq -> "="
-        | `Neq -> "<>"
-        | `Lt -> "<"
-        | `Le -> "<=" in
-      parens (separate (blank 1) [ print (PNormal (ctx, x)); string o; print (PNormal (ctx, y)) ])
-    in
-    let command =
-      string "rlqe"
-      ^^ parens
-           (Bwd.fold_right
-              (fun x cmd -> string ("all(" ^ x ^ ",") ^^ cmd ^^ char ')')
-              (vars_of_ctx ctx)
-              (concat_map (fun e -> string "not" ^^ print_eqn e ^^ string " or ") givens
-              ^^ print_eqn (goal_op, lhs, rhs))) in
-    let buf = Buffer.create 20 in
-    PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf command;
-    let command = Buffer.contents buf in
+    (* We negate the goal, since Z3 checks for satisfiability.  This involves negating the operator and also swapping the order of the arguments (although in the case of (dis)equalities swapping the arguments does nothing). *)
+    let neg_goal_op =
+      match goal_op with
+      | `Eq -> `Neq
+      | `Neq -> `Eq
+      | `Lt -> `Le
+      | `Le -> `Lt in
+    let command = (neg_goal_op, rhs, lhs) :: givens in
     let result =
       match Hashtbl.find_opt answers command with
       | Some result -> result

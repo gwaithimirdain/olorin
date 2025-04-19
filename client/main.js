@@ -123,6 +123,16 @@ const excludeFromAll = [ "negI" ] // Classical negation suffices
 
 const diagram = document.getElementById('diagram');
 
+// Initialize Z3
+const { init } = require('z3-solver');
+var Solver;
+var Real;
+init().then((z3) => {
+    const ctx = new z3.Context('main');
+    Solver = ctx.Solver;
+    Real = ctx.Real;
+});
+
 ready(() => {
     instance = newInstance({
         container: diagram,
@@ -1541,34 +1551,51 @@ function typecheck() {
     continue_typechecking(nodes, edges, connections, Narya.check(nodes, edges));
 }
 
+function symbolic_to_z3(sym) {
+    if(sym.head === "add") {
+        return symbolic_to_z3(sym.args[0]).add(symbolic_to_z3(sym.args[1]));
+    } else if(sym.head === "sub") {
+        return symbolic_to_z3(sym.args[0]).sub(symbolic_to_z3(sym.args[1]));
+    } else if(sym.head === "mul") {
+        return symbolic_to_z3(sym.args[0]).mul(symbolic_to_z3(sym.args[1]));
+    } else if(sym.head === "neg") {
+        return symbolic_to_z3(sym.args[0]).neg();
+    } else if(sym.head === "val") {
+        return Real.val(sym.args[0].head);
+    } else if(sym.head === "const") {
+        return Real.const(sym.args[0].head);
+    } else {
+        console.log("Error: invalid symbolic");
+    }
+}
+
+function callback_to_z3(callback) {
+    const solver = new Solver();
+    callback.forEach(function (rel) {
+        const lhs = symbolic_to_z3(rel.lhs);
+        const rhs = symbolic_to_z3(rel.rhs);
+        if(rel.op === "eq") {
+            solver.add(lhs.eq(rhs));
+        } else if(rel.op === "neq") {
+            solver.add(lhs.neq(rhs));
+        } else if(rel.op === "lt") {
+            solver.add(lhs.lt(rhs));
+        } else if(rel.op === "le") {
+            solver.add(lhs.le(rhs));
+        } else {
+            console.log("Error: invalid relation");
+        }
+    });
+    return solver;
+}
+
 function continue_typechecking(nodes, edges, connections, result) {
-    // If a callback string was supplied, we pass it off to the server and wait for a response.
+    // If a callback string was supplied, we pass it off to Z3 and wait for a response.
     if(result.callback) {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/reduce', true);
-        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
-        xhr.onload = function() {
-            // When we get a response back...
-            var response;
-            if (xhr.status === 200) {
-                let res = JSON.parse(xhr.responseText);
-                if(res.error) {
-                    console.log ("res.error");
-                    response = false;
-                } else {
-                    console.log ("result");
-                    console.log (res);
-                    response = res.result;
-                }
-            } else {
-                console.log ("wrong code");
-                response = false;
-            }
-            // ...we pass it back to Narya and continue with this function on the result (which might have another callback, etc.)
-            continue_typechecking(nodes, edges, connections, Narya.reenter(response));
-        };
-        const data = { command: result.callback };
-        xhr.send(JSON.stringify(data));
+        const solver = callback_to_z3(result.callback);
+        solver.check().then(function (result) {
+            continue_typechecking(nodes, edges, connections, Narya.reenter(result === 'unsat'));
+        });
         // For now, we abort this function; we'll come back to it when the response arrives.
         return;
     }

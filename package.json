@@ -11,7 +11,9 @@
     "dependencies": {
         "@json2csv/plainjs": "^7.0.6",
         "@jsplumb/browser-ui": "^6.2.10",
-        "webpack": "^5.95.0"
+        "coi-serviceworker": "^0.1.7",
+        "webpack": "^5.95.0",
+        "z3-solver": "^4.14.1"
     },
     "devDependencies": {
         "webpack-cli": "^5.1.4"

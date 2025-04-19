@@ -4,7 +4,4 @@
   (modes js)
   (preprocess (pps js_of_ocaml-ppx)))
 
-(copy_files# ../buchberger/src/sin_num.ml)
-(copy_files# ../buchberger/src/sin_num.mli)
-
 (env (_ (flags (:standard -w -69 -w -32))))
