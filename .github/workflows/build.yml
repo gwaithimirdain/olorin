@@ -1,0 +1,44 @@
+name: "Build"
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - uses: ocaml/setup-ocaml@v3
+      with:
+        ocaml-compiler: 5
+    - uses: actions/setup-node@v4
+    - run: opam install dune
+    - run: opam exec -- dune build olorin.opam
+    - run: opam install . --deps-only
+    - run: opam exec -- dune build
+    - run: npm install
+    - run: npm run build
+    - run: cp _build/default/bin/olorin.bc.js static/
+    - run: cp node_modules/coi-serviceworker/coi-serviceworker.js static/
+    - run: cp node_modules/z3-solver/build/z3-built.* static/
+    - name: Upload static files as artifact
+      id: deployment
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: static/
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

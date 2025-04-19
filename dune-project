@@ -23,5 +23,6 @@
     fmlib
     fileutils
     pprint
-    ppx_blob))
+    ppx_blob
+    zarith_stubs_js))
 (generate_opam_files)
