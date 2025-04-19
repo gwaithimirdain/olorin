@@ -1,16 +1,17 @@
 # Olorin: A graphical proof game for predicate logic
 
-Olorin is a graphical frontend for Narya that allows the user to prove simple statements in predicate logic.  It runs in a web browser, but once loaded it works offline without a server connection.  See the "about" page for more information.
+Olorin is a graphical frontend for [Narya](https://github.com/gwaithimirdain/narya) that allows the user to prove simple statements in predicate logic.  It runs in a web browser, but once loaded it works offline without a server connection.  See the "about" page for more information.
 
 ## Building Olorin
 
 Olorin contains Narya as a git submodule, along with custom code in both OCaml, to be compiled with [js_of_ocaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview), plus pure JavaScript to manage the graphics and interaction with the browser.  To compile it, you'll need all the necessary packages to build Narya, as well as the JavaScript package manager `npm`.  Then run the following commands:
 ```
-opam install zarith_stubs_js
 cd olorin
 git submodule update
+dune build olorin.opam
+opam install . --deps-only
 dune build
-npm install webpack
+npm install
 npm run build
 ```
 
