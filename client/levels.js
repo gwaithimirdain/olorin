@@ -317,6 +317,12 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
                     variables: [ ],
+                    hypotheses: [ { ty: "P⇒R" }, { ty: "Q⇒R" } ],
+                    conclusion: { ty: "(P∨Q)⇒R" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
+                    variables: [ ],
                     hypotheses: [ { ty: "(P⇒R)∧(Q⇒R)" } ],
                     conclusion: { ty: "(P∨Q)⇒R" },
                 },
@@ -1203,6 +1209,12 @@ export const LEVELS = [
           { name: "∣∃=",
             rules: [ "exE", "exI", "expr", "alg" ],
             levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(n=2*k)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(n²=2*k)" },
+                },
                 // 0 is not synthesizing )-:
                 // {
                 //     parameters: [ ],
