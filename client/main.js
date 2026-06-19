@@ -115,8 +115,10 @@ var suppressChecking = false;
 var worldPanes = [];
 var currentWorld = 0;
 const levelButtons = [];
+var allLevels = [];
 var currentLevel;
 var currentLevelButton;
+var levelCompleteShown = false;
 
 // Exclude these rules from "all"
 const excludeFromAll = [ "negI" ] // Classical negation suffices
@@ -665,6 +667,7 @@ function makeLevelSelect(res) {
                 level.name = name;
                 level.stage = stage;
                 level.button = b;
+                level.worldIndex = x;
                 if(!level.trivial) {
                     nontrivialWorldLevels.push(level);
                 }
@@ -678,6 +681,7 @@ function makeLevelSelect(res) {
                 b.addEventListener('click', function () { selectCurrentLevel(level); } );
                 stageGrid.appendChild(b);
                 levelButtons.push(b);
+                allLevels.push(level);
                 ++countlevels;
                 // Color the level if it's completed at all
                 if(past.complete) {
@@ -903,6 +907,27 @@ document.getElementById("backLevel").onclick = function () {
 // Canceling either one clears the modal boxes and goes back to the current proof.
 document.getElementById("cancelSetLevel").onclick = clearLevelSelect;
 document.getElementById("cancelChooseLevel").onclick = clearLevelSelect;
+
+// When a level is completed, the "Next" button advances to the next level.
+document.getElementById("nextLevel").onclick = function() {
+    document.getElementById("levelCompleteBG").style.display = "none";
+    if(currentLevel) {
+        const idx = allLevels.indexOf(currentLevel);
+        if(idx >= 0 && idx < allLevels.length - 1) {
+            const next = allLevels[idx + 1];
+            if(next.worldIndex !== currentWorld) {
+                setWorld(next.worldIndex);
+            }
+            selectCurrentLevel(next);
+        }
+    }
+};
+
+// The "Select Level" button on the completion modal opens the level chooser.
+document.getElementById("selectLevelAfterComplete").onclick = function() {
+    document.getElementById("levelCompleteBG").style.display = "none";
+    document.getElementById("levelChooseBG").style.display = "flex";
+};
 
 // The modal box for prompting for a new variable name
 document.getElementById("submitVariable").onclick = submitNewVariable;
@@ -1747,11 +1772,20 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
                     xhr.send(JSON.stringify(data));
                 }
+                // Show the "Level Complete" modal the first time the proof is completed
+                if(!levelCompleteShown) {
+                    levelCompleteShown = true;
+                    const idx = allLevels.indexOf(currentLevel);
+                    const hasNext = (idx >= 0 && idx < allLevels.length - 1);
+                    document.getElementById("nextLevel").style.display = hasNext ? '' : 'none';
+                    document.getElementById("levelCompleteBG").style.display = "flex";
+                }
             }
         } else {
             // If there are fatal errors, remove any green color on the goal and indicate the errors somehow.
             diagram.style.backgroundColor = "";
             conclusion_node.style.backgroundColor = "";
+            levelCompleteShown = false;
             var somethingRed = false;
             // result.diagnostics is an array of objects of type {isfatal:bool, locs, text:string}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
             result.diagnostics.forEach(function (d) {
@@ -1950,6 +1984,8 @@ function setLevel(level, rulesAllowed) {
 
     // Hide the modal dialogs for choosing levels or setting custom levels, and empty the custom text fields.
     clearLevelSelect();
+    levelCompleteShown = false;
+    document.getElementById("levelCompleteBG").style.display = "none";
 
     // Turn on the "cancel" buttons and "proof will be erased" warnings for future level-selections.
     document.getElementById("setLevelWarning").style.display = '';
