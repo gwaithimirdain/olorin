@@ -898,6 +898,75 @@ document.getElementById("clearProof").onclick = function() {
     }
 }
 
+// Compute a JSON-serializable snapshot of the current proof state: every node
+// (with its position, size, and any associated name/value), and every
+// connection (with its endpoints and user-supplied wire label).
+function serializeProof() {
+    const savedNodes = nodes.map(function (x) {
+        const node = x.node;
+        const data = {
+            id: x.id,
+            rule: x.rule,
+            left: node.style.left,
+            top: node.style.top,
+        };
+        if(x.name !== undefined) { data.name = x.name; }
+        if(x.value !== undefined) { data.value = x.value; }
+        if(node.style.width) { data.width = node.style.width; }
+        if(node.style.height) { data.height = node.style.height; }
+        if(node.dataset.variable) { data.variable = node.dataset.variable; }
+        return data;
+    });
+
+    const savedConnections = instance.getConnections().map(function (c) {
+        return {
+            source: {
+                vertex: c.source.id,
+                sort: c.endpoints[0].parameters.sort,
+                label: c.endpoints[0].parameters.label,
+            },
+            target: {
+                vertex: c.target.id,
+                sort: c.endpoints[1].parameters.sort,
+                label: c.endpoints[1].parameters.label,
+            },
+            // The user-supplied wire label, if any (entered on Adept/Master difficulty).
+            ty: c.parameters.ty,
+        };
+    });
+
+    return {
+        difficulty: difficulty,
+        // Autonumber counters, so nodes added after a restore won't reuse saved IDs.
+        counters: {
+            counter: counter,
+            paramCounter: paramCounter,
+            varCounter: varCounter,
+            hypCounter: hypCounter,
+            conclCounter: conclCounter,
+        },
+        nodes: savedNodes,
+        connections: savedConnections,
+    };
+}
+
+// localStorage key under which the proof for the currently selected level is saved.
+function savedProofKey() {
+    if(!currentLevel) { return null; }
+    return "proof:" + JSON.stringify(saveable(currentLevel));
+}
+
+// The "Save" button stores a JSON snapshot of the current proof in localStorage,
+// associated with the current level, so it can be restored later with "Load".
+document.getElementById("saveProof").onclick = function() {
+    const key = savedProofKey();
+    if(!key) {
+        alert("Saving is only supported for the built-in levels, not custom ones.");
+        return;
+    }
+    localStorage.setItem(key, JSON.stringify(serializeProof()));
+};
+
 // Going "Back" from the custom level-select sends us back to the non-custom list of levels.
 document.getElementById("backLevel").onclick = function () {
     document.getElementById("levelSelectBG").style.display = "none";
