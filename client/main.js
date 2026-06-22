@@ -1006,7 +1006,16 @@ function loadProof() {
         alert("No saved proof for this level.");
         return;
     }
-    const state = JSON.parse(saved);
+    restoreProof(JSON.parse(saved));
+}
+
+// Rebuild the proof from a snapshot object (as produced by serializeProof), into the
+// current level.  Shared by "Load" (from localStorage) and "Import" (from pasted JSON).
+function restoreProof(state) {
+    if(!currentLevel) {
+        alert("Restoring a proof is only supported for the built-in levels, not custom ones.");
+        return;
+    }
 
     // Reset to a clean slate: this recreates the fixed nodes (variables, hypotheses, conclusion) and reinitializes Narya.
     selectCurrentLevel(currentLevel);
@@ -1089,6 +1098,53 @@ function loadProof() {
 
 // The "Load" button restores the proof previously saved for the current level.
 document.getElementById("loadProof").onclick = loadProof;
+
+// The "Export" button shows the current proof state as JSON, for copying (e.g. into a bug report).
+document.getElementById("exportProof").onclick = function() {
+    document.getElementById("exportJson").value = JSON.stringify(serializeProof(), null, 2);
+    document.getElementById("exportBG").style.display = "flex";
+};
+document.getElementById("doneExport").onclick = function() {
+    document.getElementById("exportBG").style.display = "none";
+};
+document.getElementById("copyExport").onclick = function() {
+    const textarea = document.getElementById("exportJson");
+    const copyButton = document.getElementById("copyExport");
+    const done = function() { copyButton.innerText = "Copied!"; setTimeout(function() { copyButton.innerText = "Copy to clipboard"; }, 1500); };
+    if(navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value).then(done, function() { textarea.select(); document.execCommand("copy"); done(); });
+    } else {
+        textarea.select();
+        document.execCommand("copy");
+        done();
+    }
+};
+
+// The "Import" button restores a proof from pasted JSON, into the current level.
+document.getElementById("importProof").onclick = function() {
+    document.getElementById("importJson").value = "";
+    document.getElementById("importBG").style.display = "flex";
+    document.getElementById("importJson").focus();
+};
+document.getElementById("cancelImport").onclick = function() {
+    document.getElementById("importBG").style.display = "none";
+};
+document.getElementById("submitImport").onclick = function() {
+    const text = document.getElementById("importJson").value;
+    var state;
+    try {
+        state = JSON.parse(text);
+    } catch(e) {
+        alert("That isn't valid JSON: " + e.message);
+        return;
+    }
+    if(!state || !Array.isArray(state.nodes)) {
+        alert("That JSON doesn't look like an exported proof.");
+        return;
+    }
+    document.getElementById("importBG").style.display = "none";
+    restoreProof(state);
+};
 
 // Test instrumentation seam.  When the page is loaded with "?test" in the URL, we expose a
 // small read/drive API on window.__olorin so the Playwright suite can create wire

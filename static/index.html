@@ -105,6 +105,8 @@
       <div style="display: block; align-items: end" id="buttons">
         <button id="saveProof" class="proofOption">Save</button>
         <button id="loadProof" class="proofOption">Load</button>
+        <button id="exportProof" class="proofOption">Export</button>
+        <button id="importProof" class="proofOption">Import</button>
         <button id="clearProof" class="proofOption">Clear</button>
         <button id="selectLevel" class="proofOption">Select Level</button>
       </div>
@@ -240,6 +242,30 @@
         <div id="wirePalette"></div>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitWire" style="font-size: 16px">Submit</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="exportBG" class="modalbg">
+      <div class="modal" style="width: 600px">
+        <h3 style="text-align: center">Export proof</h3>
+        <p>Copy this JSON, e.g. to paste into a bug report:</p>
+        <textarea id="exportJson" style="width: 100%; font-family: monospace" rows="14" readonly></textarea>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="copyExport" style="font-size: 16px">Copy to clipboard</button>
+          <button id="doneExport" style="font-size: 16px">Close</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="importBG" class="modalbg">
+      <div class="modal" style="width: 600px">
+        <h3 style="text-align: center">Import proof</h3>
+        <p>Paste exported proof JSON below, then click Import. First make sure you have selected the same level the proof was exported from.</p>
+        <textarea id="importJson" style="width: 100%; font-family: monospace" rows="14"></textarea>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="submitImport" style="font-size: 16px">Import</button>
+          <button id="cancelImport" style="font-size: 16px">Cancel</button><br/>
         </div>
       </div>
     </div>

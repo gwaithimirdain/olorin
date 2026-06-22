@@ -130,6 +130,28 @@ class Olorin {
         return this.page.evaluate(() => window.__olorin.savedProofKey());
     }
 
+    // Open the Export modal, read the JSON it shows, close it, and return the JSON string.
+    async exportText() {
+        await this.page.click('#exportProof');
+        await this.page.waitForSelector('#exportBG', { state: 'visible' });
+        const json = await this.page.inputValue('#exportJson');
+        await this.page.click('#doneExport');
+        return json;
+    }
+
+    // Paste JSON into the Import modal and submit it.
+    async importText(json) {
+        await this.page.click('#importProof');
+        await this.page.waitForSelector('#importBG', { state: 'visible' });
+        await this.page.fill('#importJson', json);
+        await this.page.click('#submitImport');
+        await this.dismissHints();
+    }
+
+    isVisible(selector) {
+        return this.page.isVisible(selector);
+    }
+
     // A representation of the proof state that is independent of the auto-generated node
     // ids (which change when a level is reset), suitable for asserting round-trip equality.
     // Nodes are tagged by rule + position, so same-rule nodes are still distinguished.
