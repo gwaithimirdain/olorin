@@ -18,12 +18,20 @@ jobs:
     - run: opam install dune
     - run: opam exec -- dune build olorin.opam
     - run: opam install . --deps-only
-    - run: opam exec -- dune build
     - run: npm install
-    - run: npm run build
-    - run: cp _build/default/bin/olorin.bc.js static/
-    - run: cp node_modules/coi-serviceworker/coi-serviceworker.js static/
-    - run: cp node_modules/z3-solver/build/z3-built.* static/
+    # Build static/ (OCaml -> JS, webpack bundle, copy z3/coi runtime assets).
+    - run: npm run build:static
+    # Browser interaction tests.  These run before the Pages artifact is uploaded, so a
+    # failure fails this job and skips the dependent "deploy" job: tests gate deployment.
+    - run: npx playwright install --with-deps chromium
+    - run: npm run test:e2e
+    - name: Upload Playwright report
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 14
     - name: Upload static files as artifact
       id: deployment
       uses: actions/upload-pages-artifact@v3
