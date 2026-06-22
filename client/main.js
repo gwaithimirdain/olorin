@@ -111,6 +111,9 @@ var currentHint;
 // Dynamic variable to suppress re-typechecking during batch modifications of the diagram
 var suppressChecking = false;
 
+// Dynamic variable set while restoring a saved proof, to suppress the wire-label prompt and typechecking that normally fire when a connection is created.
+var restoring = false;
+
 // The world/level select panes and buttons
 var worldPanes = [];
 var currentWorld = 0;
@@ -201,190 +204,16 @@ ready(() => {
     diagram.addEventListener('drop', function (e) {
         e.preventDefault();
         const id = e.dataTransfer.getData('text/plain');
-        const originalBox = document.getElementById(id);
-        const box = originalBox.cloneNode(true);
-        box.style.position = 'absolute';
+        const box = addRuleNode(id);
         box.style.left = `${e.clientX - diagram.offsetLeft}px`;
         box.style.top = `${e.clientY - diagram.offsetTop}px`;
-        box.id = 'rule' + (counter++);
-        diagram.appendChild(box);
 
-        // Make it selectable for multi-element dragging.  We have to use mousedown instead of click so that when dragging a non-selected element, we can clear the selection before dragging starts so that only that element will be dragged.
-        box.onmousedown = toggleDragSelected(box);
-
-        // We add it to the master list of nodes.
-        nodes.push({id: box.id, rule: box.dataset.rule, node: box});
-
-        // We add a close button to the node.  (Variable, hypothesis, and conclusion nodes aren't closeable.)
-        addBoxCloseButton(box);
-
-        // Some new rules display a modal box, and we shouldn't typecheck until it is submitted.
-        var typecheck_now = true;
-
-        // Now we add endpoints appropriately for its rule type, if necessary make it larger and resizable, and prompt for variables or ascription types.
-        if (id === 'andE') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "?∧?"}} );
-            instance.addEndpoint(box, { anchor: [1, 0.2, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "fst", side: "upper"} });
-            instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "snd", side: "lower"} });
-        } else if (id === 'andI') {
-            instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "fst", side: "upper"} });
-            instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "snd", side: "lower"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∧?" } });
-        } else if (id === 'impE' ) {
-            instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "implication", side: "upper", primary: "?⇒?"} });
-            instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "antecedent", side: "lower"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output" } });
-        } else if (id === 'iffE1' || id === 'iffE2') {
-            instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "implication", side: "upper", primary: "?⇔?"} });
-            instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "antecedent", side: "lower"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output" } });
-        } else if (id === 'orI1') {
-            // Even though there is only one input, we give it a label, because *in general* a Constr can have more than one input, so Olorin OCaml expects all inputs of all Constrs to have labels.
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: { sort: "input", label: "left" } });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∨?" } });
-        } else if (id === 'orI2') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: { sort: "input", label: "right" } });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∨?" } });
-        } else if (id === 'impI' || id === 'allI' || id === 'negI' || id === 'cnegI' ) {
-            if(id === 'allI') {
-                instance.addEndpoint(box, {
-                    anchor: [0, 0.5, 1, 0, 22, -12],
-                    source: true, maxConnections: -1,
-                    parameters: { sort: "assumption", hasValue: true, side: "upper" },
-                    paintStyle: { fill: VALUECOLOR },
-                    connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 },
-                });
-            } else {
-                instance.addEndpoint(box, {
-                    anchor: [0, 0.5, 1, 0, 22, -12],
-                    source: true, maxConnections: -1,
-                    parameters: {sort: "assumption", side: "upper"},
-                });
-            }
-            instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -12], target: true, parameters: {sort: "subgoal", side: "upper"} });
-            const primary = (id === 'impI' ? "?⇒?" : (id === 'allI' ? "∀?∈?,?" : (id === 'cnegI' ? "?" : "¬?")));
-            instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: primary} });
-            box.style.width = '200px';
-            box.style.height = '50px';
-            makeResizable(box);
-            if(id === 'allI') {
-                getVariable(box.id);
-                typecheck_now = false;
-            }
-        } else if (id === 'orE') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "?∨?"} });
-            instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, -25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "left", side: "upper"} });
-            instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -25], target: true, parameters: {sort: "subgoal", label: "left", side: "upper"} });
-            instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, 25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "right", side: "lower"} });
-            instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, 25], target: true, parameters: {sort: "subgoal", label: "right", side: "lower"} });
-            instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
-            box.style.width = '200px';
-            box.style.height = '80px';
-            makeResizable(box);
-        } else if (id === 'iffI') {
-            instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, -25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "ltor", side: "upper"} });
-            instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -25], target: true, parameters: {sort: "subgoal", label: "ltor", side: "upper"} });
-            instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, 25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "rtol", side: "lower"} });
-            instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, 25], target: true, parameters: {sort: "subgoal", label: "rtol", side: "lower"} });
-            instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: "?⇔?"} });
-            box.style.width = '200px';
-            box.style.height = '80px';
-            makeResizable(box);
-        } else if (id === 'exE') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "∃?∈?,?"} });
-            instance.addEndpoint(box, {
-                anchor: [1, 0.2, 1, 0],
-                source: true, maxConnections: -1,
-                parameters: { sort: "output", label: "element", hasValue: true, side: "upper"},
-                paintStyle: { fill: VALUECOLOR },
-                connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
-            });
-            instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
-            getVariable(box.id);
-            typecheck_now = false;
-        } else if (id === 'exI') {
-            instance.addEndpoint(box, {
-                anchor: [0, 0.2, -1, 0],
-                target: true,
-                parameters: {sort: "input", label: "element", hasValue: true, side: "upper"},
-                paintStyle: { fill: VALUECOLOR },
-            });
-            instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "property", side: "lower"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "∃?∈?,?"} });
-        } else if (id === 'allE') {
-            instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "universal", side: "upper", primary: "∀?∈?,?"} });
-            instance.addEndpoint(box, {
-                anchor: [0, 0.8, -1, 0],
-                target: true,
-                parameters: {sort: "input", label: "element", hasValue: true, side: "lower"},
-                paintStyle: { fill: VALUECOLOR },
-            });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-        } else if (id === 'negE') {
-            instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "negation", side: "upper", primary: "¬?"} });
-            instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "statement", side: "lower", primary : "?"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
-        } else if (id === 'botE') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "⊥"},  });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
-        } else if (id === 'topI') {
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "⊤"} });
-        } else if (id === 'asc') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-            document.getElementById("ascribeBG").style.display = "flex";
-            const ascribe = document.getElementById('ascribe');
-            ascribe.dataset.name = box.id;
-            ascribe.focus();
-            typecheck_now = false;
-        } else if (id === 'alg') {
-            instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-        } else if (id === 'expr') {
-            instance.addEndpoint(box, {
-                anchor: "Left",
-                target: true,
-                maxConnections: -1,
-                parameters: { sort: "input", hasValue: true },
-                paintStyle: { fill: VALUECOLOR },
-            });
-            instance.addEndpoint(box, {
-                anchor: "Right",
-                source: true,
-                maxConnections: -1,
-                parameters: { sort: "output", hasValue: true },
-                paintStyle: { fill: VALUECOLOR },
-            });
-            // Prompt for the expression
-            document.getElementById("expressionBG").style.display = "flex";
-            const expr = document.getElementById('expression');
-            expr.dataset.name = box.id;
-            expr.focus();
-            typecheck_now = false;
-        } else if (id === 'integral') {
-            instance.addEndpoint(box, {
-                anchor: [0, 0.1, -1, 0],
-                target: true,
-                parameters: { sort: "input", label: "x", hasValue: true, side: "upper" },
-                paintStyle: { fill: VALUECOLOR },
-            });
-            instance.addEndpoint(box, {
-                anchor: [0, 0.5, -1, 0],
-                target: true,
-                parameters: { sort: "input", label: "y", hasValue: true, side: "middle" },
-                paintStyle: { fill: VALUECOLOR },
-            });
-            instance.addEndpoint(box, {
-                anchor: [0, 0.9, -1, 0],
-                target: true,
-                parameters: {sort: "input", label: "xy0", side: "lower"},
-            });
-            instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-        }
-        if(typecheck_now) {
+        // Add endpoints appropriately for its rule type, if necessary make it larger and resizable, and prompt for variables or ascription types.  Some rules display a modal box, in which case we don't typecheck until it is submitted.
+        if (addEndpointsForRule(box, id, false)) {
             typecheck();
         }
     });
+
 
     // Whenever the graph changes, we recompute it and pass to Narya to typecheck it.
     // This includes when a new connection is created:
@@ -425,6 +254,197 @@ ready(() => {
         document.getElementById("curvedConnectors").checked = true;
     }
 });
+
+// Clone the palette rule `id` into a new diagram node: position it, register it in the
+// nodes list, and give it a close button.  Endpoints are added separately by
+// addEndpointsForRule.  Returns the new box element.
+function addRuleNode(id) {
+    const originalBox = document.getElementById(id);
+    const box = originalBox.cloneNode(true);
+    box.style.position = 'absolute';
+    box.id = 'rule' + (counter++);
+    diagram.appendChild(box);
+    // Make it selectable for multi-element dragging.
+    box.onmousedown = toggleDragSelected(box);
+    // Add it to the master list of nodes.
+    nodes.push({id: box.id, rule: box.dataset.rule, node: box});
+    // Add a close button.  (Variable, hypothesis, and conclusion nodes aren't closeable.)
+    addBoxCloseButton(box);
+    return box;
+}
+
+// Add the endpoints (and, for bracket rules, the resizable shape) appropriate to the
+// palette rule `id` on the given box.  Returns whether the caller should typecheck right
+// away: rules that pop a modal for a variable/ascription/expression return false and
+// typecheck when the modal is submitted.  During a restore (`restore` true) those prompts
+// are skipped, since the values come from the saved proof.
+function addEndpointsForRule(box, id, restore) {
+    var typecheck_now = true;
+    if (id === 'andE') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "?∧?"}} );
+        instance.addEndpoint(box, { anchor: [1, 0.2, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "fst", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "snd", side: "lower"} });
+    } else if (id === 'andI') {
+        instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "fst", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "snd", side: "lower"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∧?" } });
+    } else if (id === 'impE' ) {
+        instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "implication", side: "upper", primary: "?⇒?"} });
+        instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "antecedent", side: "lower"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output" } });
+    } else if (id === 'iffE1' || id === 'iffE2') {
+        instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "implication", side: "upper", primary: "?⇔?"} });
+        instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "antecedent", side: "lower"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output" } });
+    } else if (id === 'orI1') {
+        // Even though there is only one input, we give it a label, because *in general* a Constr can have more than one input, so Olorin OCaml expects all inputs of all Constrs to have labels.
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: { sort: "input", label: "left" } });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∨?" } });
+    } else if (id === 'orI2') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: { sort: "input", label: "right" } });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∨?" } });
+    } else if (id === 'impI' || id === 'allI' || id === 'negI' || id === 'cnegI' ) {
+        if(id === 'allI') {
+            instance.addEndpoint(box, {
+                anchor: [0, 0.5, 1, 0, 22, -12],
+                source: true, maxConnections: -1,
+                parameters: { sort: "assumption", hasValue: true, side: "upper" },
+                paintStyle: { fill: VALUECOLOR },
+                connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 },
+            });
+        } else {
+            instance.addEndpoint(box, {
+                anchor: [0, 0.5, 1, 0, 22, -12],
+                source: true, maxConnections: -1,
+                parameters: {sort: "assumption", side: "upper"},
+            });
+        }
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -12], target: true, parameters: {sort: "subgoal", side: "upper"} });
+        const primary = (id === 'impI' ? "?⇒?" : (id === 'allI' ? "∀?∈?,?" : (id === 'cnegI' ? "?" : "¬?")));
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: primary} });
+        box.style.width = '200px';
+        box.style.height = '50px';
+        makeResizable(box);
+        if(id === 'allI') {
+            if(!restore) { getVariable(box.id); }
+            typecheck_now = false;
+        }
+    } else if (id === 'orE') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "?∨?"} });
+        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, -25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "left", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -25], target: true, parameters: {sort: "subgoal", label: "left", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, 25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "right", side: "lower"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, 25], target: true, parameters: {sort: "subgoal", label: "right", side: "lower"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
+        box.style.width = '200px';
+        box.style.height = '80px';
+        makeResizable(box);
+    } else if (id === 'iffI') {
+        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, -25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "ltor", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -25], target: true, parameters: {sort: "subgoal", label: "ltor", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, 25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "rtol", side: "lower"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, 25], target: true, parameters: {sort: "subgoal", label: "rtol", side: "lower"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: "?⇔?"} });
+        box.style.width = '200px';
+        box.style.height = '80px';
+        makeResizable(box);
+    } else if (id === 'exE') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "∃?∈?,?"} });
+        instance.addEndpoint(box, {
+            anchor: [1, 0.2, 1, 0],
+            source: true, maxConnections: -1,
+            parameters: { sort: "output", label: "element", hasValue: true, side: "upper"},
+            paintStyle: { fill: VALUECOLOR },
+            connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
+        });
+        instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        if(!restore) { getVariable(box.id); }
+        typecheck_now = false;
+    } else if (id === 'exI') {
+        instance.addEndpoint(box, {
+            anchor: [0, 0.2, -1, 0],
+            target: true,
+            parameters: {sort: "input", label: "element", hasValue: true, side: "upper"},
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "property", side: "lower"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "∃?∈?,?"} });
+    } else if (id === 'allE') {
+        instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "universal", side: "upper", primary: "∀?∈?,?"} });
+        instance.addEndpoint(box, {
+            anchor: [0, 0.8, -1, 0],
+            target: true,
+            parameters: {sort: "input", label: "element", hasValue: true, side: "lower"},
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    } else if (id === 'negE') {
+        instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "negation", side: "upper", primary: "¬?"} });
+        instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "statement", side: "lower", primary : "?"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
+    } else if (id === 'botE') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "⊥"},  });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
+    } else if (id === 'topI') {
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "⊤"} });
+    } else if (id === 'asc') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+        if(!restore) {
+            document.getElementById("ascribeBG").style.display = "flex";
+            const ascribe = document.getElementById('ascribe');
+            ascribe.dataset.name = box.id;
+            ascribe.focus();
+        }
+        typecheck_now = false;
+    } else if (id === 'alg') {
+        instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    } else if (id === 'expr') {
+        instance.addEndpoint(box, {
+            anchor: "Left",
+            target: true,
+            maxConnections: -1,
+            parameters: { sort: "input", hasValue: true },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, {
+            anchor: "Right",
+            source: true,
+            maxConnections: -1,
+            parameters: { sort: "output", hasValue: true },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        // Prompt for the expression
+        if(!restore) {
+            document.getElementById("expressionBG").style.display = "flex";
+            const expr = document.getElementById('expression');
+            expr.dataset.name = box.id;
+            expr.focus();
+        }
+        typecheck_now = false;
+    } else if (id === 'integral') {
+        instance.addEndpoint(box, {
+            anchor: [0, 0.1, -1, 0],
+            target: true,
+            parameters: { sort: "input", label: "x", hasValue: true, side: "upper" },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, {
+            anchor: [0, 0.5, -1, 0],
+            target: true,
+            parameters: { sort: "input", label: "y", hasValue: true, side: "middle" },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, {
+            anchor: [0, 0.9, -1, 0],
+            target: true,
+            parameters: {sort: "input", label: "xy0", side: "lower"},
+        });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    }
+    return typecheck_now;
+}
 
 // Set connector style
 document.getElementById("angleConnectors").onclick = function() {
@@ -967,6 +987,109 @@ document.getElementById("saveProof").onclick = function() {
     localStorage.setItem(key, JSON.stringify(serializeProof()));
 };
 
+// Find the endpoint on a node element matching a saved connection's sort and label.
+function findEndpoint(el, sort, label) {
+    return instance.getEndpoints(el).find(function (ep) {
+        return ep.parameters.sort === sort && ep.parameters.label === label;
+    });
+}
+
+// Rebuild the proof state from a snapshot previously written by "Save".
+function loadProof() {
+    const key = savedProofKey();
+    if(!key) {
+        alert("Loading is only supported for the built-in levels, not custom ones.");
+        return;
+    }
+    const saved = localStorage.getItem(key);
+    if(!saved) {
+        alert("No saved proof for this level.");
+        return;
+    }
+    const state = JSON.parse(saved);
+
+    // Reset to a clean slate: this recreates the fixed nodes (variables, hypotheses, conclusion) and reinitializes Narya.
+    selectCurrentLevel(currentLevel);
+
+    // Restore the saved difficulty setting.
+    if(typeof state.difficulty === 'number') {
+        setDifficulty(state.difficulty);
+        updateCurrentDifficulty();
+    }
+
+    // Build the rest of the proof in one batch, suppressing typechecking and the
+    // per-connection wire-label prompt until we're done.
+    suppressChecking = true;
+    restoring = true;
+
+    // Map each saved node id to the actual node element now in the diagram.
+    const idMap = {};
+    const fixedRules = ['variable', 'hypothesis', 'conclusion'];
+
+    // The fixed nodes were just recreated by selectCurrentLevel, in the same order they
+    // were saved; pair them up by that order and restore their positions.
+    const savedFixed = (state.nodes || []).filter((n) => fixedRules.includes(n.rule));
+    nodes.forEach((entry, i) => {
+        const sn = savedFixed[i];
+        if(!sn) { return; }
+        idMap[sn.id] = entry.node;
+        if(sn.left) { entry.node.style.left = sn.left; }
+        if(sn.top)  { entry.node.style.top  = sn.top; }
+    });
+
+    // Recreate the user-added nodes, in their saved order, with their saved geometry and values.
+    (state.nodes || []).filter((n) => !fixedRules.includes(n.rule)).forEach((sn) => {
+        const box = addRuleNode(sn.rule);
+        addEndpointsForRule(box, sn.rule, true);
+        if(sn.left)   { box.style.left = sn.left; }
+        if(sn.top)    { box.style.top = sn.top; }
+        if(sn.width)  { box.style.width = sn.width; }
+        if(sn.height) { box.style.height = sn.height; }
+        const entry = nodes.find((x) => x.id === box.id);
+        // Restore a bound-variable name (∀/∃ rules) into the global list and the node.
+        if(sn.name !== undefined && entry) { entry.name = sn.name; }
+        if(sn.variable) {
+            if(!varnames.includes(sn.variable)) { varnames.push(sn.variable); }
+            box.dataset.variable = sn.variable;
+        }
+        // Restore an ascription/expression value and re-render the box accordingly.
+        if(sn.value !== undefined) {
+            if(entry) { entry.value = sn.value; }
+            if(sn.rule === 'asc' || sn.rule === 'expr') {
+                box.innerHTML = (sn.rule === 'asc' ? "🏷&nbsp;" : "") + sn.value;
+                box.style.width = 'fit-content';
+                box.style.padding = "0px 8px 0px 8px";
+                // Re-rendering the box blew away its close button, so add it back.
+                addBoxCloseButton(box);
+            }
+        }
+        idMap[sn.id] = box;
+    });
+
+    // Repositioning the nodes invalidated jsPlumb's cached geometry; revalidate before reconnecting.
+    nodes.forEach((entry) => instance.revalidate(entry.node));
+
+    // Recreate the connections, matching endpoints by their sort and label.
+    (state.connections || []).forEach((c) => {
+        const srcEl = idMap[c.source.vertex];
+        const tgtEl = idMap[c.target.vertex];
+        if(!srcEl || !tgtEl) { return; }
+        const srcEp = findEndpoint(srcEl, c.source.sort, c.source.label);
+        const tgtEp = findEndpoint(tgtEl, c.target.sort, c.target.label);
+        if(!srcEp || !tgtEp) { return; }
+        const edge = instance.connect({ source: srcEp, target: tgtEp });
+        // Restore the user-supplied wire label, if any (Adept/Master difficulty).
+        if(edge && c.ty) { setUserWireLabel(edge, c.ty); }
+    });
+
+    restoring = false;
+    suppressChecking = false;
+    typecheck();
+}
+
+// The "Load" button restores the proof previously saved for the current level.
+document.getElementById("loadProof").onclick = loadProof;
+
 // Going "Back" from the custom level-select sends us back to the non-custom list of levels.
 document.getElementById("backLevel").onclick = function () {
     document.getElementById("levelSelectBG").style.display = "none";
@@ -1261,6 +1384,25 @@ function cancelExpr() {
     exprBG.style.display = "none";
 }
 
+// Attach a user-supplied label `ty` to a wire (connection), replacing any existing label overlay.
+function setUserWireLabel(edge, ty) {
+    edge.removeOverlay("label");
+    edge.removeOverlay("userLabel");
+    edge.addOverlay({ type: "Custom", options: {
+        id: "userLabel",
+        create: (e) => {
+            const d = document.createElement("div");
+            d.className = "connLabel userLabel";
+            d.innerText = ty;
+            d.onclick = function () { getUserLabel(edge); }
+            edge.parameters.userLabel = d;
+            return d;
+        },
+    } });
+    edge.parameters.ty = ty;
+    instance.revalidate(edge.source);
+}
+
 // And the modal box that prompts for a wire label
 function submitWireLabel() {
     const wire = document.getElementById('wire');
@@ -1276,21 +1418,7 @@ function submitWireLabel() {
            edge.endpoints[0].parameters.label === wire.dataset.sourceLabel &&
            edge.endpoints[1].parameters.sort === wire.dataset.targetSort &&
            edge.endpoints[1].parameters.label === wire.dataset.targetLabel) {
-            edge.removeOverlay("label");
-            edge.removeOverlay("userLabel");
-            edge.addOverlay({ type: "Custom", options: {
-                id: "userLabel",
-                create: (e) => {
-                    const d = document.createElement("div");
-                    d.className = "connLabel userLabel";
-                    d.innerText = ty;
-                    d.onclick = function () { getUserLabel(edge); }
-                    edge.parameters.userLabel = d;
-                    return d;
-                },
-            } });
-            edge.parameters.ty = ty;
-            instance.revalidate(edge.source);
+            setUserWireLabel(edge, ty);
         }
     });
     // And empty and hide the modal dialog
@@ -1531,18 +1659,21 @@ function getUserLabel(edge) {
 
 function addConnection(params) {
     const edge = params.connection;
-    // If we're on novice difficulty, or the wire connects to a hypothesis or conclusion, or carries a value, we just go ahead and typecheck.
-    if(difficulty === 0 ||
-       nodes.some(function (x) {
-           const ishyp = (x.id === edge.source.id && (x.rule === 'hypothesis' || x.rule === 'variable'));
-           const isconcl = (x.id === edge.target.id && x.rule === 'conclusion');
-           const hasval = edge.endpoints[0].parameters.hasValue;
-           return (ishyp || isconcl || hasval);
-       })) {
-        typecheck();
-    } else {
-        // Otherwise, we first prompt the user for a label for the new wire.
-        getUserLabel(edge);
+    // While restoring a saved proof, we set the wire labels ourselves and typecheck once at the end, so we skip the prompt/typecheck here (but still apply the connector styling below).
+    if(!restoring) {
+        // If we're on novice difficulty, or the wire connects to a hypothesis or conclusion, or carries a value, we just go ahead and typecheck.
+        if(difficulty === 0 ||
+           nodes.some(function (x) {
+               const ishyp = (x.id === edge.source.id && (x.rule === 'hypothesis' || x.rule === 'variable'));
+               const isconcl = (x.id === edge.target.id && x.rule === 'conclusion');
+               const hasval = edge.endpoints[0].parameters.hasValue;
+               return (ishyp || isconcl || hasval);
+           })) {
+            typecheck();
+        } else {
+            // Otherwise, we first prompt the user for a label for the new wire.
+            getUserLabel(edge);
+        }
     }
     // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
     if(edge.source == edge.target) {
