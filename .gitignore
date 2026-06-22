@@ -53,3 +53,9 @@ static/z3-built.wasm
 # Compiled javascript and webassembly files from reduce
 static/reduce.web.js
 static/reduce.web.wasm
+
+# Playwright test artifacts and browsers
+test-results/
+playwright-report/
+blob-report/
+.cache/

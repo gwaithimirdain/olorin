@@ -4,7 +4,10 @@
     "description": "",
     "main": "script.js",
     "scripts": {
-        "build": "webpack"
+        "build": "webpack",
+        "build:static": "./scripts/build-static.sh",
+        "test:e2e": "playwright test",
+        "test:e2e:headed": "playwright test --headed"
     },
     "author": "",
     "license": "ISC",
@@ -16,6 +19,7 @@
         "z3-solver": "^4.14.1"
     },
     "devDependencies": {
+        "@playwright/test": "^1.61.0",
         "webpack-cli": "^5.1.4"
     }
 }

@@ -1090,6 +1090,38 @@ function loadProof() {
 // The "Load" button restores the proof previously saved for the current level.
 document.getElementById("loadProof").onclick = loadProof;
 
+// Test instrumentation seam.  When the page is loaded with "?test" in the URL, we expose a
+// small read/drive API on window.__olorin so the Playwright suite can create wire
+// connections (which are impractical to simulate via raw jsPlumb endpoint dragging) and read
+// the proof state for assertions.  It is inert during normal use.
+if (new URLSearchParams(window.location.search).has("test")) {
+    window.__olorin = {
+        // Snapshot of the diagram nodes (id, rule, name/value, geometry).
+        nodes: () => nodes.map((n) => ({
+            id: n.id, rule: n.rule, name: n.name, value: n.value,
+            left: n.node.style.left, top: n.node.style.top,
+            width: n.node.style.width, height: n.node.style.height,
+        })),
+        // Snapshot of the connections (endpoints and user wire label).
+        connections: () => instance.getConnections().map((c) => ({
+            source: { vertex: c.source.id, sort: c.endpoints[0].parameters.sort, label: c.endpoints[0].parameters.label },
+            target: { vertex: c.target.id, sort: c.endpoints[1].parameters.sort, label: c.endpoints[1].parameters.label },
+            ty: c.parameters.ty,
+        })),
+        // Create a connection between two ports, identified as {vertex, sort, label}.
+        connect: (s, t) => {
+            const se = findEndpoint(document.getElementById(s.vertex), s.sort, s.label);
+            const te = findEndpoint(document.getElementById(t.vertex), t.sort, t.label);
+            instance.connect({ source: se, target: te });
+        },
+        difficulty: () => difficulty,
+        varnames: () => varnames.slice(),
+        savedProofKey,
+        // Whether the proof currently reads as complete (the conclusion turns a color).
+        complete: () => conclusion_node !== null && conclusion_node.style.backgroundColor !== "",
+    };
+}
+
 // Going "Back" from the custom level-select sends us back to the non-custom list of levels.
 document.getElementById("backLevel").onclick = function () {
     document.getElementById("levelSelectBG").style.display = "none";
