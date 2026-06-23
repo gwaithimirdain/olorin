@@ -103,8 +103,6 @@
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral">?*?=0</div>
       </div>
       <div style="display: block; align-items: end" id="buttons">
-        <button id="saveProof" class="proofOption">Save</button>
-        <button id="loadProof" class="proofOption">Load</button>
         <button id="exportProof" class="proofOption">Export</button>
         <button id="importProof" class="proofOption">Import</button>
         <button id="clearProof" class="proofOption">Clear</button>
@@ -134,7 +132,7 @@
           <div id="forwardWorld" style="cursor: pointer">▶</div>
           <div></div>
         </div>
-        <p id="chooseLevelWarning" style="visibility: hidden; text-align: center">(Choosing a new level clears any existing proof)</p>
+        <p id="chooseLevelWarning" style="visibility: hidden; text-align: center">(Your current proof is saved automatically; you can return to it later)</p>
         <div id="worlds"></div>
         <div id="chooseLevelButtons">
           <div style="text-align: center; display: flex">
@@ -242,6 +240,17 @@
         <div id="wirePalette"></div>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitWire" style="font-size: 16px">Submit</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="savedProofBG" class="modalbg">
+      <div class="modal" style="text-align: center; width: 360px">
+        <h3>Saved proof found</h3>
+        <p>You have a saved proof in progress for this level.</p>
+        <div style="margin-top: 20px">
+          <button id="loadSavedProof" style="font-size: 16px">Load saved proof</button>
+          <button id="discardSavedProof" style="font-size: 16px">Discard &amp; start fresh</button>
         </div>
       </div>
     </div>
@@ -381,7 +390,7 @@
           <p class="about">
             On the other hand, the underlying logic of the The Incredible Proof Machine is more configurable than Olorin's.
             For instance, in addition to predicate logic, it supports Hilbert systems and NAND calculus.
-            Moreover, The Incredible Proof Machine has other nice features that Olorin currently lacks: it saves your proof for each level when you switch to another one, and its unification algorithm can infer labels for more wires and ports in an incomplete proof than Olorin's (in fact, Olorin doesn't currently use unification <i>per se</i> at all, only bidirectional typechecking).
+            Moreover, The Incredible Proof Machine's unification algorithm can infer labels for more wires and ports in an incomplete proof than Olorin's (in fact, Olorin doesn't currently use unification <i>per se</i> at all, only bidirectional typechecking).
             If you like Olorin, you should check out <a href="https://incredible.pm/">The Incredible Proof Machine</a> too!
           </p>
           <h2>What's under the hood?</h2>

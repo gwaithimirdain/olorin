@@ -14,7 +14,8 @@ test/
   server.js               # Static file server with cross-origin-isolation headers
   helpers/olorin.js       # Page-object: open, selectLevel, dragRule, connect, save/load/clear, state readers
   e2e/                    # Test specs
-    saveload.spec.js      # Save / Load round-trip tests
+    autosave.spec.js      # autosave + reload/discard-prompt tests
+    exportimport.spec.js  # Export/Import (incl. cross-level switch) tests
 ```
 
 ## Running

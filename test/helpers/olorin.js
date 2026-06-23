@@ -112,17 +112,24 @@ class Olorin {
         }, { id, left, top });
     }
 
-    async save() {
-        await this.page.click('#saveProof');
-    }
-
-    async load() {
-        await this.page.click('#loadProof');
+    async clear() {
+        await this.page.click('#clearProof'); // confirm() auto-accepted in open()
         await this.dismissHints();
     }
 
-    async clear() {
-        await this.page.click('#clearProof'); // confirm() auto-accepted in open()
+    // Whether the "Saved proof found" prompt is currently showing.
+    savedPromptVisible() {
+        return this.page.isVisible('#savedProofBG');
+    }
+
+    // Answer the "Saved proof found" prompt: load the saved proof, or discard it.
+    async loadSaved() {
+        await this.page.click('#loadSavedProof');
+        await this.dismissHints();
+    }
+
+    async discardSaved() {
+        await this.page.click('#discardSavedProof');
         await this.dismissHints();
     }
 

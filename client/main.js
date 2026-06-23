@@ -114,6 +114,9 @@ var suppressChecking = false;
 // Dynamic variable set while restoring a saved proof, to suppress the wire-label prompt and typechecking that normally fire when a connection is created.
 var restoring = false;
 
+// Dynamic variable to suppress autosaving while a level is being set up (so the initial empty proof doesn't clobber a saved one).
+var suppressSave = false;
+
 // The world/level select panes and buttons
 var worldPanes = [];
 var currentWorld = 0;
@@ -911,10 +914,12 @@ document.getElementById("selectLevel").onclick = function() {
     document.getElementById("levelChooseBG").style.display = "flex";
 };
 
-// To clear the current proof, just re-select the current level
+// To clear the current proof, discard its autosave and re-select the current level fresh.
 document.getElementById("clearProof").onclick = function() {
     if(confirm("This will clear your current proof and reset to the beginning of this level!  It cannot be un-done.  Are you sure?")) {
-        selectCurrentLevel(currentLevel);
+        const key = savedProofKey();
+        if(key) { localStorage.removeItem(key); }
+        selectCurrentLevel(currentLevel, true);
     }
 }
 
@@ -985,15 +990,60 @@ function savedProofKey() {
     return "proof:" + JSON.stringify(saveable(currentLevel));
 }
 
-// The "Save" button stores a JSON snapshot of the current proof in localStorage,
-// associated with the current level, so it can be restored later with "Load".
-document.getElementById("saveProof").onclick = function() {
+// Whether a serialized proof represents actual progress worth restoring: at least one
+// connection, or one user-added node beyond the level's fixed nodes.
+function proofHasProgress(state) {
+    const fixedRules = ['variable', 'hypothesis', 'conclusion'];
+    return !!state && (
+        (Array.isArray(state.connections) && state.connections.length > 0) ||
+        (Array.isArray(state.nodes) && state.nodes.some((n) => !fixedRules.includes(n.rule)))
+    );
+}
+
+// Automatically persist the current proof to localStorage.  Called after every change (via
+// typecheck); suppressed while a level is being set up so the empty proof can't clobber a save.
+function autosave() {
+    if(suppressSave) { return; }
     const key = savedProofKey();
-    if(!key) {
-        alert("Saving is only supported for the built-in levels, not custom ones.");
+    if(key) {
+        localStorage.setItem(key, JSON.stringify(serializeProof()));
+    }
+}
+
+// When a level is selected, if there's an autosaved proof with real progress for it, offer to
+// reload it or discard it.  The level is already set up empty behind the prompt, so "discard"
+// just drops the saved data and leaves the fresh level in place.
+var pendingSavedProof = null;
+function offerSavedProof(level) {
+    const key = "proof:" + JSON.stringify(saveable(level));
+    const saved = localStorage.getItem(key);
+    if(!saved) { return; }
+    var state;
+    try {
+        state = JSON.parse(saved);
+    } catch(e) {
+        localStorage.removeItem(key);
         return;
     }
-    localStorage.setItem(key, JSON.stringify(serializeProof()));
+    if(!proofHasProgress(state)) { return; }
+    pendingSavedProof = { state: state, level: level, key: key };
+    document.getElementById("savedProofBG").style.display = "flex";
+}
+
+document.getElementById("loadSavedProof").onclick = function() {
+    document.getElementById("savedProofBG").style.display = "none";
+    if(pendingSavedProof) {
+        const pending = pendingSavedProof;
+        pendingSavedProof = null;
+        restoreProof(pending.state, pending.level);
+    }
+};
+document.getElementById("discardSavedProof").onclick = function() {
+    document.getElementById("savedProofBG").style.display = "none";
+    if(pendingSavedProof) {
+        localStorage.removeItem(pendingSavedProof.key);
+        pendingSavedProof = null;
+    }
 };
 
 // Find the endpoint on a node element matching a saved connection's sort and label.
@@ -1001,21 +1051,6 @@ function findEndpoint(el, sort, label) {
     return instance.getEndpoints(el).find(function (ep) {
         return ep.parameters.sort === sort && ep.parameters.label === label;
     });
-}
-
-// Rebuild the proof state from a snapshot previously written by "Save".
-function loadProof() {
-    const key = savedProofKey();
-    if(!key) {
-        alert("Loading is only supported for the built-in levels, not custom ones.");
-        return;
-    }
-    const saved = localStorage.getItem(key);
-    if(!saved) {
-        alert("No saved proof for this level.");
-        return;
-    }
-    restoreProof(JSON.parse(saved));
 }
 
 // Rebuild the proof from a snapshot object (as produced by serializeProof), into the given
@@ -1030,7 +1065,8 @@ function restoreProof(state, level) {
 
     // Reset to a clean slate: this selects the level (switching to it if different from the
     // current one) and recreates its fixed nodes (variables, hypotheses, conclusion) and Narya.
-    selectCurrentLevel(level);
+    // Skip the saved-proof prompt here: we're restoring a specific proof on purpose.
+    selectCurrentLevel(level, true);
 
     // Restore the saved difficulty setting.
     if(typeof state.difficulty === 'number') {
@@ -1107,9 +1143,6 @@ function restoreProof(state, level) {
     suppressChecking = false;
     typecheck();
 }
-
-// The "Load" button restores the proof previously saved for the current level.
-document.getElementById("loadProof").onclick = loadProof;
 
 // The "Export" button shows the current proof state as JSON, for copying (e.g. into a bug report).
 document.getElementById("exportProof").onclick = function() {
@@ -1332,11 +1365,16 @@ document.getElementById("doneAbout").onclick = function () {
     document.getElementById("aboutBG").style.display = "none";
 };
 
-function selectCurrentLevel(level) {
+function selectCurrentLevel(level, skipSavedPrompt) {
     setLevel(level, level.stage.rules.concat(extraRules));
     currentLevel = level;
     currentLevelButton = level.button;
     document.getElementById("currentLevel").innerText = "Level: " + level.name;
+    // If there's an autosaved proof for this level, offer to reload it (unless we're already
+    // in the middle of restoring/importing a specific proof, which passes skipSavedPrompt).
+    if(!skipSavedPrompt) {
+        offerSavedProof(level);
+    }
 }
 
 // Add a close button to a box
@@ -1825,6 +1863,9 @@ function addConnection(params) {
 function typecheck() {
     if(suppressChecking) { return; }
 
+    // Persist the current proof on every change.
+    autosave();
+
     document.getElementById("typecheckingBG").style.display = 'flex';
 
     console.log("typechecking with " + nodes.length + " nodes");
@@ -2294,6 +2335,8 @@ function setLevel(level, rulesAllowed) {
     // Now we know the new level is valid, so we blow away the old one and set up the new one.
 
     suppressChecking = true;
+    // Don't autosave while setting up: the initial empty proof must not overwrite a saved one.
+    suppressSave = true;
 
     // Set the global varnames to the new one.
     varnames = new_varnames;
@@ -2402,6 +2445,8 @@ function setLevel(level, rulesAllowed) {
     // Finally, we typecheck.  It will fail since the user hasn't added any connections yet, but it adds labels to ports.
     suppressChecking = false;
     typecheck();
+    // The empty level is now set up; subsequent changes should autosave.
+    suppressSave = false;
 
     // Done setting up the new level!
 
