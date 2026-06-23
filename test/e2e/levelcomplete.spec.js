@@ -1,6 +1,6 @@
-// Tests for the non-blocking "level complete" behaviour: completing a level tints the diagram
-// (it doesn't pop a modal), the corner "Next" button is disabled until the level is complete
-// and then advances, and the other corner buttons stay usable while a level is complete.
+// Tests for the non-modal "level complete" pop-up: completing a level shows a pop-up at the
+// top with Next / Select Level (without blocking the proof or the other buttons), Next advances
+// to the next level, and the pop-up hides again when the level is no longer complete.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -13,26 +13,26 @@ test.describe('Level complete', () => {
         await olorin.open();
     });
 
-    test('Next is disabled until complete, then advances to the next level', async () => {
+    test('shows a pop-up on completion whose Next advances to the next level', async () => {
         await olorin.selectLevel('1-1-1');
-        expect(await olorin.nextEnabled()).toBe(false);
+        expect(await olorin.completeBannerVisible()).toBe(false);
 
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         expect(await olorin.isComplete()).toBe(true);
-        expect(await olorin.nextEnabled()).toBe(true);
+        expect(await olorin.completeBannerVisible()).toBe(true);
 
         await olorin.next();
         expect(await olorin.currentLevelName()).toBe('1-1-2');
-        // A freshly selected (incomplete) level disables Next again.
-        expect(await olorin.nextEnabled()).toBe(false);
+        // The fresh (incomplete) level hides the pop-up again.
+        expect(await olorin.completeBannerVisible()).toBe(false);
     });
 
-    test('completing a level does not block the other buttons', async () => {
+    test('the pop-up is not modal: other buttons and the proof stay usable', async () => {
         await olorin.selectLevel('1-1-1');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        expect(await olorin.isComplete()).toBe(true);
+        expect(await olorin.completeBannerVisible()).toBe(true);
 
-        // No modal is covering the screen: Export still opens, and Clear still works.
+        // No full-screen backdrop: Export still opens and Clear still works while complete.
         await olorin.page.click('#exportProof');
         expect(await olorin.isVisible('#exportBG')).toBe(true);
         await olorin.page.click('#doneExport');
@@ -40,6 +40,15 @@ test.describe('Level complete', () => {
         await olorin.clear();
         expect(await olorin.connections()).toHaveLength(0);
         expect(await olorin.isComplete()).toBe(false);
-        expect(await olorin.nextEnabled()).toBe(false);
+        expect(await olorin.completeBannerVisible()).toBe(false);
+    });
+
+    test('Select Level in the pop-up opens the level chooser', async () => {
+        await olorin.selectLevel('1-1-1');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        expect(await olorin.completeBannerVisible()).toBe(true);
+
+        await olorin.page.click('#selectLevelAfterComplete');
+        expect(await olorin.isVisible('#levelChooseBG')).toBe(true);
     });
 });

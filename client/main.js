@@ -1252,8 +1252,9 @@ document.getElementById("backLevel").onclick = function () {
 document.getElementById("cancelSetLevel").onclick = clearLevelSelect;
 document.getElementById("cancelChooseLevel").onclick = clearLevelSelect;
 
-// The "Next" button (enabled once the level is complete) advances to the next level.
+// The "Next" button in the completion pop-up advances to the next level.
 document.getElementById("nextLevel").onclick = function() {
+    document.getElementById("levelCompleteBanner").classList.remove("shown");
     if(currentLevel) {
         const idx = allLevels.indexOf(currentLevel);
         if(idx >= 0 && idx < allLevels.length - 1) {
@@ -1264,6 +1265,12 @@ document.getElementById("nextLevel").onclick = function() {
             selectCurrentLevel(next);
         }
     }
+};
+
+// The "Select Level" button in the completion pop-up opens the level chooser.
+document.getElementById("selectLevelAfterComplete").onclick = function() {
+    document.getElementById("levelCompleteBanner").classList.remove("shown");
+    document.getElementById("levelChooseBG").style.display = "flex";
 };
 
 // The modal box for prompting for a new variable name
@@ -1986,7 +1993,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         alert ("Internal error.  Please open the javascript console, take a screenshot, and send them both to the developer.");
         diagram.style.backgroundColor = "";
         conclusion_node.style.backgroundColor = "";
-        document.getElementById("nextLevel").disabled = true;
+        document.getElementById("levelCompleteBanner").classList.remove("shown");
     } else {
         // result.labels is an array of objects of type {loc, ty:string, tm:string opt}, where loc represents either an edge or a port and has type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
         // To this we add the ports that have default labels from being "primary" (synthesizing inputs or checking outputs).  But we add them last, so they don't override any labels produced by Narya.
@@ -2126,17 +2133,18 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
                     xhr.send(JSON.stringify(data));
                 }
-                // The proof is complete: enable the "Next" button (if there is a next level).
-                // The completion itself is shown by the (non-blocking) green tint of the diagram.
+                // The proof is complete: show the (non-modal) completion pop-up at the top.
+                // It only offers "Next" when there is a next level to go to.
                 const idx = allLevels.indexOf(currentLevel);
                 const hasNext = (idx >= 0 && idx < allLevels.length - 1);
-                document.getElementById("nextLevel").disabled = !hasNext;
+                document.getElementById("nextLevel").style.display = hasNext ? '' : 'none';
+                document.getElementById("levelCompleteBanner").classList.add("shown");
             }
         } else {
             // If there are fatal errors, remove any green color on the goal and indicate the errors somehow.
             diagram.style.backgroundColor = "";
             conclusion_node.style.backgroundColor = "";
-            document.getElementById("nextLevel").disabled = true;
+            document.getElementById("levelCompleteBanner").classList.remove("shown");
             var somethingRed = false;
             // result.diagnostics is an array of objects of type {isfatal:bool, locs, text:string}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
             result.diagnostics.forEach(function (d) {
@@ -2337,8 +2345,8 @@ function setLevel(level, rulesAllowed) {
 
     // Hide the modal dialogs for choosing levels or setting custom levels, and empty the custom text fields.
     clearLevelSelect();
-    // A freshly set-up level isn't complete yet, so the "Next" button starts disabled.
-    document.getElementById("nextLevel").disabled = true;
+    // A freshly set-up level isn't complete yet, so the completion pop-up starts hidden.
+    document.getElementById("levelCompleteBanner").classList.remove("shown");
 
     // Turn on the "cancel" buttons and "proof will be erased" warnings for future level-selections.
     document.getElementById("setLevelWarning").style.display = '';

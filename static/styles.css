@@ -449,6 +449,40 @@ body {
     font-family: sans-serif;
 }
 
+/* Non-modal "level complete" pop-up, pinned to the top center.  It is hidden until the level
+   is complete.  pointer-events are disabled on the bar itself (so it doesn't block dragging the
+   proof) and re-enabled only on its buttons. */
+#levelCompleteBanner {
+    display: none;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background-color: var(--novice-bg);
+    border: 2px solid #000000;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    font-family: sans-serif;
+    pointer-events: none;
+}
+
+#levelCompleteBanner.shown {
+    display: flex;
+}
+
+#levelCompleteText {
+    font-weight: bold;
+}
+
+#levelCompleteBanner button {
+    font-size: 16px;
+    pointer-events: auto;
+}
+
 #reduceDifficulty {
     display: none;
     border: 1px solid #000000;

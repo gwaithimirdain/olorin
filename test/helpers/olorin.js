@@ -62,12 +62,12 @@ class Olorin {
         });
     }
 
-    // Whether the corner "Next" button (enabled once a level is complete) is enabled.
-    nextEnabled() {
-        return this.page.isEnabled('#nextLevel');
+    // Whether the (non-modal) "level complete" pop-up is showing.
+    completeBannerVisible() {
+        return this.page.isVisible('#levelCompleteBanner');
     }
 
-    // Advance to the next level via the "Next" button.
+    // Advance to the next level via the "Next" button in the completion pop-up.
     async next() {
         await this.page.click('#nextLevel');
         await this.dismissHints();
