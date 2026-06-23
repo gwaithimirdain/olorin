@@ -124,6 +124,11 @@ class Olorin {
         return this.page.isVisible('#savedProofBG');
     }
 
+    // The text shown in the "Saved proof found" prompt (says "partial" or "complete").
+    savedPromptText() {
+        return this.page.textContent('#savedProofText');
+    }
+
     // Answer the "Saved proof found" prompt: load the saved proof, or discard it.
     async loadSaved() {
         await this.page.click('#loadSavedProof');

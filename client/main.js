@@ -963,6 +963,8 @@ function serializeProof() {
         // The level this proof belongs to (parameters, variables, hypotheses, conclusion), so
         // an imported proof can be matched to (or used to switch to) the right level.
         level: currentLevel ? saveable(currentLevel) : undefined,
+        // Whether the proof is currently complete (the conclusion has turned a color).
+        complete: conclusion_node !== null && conclusion_node.style.backgroundColor !== "",
         difficulty: difficulty,
         // Autonumber counters, so nodes added after a restore won't reuse saved IDs.
         counters: {
@@ -1026,6 +1028,9 @@ function offerSavedProof(level) {
     }
     if(!proofHasProgress(state)) { return; }
     pendingSavedProof = { state: state, level: level, key: key };
+    document.getElementById("savedProofText").innerText = state.complete
+        ? "You have a saved complete proof for this level."
+        : "You have a saved partial proof for this level.";
     document.getElementById("savedProofBG").style.display = "flex";
 }
 
@@ -1866,9 +1871,6 @@ function addConnection(params) {
 function typecheck() {
     if(suppressChecking) { return; }
 
-    // Persist the current proof on every change.
-    autosave();
-
     document.getElementById("typecheckingBG").style.display = 'flex';
 
     console.log("typechecking with " + nodes.length + " nodes");
@@ -2229,6 +2231,9 @@ function continue_typechecking(nodes, edges, connections, result) {
             }
         }
     }
+
+    // Persist the current proof on every change, now that we know whether it's complete.
+    autosave();
 
     document.getElementById("typecheckingBG").style.display = 'none';
 }

@@ -24,10 +24,11 @@ test.describe('Autosave', () => {
         );
         const before = await olorin.structuralState();
 
-        // Switch away and back: the autosaved proof should be offered.
+        // Switch away and back: the autosaved (partial) proof should be offered.
         await olorin.selectLevel('1-1-2');
         await olorin.selectLevel('1-1-1');
         expect(await olorin.savedPromptVisible()).toBe(true);
+        expect(await olorin.savedPromptText()).toContain('partial');
 
         await olorin.loadSaved();
         expect(await olorin.structuralState()).toEqual(before);
@@ -63,6 +64,7 @@ test.describe('Autosave', () => {
         await olorin.selectLevel('1-1-2');
         await olorin.selectLevel('1-1-1');
         expect(await olorin.savedPromptVisible()).toBe(true);
+        expect(await olorin.savedPromptText()).toContain('complete');
 
         await olorin.loadSaved();
         expect(await olorin.isComplete()).toBe(true);
