@@ -21,6 +21,16 @@ test.describe('Level complete', () => {
         expect(await olorin.isComplete()).toBe(true);
         expect(await olorin.completeBannerVisible()).toBe(true);
 
+        // The pop-up is tinted to the current difficulty's color, like the conclusion box.
+        const colors = await olorin.page.evaluate(() => {
+            const conclId = window.__olorin.nodes().find((n) => n.rule === 'conclusion').id;
+            return {
+                banner: getComputedStyle(document.getElementById('levelCompleteBanner')).backgroundColor,
+                conclusion: getComputedStyle(document.getElementById(conclId)).backgroundColor,
+            };
+        });
+        expect(colors.banner).toBe(colors.conclusion);
+
         await olorin.next();
         expect(await olorin.currentLevelName()).toBe('1-1-2');
         // The fresh (incomplete) level hides the pop-up again.

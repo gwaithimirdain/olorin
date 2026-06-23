@@ -450,8 +450,9 @@ body {
 }
 
 /* Non-modal "level complete" pop-up, pinned to the top center.  It is hidden until the level
-   is complete.  pointer-events are disabled on the bar itself (so it doesn't block dragging the
-   proof) and re-enabled only on its buttons. */
+   is complete, when JavaScript also tints it to match the current difficulty.  pointer-events
+   are disabled on the bar itself (so it doesn't block dragging the proof) and re-enabled only
+   on its buttons. */
 #levelCompleteBanner {
     display: none;
     position: absolute;
@@ -462,7 +463,6 @@ body {
     align-items: center;
     gap: 12px;
     padding: 8px 16px;
-    background-color: var(--novice-bg);
     border: 2px solid #000000;
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);

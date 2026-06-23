@@ -2133,12 +2133,15 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
                     xhr.send(JSON.stringify(data));
                 }
-                // The proof is complete: show the (non-modal) completion pop-up at the top.
+                // The proof is complete: show the (non-modal) completion pop-up at the top,
+                // tinted to match the current difficulty (the same color as the conclusion box).
                 // It only offers "Next" when there is a next level to go to.
                 const idx = allLevels.indexOf(currentLevel);
                 const hasNext = (idx >= 0 && idx < allLevels.length - 1);
                 document.getElementById("nextLevel").style.display = hasNext ? '' : 'none';
-                document.getElementById("levelCompleteBanner").classList.add("shown");
+                const banner = document.getElementById("levelCompleteBanner");
+                banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
+                banner.classList.add("shown");
             }
         } else {
             // If there are fatal errors, remove any green color on the goal and indicate the errors somehow.
