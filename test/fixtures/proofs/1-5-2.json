@@ -1,0 +1,76 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "Q"
+      }
+    ],
+    "conclusion": {
+      "ty": "P∨Q"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 74,
+    "paramCounter": 71,
+    "varCounter": 0,
+    "hypCounter": 35,
+    "conclCounter": 28
+  },
+  "nodes": [
+    {
+      "id": "hyp34",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "Q"
+    },
+    {
+      "id": "concl27",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P∨Q"
+    },
+    {
+      "id": "rule73",
+      "rule": "orI2",
+      "left": "380px",
+      "top": "120px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp34",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule73",
+        "sort": "input",
+        "label": "right"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule73",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl27",
+        "sort": "input"
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P"
+      }
+    ],
+    "conclusion": {
+      "ty": "P∧P"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 2,
+    "paramCounter": 6,
+    "varCounter": 0,
+    "hypCounter": 6,
+    "conclCounter": 4
+  },
+  "nodes": [
+    {
+      "id": "hyp5",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "P"
+    },
+    {
+      "id": "concl3",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P∧P"
+    },
+    {
+      "id": "rule1",
+      "rule": "andI",
+      "left": "380px",
+      "top": "120px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp5",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp5",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl3",
+        "sort": "input"
+      }
+    }
+  ]
+}

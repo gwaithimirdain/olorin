@@ -1,0 +1,105 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P∧Q"
+      }
+    ],
+    "conclusion": {
+      "ty": "Q∧P"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 6,
+    "paramCounter": 12,
+    "varCounter": 0,
+    "hypCounter": 9,
+    "conclCounter": 7
+  },
+  "nodes": [
+    {
+      "id": "hyp8",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "P∧Q"
+    },
+    {
+      "id": "concl6",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "Q∧P"
+    },
+    {
+      "id": "rule4",
+      "rule": "andE",
+      "left": "380px",
+      "top": "120px"
+    },
+    {
+      "id": "rule5",
+      "rule": "andI",
+      "left": "380px",
+      "top": "190px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp8",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule4",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule4",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule5",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule4",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule5",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule5",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl6",
+        "sort": "input"
+      }
+    }
+  ]
+}

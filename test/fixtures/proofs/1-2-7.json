@@ -1,0 +1,155 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "(P∧Q)∧R"
+      }
+    ],
+    "conclusion": {
+      "ty": "P∧(Q∧R)"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 13,
+    "paramCounter": 18,
+    "varCounter": 0,
+    "hypCounter": 11,
+    "conclCounter": 9
+  },
+  "nodes": [
+    {
+      "id": "hyp10",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "(P∧Q)∧R"
+    },
+    {
+      "id": "concl8",
+      "rule": "conclusion",
+      "left": "1053px",
+      "top": "50%",
+      "value": "P∧(Q∧R)"
+    },
+    {
+      "id": "rule9",
+      "rule": "andE",
+      "left": "380px",
+      "top": "120px"
+    },
+    {
+      "id": "rule10",
+      "rule": "andE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule11",
+      "rule": "andI",
+      "left": "380px",
+      "top": "260px"
+    },
+    {
+      "id": "rule12",
+      "rule": "andI",
+      "left": "380px",
+      "top": "330px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp10",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule9",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule9",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule10",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule10",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule11",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule10",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule12",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule9",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule12",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule12",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule11",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule11",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl8",
+        "sort": "input"
+      }
+    }
+  ]
+}

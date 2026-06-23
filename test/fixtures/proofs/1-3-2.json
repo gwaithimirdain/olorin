@@ -1,0 +1,62 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "P⇒P"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 24,
+    "paramCounter": 28,
+    "varCounter": 0,
+    "hypCounter": 15,
+    "conclCounter": 13
+  },
+  "nodes": [
+    {
+      "id": "concl12",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P⇒P"
+    },
+    {
+      "id": "rule23",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule23",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl12",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule23",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule23",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}

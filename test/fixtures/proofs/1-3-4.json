@@ -1,0 +1,147 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P⇒Q"
+      },
+      {
+        "ty": "Q⇒R"
+      }
+    ],
+    "conclusion": {
+      "ty": "P⇒R"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 29,
+    "paramCounter": 33,
+    "varCounter": 0,
+    "hypCounter": 17,
+    "conclCounter": 15
+  },
+  "nodes": [
+    {
+      "id": "hyp15",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "240px",
+      "value": "P⇒Q"
+    },
+    {
+      "id": "hyp16",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "480px",
+      "value": "Q⇒R"
+    },
+    {
+      "id": "concl14",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P⇒R"
+    },
+    {
+      "id": "rule26",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule27",
+      "rule": "impE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule28",
+      "rule": "impE",
+      "left": "380px",
+      "top": "260px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule26",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl14",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp15",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule27",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule26",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule27",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp16",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule28",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule27",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule28",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule28",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule26",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}

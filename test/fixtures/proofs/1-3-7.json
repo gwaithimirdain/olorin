@@ -1,0 +1,155 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P⇒(Q⇒R)"
+      }
+    ],
+    "conclusion": {
+      "ty": "Q⇒(P⇒R)"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 40,
+    "paramCounter": 42,
+    "varCounter": 0,
+    "hypCounter": 23,
+    "conclCounter": 18
+  },
+  "nodes": [
+    {
+      "id": "hyp22",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "P⇒(Q⇒R)"
+    },
+    {
+      "id": "concl17",
+      "rule": "conclusion",
+      "left": "1051px",
+      "top": "50%",
+      "value": "Q⇒(P⇒R)"
+    },
+    {
+      "id": "rule36",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule37",
+      "rule": "impI",
+      "left": "380px",
+      "top": "190px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule38",
+      "rule": "impE",
+      "left": "380px",
+      "top": "260px"
+    },
+    {
+      "id": "rule39",
+      "rule": "impE",
+      "left": "380px",
+      "top": "330px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule36",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl17",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule37",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule36",
+        "sort": "subgoal"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp22",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule38",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule37",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule38",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule38",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule39",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule36",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule39",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule39",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule37",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}

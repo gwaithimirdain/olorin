@@ -1,0 +1,97 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P⇒Q"
+      },
+      {
+        "ty": "P"
+      }
+    ],
+    "conclusion": {
+      "ty": "Q"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 23,
+    "paramCounter": 27,
+    "varCounter": 0,
+    "hypCounter": 15,
+    "conclCounter": 12
+  },
+  "nodes": [
+    {
+      "id": "hyp13",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "240px",
+      "value": "P⇒Q"
+    },
+    {
+      "id": "hyp14",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "480px",
+      "value": "P"
+    },
+    {
+      "id": "concl11",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "Q"
+    },
+    {
+      "id": "rule22",
+      "rule": "impE",
+      "left": "380px",
+      "top": "120px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp13",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule22",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp14",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule22",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule22",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl11",
+        "sort": "input"
+      }
+    }
+  ]
+}

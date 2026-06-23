@@ -1,0 +1,176 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      },
+      {
+        "name": "S",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "(P∧Q)∧(R∧S)"
+      }
+    ],
+    "conclusion": {
+      "ty": "R∧(S∧Q)"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 22,
+    "paramCounter": 25,
+    "varCounter": 0,
+    "hypCounter": 13,
+    "conclCounter": 11
+  },
+  "nodes": [
+    {
+      "id": "hyp12",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "(P∧Q)∧(R∧S)"
+    },
+    {
+      "id": "concl10",
+      "rule": "conclusion",
+      "left": "1053px",
+      "top": "50%",
+      "value": "R∧(S∧Q)"
+    },
+    {
+      "id": "rule17",
+      "rule": "andE",
+      "left": "380px",
+      "top": "120px"
+    },
+    {
+      "id": "rule18",
+      "rule": "andE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule19",
+      "rule": "andE",
+      "left": "380px",
+      "top": "260px"
+    },
+    {
+      "id": "rule20",
+      "rule": "andI",
+      "left": "380px",
+      "top": "330px"
+    },
+    {
+      "id": "rule21",
+      "rule": "andI",
+      "left": "380px",
+      "top": "400px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp12",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule17",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule17",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule18",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule17",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule19",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule19",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule20",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule19",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule21",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule18",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule21",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule21",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule20",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule20",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl10",
+        "sort": "input"
+      }
+    }
+  ]
+}

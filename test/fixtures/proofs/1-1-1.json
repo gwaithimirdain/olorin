@@ -1,0 +1,55 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P"
+      }
+    ],
+    "conclusion": {
+      "ty": "P"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 0,
+    "paramCounter": 1,
+    "varCounter": 0,
+    "hypCounter": 1,
+    "conclCounter": 1
+  },
+  "nodes": [
+    {
+      "id": "hyp0",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "P"
+    },
+    {
+      "id": "concl0",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp0",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl0",
+        "sort": "input"
+      }
+    }
+  ]
+}

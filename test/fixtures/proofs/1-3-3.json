@@ -1,0 +1,84 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "P⇒(Q⇒P)"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 26,
+    "paramCounter": 30,
+    "varCounter": 0,
+    "hypCounter": 15,
+    "conclCounter": 14
+  },
+  "nodes": [
+    {
+      "id": "concl13",
+      "rule": "conclusion",
+      "left": "1053px",
+      "top": "50%",
+      "value": "P⇒(Q⇒P)"
+    },
+    {
+      "id": "rule24",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule25",
+      "rule": "impI",
+      "left": "380px",
+      "top": "190px",
+      "width": "200px",
+      "height": "50px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule24",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl13",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule25",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule24",
+        "sort": "subgoal"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule24",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule25",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}

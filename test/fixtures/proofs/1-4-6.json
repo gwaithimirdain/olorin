@@ -1,0 +1,197 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      },
+      {
+        "name": "S",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P⇒Q"
+      },
+      {
+        "ty": "R⇒S"
+      }
+    ],
+    "conclusion": {
+      "ty": "(P∧R)⇒(Q∧S)"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 72,
+    "paramCounter": 67,
+    "varCounter": 0,
+    "hypCounter": 33,
+    "conclCounter": 26
+  },
+  "nodes": [
+    {
+      "id": "hyp31",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "240px",
+      "value": "P⇒Q"
+    },
+    {
+      "id": "hyp32",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "480px",
+      "value": "R⇒S"
+    },
+    {
+      "id": "concl25",
+      "rule": "conclusion",
+      "left": "1021px",
+      "top": "50%",
+      "value": "(P∧R)⇒(Q∧S)"
+    },
+    {
+      "id": "rule67",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule68",
+      "rule": "andE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule69",
+      "rule": "impE",
+      "left": "380px",
+      "top": "260px"
+    },
+    {
+      "id": "rule70",
+      "rule": "impE",
+      "left": "380px",
+      "top": "330px"
+    },
+    {
+      "id": "rule71",
+      "rule": "andI",
+      "left": "380px",
+      "top": "400px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule67",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl25",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule67",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule68",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp31",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule69",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule68",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule69",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp32",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule70",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule68",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule70",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule69",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule71",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule70",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule71",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule71",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule67",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}

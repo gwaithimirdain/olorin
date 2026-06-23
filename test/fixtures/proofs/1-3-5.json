@@ -1,0 +1,133 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P⇒(P⇒Q)"
+      }
+    ],
+    "conclusion": {
+      "ty": "P⇒Q"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 32,
+    "paramCounter": 35,
+    "varCounter": 0,
+    "hypCounter": 18,
+    "conclCounter": 16
+  },
+  "nodes": [
+    {
+      "id": "hyp17",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "P⇒(P⇒Q)"
+    },
+    {
+      "id": "concl15",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P⇒Q"
+    },
+    {
+      "id": "rule29",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule30",
+      "rule": "impE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule31",
+      "rule": "impE",
+      "left": "380px",
+      "top": "260px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl15",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp17",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule30",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule31",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule31",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule31",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule29",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}

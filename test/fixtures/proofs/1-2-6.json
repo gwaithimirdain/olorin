@@ -1,0 +1,126 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "(P∧Q)∧R"
+      }
+    ],
+    "conclusion": {
+      "ty": "P∧R"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 9,
+    "paramCounter": 15,
+    "varCounter": 0,
+    "hypCounter": 10,
+    "conclCounter": 8
+  },
+  "nodes": [
+    {
+      "id": "hyp9",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "360px",
+      "value": "(P∧Q)∧R"
+    },
+    {
+      "id": "concl7",
+      "rule": "conclusion",
+      "left": "1077px",
+      "top": "50%",
+      "value": "P∧R"
+    },
+    {
+      "id": "rule6",
+      "rule": "andE",
+      "left": "380px",
+      "top": "120px"
+    },
+    {
+      "id": "rule7",
+      "rule": "andE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule8",
+      "rule": "andI",
+      "left": "380px",
+      "top": "260px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp9",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule6",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule7",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule8",
+        "sort": "input",
+        "label": "fst"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule8",
+        "sort": "input",
+        "label": "snd"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl7",
+        "sort": "input"
+      }
+    }
+  ]
+}

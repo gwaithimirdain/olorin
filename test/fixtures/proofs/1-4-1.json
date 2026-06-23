@@ -1,0 +1,136 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      },
+      {
+        "name": "R",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P⇒R"
+      },
+      {
+        "ty": "Q⇒R"
+      }
+    ],
+    "conclusion": {
+      "ty": "(P∧Q)⇒R"
+    }
+  },
+  "difficulty": 0,
+  "counters": {
+    "counter": 51,
+    "paramCounter": 51,
+    "varCounter": 0,
+    "hypCounter": 27,
+    "conclCounter": 21
+  },
+  "nodes": [
+    {
+      "id": "hyp25",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "240px",
+      "value": "P⇒R"
+    },
+    {
+      "id": "hyp26",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "480px",
+      "value": "Q⇒R"
+    },
+    {
+      "id": "concl20",
+      "rule": "conclusion",
+      "left": "1052px",
+      "top": "50%",
+      "value": "(P∧Q)⇒R"
+    },
+    {
+      "id": "rule48",
+      "rule": "impI",
+      "left": "380px",
+      "top": "120px",
+      "width": "200px",
+      "height": "50px"
+    },
+    {
+      "id": "rule49",
+      "rule": "andE",
+      "left": "380px",
+      "top": "190px"
+    },
+    {
+      "id": "rule50",
+      "rule": "impE",
+      "left": "380px",
+      "top": "260px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule48",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl20",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule48",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule49",
+        "sort": "input"
+      }
+    },
+    {
+      "source": {
+        "vertex": "hyp25",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule50",
+        "sort": "input",
+        "label": "implication"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule49",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule50",
+        "sort": "input",
+        "label": "antecedent"
+      }
+    },
+    {
+      "source": {
+        "vertex": "rule50",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule48",
+        "sort": "subgoal"
+      }
+    }
+  ]
+}
