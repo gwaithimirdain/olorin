@@ -124,7 +124,6 @@ const levelButtons = [];
 var allLevels = [];
 var currentLevel;
 var currentLevelButton;
-var levelCompleteShown = false;
 
 // Exclude these rules from "all"
 const excludeFromAll = [ "negI" ] // Classical negation suffices
@@ -1234,6 +1233,10 @@ if (new URLSearchParams(window.location.search).has("test")) {
         difficulty: () => difficulty,
         varnames: () => varnames.slice(),
         savedProofKey,
+        // The JSON snapshot of the current proof (as autosave/Export produce).
+        serialize: () => serializeProof(),
+        // Rebuild the proof from a snapshot, into the current level.
+        restore: (state) => restoreProof(state),
         // Whether the proof currently reads as complete (the conclusion turns a color).
         complete: () => conclusion_node !== null && conclusion_node.style.backgroundColor !== "",
     };
@@ -1249,9 +1252,8 @@ document.getElementById("backLevel").onclick = function () {
 document.getElementById("cancelSetLevel").onclick = clearLevelSelect;
 document.getElementById("cancelChooseLevel").onclick = clearLevelSelect;
 
-// When a level is completed, the "Next" button advances to the next level.
+// The "Next" button (enabled once the level is complete) advances to the next level.
 document.getElementById("nextLevel").onclick = function() {
-    document.getElementById("levelCompleteBG").style.display = "none";
     if(currentLevel) {
         const idx = allLevels.indexOf(currentLevel);
         if(idx >= 0 && idx < allLevels.length - 1) {
@@ -1262,12 +1264,6 @@ document.getElementById("nextLevel").onclick = function() {
             selectCurrentLevel(next);
         }
     }
-};
-
-// The "Select Level" button on the completion modal opens the level chooser.
-document.getElementById("selectLevelAfterComplete").onclick = function() {
-    document.getElementById("levelCompleteBG").style.display = "none";
-    document.getElementById("levelChooseBG").style.display = "flex";
 };
 
 // The modal box for prompting for a new variable name
@@ -1990,6 +1986,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         alert ("Internal error.  Please open the javascript console, take a screenshot, and send them both to the developer.");
         diagram.style.backgroundColor = "";
         conclusion_node.style.backgroundColor = "";
+        document.getElementById("nextLevel").disabled = true;
     } else {
         // result.labels is an array of objects of type {loc, ty:string, tm:string opt}, where loc represents either an edge or a port and has type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
         // To this we add the ports that have default labels from being "primary" (synthesizing inputs or checking outputs).  But we add them last, so they don't override any labels produced by Narya.
@@ -2129,20 +2126,17 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
                     xhr.send(JSON.stringify(data));
                 }
-                // Show the "Level Complete" modal the first time the proof is completed
-                if(!levelCompleteShown) {
-                    levelCompleteShown = true;
-                    const idx = allLevels.indexOf(currentLevel);
-                    const hasNext = (idx >= 0 && idx < allLevels.length - 1);
-                    document.getElementById("nextLevel").style.display = hasNext ? '' : 'none';
-                    document.getElementById("levelCompleteBG").style.display = "flex";
-                }
+                // The proof is complete: enable the "Next" button (if there is a next level).
+                // The completion itself is shown by the (non-blocking) green tint of the diagram.
+                const idx = allLevels.indexOf(currentLevel);
+                const hasNext = (idx >= 0 && idx < allLevels.length - 1);
+                document.getElementById("nextLevel").disabled = !hasNext;
             }
         } else {
             // If there are fatal errors, remove any green color on the goal and indicate the errors somehow.
             diagram.style.backgroundColor = "";
             conclusion_node.style.backgroundColor = "";
-            levelCompleteShown = false;
+            document.getElementById("nextLevel").disabled = true;
             var somethingRed = false;
             // result.diagnostics is an array of objects of type {isfatal:bool, locs, text:string}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
             result.diagnostics.forEach(function (d) {
@@ -2343,8 +2337,8 @@ function setLevel(level, rulesAllowed) {
 
     // Hide the modal dialogs for choosing levels or setting custom levels, and empty the custom text fields.
     clearLevelSelect();
-    levelCompleteShown = false;
-    document.getElementById("levelCompleteBG").style.display = "none";
+    // A freshly set-up level isn't complete yet, so the "Next" button starts disabled.
+    document.getElementById("nextLevel").disabled = true;
 
     // Turn on the "cancel" buttons and "proof will be erased" warnings for future level-selections.
     document.getElementById("setLevelWarning").style.display = '';

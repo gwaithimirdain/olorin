@@ -62,13 +62,15 @@ class Olorin {
         });
     }
 
-    // Hide the "Level Complete!" modal.  Unlike the hint overlay it has no plain dismiss
-    // gesture (only Next / Select Level), so for tests we just take it out of the way.
-    async dismissCompletion() {
-        await this.page.evaluate(() => {
-            const m = document.getElementById('levelCompleteBG');
-            if (m) m.style.display = 'none';
-        });
+    // Whether the corner "Next" button (enabled once a level is complete) is enabled.
+    nextEnabled() {
+        return this.page.isEnabled('#nextLevel');
+    }
+
+    // Advance to the next level via the "Next" button.
+    async next() {
+        await this.page.click('#nextLevel');
+        await this.dismissHints();
     }
 
     // Drag a palette rule (e.g. "andI") onto the diagram at (x, y) relative to the diagram's
@@ -156,6 +158,12 @@ class Olorin {
         const json = await this.page.inputValue('#exportJson');
         await this.page.click('#doneExport');
         return json;
+    }
+
+    // Rebuild the proof from a snapshot object (as exported/autosaved), into the current level.
+    async restore(state) {
+        await this.page.evaluate((s) => window.__olorin.restore(s), state);
+        await this.dismissHints();
     }
 
     // Paste JSON into the Import modal and submit it.

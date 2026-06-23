@@ -59,14 +59,12 @@ test.describe('Autosave', () => {
         await olorin.selectLevel('1-1-1');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         expect(await olorin.isComplete()).toBe(true);
-        await olorin.dismissCompletion();
 
         await olorin.selectLevel('1-1-2');
         await olorin.selectLevel('1-1-1');
         expect(await olorin.savedPromptVisible()).toBe(true);
 
         await olorin.loadSaved();
-        await olorin.dismissCompletion();
         expect(await olorin.isComplete()).toBe(true);
     });
 

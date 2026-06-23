@@ -41,7 +41,6 @@ test.describe('Export / Import', () => {
         // Export a completed proof from 1-1-1.
         await olorin.selectLevel('1-1-1');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        await olorin.dismissCompletion();
         const exported = await olorin.exportText();
         expect(JSON.parse(exported).level).toBeTruthy(); // the level is embedded
 
@@ -51,7 +50,6 @@ test.describe('Export / Import', () => {
         expect(await olorin.currentLevelName()).toBe('1-1-2');
 
         await olorin.importText(exported);
-        await olorin.dismissCompletion();
 
         expect(await olorin.currentLevelName()).toBe('1-1-1');
         expect(await olorin.connections()).toHaveLength(1);
@@ -61,7 +59,6 @@ test.describe('Export / Import', () => {
     test('cancelling the level-switch prompt leaves the current level untouched', async () => {
         await olorin.selectLevel('1-1-1');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        await olorin.dismissCompletion();
         const exported = await olorin.exportText();
 
         await olorin.selectLevel('1-1-2');
@@ -79,7 +76,6 @@ test.describe('Export / Import', () => {
     test('rejects invalid JSON without changing the proof', async () => {
         await olorin.selectLevel('1-1-1');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        await olorin.dismissCompletion();
         const before = await olorin.structuralState();
 
         // The alert() raised for bad input is auto-accepted by the dialog handler in open().
