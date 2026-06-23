@@ -956,6 +956,9 @@ function serializeProof() {
     });
 
     return {
+        // The level this proof belongs to (parameters, variables, hypotheses, conclusion), so
+        // an imported proof can be matched to (or used to switch to) the right level.
+        level: currentLevel ? saveable(currentLevel) : undefined,
         difficulty: difficulty,
         // Autonumber counters, so nodes added after a restore won't reuse saved IDs.
         counters: {
@@ -968,6 +971,12 @@ function serializeProof() {
         nodes: savedNodes,
         connections: savedConnections,
     };
+}
+
+// Find the built-in level whose identity (saveable parameters/hypotheses/conclusion) matches
+// the given JSON.stringify(saveable(...)) key, or undefined if none does.
+function findLevelByKey(key) {
+    return allLevels.find(function (l) { return JSON.stringify(saveable(l)) === key; });
 }
 
 // localStorage key under which the proof for the currently selected level is saved.
@@ -1009,16 +1018,19 @@ function loadProof() {
     restoreProof(JSON.parse(saved));
 }
 
-// Rebuild the proof from a snapshot object (as produced by serializeProof), into the
-// current level.  Shared by "Load" (from localStorage) and "Import" (from pasted JSON).
-function restoreProof(state) {
-    if(!currentLevel) {
+// Rebuild the proof from a snapshot object (as produced by serializeProof), into the given
+// level (defaulting to the current one).  Shared by "Load" (from localStorage) and "Import"
+// (from pasted JSON).
+function restoreProof(state, level) {
+    level = level || currentLevel;
+    if(!level) {
         alert("Restoring a proof is only supported for the built-in levels, not custom ones.");
         return;
     }
 
-    // Reset to a clean slate: this recreates the fixed nodes (variables, hypotheses, conclusion) and reinitializes Narya.
-    selectCurrentLevel(currentLevel);
+    // Reset to a clean slate: this selects the level (switching to it if different from the
+    // current one) and recreates its fixed nodes (variables, hypotheses, conclusion) and Narya.
+    selectCurrentLevel(level);
 
     // Restore the saved difficulty setting.
     if(typeof state.difficulty === 'number') {
@@ -1140,6 +1152,22 @@ document.getElementById("submitImport").onclick = function() {
     }
     if(!state || !Array.isArray(state.nodes)) {
         alert("That JSON doesn't look like an exported proof.");
+        return;
+    }
+    // If the proof was exported from a different level, offer to switch to that level.
+    const importedKey = state.level ? JSON.stringify(state.level) : null;
+    const currentKey = currentLevel ? JSON.stringify(saveable(currentLevel)) : null;
+    if(importedKey && importedKey !== currentKey) {
+        const target = findLevelByKey(importedKey);
+        if(!target) {
+            alert("This proof was exported from a level that isn't available, so it can't be imported.");
+            return;
+        }
+        if(!confirm("You're trying to import a proof that doesn't match the current level.  Switch to the level it was exported from?")) {
+            return;
+        }
+        document.getElementById("importBG").style.display = "none";
+        restoreProof(state, target);
         return;
     }
     document.getElementById("importBG").style.display = "none";

@@ -14,17 +14,29 @@ class Olorin {
         this.page = page;
     }
 
-    // Load the app, suppressing the first-visit "About" modal and auto-accepting the
-    // confirm() dialog raised by the Clear button.  Resolves once the app is interactive.
+    // Load the app, suppressing the first-visit "About" modal and handling native dialogs
+    // (e.g. the Clear confirm).  Dialogs are accepted by default; setDialogAction('dismiss')
+    // switches to dismissing the next ones, to test "cancel" paths.  Resolves once interactive.
     async open() {
+        this._dialogAction = 'accept';
         await this.page.addInitScript(() => localStorage.setItem('visited', 'true'));
-        this.page.on('dialog', (d) => d.accept());
+        this.page.on('dialog', (d) => (this._dialogAction === 'dismiss' ? d.dismiss() : d.accept()));
         await this.page.goto('/?test=1', { waitUntil: 'load' });
         await this.page.waitForFunction(
             () => typeof window.__olorin !== 'undefined' && typeof window.Narya !== 'undefined',
             null,
             { timeout: 30000 },
         );
+    }
+
+    // Control how native confirm()/alert() dialogs are answered: 'accept' (default) or 'dismiss'.
+    setDialogAction(action) {
+        this._dialogAction = action;
+    }
+
+    // The current level's display name (without the "Level: " prefix), e.g. "1-1-1".
+    currentLevelName() {
+        return this.page.evaluate(() => document.getElementById('currentLevel').innerText.replace(/^Level:\s*/, ''));
     }
 
     // Pick a built-in level by its "world-stage-level" name, e.g. "1-1-1".

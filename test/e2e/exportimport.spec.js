@@ -37,6 +37,45 @@ test.describe('Export / Import', () => {
         expect(await olorin.structuralState()).toEqual(before);
     });
 
+    test('imports a proof from another level after confirming a switch', async () => {
+        // Export a completed proof from 1-1-1.
+        await olorin.selectLevel('1-1-1');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        await olorin.dismissCompletion();
+        const exported = await olorin.exportText();
+        expect(JSON.parse(exported).level).toBeTruthy(); // the level is embedded
+
+        // Move to a different level, then import: it should offer to switch back, and (with
+        // the confirm accepted) switch to 1-1-1 and restore the proof.
+        await olorin.selectLevel('1-1-2');
+        expect(await olorin.currentLevelName()).toBe('1-1-2');
+
+        await olorin.importText(exported);
+        await olorin.dismissCompletion();
+
+        expect(await olorin.currentLevelName()).toBe('1-1-1');
+        expect(await olorin.connections()).toHaveLength(1);
+        expect(await olorin.isComplete()).toBe(true);
+    });
+
+    test('cancelling the level-switch prompt leaves the current level untouched', async () => {
+        await olorin.selectLevel('1-1-1');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        await olorin.dismissCompletion();
+        const exported = await olorin.exportText();
+
+        await olorin.selectLevel('1-1-2');
+        const before = await olorin.structuralState();
+
+        // Dismiss the "switch level?" confirm: the import should be cancelled.
+        olorin.setDialogAction('dismiss');
+        await olorin.importText(exported);
+
+        expect(await olorin.currentLevelName()).toBe('1-1-2');
+        expect(await olorin.structuralState()).toEqual(before);
+        expect(await olorin.isVisible('#importBG')).toBe(true);
+    });
+
     test('rejects invalid JSON without changing the proof', async () => {
         await olorin.selectLevel('1-1-1');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
