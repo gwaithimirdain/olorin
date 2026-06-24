@@ -154,21 +154,44 @@
     </div>
 
     <div id="levelSelectBG" class="modalbg">
-      <div class="modal">
+      <div class="modal" id="customModal">
         <h3 style="text-align: center">What do you want to prove?</h3>
-        <span id="setLevelWarning" style="display: none">(Choosing a new level clears any existing proof)</span>
-        <p>Parameters, as <tt>name : type</tt>, one per line:</p>
+        <p>
+          <b>Parameters.</b>
+          These are the sets, propositions, and predicates used in the statements you want to prove.
+          List them one on each line, each followed by a colon and then their "type", as follows:
+        </p>
+          <ul>
+            <li>Write <tt>A : Type</tt> to mean <tt>A</tt> is a set.</li>
+            <li>Write <tt>P : Type</tt> to mean <tt>P</tt> is a proposition.</li>
+            <li>Write <tt>Q : A → Type</tt> to mean <tt>Q</tt> is a one-place predicate on the set <tt>A</tt></li>
+            <li>Write <tt>R : A → B → Type</tt> to mean <tt>R</tt> is a two-place predicate on <tt>A</tt> and <tt>B</tt>.</li>
+          </ul>
         <textarea id="parameters" style="width: 100%" rows="3"></textarea>
         <div id="paramPalette"></div>
-        <p>Variables, as <tt>name : type</tt>, one per line:</p>
+        <p><b>Variables.</b>
+          These are the assumed elements of sets, appearing in the upper-left corner in blue.
+          List them one on each line, each followed by a colon and then the set they belong to:
+        </p>
+        <ul>
+          <li>Write <tt>a : A</tt> to mean <tt>a</tt> is an element of the set <tt>A</tt>.</li>
+        </ul>
         <textarea id="variables" style="width: 100%" rows="3"></textarea>
         <div id="varPalette"></div>
-        <p>Hypotheses, types only (i.e. propositions), one per line:</p>
+        <p><b>Hypotheses.</b>
+          These are the statements that you assume to be true, such as <tt>P∧Q</tt>, built out of the parameters using the logical operators.
+          List them one on each line.
+        </p>
         <textarea id="hypotheses" style="width: 100%" rows="3"></textarea>
         <div id="hypPalette"></div>
-        <p>Conclusion:</p>
+        <p><b>Conclusion.</b>
+          This is the statement that you want to prove.
+        </p>
         <input type="text" id="conclusion" style="width: 100%; font-family: monospace"/>
         <div id="conclPalette"></div>
+        <p><b>Difficulty.</b>
+          What difficulty level do you want to prove it on?
+        </p>
         <div style="margin-left: auto; margin-right: auto">
           <div style="text-align: center; display: flex; margin-top: 20px">
             <div id="noviceRadioCustom" class="difficultyRadio"><div id="noviceBoxCustom">☐</div>&nbsp;Novice</div>

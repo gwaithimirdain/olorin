@@ -627,6 +627,14 @@ body {
     flex-direction: column;
 }
 
+#customModal {
+    max-height: 70%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 600px;
+}
+
 #chooseLevelButtons {
     margin-left: auto;
     margin-right: auto;
