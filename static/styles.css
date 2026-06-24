@@ -466,7 +466,10 @@ body {
     padding: 3px;
     background-color: #ffffff;
     font-size: 18px;
-    font-family: sans-serif;
+    /* Name a font that contains all the logic/math symbols (∧ ∨ ⇒ ⇔ ¬ ⊤ ⊥ ∀ ∃ …) up front, so the
+       whole label is shaped in one font.  Otherwise the browser falls back per-character and renders
+       the double arrows ⇒/⇔ at different sizes depending on their neighbors. */
+    font-family: "DejaVu Sans", "Noto Sans Symbols2", "Segoe UI Symbol", sans-serif;
 }
 
 .level {
