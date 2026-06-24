@@ -1140,6 +1140,8 @@ function serializeProof() {
             },
             // The user-supplied wire label, if any (entered on Adept/Master difficulty).
             ty: c.parameters.ty,
+            // The connector style (angled / curved / straight) of this particular wire.
+            connector: c.connector && c.connector.type,
         };
     });
 
@@ -1328,8 +1330,16 @@ function restoreProof(state, level) {
         const tgtEp = findEndpoint(tgtEl, c.target.sort, c.target.label);
         if(!srcEp || !tgtEp) { return; }
         const edge = instance.connect({ source: srcEp, target: tgtEp });
-        // Restore the user-supplied wire label, if any (Adept/Master difficulty).
-        if(edge && c.ty) { setUserWireLabel(edge, c.ty); }
+        if(edge) {
+            // Restore this wire's connector style if it differs from the default just applied
+            // (re-adding the arrow overlay, which _setConnector removes).
+            if(c.connector && edge.connector && c.connector !== edge.connector.type) {
+                edge._setConnector(c.connector);
+                edge.addOverlay({ type: "Arrow", options: { location: -5, width: 10, length: 10 } });
+            }
+            // Restore the user-supplied wire label, if any (Adept/Master difficulty).
+            if(c.ty) { setUserWireLabel(edge, c.ty); }
+        }
     });
 
     restoring = false;

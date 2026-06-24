@@ -174,6 +174,16 @@ class Olorin {
         return this.page.evaluate(() => window.__olorin.connections());
     }
 
+    // The full serialized proof (as autosave/Export produce), including per-wire connector style.
+    serialize() {
+        return this.page.evaluate(() => window.__olorin.serialize());
+    }
+
+    // Click the Angle / Curved connector-style radio.
+    async setConnectorStyle(style) {
+        await this.page.click(style === 'curved' ? '#curvedConnectors' : '#angleConnectors');
+    }
+
     isComplete() {
         return this.page.evaluate(() => window.__olorin.complete());
     }
