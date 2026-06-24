@@ -644,7 +644,9 @@ body {
     overflow-x: hidden;
 }
 
-#customScroll h3 {
+/* The title and the Submit/Back buttons live outside #customScroll so they stay visible while the
+   body scrolls. */
+#customModal > h3 {
     margin-top: 0;
 }
 
