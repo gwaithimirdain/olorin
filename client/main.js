@@ -2512,7 +2512,6 @@ function setLevel(level, rulesAllowed) {
 function clearLevelSelect () {
     document.getElementById("levelSelectBG").style.display = "none";
     document.getElementById("levelChooseBG").style.display = "none";
-    document.getElementById("chooseLevelWarning").style.visibility = 'visible';
     document.getElementById("parameters").value = "";
     document.getElementById("variables").value = "";
     document.getElementById("hypotheses").value = "";
