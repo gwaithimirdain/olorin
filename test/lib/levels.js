@@ -38,4 +38,13 @@ function allLevels() {
     return out;
 }
 
-module.exports = { allLevels };
+// The fewest of `total` completed levels that reach fraction `frac`, computed the same way the app
+// gates worlds (`done / total >= frac`), so tests don't hardcode level counts.  `thresholdCount`
+// just-unlocks; `thresholdCount(total, frac) - 1` is the largest count that stays below the gate.
+function thresholdCount(total, frac) {
+    let need = 0;
+    while (need / total < frac) need++;
+    return need;
+}
+
+module.exports = { allLevels, thresholdCount };
