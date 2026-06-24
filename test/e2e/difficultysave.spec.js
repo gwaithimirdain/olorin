@@ -95,5 +95,7 @@ test.describe('Per-difficulty saved proofs', () => {
 
         // Loading the saved complete novice proof counts as a fresh solve -> Adept re-locked.
         expect((await olorin.levelStates('1-1-1'))[1]).toBe('locked');
+        // But a re-load doesn't advance the global completion counter (still 30).
+        expect(await page.evaluate(() => localStorage.getItem('time'))).toBe('30');
     });
 });

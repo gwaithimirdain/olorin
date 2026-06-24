@@ -134,6 +134,10 @@ var globalTime = 0;
 // Whether the current (complete) proof has already been registered as a completion, so re-running
 // typecheck on an already-complete proof doesn't count as a fresh completion.
 var proofRegisteredComplete = false;
+// When registering the next completion, stamp it at the current global time WITHOUT advancing the
+// counter.  Used by the downgrade-restore path so re-loading a saved proof re-locks the higher
+// difficulty but doesn't "use up" a completion slot (several levels may share a most-recent time).
+var registerWithoutAdvancingTime = false;
 
 // Per-world / per-stage completion data driving the unlock rule (see computeUnlockData).
 var unlockData = [];
@@ -1365,8 +1369,10 @@ function restoreProof(state, level, countAsCompletion) {
     suppressChecking = false;
     // Restoring a proof that was already complete normally shouldn't count as a fresh completion,
     // except when restoring the lower-difficulty proof after a downgrade (countAsCompletion): that
-    // re-locks the higher difficulty just as if you'd re-solved it.
+    // re-locks the higher difficulty just as if you'd re-solved it -- but without advancing the
+    // global completion counter (it's a re-load, not a brand-new solve).
     proofRegisteredComplete = countAsCompletion ? false : !!state.complete;
+    registerWithoutAdvancingTime = !!countAsCompletion;
     typecheck();
 }
 
@@ -2444,9 +2450,14 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const past = getPast(null, currentLevel);
                     // Snapshot which worlds are open before recording this completion.
                     const beforeGates = snapshotWorldGates();
-                    // Advance the global time counter and stamp this difficulty's completion time.
-                    globalTime = (parseInt(localStorage.getItem("time")) || 0) + 1;
-                    localStorage.setItem("time", globalTime.toString());
+                    // Advance the global time counter and stamp this difficulty's completion time
+                    // (a downgrade-restore stamps the current time without advancing the counter).
+                    globalTime = parseInt(localStorage.getItem("time")) || 0;
+                    if(!registerWithoutAdvancingTime) {
+                        globalTime += 1;
+                        localStorage.setItem("time", globalTime.toString());
+                    }
+                    registerWithoutAdvancingTime = false;
                     const times = Object.assign({}, past.times);
                     times[difficulty] = globalTime;
                     // Record completion, with the difficulty and per-difficulty times, in local storage
