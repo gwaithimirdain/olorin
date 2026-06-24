@@ -30,6 +30,7 @@ function allLevels() {
                     name: `${x + 1}-${y + 1}-${z + 1}`,
                     saveable: saveable(level),
                     trivial: !!level.trivial,
+                    autoComplete: !!level.autoComplete,
                 });
             });
         });

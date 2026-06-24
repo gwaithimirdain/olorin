@@ -11,6 +11,10 @@ const { allLevels } = require('../lib/levels');
 const LV = allLevels();
 const sav = (name) => JSON.stringify(LV.find((l) => l.name === name).saveable);
 const fixture111 = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'proofs', '1-1-1.json'), 'utf8');
+// 1-2-1 (P, Q ⊢ P∧Q) has internal wires, so it is NOT auto-completed -- used for the re-lock tests
+// (the trivial 1-1-x levels now auto-complete at adept and can't be downgraded-from).
+const fixture121raw = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'proofs', '1-2-1.json'), 'utf8');
+const fixture121 = JSON.parse(fixture121raw);
 
 test.describe('Per-difficulty saved proofs', () => {
     test('a level opens blank with no prompt at a difficulty that has no saved proof', async ({ page }) => {
@@ -54,39 +58,40 @@ test.describe('Per-difficulty saved proofs', () => {
         expect(await olorin.isComplete()).toBe(false);
     });
 
+    // World 2 >= 50% novice unlocks 1-2-1 at Adept (rule 2; the trivial stage-1 levels auto-complete
+    // at adept, satisfying rule 4), without auto-completing 1-2-1 itself (it has wires to label).
+    const reachAdept = () => LV.filter((l) => l.name.startsWith('2-')).slice(0, 14)
+        .map((l) => [sav(l.name), JSON.stringify({ complete: true, difficulty: 0 })]);
+
     test('reducing difficulty and re-solving re-locks the higher difficulty for a while', async ({ page }) => {
         const olorin = new Olorin(page);
-        // World 2 >= 50% novice makes 1-1-1 reachable at Adept; load there.
-        const w2 = LV.filter((l) => l.name.startsWith('2-')).slice(0, 14)
-            .map((l) => [sav(l.name), JSON.stringify({ complete: true, difficulty: 0 })]);
-        await olorin.seed([['difficulty', '1'], ...w2]);
+        await olorin.seed([['difficulty', '1'], ...reachAdept()]);
         await olorin.open();
-        await olorin.selectLevel('1-1-1'); // opens at Adept
-        expect((await olorin.levelStates('1-1-1'))[1]).toBe('unlocked');
+        await olorin.selectLevel('1-2-1'); // opens at Adept
+        expect((await olorin.levelStates('1-2-1'))[1]).toBe('unlocked');
 
         await page.click('#reduceDifficulty'); // -> Novice (no saved novice proof, so no prompt)
-        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' }); // solve novice
+        await olorin.restore(fixture121); // solve novice
+        expect(await olorin.isComplete()).toBe(true);
 
         // Adept is re-locked now that this level's novice was just completed (rule 7).
-        expect((await olorin.levelStates('1-1-1'))[1]).toBe('locked');
+        expect((await olorin.levelStates('1-2-1'))[1]).toBe('locked');
     });
 
     test('downgrading and loading the saved lower-difficulty proof also re-locks the higher one', async ({ page }) => {
         const olorin = new Olorin(page);
-        // World 2 >= 50% novice makes 1-1-1 reachable at Adept; 1-1-1's novice was completed long
-        // ago (time 5 of 30), so Adept is unlocked.  A saved novice proof exists to restore.
-        const w2 = LV.filter((l) => l.name.startsWith('2-')).slice(0, 14)
-            .map((l) => [sav(l.name), JSON.stringify({ complete: true, difficulty: 0 })]);
+        // 1-2-1's novice was completed long ago (time 5 of 30), so Adept is unlocked; a saved novice
+        // proof exists to restore.
         await olorin.seed([
             ['difficulty', '1'],
             ['time', '30'],
-            [sav('1-1-1'), JSON.stringify({ complete: true, difficulty: 0, times: { 0: 5 } })],
-            ['proof:0:' + sav('1-1-1'), fixture111],
-            ...w2,
+            [sav('1-2-1'), JSON.stringify({ complete: true, difficulty: 0, times: { 0: 5 } })],
+            ['proof:0:' + sav('1-2-1'), fixture121raw],
+            ...reachAdept(),
         ]);
         await olorin.open();
-        await olorin.selectLevel('1-1-1'); // opens at Adept
-        expect((await olorin.levelStates('1-1-1'))[1]).toBe('unlocked');
+        await olorin.selectLevel('1-2-1'); // opens at Adept
+        expect((await olorin.levelStates('1-2-1'))[1]).toBe('unlocked');
 
         await page.click('#reduceDifficulty'); // -> Novice, with a saved novice proof
         await page.click('#restoreSavedDowngrade'); // load the complete novice proof
@@ -94,7 +99,7 @@ test.describe('Per-difficulty saved proofs', () => {
         expect(await olorin.isComplete()).toBe(true);
 
         // Loading the saved complete novice proof counts as a fresh solve -> Adept re-locked.
-        expect((await olorin.levelStates('1-1-1'))[1]).toBe('locked');
+        expect((await olorin.levelStates('1-2-1'))[1]).toBe('locked');
         // But a re-load doesn't advance the global completion counter (still 30).
         expect(await page.evaluate(() => localStorage.getItem('time'))).toBe('30');
     });

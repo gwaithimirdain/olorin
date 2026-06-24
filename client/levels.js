@@ -10,6 +10,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "P" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "wiresHint",
                 },
                 {
@@ -18,6 +19,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" }, { ty: "Q" } ],
                     conclusion: { ty: "Q" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "muxHint",
                 },
             ],

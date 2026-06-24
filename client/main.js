@@ -686,6 +686,7 @@ function makeLevelSelect(res) {
     var maxrows = 0;
     // Compute completion data first, so each button can show which difficulties are unlocked.
     computeUnlockData(res);
+    applyAutoCompletions(res);
     LEVELS.forEach(function (world, x) {
         // Skip this world if it requires a server and we're not in server mode.
         if(world.server && !SERVER) { return; }
@@ -831,8 +832,44 @@ function makeLevelSelect(res) {
 
 // Re-render every level button's marks/state -- after logging back in, or when a completion
 // may have unlocked further levels/difficulties.
+// Levels flagged `autoComplete` (those with no internal wires worth re-labeling) are marked
+// complete automatically as soon as they unlock at adept/master, so the player needn't redo a
+// level that has nothing extra to do.  Completing adept can unlock master, and completions feed
+// back into the unlock data, so loop to a fixed point.  This never advances the global time
+// counter (it isn't a real solve) and preserves any existing per-difficulty completion times.
+function applyAutoCompletions(res) {
+    var changed = true;
+    while(changed) {
+        changed = false;
+        // Use the loop indices (x,y,z) rather than level.worldIndex etc., since this can run during
+        // makeLevelSelect before those properties are assigned.
+        LEVELS.forEach(function (world, x) {
+            world.stages.forEach(function (stage, y) {
+                stage.levels.forEach(function (level, z) {
+                    if(!level.autoComplete) { return; }
+                    const past = getPast(res, level);
+                    const base = past.complete ? (past.difficulty || 0) : -1;
+                    var newDiff = base;
+                    for(var K = 1; K < 3; K++) {
+                        if(difficultyUnlocked(x, y, z, K, unlockData)) { newDiff = Math.max(newDiff, K); }
+                    }
+                    if(newDiff > base && newDiff >= 1) {
+                        const key = JSON.stringify(saveable(level));
+                        const value = { complete: true, difficulty: newDiff, times: past.times || {} };
+                        localStorage.setItem(key, JSON.stringify(value));
+                        if(res) { res[key] = value; }
+                        changed = true;
+                    }
+                });
+            });
+        });
+        if(changed) { computeUnlockData(res); }
+    }
+}
+
 function updateLevelSelect(res) {
     computeUnlockData(res);
+    applyAutoCompletions(res);
     LEVELS.forEach(function (world, x) {
         world.stages.forEach(function (stage, y) {
             stage.levels.forEach(function (level, z) {
