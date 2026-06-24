@@ -1170,9 +1170,12 @@ function findLevelByKey(key) {
 }
 
 // localStorage key under which the proof for the currently selected level is saved.
-function savedProofKey() {
+// localStorage key for the proof saved for the current level at a given difficulty (default the
+// current one).  Each level has a separate saved proof per difficulty.
+function savedProofKey(d) {
     if(!currentLevel) { return null; }
-    return "proof:" + JSON.stringify(saveable(currentLevel));
+    if(d === undefined) { d = difficulty; }
+    return "proof:" + d + ":" + JSON.stringify(saveable(currentLevel));
 }
 
 // Whether a serialized proof represents actual progress worth restoring: at least one
@@ -1195,12 +1198,14 @@ function autosave() {
     }
 }
 
-// When a level is selected, if there's an autosaved proof with real progress for it, offer to
-// reload it or discard it.  The level is already set up empty behind the prompt, so "discard"
-// just drops the saved data and leaves the fresh level in place.
+// When a level is selected, if there's an autosaved proof with real progress for it AT THE
+// CURRENT DIFFICULTY, offer to reload it or discard it.  (A level just unlocked at a higher
+// difficulty has no saved proof there yet, so it opens blank with no prompt.)  The level is set
+// up empty behind the prompt, so "discard" just drops the saved data and leaves the fresh level.
 var pendingSavedProof = null;
 function offerSavedProof(level) {
-    const key = "proof:" + JSON.stringify(saveable(level));
+    const key = savedProofKey();
+    if(!key) { return; }
     const saved = localStorage.getItem(key);
     if(!saved) { return; }
     var state;
@@ -1520,15 +1525,50 @@ clearHistory.onclick = function () {
     }
 };
 
+var pendingDowngrade = null;
 document.getElementById("reduceDifficulty").onclick = function () {
-    // Reduce the difficulty by one
-    difficulty = Math.max(difficulty - 1, 0);
-    // Update the display of the current difficulty in the proof
+    if(difficulty === 0) { return; }
+    const newDiff = difficulty - 1;
+    // Capture any proof saved at the lower difficulty BEFORE the re-typecheck autosaves the
+    // current proof over it.
+    var oldState = null;
+    const oldKey = savedProofKey(newDiff);
+    const oldSaved = oldKey ? localStorage.getItem(oldKey) : null;
+    if(oldSaved) { try { oldState = JSON.parse(oldSaved); } catch(e) { oldState = null; } }
+    // Switch to the lower difficulty and re-check the current proof there (this autosaves it
+    // at the lower difficulty's key).
+    setDifficulty(newDiff);
     updateCurrentDifficulty();
-    // Save this new difficulty for the next level select
-    setDifficulty(difficulty);
-    // Re-typecheck, te create new labels and colors
     typecheck();
+    // If there's a saved proof at the lower difficulty with real progress, let the player pick
+    // between restoring it, keeping their current proof, or starting fresh.
+    if(oldState && proofHasProgress(oldState)) {
+        pendingDowngrade = oldState;
+        document.getElementById("downgradeText").innerText =
+            "You have a saved proof for this level at " + DIFFICULTIES[newDiff] + " difficulty.";
+        document.getElementById("downgradeBG").style.display = "flex";
+    }
+}
+
+document.getElementById("restoreSavedDowngrade").onclick = function() {
+    document.getElementById("downgradeBG").style.display = "none";
+    if(pendingDowngrade) {
+        const state = pendingDowngrade;
+        pendingDowngrade = null;
+        restoreProof(state);
+    }
+};
+document.getElementById("keepCurrentDowngrade").onclick = function() {
+    // The current proof is already autosaved at the new difficulty; nothing to do.
+    document.getElementById("downgradeBG").style.display = "none";
+    pendingDowngrade = null;
+};
+document.getElementById("freshDowngrade").onclick = function() {
+    document.getElementById("downgradeBG").style.display = "none";
+    pendingDowngrade = null;
+    const key = savedProofKey();
+    if(key) { localStorage.removeItem(key); }
+    selectCurrentLevel(currentLevel, true);
 }
 
 function updateCurrentDifficulty() {
