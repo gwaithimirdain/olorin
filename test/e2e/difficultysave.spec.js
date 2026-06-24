@@ -53,4 +53,21 @@ test.describe('Per-difficulty saved proofs', () => {
         expect((await olorin.nodes()).some((n) => n.rule === 'andI')).toBe(true);
         expect(await olorin.isComplete()).toBe(false);
     });
+
+    test('reducing difficulty and re-solving re-locks the higher difficulty for a while', async ({ page }) => {
+        const olorin = new Olorin(page);
+        // World 2 >= 50% novice makes 1-1-1 reachable at Adept; load there.
+        const w2 = LV.filter((l) => l.name.startsWith('2-')).slice(0, 14)
+            .map((l) => [sav(l.name), JSON.stringify({ complete: true, difficulty: 0 })]);
+        await olorin.seed([['difficulty', '1'], ...w2]);
+        await olorin.open();
+        await olorin.selectLevel('1-1-1'); // opens at Adept
+        expect((await olorin.levelStates('1-1-1'))[1]).toBe('unlocked');
+
+        await page.click('#reduceDifficulty'); // -> Novice (no saved novice proof, so no prompt)
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' }); // solve novice
+
+        // Adept is re-locked now that this level's novice was just completed (rule 7).
+        expect((await olorin.levelStates('1-1-1'))[1]).toBe('locked');
+    });
 });

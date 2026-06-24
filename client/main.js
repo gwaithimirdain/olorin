@@ -127,6 +127,14 @@ var allLevels = [];
 var currentLevel;
 var currentLevelButton;
 
+// A counter (in localStorage "time") incremented on each level completion; per-difficulty
+// completion times are recorded against it so a higher difficulty can be re-locked for a while
+// after its lower difficulty was just completed.
+var globalTime = 0;
+// Whether the current (complete) proof has already been registered as a completion, so re-running
+// typecheck on an already-complete proof doesn't count as a fresh completion.
+var proofRegisteredComplete = false;
+
 // Per-world / per-stage completion data driving the unlock rule (see computeUnlockData).
 var unlockData = [];
 
@@ -980,8 +988,20 @@ function difficultyUnlocked(w, s, c, K, data) {
             if(stage.hasHint[j] && stage.levelDiff[j] < 0) { return false; }
         }
     }
+    // 7. (Adept/Master) the previous difficulty of THIS level must not have been completed within
+    //    the last RECENT_COMPLETION_WINDOW completions, so you can't immediately go up a difficulty
+    //    and copy what you just did at the lower one.
+    if(K >= 1) {
+        const times = stage.levelTimes[c];
+        if(times && times[K - 1] !== undefined && globalTime - times[K - 1] <= RECENT_COMPLETION_WINDOW) {
+            return false;
+        }
+    }
     return true;
 }
+
+// How many completions must pass before a just-completed difficulty stops re-locking the next.
+const RECENT_COMPLETION_WINDOW = 10;
 
 // The state of each of a level's three difficulties: 'completed', 'unlocked', or 'locked'.
 function levelDifficultyStates(level, past, data) {
@@ -1028,14 +1048,16 @@ function renderLevelButton(b, name, states) {
 // Recompute, for every world and stage, how many of its levels are complete at each difficulty
 // (>= K) and each level's completed difficulty, from the saved results.  Drives the unlock rule.
 function computeUnlockData(res) {
+    globalTime = parseInt(localStorage.getItem("time")) || 0;
     unlockData = LEVELS.map(function (world) {
         const wd = { total: 0, done: [0, 0, 0], stages: [] };
         world.stages.forEach(function (stage) {
-            const sd = { total: 0, done: [0, 0, 0], levelDiff: [], hasHint: [] };
+            const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [] };
             stage.levels.forEach(function (level) {
                 const p = getPast(res, level);
                 const cd = p.complete ? p.difficulty : -1;
                 sd.levelDiff.push(cd);
+                sd.levelTimes.push(p.times || null);
                 sd.hasHint.push(!!level.hint);
                 sd.total++;
                 wd.total++;
@@ -1341,6 +1363,8 @@ function restoreProof(state, level) {
 
     restoring = false;
     suppressChecking = false;
+    // Restoring a proof that was already complete shouldn't count as a fresh completion.
+    proofRegisteredComplete = !!state.complete;
     typecheck();
 }
 
@@ -2409,35 +2433,44 @@ function continue_typechecking(nodes, edges, connections, result) {
             conclusion_node.style.color = COLORS[difficulty][1].color;
             conclusion_node.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
             if(currentLevel) {
-                const past = getPast(null, currentLevel);
-                const present = { complete: true, difficulty: Math.max(difficulty, past.difficulty) };
-                // Snapshot which worlds are open before recording this completion.
-                const beforeGates = snapshotWorldGates();
-                // Record completion, with the difficulty, in local storage
-                const key = JSON.stringify(saveable(currentLevel));
-                const value = present;
-                localStorage.setItem(key, JSON.stringify(value));
-                // Re-render the level buttons (this level is now complete, and others may have
-                // unlocked), and update this world's index-chip progress count.
-                updateLevelSelect(null);
-                refreshWorldProgress(currentLevel.worldPaneIndex);
-                // If a new world just opened at some difficulty, tell the player.
-                announceNewlyUnlockedWorlds(beforeGates);
-                if(SERVER) {
-                    // Save it to the server too
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/solve', true);
-                    xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
-                    xhr.onload = function() {
-                        if (xhr.status === 200) {
-                            // Success, nothing to be done
-                        } else {
-                            let res = JSON.parse(xhr.responseText);
-                            alert("Error saving completed proof (" + res.error + ").  Check your Internet connection, and then delete and replace a wire to re-trigger saving.")
-                        }
-                    };
-                    const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
-                    xhr.send(JSON.stringify(data));
+                // Register this as a fresh completion only once (not on every re-typecheck of an
+                // already-complete proof), advancing the global completion-time counter.
+                if(!proofRegisteredComplete) {
+                    proofRegisteredComplete = true;
+                    const past = getPast(null, currentLevel);
+                    // Snapshot which worlds are open before recording this completion.
+                    const beforeGates = snapshotWorldGates();
+                    // Advance the global time counter and stamp this difficulty's completion time.
+                    globalTime = (parseInt(localStorage.getItem("time")) || 0) + 1;
+                    localStorage.setItem("time", globalTime.toString());
+                    const times = Object.assign({}, past.times);
+                    times[difficulty] = globalTime;
+                    // Record completion, with the difficulty and per-difficulty times, in local storage
+                    const key = JSON.stringify(saveable(currentLevel));
+                    const value = { complete: true, difficulty: Math.max(difficulty, past.difficulty || 0), times: times };
+                    localStorage.setItem(key, JSON.stringify(value));
+                    // Re-render the level buttons (this level is now complete, and others may have
+                    // unlocked or re-locked), and update this world's index-chip progress count.
+                    updateLevelSelect(null);
+                    refreshWorldProgress(currentLevel.worldPaneIndex);
+                    // If a new world just opened at some difficulty, tell the player.
+                    announceNewlyUnlockedWorlds(beforeGates);
+                    if(SERVER) {
+                        // Save it to the server too
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/solve', true);
+                        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+                        xhr.onload = function() {
+                            if (xhr.status === 200) {
+                                // Success, nothing to be done
+                            } else {
+                                let res = JSON.parse(xhr.responseText);
+                                alert("Error saving completed proof (" + res.error + ").  Check your Internet connection, and then delete and replace a wire to re-trigger saving.")
+                            }
+                        };
+                        const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
+                        xhr.send(JSON.stringify(data));
+                    }
                 }
                 // The proof is complete: show the (non-modal) completion pop-up at the top,
                 // tinted to match the current difficulty (the same color as the conclusion box),
@@ -2452,6 +2485,8 @@ function continue_typechecking(nodes, edges, connections, result) {
             diagram.style.backgroundColor = "";
             conclusion_node.style.backgroundColor = "";
             document.getElementById("levelCompleteBanner").classList.remove("shown");
+            // The proof is no longer complete; a later re-completion counts afresh.
+            proofRegisteredComplete = false;
             var somethingRed = false;
             // result.diagnostics is an array of objects of type {isfatal:bool, locs, text:string}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
             result.diagnostics.forEach(function (d) {

@@ -98,4 +98,23 @@ test.describe('Per-difficulty unlocking', () => {
         const olorin = await open(page, rule5Base().concat(done(['1-2-1'], 1)));
         expect((await olorin.levelStates('1-2-4'))[1]).toBe('unlocked');
     });
+
+    // Adept of 1-1-1 is reachable once world 2 is >= 50% novice; rule 7 then gates it on how
+    // recently this level's novice was completed (global "time" counts completions).
+    const rule7Base = (time, noviceTime) => done(inWorld('2').slice(0, 14), 0).concat([
+        ['time', String(time)],
+        [key('1-1-1'), JSON.stringify({ complete: true, difficulty: 0, times: { 0: noviceTime } })],
+    ]);
+
+    test('rule 7: a recently-completed lower difficulty re-locks the higher one', async ({ page }) => {
+        // Novice completed at time 10, only 5 completions ago (global time 15) -> adept re-locked.
+        const olorin = await open(page, rule7Base(15, 10));
+        expect((await olorin.levelStates('1-1-1'))[1]).toBe('locked');
+    });
+
+    test('rule 7: the higher difficulty unlocks again after more than 10 completions', async ({ page }) => {
+        // Novice completed 15 completions ago (global time 25) -> adept available again.
+        const olorin = await open(page, rule7Base(25, 10));
+        expect((await olorin.levelStates('1-1-1'))[1]).toBe('unlocked');
+    });
 });
