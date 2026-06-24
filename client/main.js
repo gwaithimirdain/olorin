@@ -2496,12 +2496,13 @@ function setLevel(level, rulesAllowed) {
 
     // Done setting up the new level!
 
-    // Now we display any associated hints, as long as the user hasn't solved this level yet or hasn't seen the hint yet
+    // Show the level's hint (if any) automatically the first time the player sees this level;
+    // afterwards it's available via the "Show Hint" button.  This also means restoring a saved
+    // proof (which re-runs setLevel) doesn't pop the hint a second time.
     currentHint = level.hint;
     if(currentHint) {
         document.getElementById("showHint").style.display = 'block';
-        const past = getPast(null, level);
-        if(!past.complete || !localStorage.getItem(level.hint)) {
+        if(!localStorage.getItem(currentHint)) {
             showHint();
         }
     } else {

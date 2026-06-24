@@ -54,6 +54,11 @@ class Olorin {
         await this.dismissHints();
     }
 
+    // Whether the level hint overlay is currently showing.
+    hintVisible() {
+        return this.page.isVisible('#hintBG');
+    }
+
     // Close the level hint overlay if it's showing (it's dismissed by clicking the backdrop).
     async dismissHints() {
         await this.page.evaluate(() => {
