@@ -471,16 +471,60 @@ body {
 
 .level {
     display: flex;
+    flex-direction: column;
     align-items: center;
     text-align: center;
     justify-content: center;
+    gap: 1px;
     padding: 3px;
-    background-color: #dddddd;
+    background-color: #ffffff;
     font-size: 16px;
     font-family: sans-serif;
     border: 2px solid #000000;
     border-radius: 5px;
     cursor: pointer;
+    overflow: hidden;
+}
+
+.level-number {
+    font-size: 15px;
+    font-weight: bold;
+    line-height: 1.1;
+}
+
+.level-marks {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.lvmark {
+    display: inline-flex;
+    align-items: center;
+    font-size: 17px;
+    line-height: 1;
+}
+
+.lvmark .lockicon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+}
+
+.lvmark.locked {
+    opacity: 0.4;
+}
+
+/* A level whose easiest difficulty isn't unlocked yet: shown disabled. */
+.level.level-locked {
+    flex-direction: row;
+    gap: 4px;
+    background-color: #ededed;
+    border-color: #aaaaaa;
+    color: #999999;
+    cursor: default;
 }
 
 .proofOption {

@@ -134,7 +134,9 @@
         <div id="worldIndex"></div>
         <div id="worlds"></div>
         <div id="chooseLevelButtons">
-          <div style="text-align: center; display: flex">
+          <!-- Difficulty is now chosen per level (a level opens at its highest unlocked difficulty),
+               so these global radios are hidden; they remain only so setDifficulty has elements to update. -->
+          <div style="text-align: center; display: none">
             <div id="noviceRadio" class="difficultyRadio"><div id="noviceBox">☐</div>&nbsp;Novice</div>
             <div id="adeptRadio" class="difficultyRadio"><div id="adeptBox">☐</div>&nbsp;Adept</div>
             <div id="masterRadio" class="difficultyRadio"><div id="masterBox">☐</div>&nbsp;Master</div>

@@ -74,6 +74,8 @@ const KEYS = [
 
 // Allow the expert user to supply a "rules=andE,asc" query string to get extra rules available
 const urlParams = new URLSearchParams(window.location.search);
+// In test mode ("?test") we skip unlock enforcement so the suite can select any level.
+const TEST_MODE = urlParams.has('test');
 const ruleParam = urlParams.get('rules');
 var extraRules = [];
 if(ruleParam) {
@@ -124,6 +126,9 @@ const levelButtons = [];
 var allLevels = [];
 var currentLevel;
 var currentLevelButton;
+
+// Number of levels completed at each difficulty (>= d), for the placeholder unlock rule.
+var completedCounts = [0, 0, 0];
 
 // Exclude these rules from "all"
 const excludeFromAll = [ "negI" ] // Classical negation suffices
@@ -663,6 +668,8 @@ function makeLevelSelect(res) {
     const worlds = document.getElementById("worlds");
     var maxcols = 0;
     var maxrows = 0;
+    // Tally completions first, so each button can show which difficulties are unlocked.
+    tallyCompletedCounts(res);
     LEVELS.forEach(function (world, x) {
         // Skip this world if it requires a server and we're not in server mode.
         if(world.server && !SERVER) { return; }
@@ -725,19 +732,15 @@ function makeLevelSelect(res) {
                 worldLevels.push(level);
                 if(past.complete) { worldDone++; }
 
-                // Give a number of stars according to the difficulty completed
-                b.innerHTML = name + '<br>' + getStars(past);
-                b.className = 'level';
-                b.addEventListener('click', function () { selectCurrentLevel(level); } );
+                // Render the button showing the number and per-difficulty lock/unlock/done marks.
+                const idx = allLevels.length;
+                level.globalIndex = idx;
+                renderLevelButton(b, name, levelDifficultyStates(idx, past, completedCounts));
+                b.addEventListener('click', function () { chooseLevel(level); } );
                 stageGrid.appendChild(b);
                 levelButtons.push(b);
                 allLevels.push(level);
                 ++countlevels;
-                // Color the level if it's completed at all
-                if(past.complete) {
-                    b.style.color = COLORS[past.difficulty][1].color;
-                    b.style.backgroundColor = COLORS[past.difficulty][1].backgroundColor;
-                }
             });
             ++countstages;
             maxcols = Math.max(maxcols, countlevels);
@@ -768,8 +771,15 @@ function makeLevelSelect(res) {
         randomLevel.className = 'level';
         randomLevel.innerText = 'Random';
         randomLevel.onclick = function () {
-            const rand = nontrivialWorldLevels[Math.floor(Math.random() * nontrivialWorldLevels.length)];
-            selectCurrentLevel(rand);
+            // Pick a random non-trivial level that's actually unlocked.
+            var pool = nontrivialWorldLevels;
+            if(!TEST_MODE) {
+                pool = nontrivialWorldLevels.filter(function (l) {
+                    return levelDifficultyStates(l.globalIndex, getPast(null, l), completedCounts)[0] !== 'locked';
+                });
+            }
+            if(pool.length === 0) { return; }
+            chooseLevel(pool[Math.floor(Math.random() * pool.length)]);
         };
         otherStage.appendChild(randomLevel);
 
@@ -812,18 +822,15 @@ function makeLevelSelect(res) {
     setDifficulty(difficulty);
 }
 
-// Just correct the stars and colors for each level select button, when logging back in after logging out.
+// Re-render every level button's marks/state -- after logging back in, or when a completion
+// may have unlocked further levels/difficulties.
 function updateLevelSelect(res) {
-    const worlds = document.getElementById("worlds");
+    tallyCompletedCounts(res);
     LEVELS.forEach(function (world, x) {
         world.stages.forEach(function (stage, y) {
             stage.levels.forEach(function (level, z) {
                 const past = getPast(res, level);
-                level.button.innerHTML = level.name + '<br>' + getStars(past);
-                if(past.complete) {
-                    level.button.style.color = COLORS[past.difficulty][1].color;
-                    level.button.style.backgroundColor = COLORS[past.difficulty][1].backgroundColor;
-                }
+                renderLevelButton(level.button, level.name, levelDifficultyStates(level.globalIndex, past, completedCounts));
             });
         });
     });
@@ -929,17 +936,79 @@ function getPast(res, level) {
     return past;
 }
 
-// Make past success into a string of stars
-function getStars(past) {
-    var stars = "";
-    for(var i = 0; i < 3; i++) {
-        if(past.complete && i <= past.difficulty) {
-            stars = stars + "★";
-        } else {
-            stars = stars + "☆";
-        }
+// === Level-button rendering with per-difficulty lock / unlock / completed states ===
+//
+// Lock states come from a placeholder unlock rule and are shown visually only for now -- every
+// level stays clickable and difficulty selection is unchanged.
+
+// Small line-art padlock icons, tinted via the surrounding element's text color.
+const LOCK_SVG = '<svg class="lockicon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+// The "unlocked" padlock's shackle is open, swung up and out to the right.
+const UNLOCK_SVG = '<svg class="lockicon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a5 5 0 0 1 8.5-2"/></svg>';
+
+// Placeholder unlock rule: novice unlocks roughly as far as you've completed it, and each harder
+// difficulty lags the previous by UNLOCK_LAG levels (you re-do earlier levels at higher
+// difficulty as you progress).  `counts[d]` is how many levels are completed at >= d.
+const UNLOCK_LAG = 8;
+function difficultyUnlocked(idx, d, counts) {
+    if(d === 0) { return idx <= counts[0]; }
+    return idx <= counts[d - 1] - UNLOCK_LAG;
+}
+
+// The state of each of a level's three difficulties: 'completed', 'unlocked', or 'locked'.
+function levelDifficultyStates(idx, past, counts) {
+    const states = [];
+    for(var d = 0; d < 3; d++) {
+        if(past.complete && past.difficulty >= d) { states.push('completed'); }
+        else if(difficultyUnlocked(idx, d, counts)) { states.push('unlocked'); }
+        else { states.push('locked'); }
     }
-    return stars;
+    return states;
+}
+
+// The mark for one difficulty: a star (completed), an open lock (unlocked), or a closed lock
+// (locked), tinted to that difficulty's color.
+function difficultyMark(state, d) {
+    const color = COLORS[d][1].backgroundColor;
+    if(state === 'completed') { return '<span class="lvmark" style="color:' + color + '">★</span>'; }
+    if(state === 'unlocked')  { return '<span class="lvmark" style="color:' + color + '">' + UNLOCK_SVG + '</span>'; }
+    return '<span class="lvmark locked" style="color:' + color + '">' + LOCK_SVG + '</span>';
+}
+
+// Render a level's button: its number, a row of three per-difficulty marks, and a top stripe in
+// the highest completed difficulty's color (the normal black border when nothing is completed).
+function renderLevelButton(b, name, states) {
+    b.className = 'level';
+    b.style.borderTop = '';
+    // A fully locked level (novice not yet unlocked) is shown disabled, with a lock in front.
+    if(states[0] === 'locked') {
+        b.classList.add('level-locked');
+        b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
+        return;
+    }
+    b.innerHTML = '<div class="level-number">' + name + '</div>' +
+        '<div class="level-marks">' +
+        difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2) +
+        '</div>';
+    var hc = -1;
+    for(var d = 0; d < 3; d++) { if(states[d] === 'completed') { hc = d; } }
+    if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
+}
+
+// Recompute completedCounts (levels completed at each difficulty) from the saved results.
+function tallyCompletedCounts(res) {
+    completedCounts = [0, 0, 0];
+    LEVELS.forEach(function (world) {
+        if(world.server && !SERVER) { return; }
+        world.stages.forEach(function (stage) {
+            stage.levels.forEach(function (level) {
+                const p = getPast(res, level);
+                if(p.complete) {
+                    for(var d = 0; d <= p.difficulty; d++) { completedCounts[d]++; }
+                }
+            });
+        });
+    });
 }
 
 // The "Select Level" button opens a modal box to choose from pre-set levels.  There's a "custom" button at the bottom that switches to a modal box that sets a custom level.
@@ -1301,7 +1370,7 @@ document.getElementById("nextLevel").onclick = function() {
             if(next.worldIndex !== currentWorld) {
                 setWorld(next.worldIndex);
             }
-            selectCurrentLevel(next);
+            chooseLevel(next);
         }
     }
 };
@@ -1355,11 +1424,7 @@ clearHistory.onclick = function () {
     if(SERVER || confirm("This will forget all your completed levels and difficulties!  Are you sure?")) {
         localStorage.clear();
         localStorage.setItem("visited",true);
-        levelButtons.forEach(function (b) {
-            b.style.backgroundColor = '';
-            b.style.color = '';
-            b.innerHTML = b.dataset.name + '<br>☆☆☆';
-        });
+        updateLevelSelect(null);
         setWorld(0);
         if(SERVER) {
             document.getElementById("levelChooseBG").style.display = "none";
@@ -1417,6 +1482,20 @@ function selectCurrentLevel(level, skipSavedPrompt) {
     if(!skipSavedPrompt) {
         offerSavedProof(level);
     }
+}
+
+// Open a level chosen from the chooser, starting at the highest difficulty unlocked for it (the
+// in-level "Reduce difficulty" button can drop lower).  A fully locked level isn't selectable.
+// In test mode, enforcement is skipped and the level opens at the current difficulty.
+function chooseLevel(level) {
+    if(!TEST_MODE) {
+        const states = levelDifficultyStates(level.globalIndex, getPast(null, level), completedCounts);
+        if(states[0] === 'locked') { return; }
+        var d = 0;
+        for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
+        setDifficulty(d);
+    }
+    selectCurrentLevel(level);
 }
 
 // Add a close button to a box
@@ -2146,14 +2225,13 @@ function continue_typechecking(nodes, edges, connections, result) {
             if(currentLevel) {
                 const past = getPast(null, currentLevel);
                 const present = { complete: true, difficulty: Math.max(difficulty, past.difficulty) };
-                currentLevelButton.style.color = COLORS[present.difficulty][1].color;
-                currentLevelButton.style.backgroundColor = COLORS[present.difficulty][1].backgroundColor;
-                currentLevelButton.innerHTML = currentLevelButton.dataset.name + "<br>" + getStars(present)
                 // Record completion, with the difficulty, in local storage
                 const key = JSON.stringify(saveable(currentLevel));
                 const value = present;
                 localStorage.setItem(key, JSON.stringify(value));
-                // Update this world's index-chip progress count.
+                // Re-render the level buttons (this level is now complete, and others may have
+                // unlocked), and update this world's index-chip progress count.
+                updateLevelSelect(null);
                 refreshWorldProgress(currentLevel.worldPaneIndex);
                 if(SERVER) {
                     // Save it to the server too
