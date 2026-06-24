@@ -1270,7 +1270,7 @@ function findEndpoint(el, sort, label) {
 // Rebuild the proof from a snapshot object (as produced by serializeProof), into the given
 // level (defaulting to the current one).  Shared by "Load" (from localStorage) and "Import"
 // (from pasted JSON).
-function restoreProof(state, level) {
+function restoreProof(state, level, countAsCompletion) {
     level = level || currentLevel;
     if(!level) {
         alert("Restoring a proof is only supported for the built-in levels, not custom ones.");
@@ -1363,8 +1363,10 @@ function restoreProof(state, level) {
 
     restoring = false;
     suppressChecking = false;
-    // Restoring a proof that was already complete shouldn't count as a fresh completion.
-    proofRegisteredComplete = !!state.complete;
+    // Restoring a proof that was already complete normally shouldn't count as a fresh completion,
+    // except when restoring the lower-difficulty proof after a downgrade (countAsCompletion): that
+    // re-locks the higher difficulty just as if you'd re-solved it.
+    proofRegisteredComplete = countAsCompletion ? false : !!state.complete;
     typecheck();
 }
 
@@ -1629,7 +1631,9 @@ document.getElementById("restoreSavedDowngrade").onclick = function() {
     if(pendingDowngrade) {
         const state = pendingDowngrade;
         pendingDowngrade = null;
-        restoreProof(state);
+        // Loading the lower difficulty's saved (complete) proof counts as a fresh solve, so it
+        // re-locks the higher difficulty (rule 7) the same as re-solving by hand would.
+        restoreProof(state, undefined, true);
     }
 };
 document.getElementById("keepCurrentDowngrade").onclick = function() {
