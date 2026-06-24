@@ -2,37 +2,71 @@
 
 Olorin is a graphical frontend for [Narya](https://github.com/gwaithimirdain/narya) that allows the user to prove simple statements in predicate logic.  It runs in a web browser, but once loaded it works offline without a server connection.  See the "about" page for more information.
 
+## Prerequisites
+
+Olorin contains Narya as a git submodule, along with custom code in OCaml (compiled with [js_of_ocaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview)) plus pure JavaScript that manages the graphics and browser interaction.  To build it you need:
+
+- An **OCaml/opam** environment with everything required to build Narya (see Narya's own build instructions).  This compiles the proof checker to JavaScript.
+- **Node.js and npm**, for the JavaScript client and the build/test tooling.
+
+## Installing dependencies
+
+One-time setup, from the repository root:
+```
+git submodule update --init --recursive   # fetch the Narya submodule
+dune build olorin.opam                     # generate the opam file
+opam install . --deps-only                 # install the OCaml dependencies (incl. Narya's)
+npm install                                # install the JavaScript dependencies
+```
+
+`npm install` also installs the build tools (webpack) and the test runner (`@playwright/test`); see [Testing](#testing) for the extra one-time step of downloading a browser.
+
 ## Building Olorin
 
-Olorin contains Narya as a git submodule, along with custom code in both OCaml, to be compiled with [js_of_ocaml](https://ocsigen.org/js_of_ocaml/latest/manual/overview), plus pure JavaScript to manage the graphics and interaction with the browser.  To compile it, you'll need all the necessary packages to build Narya, as well as the JavaScript package manager `npm`.  Then run the following commands:
+After the one-time setup above, build everything the browser needs into `static/` with:
 ```
-cd olorin
-git submodule update
-dune build olorin.opam
-opam install . --deps-only
-dune build
-npm install
-npm run build
+npm run build:static
 ```
+This compiles the OCaml to JavaScript (`dune build`), bundles the client with webpack (`npm run build`), and copies the runtime assets — `olorin.bc.js`, `z3-built.js`/`z3-built.wasm`, and `coi-serviceworker.js` — into `static/`.  This is the only command you need to rebuild after changing anything.
+
+If you have **only** changed JavaScript or CSS (not the OCaml), you can skip the OCaml step and just run `npm run build`, which refreshes `static/main.bundle.js`.  (In both cases you may need to Shift+Reload the page to pick up the new files.)
 
 ## Serving Olorin
 
-After compiling it, to make Olorin accessible from a web server, place the following files in a directory that will be served by a web server:
+Once `static/` has been built, it is self-contained: serve that directory with any static file server.  For local use:
+```
+npx http-server static -o -p 9999
+```
+The page needs [cross-origin isolation](https://web.dev/coop-coep/) (for `SharedArrayBuffer`, used by Z3); `coi-serviceworker.js` provides this by reloading the page to turn it on, so a plain static server like `http-server` works.  Alternatively, serve it from a custom server that sets the cross-origin headers itself, in which case `coi-serviceworker.js` is unnecessary.
 
-- All the files in the directory `static`, including the `main.bundle.js` which should be placed there by `npm run build`.
-- `_build/default/bin/olorin.bc.js`, which should be created by `dune build`.
-- `node_modules/coi-serviceworker/coi-serviceworker.js`.  This enables SharedArrayBuffer by reloading the page to turn on Cross-Origin Isolation.  It could be avoided if the page is being served by a custom server that can set the [cross-origin headers](https://web.dev/coop-coep/) correctly server-side.
-- `node_modules/z3-solver/build/z3-built.js` and `node_modules/z3-solver/build/z3-built.wasm`.  Apparently bundling these file with webpack would prevent them from loading correctly.
+The runtime assets (`main.bundle.js`, `olorin.bc.js`, `z3-built.*`, `coi-serviceworker.js`) are not checked into git, so a fresh checkout has none of them until you build — `npm run build:static` puts them all in `static/`.
 
-For instance, to test Olorin locally, you can run:
+For development, you can instead symlink the generated files into `static/` rather than copying them, so OCaml changes take effect as soon as you re-run `dune build` (and JavaScript changes as soon as you re-run `npm run build`), without re-running the full `build:static`:
 ```
 cd static
 ln -s ../_build/default/bin/olorin.bc.js .
 ln -s ../node_modules/coi-serviceworker/coi-serviceworker.js .
 ln -s ../node_modules/z3-solver/build/z3-built.* .
-npx http-server . -o -p 9999
 ```
-If you create symlinks like this rather than copying the files, then changes to the Olorin OCaml code will take effect as soon as you re-run `dune build` and reload the web page.  Changes to the JavaScript side (`client/main.js`) will always take effect as soon as you re-run `npm run build` and reload the web page.  (In both cases, you may need to Shift+Reload.)
+
+## Testing
+
+Olorin has a Playwright suite that drives the **real built app** in headless Chromium (selecting levels, dragging rules, wiring ports, etc.); see [`test/README.md`](test/README.md) for details.
+
+One-time setup (in addition to `npm install` above):
+```
+npx playwright install chromium   # download the browser
+```
+On Linux you may also need its system libraries: `npx playwright install-deps` (requires `sudo`).
+
+The tests run against the built `static/` directory, so build it first, then run the suite:
+```
+npm run build:static
+npm run test:e2e
+```
+The runner automatically starts a static server with the correct cross-origin headers (`test/server.js`, on port 8123) for the duration of the run.  Use `npm run test:e2e:headed` to watch the tests in a visible browser.
+
+Run the suite via `npm run test:e2e` (not a bare `playwright test`): the npm script uses the project's local `@playwright/test`, whereas a global `playwright` is the browser-automation package only and will report `error: unknown command 'test'`.
 
 ## Olorin server
 
