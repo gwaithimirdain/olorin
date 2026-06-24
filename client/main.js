@@ -2636,9 +2636,11 @@ function continue_typechecking(nodes, edges, connections, result) {
     document.getElementById("typecheckingBG").style.display = 'none';
 }
 
-// Check that the parameters and variables have types, split up grouped variables, and associate them to types.
-function checkType(sort, eg) { return function(v) {
-    v = v.split(/ *: */);
+// Check that the parameters and variables have types, split up grouped variables, and associate
+// them to types.  The separator is ":" for parameters and "∈" for variables (so the player writes
+// "a ∈ A"); either way the result is the {name, ty} format that Narya consumes.
+function checkType(sort, eg, sep) { return function(v) {
+    v = v.split(new RegExp(' *' + (sep || ':') + ' *'));
     if(v.length !== 2) {
         throw new Error('All ' + sort + ' must have a unique type, for instance "' + eg + '"');
     }
@@ -2661,7 +2663,7 @@ document.getElementById("submitLevel").onclick = function () {
         variables = document.getElementById("variables").value.
             split(/[\r\n]+/).
             filter(Boolean).
-            map(checkType('variables', 'a : A')).
+            map(checkType('variables', 'a ∈ A', '∈')).
             flat();
     } catch(exn) {
         alert(exn.message);
@@ -2755,7 +2757,9 @@ function setLevel(level, rulesAllowed) {
     document.getElementById("levelCompleteBanner").classList.remove("shown");
 
     // Turn on the "cancel" buttons and "proof will be erased" warnings for future level-selections.
-    document.getElementById("setLevelWarning").style.display = '';
+    // (setLevelWarning is optional -- it was removed from the custom dialog.)
+    const setLevelWarning = document.getElementById("setLevelWarning");
+    if(setLevelWarning) { setLevelWarning.style.display = ''; }
     document.getElementById("cancelChooseLevel").style.display = '';
     document.getElementById("cancelSetLevel").style.display = '';
 
