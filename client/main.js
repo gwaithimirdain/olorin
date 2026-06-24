@@ -643,11 +643,23 @@ function login(email, course) {
 };
 
 // Add level select buttons to the dialog box.
-function makeLevelSelect(res) {
-    const worldName = document.getElementById('worldName');
-    const backWorld = document.getElementById('backWorld');
-    const forwardWorld = document.getElementById('forwardWorld');
+// A short label for a world's index chip, e.g. "Advanced proposition world" -> "Advanced".
+function shortWorldName(name) {
+    return name.replace(/ world$/i, '').split(' ')[0];
+}
 
+// Recompute and display the "done/total" count on a world's index chip.
+function refreshWorldProgress(worldPaneIndex) {
+    const entry = worldPanes[worldPaneIndex];
+    if(!entry || !entry.chip) { return; }
+    const prog = entry.chip.querySelector('.world-progress');
+    if(!prog) { return; }
+    const done = entry.levels.filter(function (l) { return getPast(null, l).complete; }).length;
+    prog.innerText = done + '/' + entry.levels.length;
+}
+
+function makeLevelSelect(res) {
+    const worldIndex = document.getElementById('worldIndex');
     const worlds = document.getElementById("worlds");
     var maxcols = 0;
     var maxrows = 0;
@@ -657,8 +669,21 @@ function makeLevelSelect(res) {
 
         const worldPane = document.createElement("div");
         worldPane.className = "world";
+
+        // Each world starts with a sticky header showing its name, so it stays visible while
+        // scrolling through that world.
+        const worldHeader = document.createElement("div");
+        worldHeader.className = "world-header";
+        worldHeader.innerText = world.name;
+        worldPane.appendChild(worldHeader);
+
         worlds.appendChild(worldPane);
         var countstages = 1;
+
+        // Track this world's levels and how many are completed, for the index-chip progress count.
+        const worldLevels = [];
+        var worldDone = 0;
+        const worldNum = worldPanes.length;
 
         var nontrivialWorldLevels = [];
         world.stages.forEach(function (stage, y) {
@@ -690,12 +715,15 @@ function makeLevelSelect(res) {
                 level.stage = stage;
                 level.button = b;
                 level.worldIndex = x;
+                level.worldPaneIndex = worldNum;
                 if(!level.trivial) {
                     nontrivialWorldLevels.push(level);
                 }
 
                 // Has the user has solved this level before?
                 const past = getPast(res, level);
+                worldLevels.push(level);
+                if(past.complete) { worldDone++; }
 
                 // Give a number of stars according to the difficulty completed
                 b.innerHTML = name + '<br>' + getStars(past);
@@ -747,21 +775,33 @@ function makeLevelSelect(res) {
 
         worldPane.appendChild(otherStage);
 
-        worldPane.style.display = 'none';
+        // A clickable chip in the index bar scrolls to this world, with a short name and a
+        // running "done/total" level count.
+        const chip = document.createElement("div");
+        chip.className = "world-chip";
+        chip.innerHTML = escapeHtml(shortWorldName(world.name)) +
+            ' <span class="world-progress">' + worldDone + '/' + worldLevels.length + '</span>';
+        chip.onclick = function () { setWorld(worldNum); };
+        worldIndex.appendChild(chip);
+
         worldPanes.push({
             name: world.name,
             pane: worldPane,
+            chip: chip,
+            levels: worldLevels,
         });
     });
     document.getElementById("levelChooseModal").style.width = (maxcols * 80 + 30) + 'px';
-    document.getElementById("levelChooseModal").style.height = (maxrows * 60 + 200) + 'px';
+
+    // Keep the active world chip in sync as the user scrolls through the worlds.
+    worlds.onscroll = updateActiveWorldFromScroll;
 
     currentWorld = parseInt(localStorage.getItem("world")) || 0;
     if(! worldPanes[currentWorld] ) {
         currentWorld = 0;
     }
 
-    // The forwards and backwards arrows have a different look and cursor if there's nowhere to go in that direction.
+    // Scroll to the most recently viewed world.
     setWorld(currentWorld);
 
     // Load the recent difficulty
@@ -789,50 +829,44 @@ function updateLevelSelect(res) {
     });
 }
 
-// The backwards and forwards world buttons move to the next world in that direction if there is one, and update their displays.
-
-document.getElementById('backWorld').onclick = function () {
-    if(currentWorld > 0) {
-        setWorld(currentWorld - 1);
-    }
-};
-
-document.getElementById('forwardWorld').onclick = function () {
-    if(currentWorld < worldPanes.length - 1) {
-        setWorld(currentWorld + 1);
-    }
-};
-
+// Scroll the level chooser to a given world (by its index in worldPanes) and mark its chip active.
 function setWorld(newWorld) {
-    const backWorld = document.getElementById('backWorld');
-    const forwardWorld = document.getElementById('forwardWorld');
-
-    // Hide the old world
-    worldPanes[currentWorld].pane.style.display = 'none';
-
-    // Set the new world
     currentWorld = newWorld;
     localStorage.setItem("world", currentWorld);
-
-    // Display the new world
-    worldPanes[currentWorld].pane.style.display = '';
-    worldName.innerText = worldPanes[currentWorld].name;
-
-    // Correct the world arrows
-    if(currentWorld === 0) {
-        backWorld.innerText = '◁';
-        backWorld.style.cursor = 'default';
-    } else {
-        backWorld.innerText = '◀';
-        backWorld.style.cursor = 'pointer';
+    const entry = worldPanes[currentWorld];
+    if(entry) {
+        entry.pane.scrollIntoView({ block: 'start' });
+        highlightWorldChip(currentWorld);
     }
+}
 
-    if(currentWorld === worldPanes.length - 1) {
-        forwardWorld.innerText = '▷';
-        forwardWorld.style.cursor = 'default';
-    } else {
-        forwardWorld.innerText = '▶';
-        forwardWorld.style.cursor = 'pointer';
+// Mark the given world's chip active in the index bar.
+function highlightWorldChip(i) {
+    worldPanes.forEach(function (entry, j) {
+        if(entry.chip) {
+            entry.chip.classList.toggle("active", i === j);
+        }
+    });
+}
+
+// As the user scrolls the worlds list, highlight the chip for the world currently at the top.
+function updateActiveWorldFromScroll() {
+    const worlds = document.getElementById("worlds");
+    const top = worlds.getBoundingClientRect().top;
+    var active = 0;
+    worldPanes.forEach(function (entry, i) {
+        if(entry.pane.getBoundingClientRect().top - top <= 5) {
+            active = i;
+        }
+    });
+    // When scrolled to the bottom, the last (short) world can't reach the top, so select it.
+    if(worlds.scrollTop + worlds.clientHeight >= worlds.scrollHeight - 5) {
+        active = worldPanes.length - 1;
+    }
+    if(active !== currentWorld) {
+        currentWorld = active;
+        localStorage.setItem("world", currentWorld);
+        highlightWorldChip(active);
     }
 }
 
@@ -2119,6 +2153,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                 const key = JSON.stringify(saveable(currentLevel));
                 const value = present;
                 localStorage.setItem(key, JSON.stringify(value));
+                // Update this world's index-chip progress count.
+                refreshWorldProgress(currentLevel.worldPaneIndex);
                 if(SERVER) {
                     // Save it to the server too
                     const xhr = new XMLHttpRequest();

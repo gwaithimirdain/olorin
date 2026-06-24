@@ -396,10 +396,58 @@ body {
 
 #worlds {
     flex: 1;
+    min-height: 0;
     overflow-x: clip;
     overflow-y: auto;
     display: grid;
     align-items: top;
+}
+
+/* The clickable index of worlds, pinned above the scrolling world list. */
+#worldIndex {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 2px 0 4px;
+    font-family: sans-serif;
+}
+
+.world-chip {
+    padding: 4px 10px;
+    border: 1px solid #888888;
+    border-radius: 14px;
+    background-color: #eeeeee;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.world-chip.active {
+    background-color: #333333;
+    color: #ffffff;
+    border-color: #333333;
+}
+
+/* The "done/total" level counts on the world chips. */
+.world-progress {
+    opacity: 0.65;
+    font-size: 12px;
+}
+
+/* A world's name, which sticks to the top of the list while scrolling through that world. */
+.world-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background-color: #ffffff;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    font-family: sans-serif;
+    padding: 8px 0;
+    border-bottom: 2px solid #cccccc;
+    margin-bottom: 6px;
 }
 
 .stage {
