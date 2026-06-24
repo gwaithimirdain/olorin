@@ -6,6 +6,7 @@
     "scripts": {
         "build": "webpack",
         "build:static": "./scripts/build-static.sh",
+        "test": "npm run build:static && npm run test:e2e",
         "test:e2e": "playwright test",
         "test:e2e:headed": "playwright test --headed",
         "gen:fixtures": "node test/generate-fixtures.js"

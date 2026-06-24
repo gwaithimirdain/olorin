@@ -59,12 +59,11 @@ npx playwright install chromium   # download the browser
 ```
 On Linux you may also need its system libraries: `npx playwright install-deps` (requires `sudo`).
 
-The tests run against the built `static/` directory, so build it first, then run the suite:
+The tests run against the built `static/` directory.  The simplest way to run them is:
 ```
-npm run build:static
-npm run test:e2e
+npm test
 ```
-The runner automatically starts a static server with the correct cross-origin headers (`test/server.js`, on port 8123) for the duration of the run.  Use `npm run test:e2e:headed` to watch the tests in a visible browser.
+which rebuilds `static/` (via `build:static`, so the `dune` build is incremental — fast unless something actually changed) and then runs the suite, so you never test a stale build.  If you've already built and want to skip straight to the tests, run `npm run test:e2e` instead.  The runner automatically starts a static server with the correct cross-origin headers (`test/server.js`, on port 8123) for the duration of the run.  Use `npm run test:e2e:headed` to watch the tests in a visible browser.
 
 Run the suite via `npm run test:e2e` (not a bare `playwright test`): the npm script uses the project's local `@playwright/test`, whereas a global `playwright` is the browser-automation package only and will report `error: unknown command 'test'`.
 
