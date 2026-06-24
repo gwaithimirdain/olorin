@@ -39,6 +39,18 @@ class Olorin {
         return this.page.evaluate(() => document.getElementById('currentLevel').innerText.replace(/^Level:\s*/, ''));
     }
 
+    // Seed localStorage completion records before open().  `pairs` is [[key, valueJson], ...].
+    async seed(pairs) {
+        await this.page.addInitScript((pairs) => {
+            for (const [k, v] of pairs) localStorage.setItem(k, v);
+        }, pairs);
+    }
+
+    // The per-difficulty ['locked'|'unlocked'|'completed'] states of a level, by name.
+    levelStates(name) {
+        return this.page.evaluate((n) => window.__olorin.levelStates(n), name);
+    }
+
     // Pick a built-in level by its "world-stage-level" name, e.g. "1-1-1".
     async selectLevel(name) {
         // Make sure the level chooser is open (it closes after a level is picked).

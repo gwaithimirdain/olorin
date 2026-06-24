@@ -127,8 +127,8 @@ var allLevels = [];
 var currentLevel;
 var currentLevelButton;
 
-// Number of levels completed at each difficulty (>= d), for the placeholder unlock rule.
-var completedCounts = [0, 0, 0];
+// Per-world / per-stage completion data driving the unlock rule (see computeUnlockData).
+var unlockData = [];
 
 // Exclude these rules from "all"
 const excludeFromAll = [ "negI" ] // Classical negation suffices
@@ -668,8 +668,8 @@ function makeLevelSelect(res) {
     const worlds = document.getElementById("worlds");
     var maxcols = 0;
     var maxrows = 0;
-    // Tally completions first, so each button can show which difficulties are unlocked.
-    tallyCompletedCounts(res);
+    // Compute completion data first, so each button can show which difficulties are unlocked.
+    computeUnlockData(res);
     LEVELS.forEach(function (world, x) {
         // Skip this world if it requires a server and we're not in server mode.
         if(world.server && !SERVER) { return; }
@@ -722,6 +722,8 @@ function makeLevelSelect(res) {
                 level.stage = stage;
                 level.button = b;
                 level.worldIndex = x;
+                level.stageIndex = y;
+                level.levelIndex = z;
                 level.worldPaneIndex = worldNum;
                 if(!level.trivial) {
                     nontrivialWorldLevels.push(level);
@@ -733,9 +735,7 @@ function makeLevelSelect(res) {
                 if(past.complete) { worldDone++; }
 
                 // Render the button showing the number and per-difficulty lock/unlock/done marks.
-                const idx = allLevels.length;
-                level.globalIndex = idx;
-                renderLevelButton(b, name, levelDifficultyStates(idx, past, completedCounts));
+                renderLevelButton(b, name, levelDifficultyStates(level, past, unlockData));
                 b.addEventListener('click', function () { chooseLevel(level); } );
                 stageGrid.appendChild(b);
                 levelButtons.push(b);
@@ -775,7 +775,7 @@ function makeLevelSelect(res) {
             var pool = nontrivialWorldLevels;
             if(!TEST_MODE) {
                 pool = nontrivialWorldLevels.filter(function (l) {
-                    return levelDifficultyStates(l.globalIndex, getPast(null, l), completedCounts)[0] !== 'locked';
+                    return levelDifficultyStates(l, getPast(null, l), unlockData)[0] !== 'locked';
                 });
             }
             if(pool.length === 0) { return; }
@@ -825,12 +825,12 @@ function makeLevelSelect(res) {
 // Re-render every level button's marks/state -- after logging back in, or when a completion
 // may have unlocked further levels/difficulties.
 function updateLevelSelect(res) {
-    tallyCompletedCounts(res);
+    computeUnlockData(res);
     LEVELS.forEach(function (world, x) {
         world.stages.forEach(function (stage, y) {
             stage.levels.forEach(function (level, z) {
                 const past = getPast(res, level);
-                renderLevelButton(level.button, level.name, levelDifficultyStates(level.globalIndex, past, completedCounts));
+                renderLevelButton(level.button, level.name, levelDifficultyStates(level, past, unlockData));
             });
         });
     });
@@ -937,30 +937,44 @@ function getPast(res, level) {
 }
 
 // === Level-button rendering with per-difficulty lock / unlock / completed states ===
-//
-// Lock states come from a placeholder unlock rule and are shown visually only for now -- every
-// level stays clickable and difficulty selection is unchanged.
 
 // Small line-art padlock icons, tinted via the surrounding element's text color.
 const LOCK_SVG = '<svg class="lockicon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 // The "unlocked" padlock's shackle is open, swung up and out to the right.
 const UNLOCK_SVG = '<svg class="lockicon" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a5 5 0 0 1 8.5-2"/></svg>';
 
-// Placeholder unlock rule: novice unlocks roughly as far as you've completed it, and each harder
-// difficulty lags the previous by UNLOCK_LAG levels (you re-do earlier levels at higher
-// difficulty as you progress).  `counts[d]` is how many levels are completed at >= d.
-const UNLOCK_LAG = 8;
-function difficultyUnlocked(idx, d, counts) {
-    if(d === 0) { return idx <= counts[0]; }
-    return idx <= counts[d - 1] - UNLOCK_LAG;
+// What fraction of `total` is `done` (an empty world/stage counts as fully complete).
+function fraction(done, total) {
+    return total === 0 ? 1 : done / total;
+}
+
+// Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
+// is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
+function difficultyUnlocked(w, s, c, K, data) {
+    const world = data[w];
+    const stage = world.stages[s];
+    // 1. The previous world is >= 80% complete at difficulty K (unless this is the first world).
+    if(w > 0 && fraction(data[w - 1].done[K], data[w - 1].total) < 0.8) { return false; }
+    // 2. The next world is >= 50% complete at K-1 (unless K is 0, or this is the last world).
+    if(K > 0 && w < data.length - 1 && fraction(data[w + 1].done[K - 1], data[w + 1].total) < 0.5) { return false; }
+    // 3. The world two back is >= 50% complete at K+1 (unless this is the first/second world or K=2).
+    if(w >= 2 && K < 2 && fraction(data[w - 2].done[K + 1], data[w - 2].total) < 0.5) { return false; }
+    // 4. The previous stage of this world is >= 70% complete at K (unless this is the first stage).
+    if(s > 0 && fraction(world.stages[s - 1].done[K], world.stages[s - 1].total) < 0.7) { return false; }
+    // 5. All but (at most) 2 of the levels before this one in the stage are complete at K -- so a
+    //    stage's first three levels are available as soon as it opens.
+    var completedBefore = 0;
+    for(var i = 0; i < c; i++) { if(stage.levelDiff[i] >= K) { completedBefore++; } }
+    if(completedBefore < c - 2) { return false; }
+    return true;
 }
 
 // The state of each of a level's three difficulties: 'completed', 'unlocked', or 'locked'.
-function levelDifficultyStates(idx, past, counts) {
+function levelDifficultyStates(level, past, data) {
     const states = [];
-    for(var d = 0; d < 3; d++) {
-        if(past.complete && past.difficulty >= d) { states.push('completed'); }
-        else if(difficultyUnlocked(idx, d, counts)) { states.push('unlocked'); }
+    for(var K = 0; K < 3; K++) {
+        if(past.complete && past.difficulty >= K) { states.push('completed'); }
+        else if(difficultyUnlocked(level.worldIndex, level.stageIndex, level.levelIndex, K, data)) { states.push('unlocked'); }
         else { states.push('locked'); }
     }
     return states;
@@ -995,19 +1009,26 @@ function renderLevelButton(b, name, states) {
     if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
 }
 
-// Recompute completedCounts (levels completed at each difficulty) from the saved results.
-function tallyCompletedCounts(res) {
-    completedCounts = [0, 0, 0];
-    LEVELS.forEach(function (world) {
-        if(world.server && !SERVER) { return; }
+// Recompute, for every world and stage, how many of its levels are complete at each difficulty
+// (>= K) and each level's completed difficulty, from the saved results.  Drives the unlock rule.
+function computeUnlockData(res) {
+    unlockData = LEVELS.map(function (world) {
+        const wd = { total: 0, done: [0, 0, 0], stages: [] };
         world.stages.forEach(function (stage) {
+            const sd = { total: 0, done: [0, 0, 0], levelDiff: [] };
             stage.levels.forEach(function (level) {
                 const p = getPast(res, level);
-                if(p.complete) {
-                    for(var d = 0; d <= p.difficulty; d++) { completedCounts[d]++; }
+                const cd = p.complete ? p.difficulty : -1;
+                sd.levelDiff.push(cd);
+                sd.total++;
+                wd.total++;
+                for(var K = 0; K <= 2; K++) {
+                    if(cd >= K) { sd.done[K]++; wd.done[K]++; }
                 }
             });
+            wd.stages.push(sd);
         });
+        return wd;
     });
 }
 
@@ -1347,6 +1368,11 @@ if (new URLSearchParams(window.location.search).has("test")) {
         restore: (state) => restoreProof(state),
         // Whether the proof currently reads as complete (the conclusion turns a color).
         complete: () => conclusion_node !== null && conclusion_node.style.backgroundColor !== "",
+        // The per-difficulty ['locked'|'unlocked'|'completed'] states of a level, by name.
+        levelStates: (name) => {
+            const lvl = allLevels.find((l) => l.name === name);
+            return lvl ? levelDifficultyStates(lvl, getPast(null, lvl), unlockData) : null;
+        },
     };
 }
 
@@ -1489,7 +1515,7 @@ function selectCurrentLevel(level, skipSavedPrompt) {
 // In test mode, enforcement is skipped and the level opens at the current difficulty.
 function chooseLevel(level) {
     if(!TEST_MODE) {
-        const states = levelDifficultyStates(level.globalIndex, getPast(null, level), completedCounts);
+        const states = levelDifficultyStates(level, getPast(null, level), unlockData);
         if(states[0] === 'locked') { return; }
         var d = 0;
         for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
