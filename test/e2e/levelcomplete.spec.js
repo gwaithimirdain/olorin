@@ -4,6 +4,9 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { allLevels } = require('../lib/levels');
+
+const completionKey = (name) => JSON.stringify(allLevels().find((l) => l.name === name).saveable);
 
 test.describe('Level complete', () => {
     let olorin;
@@ -20,6 +23,8 @@ test.describe('Level complete', () => {
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         expect(await olorin.isComplete()).toBe(true);
         expect(await olorin.completeBannerVisible()).toBe(true);
+        // The next level in sequence (1-1-2) is active, so a single Next button suffices.
+        expect(await olorin.page.isVisible('#nextUnsolved')).toBe(false);
 
         // The pop-up is tinted to the current difficulty's color, like the conclusion box.
         const colors = await olorin.page.evaluate(() => {
@@ -60,5 +65,24 @@ test.describe('Level complete', () => {
 
         await olorin.page.click('#selectLevelAfterComplete');
         expect(await olorin.isVisible('#levelChooseBG')).toBe(true);
+    });
+});
+
+test.describe('Level complete: Next vs Next Unsolved', () => {
+    test('splits into two buttons when the next level in sequence is already solved', async ({ page }) => {
+        const olorin = new Olorin(page);
+        // 1-1-2 is fully completed, so after finishing 1-1-1 the next-in-sequence level isn't
+        // "active"; the next active level (1-2-1) differs, so both buttons appear.
+        await olorin.seed([[completionKey('1-1-2'), JSON.stringify({ complete: true, difficulty: 2 })]]);
+        await olorin.open();
+        await olorin.selectLevel('1-1-1');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+
+        expect(await page.isVisible('#nextLevel')).toBe(true);
+        expect(await page.isVisible('#nextUnsolved')).toBe(true);
+
+        // "Next Unsolved" skips the solved 1-1-2 and jumps to the next active level.
+        await olorin.nextUnsolved();
+        expect(await olorin.currentLevelName()).toBe('1-2-1');
     });
 });

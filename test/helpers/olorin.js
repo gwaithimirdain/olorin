@@ -108,6 +108,12 @@ class Olorin {
         await this.dismissHints();
     }
 
+    // Jump to the next unsolved (active) level via the "Next Unsolved" button.
+    async nextUnsolved() {
+        await this.page.click('#nextUnsolved');
+        await this.dismissHints();
+    }
+
     // Drag a palette rule (e.g. "andI") onto the diagram at (x, y) relative to the diagram's
     // top-left.  Returns the id of the newly created node.
     async dragRule(ruleId, x, y) {

@@ -1458,19 +1458,62 @@ document.getElementById("backLevel").onclick = function () {
 document.getElementById("cancelSetLevel").onclick = clearLevelSelect;
 document.getElementById("cancelChooseLevel").onclick = clearLevelSelect;
 
-// The "Next" button in the completion pop-up advances to the next level.
+// Open a level (switching worlds in the chooser if needed) -- used by the completion pop-up.
+function goToLevel(level) {
+    if(level.worldIndex !== currentWorld) { setWorld(level.worldIndex); }
+    chooseLevel(level);
+}
+
+function levelStatesOf(level) {
+    return levelDifficultyStates(level, getPast(null, level), unlockData);
+}
+function isLevelActive(level) { return levelStatesOf(level).includes('unlocked'); }
+function isLevelSelectable(level) { return levelStatesOf(level)[0] !== 'locked'; }
+
+// The two candidate targets for the completion pop-up's "Next": the next level in sequence (if
+// it's unlocked at all), and the next "active" level scanning forward and wrapping around.
+function computeNextTargets() {
+    const i = allLevels.indexOf(currentLevel);
+    if(i < 0) { return { seq: null, active: null }; }
+    var seq = null;
+    if(i + 1 < allLevels.length && isLevelSelectable(allLevels[i + 1])) {
+        seq = allLevels[i + 1];
+    }
+    var active = null;
+    for(var k = 1; k < allLevels.length; k++) {
+        const lvl = allLevels[(i + k) % allLevels.length];
+        if(isLevelActive(lvl)) { active = lvl; break; }
+    }
+    return { seq: seq, active: active };
+}
+
+// Show one "Next" button, or split into "Next" and "Next Unsolved", per the two targets.
+var nextButtonTarget = null;
+var nextUnsolvedTarget = null;
+function configureNextButtons() {
+    const targets = computeNextTargets();
+    const nextBtn = document.getElementById("nextLevel");
+    const unsolvedBtn = document.getElementById("nextUnsolved");
+    if(targets.seq && targets.active && targets.seq !== targets.active) {
+        nextButtonTarget = targets.seq;
+        nextUnsolvedTarget = targets.active;
+        nextBtn.style.display = '';
+        unsolvedBtn.style.display = '';
+    } else {
+        nextButtonTarget = targets.seq || targets.active;
+        nextUnsolvedTarget = null;
+        nextBtn.style.display = nextButtonTarget ? '' : 'none';
+        unsolvedBtn.style.display = 'none';
+    }
+}
+
 document.getElementById("nextLevel").onclick = function() {
     document.getElementById("levelCompleteBanner").classList.remove("shown");
-    if(currentLevel) {
-        const idx = allLevels.indexOf(currentLevel);
-        if(idx >= 0 && idx < allLevels.length - 1) {
-            const next = allLevels[idx + 1];
-            if(next.worldIndex !== currentWorld) {
-                setWorld(next.worldIndex);
-            }
-            chooseLevel(next);
-        }
-    }
+    if(nextButtonTarget) { goToLevel(nextButtonTarget); }
+};
+document.getElementById("nextUnsolved").onclick = function() {
+    document.getElementById("levelCompleteBanner").classList.remove("shown");
+    if(nextUnsolvedTarget) { goToLevel(nextUnsolvedTarget); }
 };
 
 // The "Select Level" button in the completion pop-up opens the level chooser.
@@ -2397,11 +2440,9 @@ function continue_typechecking(nodes, edges, connections, result) {
                     xhr.send(JSON.stringify(data));
                 }
                 // The proof is complete: show the (non-modal) completion pop-up at the top,
-                // tinted to match the current difficulty (the same color as the conclusion box).
-                // It only offers "Next" when there is a next level to go to.
-                const idx = allLevels.indexOf(currentLevel);
-                const hasNext = (idx >= 0 && idx < allLevels.length - 1);
-                document.getElementById("nextLevel").style.display = hasNext ? '' : 'none';
+                // tinted to match the current difficulty (the same color as the conclusion box),
+                // with smart "Next" / "Next Unsolved" buttons.
+                configureNextButtons();
                 const banner = document.getElementById("levelCompleteBanner");
                 banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
                 banner.classList.add("shown");
