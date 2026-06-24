@@ -966,6 +966,13 @@ function difficultyUnlocked(w, s, c, K, data) {
     var completedBefore = 0;
     for(var i = 0; i < c; i++) { if(stage.levelDiff[i] >= K) { completedBefore++; } }
     if(completedBefore < c - 2) { return false; }
+    // 6. (Novice only) every earlier level in this stage that has a hint is completed -- so you
+    //    can't skip past a level that teaches something new.
+    if(K === 0) {
+        for(var j = 0; j < c; j++) {
+            if(stage.hasHint[j] && stage.levelDiff[j] < 0) { return false; }
+        }
+    }
     return true;
 }
 
@@ -1015,11 +1022,12 @@ function computeUnlockData(res) {
     unlockData = LEVELS.map(function (world) {
         const wd = { total: 0, done: [0, 0, 0], stages: [] };
         world.stages.forEach(function (stage) {
-            const sd = { total: 0, done: [0, 0, 0], levelDiff: [] };
+            const sd = { total: 0, done: [0, 0, 0], levelDiff: [], hasHint: [] };
             stage.levels.forEach(function (level) {
                 const p = getPast(res, level);
                 const cd = p.complete ? p.difficulty : -1;
                 sd.levelDiff.push(cd);
+                sd.hasHint.push(!!level.hint);
                 sd.total++;
                 wd.total++;
                 for(var K = 0; K <= 2; K++) {
