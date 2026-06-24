@@ -664,8 +664,13 @@ function login(email, course) {
 };
 
 // Add level select buttons to the dialog box.
-// A short label for a world's index chip, e.g. "Advanced proposition world" -> "Advanced".
+// A short label for a world's index chip, e.g. "Quantifier world" -> "Quantifier".  A few names
+// have an explicit short form; the rest just drop " world" and keep the first word.
+const SHORT_WORLD_NAMES = {
+    "Advanced proposition world": "Adv. Proposition",
+};
 function shortWorldName(name) {
+    if(SHORT_WORLD_NAMES[name]) { return SHORT_WORLD_NAMES[name]; }
     return name.replace(/ world$/i, '').split(' ')[0];
 }
 
