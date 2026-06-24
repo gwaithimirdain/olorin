@@ -752,7 +752,8 @@ function makeLevelSelect(res) {
 
         maxrows = Math.max(maxrows, countstages);
 
-        // The last "pseudo-stage" includes "Custom" and "Random" stages
+        // The last "pseudo-stage" has a "Random" level (a single "Custom" button lives at the
+        // bottom of the chooser, not per-world).
         const otherStage = document.createElement('div');
         otherStage.className = 'stage';
 
@@ -760,16 +761,6 @@ function makeLevelSelect(res) {
         otherLabel.className = 'stage-label';
         otherStage.appendChild(otherLabel);
 
-        // The "Custom" level lets the user specify their own values by switching to another modal box.
-        const customLevel = document.createElement('div');
-        customLevel.className = 'level';
-        customLevel.innerText = 'Custom';
-        customLevel.onclick = function () {
-            document.getElementById("levelChooseBG").style.display = "none";
-            document.getElementById("levelSelectBG").style.display = "flex";
-        };
-        otherStage.appendChild(customLevel);
-        
         // The "Random" level chooses a random level from that world
         const randomLevel = document.createElement('div');
         randomLevel.className = 'level';
@@ -1605,6 +1596,12 @@ function showHint() {
 document.getElementById("showHint").onclick = showHint;
 
 // show and hide the about box
+// The "Custom" button switches from the level chooser to the custom-level dialog.
+document.getElementById("customLevel").onclick = function () {
+    document.getElementById("levelChooseBG").style.display = "none";
+    document.getElementById("levelSelectBG").style.display = "flex";
+};
+
 document.getElementById("about").onclick = function () {
     document.getElementById("aboutBG").style.display = "flex";
 };
