@@ -51,6 +51,15 @@ class Olorin {
         return this.page.evaluate((n) => window.__olorin.levelStates(n), name);
     }
 
+    // Whether a level's chooser button is highlighted as "active" (has an unlocked, uncompleted
+    // difficulty).
+    levelActive(name) {
+        return this.page.evaluate((n) => {
+            const e = document.querySelector(`#worlds .level[data-name="${n}"]`);
+            return !!e && e.classList.contains('level-active');
+        }, name);
+    }
+
     // Pick a built-in level by its "world-stage-level" name, e.g. "1-1-1".
     async selectLevel(name) {
         // Make sure the level chooser is open (it closes after a level is picked).

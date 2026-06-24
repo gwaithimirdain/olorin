@@ -1014,6 +1014,8 @@ function renderLevelButton(b, name, states) {
         b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
         return;
     }
+    // "Active" = has a difficulty that's unlocked but not yet completed: where to work next.
+    if(states.includes('unlocked')) { b.classList.add('level-active'); }
     b.innerHTML = '<div class="level-number">' + name + '</div>' +
         '<div class="level-marks">' +
         difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2) +

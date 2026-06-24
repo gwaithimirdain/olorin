@@ -36,6 +36,14 @@ test.describe('Per-difficulty unlocking', () => {
         expect((await olorin.levelStates('1-2-1'))[0]).toBe('locked');
     });
 
+    test('"active" levels (an unlocked, uncompleted difficulty) are highlighted', async ({ page }) => {
+        // 1-1-1 completed at every difficulty -> not active; 1-1-2 then unlocked at novice -> active.
+        const olorin = await open(page, done(['1-1-1'], 2));
+        expect(await olorin.levelActive('1-1-1')).toBe(false); // fully completed
+        expect(await olorin.levelActive('1-1-2')).toBe(true);  // unlocked, not done
+        expect(await olorin.levelActive('1-2-1')).toBe(false); // locked
+    });
+
     test('rule 6: a level unlocks once the hinted level before it is completed', async ({ page }) => {
         const olorin = await open(page, done(['1-1-1'], 0));
         expect((await olorin.levelStates('1-1-2'))[0]).toBe('unlocked');

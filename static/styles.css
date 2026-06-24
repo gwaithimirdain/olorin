@@ -527,6 +527,12 @@ body {
     cursor: default;
 }
 
+/* An "active" level (has an unlocked, uncompleted difficulty): bright glow so the player can
+   see at a glance where to work next. */
+.level.level-active {
+    box-shadow: 0 0 0 3px #ffb300, 0 0 9px 3px #ffd166;
+}
+
 .proofOption {
     font-size: 18px;
     white-space: normal;
