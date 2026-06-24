@@ -1,0 +1,200 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "(P∨Q)∧(P∨¬Q)"
+      }
+    ],
+    "conclusion": {
+      "ty": "P"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "counters": {
+    "counter": 4,
+    "paramCounter": 2,
+    "varCounter": 0,
+    "hypCounter": 1,
+    "conclCounter": 1
+  },
+  "nodes": [
+    {
+      "id": "hyp0",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "474px",
+      "value": "(P∨Q)∧(P∨¬Q)"
+    },
+    {
+      "id": "concl0",
+      "rule": "conclusion",
+      "left": "1430px",
+      "top": "50%",
+      "value": "P"
+    },
+    {
+      "id": "rule0",
+      "rule": "andE",
+      "left": "518px",
+      "top": "324px"
+    },
+    {
+      "id": "rule1",
+      "rule": "orE",
+      "left": "892px",
+      "top": "585px",
+      "width": "200px",
+      "height": "80px"
+    },
+    {
+      "id": "rule2",
+      "rule": "orE",
+      "left": "956px",
+      "top": "296px",
+      "width": "200px",
+      "height": "80px"
+    },
+    {
+      "id": "rule3",
+      "rule": "negE",
+      "left": "977px",
+      "top": "480px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp0",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule2",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule2",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl0",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule2",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule2",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule2",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "rule2",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule3",
+        "sort": "input",
+        "label": "statement"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule3",
+        "sort": "input",
+        "label": "negation"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule3",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Flowchart"
+    }
+  ]
+}

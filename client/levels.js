@@ -327,12 +327,6 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "P⇒R" }, { ty: "Q⇒R" } ],
-                    conclusion: { ty: "(P∨Q)⇒R" },
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
-                    variables: [ ],
                     hypotheses: [ { ty: "(P⇒R)∧(Q⇒R)" } ],
                     conclusion: { ty: "(P∨Q)⇒R" },
                 },
@@ -939,6 +933,12 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ { ty: "P∨Q" }, { ty: "¬P" } ],
                     conclusion: { ty: "Q" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(P∨Q)∧(P∨¬Q)" } ],
+                    conclusion: { ty: "P" },
                 },
             ]
           },
