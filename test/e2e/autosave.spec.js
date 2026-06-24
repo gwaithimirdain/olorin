@@ -94,4 +94,21 @@ test.describe('Autosave', () => {
         await olorin.selectLevel('1-1-2');
         expect(await olorin.savedPromptVisible()).toBe(false);
     });
+
+    test('rearranging a node by dragging saves its new position', async ({ page }) => {
+        await olorin.selectLevel('1-1-1');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        const before = (await olorin.savedProof()).nodes.find((n) => n.id === 'hyp0').top;
+
+        await olorin.dragNode('hyp0', 120, 120);
+
+        const saved = (await olorin.savedProof()).nodes.find((n) => n.id === 'hyp0');
+        expect(saved.top).not.toEqual(before);
+        // The saved position matches where the node actually ended up.
+        const dom = await page.evaluate(() => {
+            const e = document.getElementById('hyp0');
+            return { left: e.style.left, top: e.style.top };
+        });
+        expect({ left: saved.left, top: saved.top }).toEqual(dom);
+    });
 });

@@ -179,6 +179,26 @@ class Olorin {
         return this.page.evaluate(() => window.__olorin.serialize());
     }
 
+    // The proof currently autosaved in localStorage for this level/difficulty (or null).
+    savedProof() {
+        return this.page.evaluate(() => {
+            const k = window.__olorin.savedProofKey();
+            const s = k && localStorage.getItem(k);
+            return s ? JSON.parse(s) : null;
+        });
+    }
+
+    // Drag a diagram node by (dx, dy) pixels with a real mouse gesture.
+    async dragNode(id, dx, dy) {
+        const box = await this.page.locator('#' + id).boundingBox();
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+        await this.page.mouse.move(cx, cy);
+        await this.page.mouse.down();
+        await this.page.mouse.move(cx + dx, cy + dy, { steps: 8 });
+        await this.page.mouse.up();
+    }
+
     // Click the Angle / Curved connector-style radio.
     async setConnectorStyle(style) {
         await this.page.click(style === 'curved' ? '#curvedConnectors' : '#angleConnectors');

@@ -1,4 +1,4 @@
-import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT } from "@jsplumb/browser-ui"
+import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, saveable } from "./levels.js"
 import { SERVER } from "./config.js"
 
@@ -227,6 +227,10 @@ ready(() => {
     instance.bind(EVENT_CONNECTION, addConnection);
     // It seems that EVENT_CONNECTION also fires after a connection is moved, so no need to separately bind EVENT_CONNECTION_MOVED.
     // We've forbidden connections from being detached by dropping, since it appears to be kind of broken, e.g. EVENT_CONNECTION_DETACHED fires *before* it's detached.  Instead the user removes connections with the close button.
+
+    // Dragging a node to rearrange the proof changes positions without re-typechecking, so save
+    // the new positions when a drag finishes.
+    instance.bind(EVENT_DRAG_STOP, autosave);
 
     if(SERVER) {
         // If they have a saved login, use it.
