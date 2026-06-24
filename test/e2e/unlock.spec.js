@@ -119,25 +119,27 @@ test.describe('Per-difficulty unlocking', () => {
         expect((await olorin.levelStates('1-2-4'))[1]).toBe('unlocked');
     });
 
-    // Adept of 1-2-1 (a non-trivial level) is reachable once world 2 is >= 50% novice (rule 2) and
-    // stage 1-1 is complete at adept (rule 4); rule 7 then gates it on how recently this level's
-    // novice was completed (global "time" counts completions).
+    // Adept of 1-2-5 (a non-trivial, non-auto-completed level) is reachable once world 2 is >= 50%
+    // novice (rule 2), stage 1-1 is complete at adept (rule 4), and its stage-1-2 predecessors are
+    // complete at adept (rule 5); rule 7 then gates it on how recently this level's novice was
+    // completed (global "time" counts completions).
     const rule7Base = (time, noviceTime) => done(inWorld('2').slice(0, 14), 0)
         .concat(done(inStage('1', '1'), 1))
+        .concat(done(['1-2-1', '1-2-2', '1-2-3', '1-2-4'], 1))
         .concat([
             ['time', String(time)],
-            [key('1-2-1'), JSON.stringify({ complete: true, difficulty: 0, times: { 0: noviceTime } })],
+            [key('1-2-5'), JSON.stringify({ complete: true, difficulty: 0, times: { 0: noviceTime } })],
         ]);
 
     test('rule 7: a recently-completed lower difficulty re-locks the higher one', async ({ page }) => {
         // Novice completed at time 10, only 5 completions ago (global time 15) -> adept re-locked.
         const olorin = await open(page, rule7Base(15, 10));
-        expect((await olorin.levelStates('1-2-1'))[1]).toBe('locked');
+        expect((await olorin.levelStates('1-2-5'))[1]).toBe('locked');
     });
 
     test('rule 7: the higher difficulty unlocks again after more than 10 completions', async ({ page }) => {
         // Novice completed 15 completions ago (global time 25) -> adept available again.
         const olorin = await open(page, rule7Base(25, 10));
-        expect((await olorin.levelStates('1-2-1'))[1]).toBe('unlocked');
+        expect((await olorin.levelStates('1-2-5'))[1]).toBe('unlocked');
     });
 });

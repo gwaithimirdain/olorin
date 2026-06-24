@@ -33,6 +33,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" }, { ty: "Q" } ],
                     conclusion: { ty: "P∧Q" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "introHint",
                 },
                 {
@@ -41,6 +42,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "P∧P" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
@@ -48,6 +50,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P∧Q" } ],
                     conclusion: { ty: "P" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "elimHint",
                 },
                 {
@@ -56,6 +59,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P∧Q" } ],
                     conclusion: { ty: "Q" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
@@ -99,6 +103,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P⇒Q" }, { ty: "P" } ],
                     conclusion: { ty: "Q" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "impHint",
                 },
                 {
@@ -210,6 +215,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "P∨Q" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "orHint",
                 },
                 {
@@ -218,6 +224,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "Q" } ],
                     conclusion: { ty: "P∨Q" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "P", ty: "Type" } ],
@@ -225,6 +232,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "P∨P" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "P", ty: "Type" } ],
