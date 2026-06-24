@@ -833,10 +833,11 @@ function makeLevelSelect(res) {
 // Re-render every level button's marks/state -- after logging back in, or when a completion
 // may have unlocked further levels/difficulties.
 // Levels flagged `autoComplete` (those with no internal wires worth re-labeling) are marked
-// complete automatically as soon as they unlock at adept/master, so the player needn't redo a
-// level that has nothing extra to do.  Completing adept can unlock master, and completions feed
-// back into the unlock data, so loop to a fixed point.  This never advances the global time
-// counter (it isn't a real solve) and preserves any existing per-difficulty completion times.
+// complete automatically as soon as they unlock at adept/master -- but only once the player has
+// already solved them at least once (at novice), so they still solve the level one time rather
+// than redoing a level that has nothing extra to do.  Completing adept can unlock master, and
+// completions feed back into the unlock data, so loop to a fixed point.  This never advances the
+// global time counter (it isn't a real solve) and preserves any existing per-difficulty times.
 function applyAutoCompletions(res) {
     var changed = true;
     while(changed) {
@@ -848,12 +849,15 @@ function applyAutoCompletions(res) {
                 stage.levels.forEach(function (level, z) {
                     if(!level.autoComplete) { return; }
                     const past = getPast(res, level);
-                    const base = past.complete ? (past.difficulty || 0) : -1;
+                    // Only auto-complete the higher difficulties once the player has actually solved
+                    // the level at least once (at novice), so they do see and solve it one time.
+                    if(!past.complete) { return; }
+                    const base = past.difficulty || 0;
                     var newDiff = base;
                     for(var K = 1; K < 3; K++) {
                         if(difficultyUnlocked(x, y, z, K, unlockData)) { newDiff = Math.max(newDiff, K); }
                     }
-                    if(newDiff > base && newDiff >= 1) {
+                    if(newDiff > base) {
                         const key = JSON.stringify(saveable(level));
                         const value = { complete: true, difficulty: newDiff, times: past.times || {} };
                         localStorage.setItem(key, JSON.stringify(value));

@@ -58,10 +58,11 @@ test.describe('Per-difficulty saved proofs', () => {
         expect(await olorin.isComplete()).toBe(false);
     });
 
-    // World 2 >= 50% novice unlocks 1-2-1 at Adept (rule 2; the trivial stage-1 levels auto-complete
-    // at adept, satisfying rule 4), without auto-completing 1-2-1 itself (it has wires to label).
+    // Make 1-2-1 reachable at Adept: world 2 >= 50% novice (rule 2) and stage 1-1 complete at adept
+    // (rule 4).  1-2-1 itself has wires to label, so it is NOT auto-completed.
     const reachAdept = () => LV.filter((l) => l.name.startsWith('2-')).slice(0, 14)
-        .map((l) => [sav(l.name), JSON.stringify({ complete: true, difficulty: 0 })]);
+        .map((l) => [sav(l.name), JSON.stringify({ complete: true, difficulty: 0 })])
+        .concat(['1-1-1', '1-1-2'].map((n) => [sav(n), JSON.stringify({ complete: true, difficulty: 1 })]));
 
     test('reducing difficulty and re-solving re-locks the higher difficulty for a while', async ({ page }) => {
         const olorin = new Olorin(page);
