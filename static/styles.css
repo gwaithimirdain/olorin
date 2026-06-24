@@ -539,6 +539,16 @@ body {
     top: 10px;
     right: 10px;
     font-family: sans-serif;
+    text-align: right;
+}
+
+/* The difficulty label is tinted (in JS) with the current difficulty's color. */
+#currentDifficulty {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    border: 1px solid #00000033;
+    font-weight: bold;
 }
 
 /* Non-modal "level complete" pop-up, pinned to the top center.  It is hidden until the level

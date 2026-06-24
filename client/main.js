@@ -907,6 +907,10 @@ function setDifficulty(d) {
     });
     difficulty = d;
     localStorage.setItem("difficulty", d.toString());
+    // Tint the palette bar and the difficulty label with the current difficulty's (light) color,
+    // so it's obvious at a glance which difficulty you're working at.
+    document.getElementById("paletteBar").style.backgroundColor = COLORS[d][0].backgroundColor;
+    document.getElementById("currentDifficulty").style.backgroundColor = COLORS[d][0].backgroundColor;
 }
 
 difficultyRadios.forEach(function (radios, i) {
