@@ -633,6 +633,35 @@ body {
     display: flex;
     flex-direction: column;
     width: 600px;
+    /* Clip to the rounded corners; the inner #customScroll does the scrolling, so its scrollbar is
+       inset within the modal's padding and the rounded right-hand corners stay visible. */
+    overflow: hidden;
+}
+
+#customScroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#customScroll h3 {
+    margin-top: 0;
+}
+
+/* Keep each bullet list tight against the paragraph that introduces it, and don't over-indent. */
+#customScroll p {
+    margin-bottom: 6px;
+}
+
+#customScroll ul {
+    margin-top: 0;
+    padding-left: 24px;
+}
+
+/* Without border-box the full-width fields overflow by their border, forcing a horizontal scrollbar. */
+#customScroll textarea,
+#customScroll input {
+    box-sizing: border-box;
 }
 
 #chooseLevelButtons {
