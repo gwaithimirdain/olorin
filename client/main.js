@@ -2771,10 +2771,10 @@ function setLevel(level, rulesAllowed) {
         }
     }
 
-    // We space the variables and hypotheses out vertically equally on the left side.
-    const num_inputs = variables.length + hypotheses.length;
-    const height_inc = diagram.offsetHeight / (num_inputs + 1);
-    var height = height_inc;
+    // Lay out the context on the left: stack the variables close together at the top, then space
+    // the hypotheses out equally in the vertical space remaining below them.
+    const VAR_GAP = 10;
+    var height = VAR_GAP;
 
     // The difference between variables and hypotheses is that variables are labeled with their name as well as a type, and they are colored.
     for(const v of variables) {
@@ -2800,9 +2800,12 @@ function setLevel(level, rulesAllowed) {
             paintStyle: { fill: VALUECOLOR },
             connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
         });
-        height += height_inc;
+        height += vbx.offsetHeight + VAR_GAP;
     }
 
+    // Hypotheses fill the space remaining below the variable stack, spaced out equally.
+    const hyp_inc = (diagram.offsetHeight - height) / (hypotheses.length + 1);
+    height += hyp_inc;
     for(const h of hypotheses) {
         const hyp = document.createElement("div");
         hyp.dataset.rule = "hypothesis";
@@ -2822,7 +2825,7 @@ function setLevel(level, rulesAllowed) {
             parameters: {sort: "output"},
             maxConnections: -1
         });
-        height += height_inc;
+        height += hyp_inc;
     }
 
     // Similarly, the conclusion goes on the right.
