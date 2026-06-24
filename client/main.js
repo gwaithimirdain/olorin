@@ -954,15 +954,23 @@ function fraction(done, total) {
 
 // Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
 // is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
-function difficultyUnlocked(w, s, c, K, data) {
-    const world = data[w];
-    const stage = world.stages[s];
+// Whether a world's three inter-world gates (rules 1-3) pass at difficulty K -- i.e. whether the
+// world itself is "open" at K (individual levels still need the stage/level rules 4-6).
+function worldGatesPass(w, K, data) {
     // 1. The previous world is >= 80% complete at difficulty K (unless this is the first world).
     if(w > 0 && fraction(data[w - 1].done[K], data[w - 1].total) < 0.8) { return false; }
     // 2. The next world is >= 50% complete at K-1 (unless K is 0, or this is the last world).
     if(K > 0 && w < data.length - 1 && fraction(data[w + 1].done[K - 1], data[w + 1].total) < 0.5) { return false; }
     // 3. The world two back is >= 50% complete at K+1 (unless this is the first/second world or K=2).
     if(w >= 2 && K < 2 && fraction(data[w - 2].done[K + 1], data[w - 2].total) < 0.5) { return false; }
+    return true;
+}
+
+function difficultyUnlocked(w, s, c, K, data) {
+    const world = data[w];
+    const stage = world.stages[s];
+    // Rules 1-3: the world must be open at this difficulty.
+    if(!worldGatesPass(w, K, data)) { return false; }
     // 4. The previous stage of this world is >= 70% complete at K (unless this is the first stage).
     if(s > 0 && fraction(world.stages[s - 1].done[K], world.stages[s - 1].total) < 0.7) { return false; }
     // 5. All but (at most) 2 of the levels before this one in the stage are complete at K -- so a
@@ -1042,6 +1050,46 @@ function computeUnlockData(res) {
         });
         return wd;
     });
+}
+
+// Snapshot which (world, difficulty) pairs are currently "open" (rules 1-3), from unlockData.
+function snapshotWorldGates() {
+    return unlockData.map(function (_, w) {
+        return [0, 1, 2].map(function (K) { return worldGatesPass(w, K, unlockData); });
+    });
+}
+
+const ABOUT_DIFFICULTY_IDS = ['aboutNovice', 'aboutAdept', 'aboutMaster'];
+
+// After a completion (with unlockData already recomputed), pop up a modal for any world that just
+// became open at a difficulty, compared with the `before` snapshot.  The first time a difficulty
+// becomes available at all, also include its explanation from the About box.
+function announceNewlyUnlockedWorlds(before) {
+    const events = [];
+    for(var w = 0; w < unlockData.length; w++) {
+        for(var K = 0; K < 3; K++) {
+            if(worldGatesPass(w, K, unlockData) && !before[w][K]) {
+                events.push({ w: w, K: K });
+            }
+        }
+    }
+    if(events.length === 0) { return; }
+    var html = '';
+    events.forEach(function (e) {
+        html += '<h3 style="text-align: center">' + escapeHtml(LEVELS[e.w].name) +
+            ' is now unlocked at ' + DIFFICULTIES[e.K] + ' difficulty!</h3>';
+    });
+    // If a difficulty just became available for the very first time, explain it (once).
+    [0, 1, 2].forEach(function (K) {
+        const newAtK = events.some(function (e) { return e.K === K; });
+        const noneBeforeAtK = !before.some(function (row) { return row[K]; });
+        if(newAtK && noneBeforeAtK) {
+            const p = document.getElementById(ABOUT_DIFFICULTY_IDS[K]);
+            if(p) { html += '<p class="about">' + p.innerHTML + '</p>'; }
+        }
+    });
+    document.getElementById("unlockContent").innerHTML = html;
+    document.getElementById("unlockBG").style.display = "flex";
 }
 
 // The "Select Level" button opens a modal box to choose from pre-set levels.  There's a "custom" button at the bottom that switches to a modal box that sets a custom level.
@@ -1508,6 +1556,10 @@ document.getElementById("about").onclick = function () {
 };
 document.getElementById("doneAbout").onclick = function () {
     document.getElementById("aboutBG").style.display = "none";
+};
+
+document.getElementById("doneUnlock").onclick = function () {
+    document.getElementById("unlockBG").style.display = "none";
 };
 
 function selectCurrentLevel(level, skipSavedPrompt) {
@@ -2263,6 +2315,8 @@ function continue_typechecking(nodes, edges, connections, result) {
             if(currentLevel) {
                 const past = getPast(null, currentLevel);
                 const present = { complete: true, difficulty: Math.max(difficulty, past.difficulty) };
+                // Snapshot which worlds are open before recording this completion.
+                const beforeGates = snapshotWorldGates();
                 // Record completion, with the difficulty, in local storage
                 const key = JSON.stringify(saveable(currentLevel));
                 const value = present;
@@ -2271,6 +2325,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                 // unlocked), and update this world's index-chip progress count.
                 updateLevelSelect(null);
                 refreshWorldProgress(currentLevel.worldPaneIndex);
+                // If a new world just opened at some difficulty, tell the player.
+                announceNewlyUnlockedWorlds(beforeGates);
                 if(SERVER) {
                     // Save it to the server too
                     const xhr = new XMLHttpRequest();

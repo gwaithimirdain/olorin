@@ -84,6 +84,15 @@ class Olorin {
         return this.page.isVisible('#levelCompleteBanner');
     }
 
+    // The "world unlocked" modal that pops when a completion opens a new world/difficulty.
+    unlockModalVisible() {
+        return this.page.isVisible('#unlockBG');
+    }
+
+    unlockModalText() {
+        return this.page.textContent('#unlockContent');
+    }
+
     // Advance to the next level via the "Next" button in the completion pop-up.
     async next() {
         await this.page.click('#nextLevel');

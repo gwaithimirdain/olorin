@@ -330,14 +330,14 @@
             If you make a mistake, you can remove boxes and wires by clicking on the red "X" that appears when you hover over them, or you can remove your entire attempted proof with the "Clear" button.
           </p>
           <h2>What do the difficulty settings mean?</h2>
-          <p class="about">
+          <p class="about" id="aboutNovice">
             At Novice difficulty (<span class="noviceColor" style="padding:1px">★☆☆</span>), most unconnected ports are automatically labeled with the statement or value they carry (red for input ports, which are missing something to connect to them).
             In addition, all wires are automatically labeled with the statement or value they carry, and incorrectly connected wires are colored red.
             At any given point during the construction of a proof, the labeled output ports can be thought of as "givens" (known or assumed facts), and the red-labeled input ports can be thought of as "goals" (statements to prove).
             (However, not all givens are available for all goals; hypotheses introduced on the left side of a bracket are only usable to prove the corresponding subgoal on the right side of that bracket.)
             <i>A proof novice can choose the rule to apply next, guided by the logical structure of the givens and the goals.</i>
           </p>
-          <p class="about">
+          <p class="about" id="aboutAdept">
             At Adept difficulty (<span class="adeptColor" style="padding:1px">★★☆</span>), ports are not labeled, and most wires are not labeled automatically.
             Instead, you are prompted for a label for each wire.
             (The exceptions are wires connected directly to a hypothesis or the conclusion, since it is obvious what those should be labeled, and wires that carry values.)
@@ -345,7 +345,7 @@
             In particular, even if your proof would be correct in Novice mode according to the connections only, it is rejected in Adept mode if you labeled the wires incorrectly.
             <i>A proof adept knows how each applied rule affects the current givens and goals.</i>
           </p>
-          <p class="about">
+          <p class="about" id="aboutMaster">
             At Master difficulty (<span class="masterColor" style="padding:1px">★★★</span>), you are still required to label all the wires yourself (with the same exceptions), but incorrectly connected or labeled wires are not colored red any more.
             The only information you get about the correctness of the proof (including your labels on the wires) is whether the conclusion turns purple!
             <i>A proof master can plan and execute an entire proof alone, and find and fix their own mistakes.</i>
@@ -645,6 +645,15 @@
     <div id="typecheckingBG" class="modalbg">
       <div class="modal" style="margin-left: auto; margin-right: auto">
         Typechecking...
+      </div>
+    </div>
+
+    <div id="unlockBG" class="modalbg">
+      <div class="modal" style="width: 560px">
+        <div id="unlockContent"></div>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="doneUnlock" style="font-size: 16px">OK</button>
+        </div>
       </div>
     </div>
 
