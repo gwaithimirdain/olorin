@@ -551,6 +551,10 @@ body {
     text-align: right;
 }
 
+#currentLevel {
+    text-align: center;
+}
+
 /* The difficulty label is tinted (in JS) with the current difficulty's color. */
 #currentDifficulty {
     display: inline-block;
@@ -594,20 +598,26 @@ body {
     pointer-events: auto;
 }
 
-#reduceDifficulty {
+#reduceDifficulty, #showHint {
     display: none;
-    border: 1px solid #000000;
-    border-radius: 2px;
-    background-color: #eeeeee;
+    text-align: center;
+    margin-top: 5px;
+    padding: 4px 10px;
+    border: 1px solid #999999;
+    border-radius: 5px;
+    background-color: #f4f4f4;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     cursor: pointer;
+    user-select: none;
 }
 
-#showHint {
-    display: none;
-    border: 1px solid #000000;
-    border-radius: 2px;
-    background-color: #eeeeee;
-    cursor: pointer;
+#reduceDifficulty:hover, #showHint:hover {
+    background-color: #e6e6e6;
+}
+
+#reduceDifficulty:active, #showHint:active {
+    background-color: #d8d8d8;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 #levelChooseModal {
