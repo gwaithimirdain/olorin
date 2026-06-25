@@ -2556,14 +2556,15 @@ function continue_typechecking(nodes, edges, connections, result) {
                         xhr.send(JSON.stringify(data));
                     }
                 }
-                // The proof is complete: show the (non-modal) completion pop-up at the top,
-                // tinted to match the current difficulty (the same color as the conclusion box),
-                // with smart "Next" / "Next Unsolved" buttons.
-                configureNextButtons();
-                const banner = document.getElementById("levelCompleteBanner");
-                banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
-                banner.classList.add("shown");
             }
+            // The proof is complete: show the (non-modal) completion pop-up at the top, tinted to
+            // match the current difficulty (the same color as the conclusion box), with smart
+            // "Next" / "Next Unsolved" buttons.  This shows for a custom level too, where there is
+            // no "Next" target, so only the "Select Level" button appears.
+            configureNextButtons();
+            const banner = document.getElementById("levelCompleteBanner");
+            banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
+            banner.classList.add("shown");
         } else {
             // If there are fatal errors, remove any green color on the goal and indicate the errors somehow.
             diagram.style.backgroundColor = "";

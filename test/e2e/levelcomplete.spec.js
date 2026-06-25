@@ -66,6 +66,27 @@ test.describe('Level complete', () => {
         await olorin.page.click('#selectLevelAfterComplete');
         expect(await olorin.isVisible('#levelChooseBG')).toBe(true);
     });
+
+    test('a custom level still shows the pop-up, with only Select Level (no Next)', async () => {
+        // Build a custom level (P |- P) via the dialog; custom levels have no currentLevel.
+        await olorin.page.evaluate(() => {
+            document.getElementById('selectLevel').click();
+            document.getElementById('customLevel').click();
+        });
+        await olorin.page.fill('#parameters', 'P : Type');
+        await olorin.page.fill('#hypotheses', 'P');
+        await olorin.page.fill('#conclusion', 'P');
+        await olorin.page.click('#submitLevel');
+        await olorin.dismissHints();
+        expect(await olorin.currentLevelName()).toBe('Custom');
+
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        expect(await olorin.completeBannerVisible()).toBe(true);
+        // No "Next" target for a custom level, so only the Select Level button shows.
+        expect(await olorin.page.isVisible('#nextLevel')).toBe(false);
+        expect(await olorin.page.isVisible('#nextUnsolved')).toBe(false);
+        expect(await olorin.page.isVisible('#selectLevelAfterComplete')).toBe(true);
+    });
 });
 
 test.describe('Level complete: Next vs Next Unsolved', () => {
