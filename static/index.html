@@ -103,10 +103,10 @@
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral">?*?=0</div>
       </div>
       <div style="display: block; align-items: end" id="buttons">
-        <button id="exportProof" class="proofOption">Export</button>
-        <button id="importProof" class="proofOption">Import</button>
-        <button id="clearProof" class="proofOption">Clear</button>
-        <button id="selectLevel" class="proofOption">Select Level</button>
+        <button id="exportProof" class="proofOption" title="Copy this proof out as JSON text">Export</button>
+        <button id="importProof" class="proofOption" title="Paste in a proof from JSON text">Import</button>
+        <button id="clearProof" class="proofOption" title="Erase the whole proof and start this level over">Clear</button>
+        <button id="selectLevel" class="proofOption" title="Choose a different level">Select Level</button>
       </div>
     </div>
     <div id="diagram"></div>
@@ -122,11 +122,11 @@
     <div id="currentLevelAndDifficulty">
       <div id="currentLevel"></div>
       <div id="currentDifficulty"></div>
-      <div id="reduceDifficulty"></div>
-      <div id="showHint">Show Hint</div>
+      <div id="reduceDifficulty" title="Switch to an easier difficulty of this level"></div>
+      <div id="showHint" title="Show a hint for this level">Show Hint</div>
       <div>
-        <input type="radio" name="connectors" id="angleConnectors" checked="1"> Angle
-        <input type="radio" name="connectors" id="curvedConnectors"> Curved
+        <input type="radio" name="connectors" id="angleConnectors" checked="1" title="Draw wires as right-angled connectors"> Angle
+        <input type="radio" name="connectors" id="curvedConnectors" title="Draw wires as curved connectors"> Curved
       </div>
     </div>
 
