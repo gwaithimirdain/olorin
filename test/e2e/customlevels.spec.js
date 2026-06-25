@@ -95,6 +95,33 @@ test.describe('Custom levels', () => {
         expect(await customNames(olorin)).toEqual([]);
     });
 
+    test('naming the level in the dialog saves it on submit (no separate Save needed)', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await page.evaluate(() => {
+            document.getElementById('selectLevel').click();
+            document.getElementById('customLevel').click();
+        });
+        await page.fill('#customName', 'Quick Save');
+        await page.fill('#parameters', 'P : Type');
+        await page.fill('#hypotheses', 'P');
+        await page.fill('#conclusion', 'P');
+        await page.click('#submitLevel');
+        await olorin.dismissHints();
+        expect(await olorin.currentLevelName()).toBe('Quick Save');
+        await openChooser(olorin);
+        expect(await customNames(olorin)).toEqual(['Quick Save']);
+    });
+
+    test('an unnamed custom level is not auto-saved', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildCustom(olorin); // leaves the name box empty
+        expect(await olorin.currentLevelName()).toBe('Custom');
+        await openChooser(olorin);
+        expect(await customNames(olorin)).toEqual([]);
+    });
+
     test('a saved custom level remembers an in-progress proof', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();

@@ -1780,6 +1780,7 @@ document.getElementById("showHint").onclick = showHint;
 // show and hide the about box
 // The "Custom" button switches from the level chooser to the custom-level dialog.
 document.getElementById("customLevel").onclick = function () {
+    document.getElementById("customName").value = "";
     document.getElementById("levelChooseBG").style.display = "none";
     document.getElementById("levelSelectBG").style.display = "flex";
 };
@@ -1800,6 +1801,8 @@ function fillCustomDialog(level) {
 document.getElementById("editLevel").onclick = function () {
     if(!currentLevelDef) { return; }
     fillCustomDialog(currentLevelDef);
+    // Pre-fill the name when editing an already-saved custom level, so re-submitting re-saves it.
+    document.getElementById("customName").value = currentCustom ? currentCustom.name : "";
     document.getElementById("levelChooseBG").style.display = "none";
     document.getElementById("levelSelectBG").style.display = "flex";
 };
@@ -1863,6 +1866,13 @@ function saveCustomLevel() {
     if(input === null) { return; }
     const name = input.trim();
     if(!name) { return; }
+    saveCustomLevelNamed(name);
+}
+
+// Save the current custom level under the given (already non-empty) name, without prompting.  Used
+// by the Save button (via saveCustomLevel) and by the custom dialog's optional Name field.
+function saveCustomLevelNamed(name) {
+    if(currentLevel || !currentLevelDef) { return; }
     const def = levelDefCopy(currentLevelDef);
     const list = loadCustomLevels();
     var cl = list.find(function (c) { return c.name === name; });
@@ -2897,6 +2907,8 @@ function checkType(sort, eg, sep) { return function(v) {
 document.getElementById("submitLevel").onclick = function () {
     var parameters = [];
     var variables = [];
+    // Read the optional name now, before setLevel clears the dialog fields.
+    const customName = document.getElementById("customName").value.trim();
 
     try {
         parameters = document.getElementById("parameters").value.
@@ -2941,6 +2953,8 @@ document.getElementById("submitLevel").onclick = function () {
     currentCustom = null;
     updateSaveButtonVisibility();
     document.getElementById("currentLevel").innerText = "Level: Custom";
+    // If the player named the level, save it to the Custom list right away.
+    if(customName) { saveCustomLevelNamed(customName); }
 }
 
 function setLevel(level, rulesAllowed) {
@@ -3134,6 +3148,7 @@ function clearLevelSelect () {
     document.getElementById("variables").value = "";
     document.getElementById("hypotheses").value = "";
     document.getElementById("conclusion").value = "";
+    document.getElementById("customName").value = "";
 }
 
 // Display hints on certain levels
