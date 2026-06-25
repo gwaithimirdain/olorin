@@ -603,6 +603,23 @@ diagram.addEventListener('mouseup', function(e) {
     selectionBox.style.display = 'none';
 });
 
+// Delete or Backspace removes every selected box, as if each one's red X had been clicked.  Only
+// boxes with a close button (rule boxes, not the fixed context nodes) are deletable.
+document.addEventListener('keydown', function(e) {
+    if(e.key !== 'Delete' && e.key !== 'Backspace') { return; }
+    // Don't hijack the key while typing in a text field (custom-level / variable dialogs, etc.).
+    const tag = (e.target.tagName || '').toLowerCase();
+    if(tag === 'input' || tag === 'textarea' || e.target.isContentEditable) { return; }
+    const selected = instance.dragSelection._dragSelection.slice();
+    if(selected.length === 0) { return; }
+    e.preventDefault();
+    selected.forEach(function(sel) {
+        const el = document.getElementById(sel.id);
+        if(el && el.querySelector('.closebutton')) { deleteRule(el); }
+    });
+    instance.clearDragSelection();
+});
+
 // In SERVER mode, there is a login box
 function submitLogin() {
     login(document.getElementById('loginEmail').value, document.getElementById('loginCourse').value);
