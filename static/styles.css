@@ -402,6 +402,9 @@ body {
     overflow-x: clip;
     overflow-y: auto;
     display: grid;
+    /* Constrain the single column to the visible width (instead of growing to the widest content),
+       so full-width custom-level rows don't overflow and clip their right-hand marks/delete. */
+    grid-template-columns: minmax(0, 1fr);
     align-items: top;
 }
 
