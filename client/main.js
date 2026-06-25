@@ -129,6 +129,13 @@ var currentLevelButton;
 // The definition (parameters/variables/hypotheses/conclusion) of whatever level is currently
 // loaded, built-in or custom, so the "Edit" button can re-open the custom dialog pre-filled.
 var currentLevelDef = null;
+// The saved custom level currently open (an entry of the localStorage "customLevels" list), or null
+// when on a built-in level or an unsaved custom one.  Used so custom levels track completion and
+// save proofs like built-in ones.
+var currentCustom = null;
+// References to the dynamically-built "Custom" world pane, populated by refreshCustomWorld.
+var customRowsContainer = null;
+var customChipEl = null;
 
 // A counter (in localStorage "time") incremented on each level completion; per-difficulty
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
@@ -817,6 +824,29 @@ function makeLevelSelect(res) {
             levels: worldLevels,
         });
     });
+
+    // A final "Custom" world holds the player's saved custom levels, listed as named rows (built by
+    // refreshCustomWorld), with its own index chip.
+    const customPane = document.createElement("div");
+    customPane.className = "world";
+    const customHeader = document.createElement("div");
+    customHeader.className = "world-header";
+    customHeader.innerText = "Custom";
+    customPane.appendChild(customHeader);
+    customRowsContainer = document.createElement("div");
+    customRowsContainer.id = "customRows";
+    customPane.appendChild(customRowsContainer);
+    worlds.appendChild(customPane);
+
+    const customWorldNum = worldPanes.length;
+    customChipEl = document.createElement("div");
+    customChipEl.className = "world-chip";
+    customChipEl.innerHTML = 'Custom <span class="world-progress"></span>';
+    customChipEl.onclick = function () { setWorld(customWorldNum); };
+    worldIndex.appendChild(customChipEl);
+    worldPanes.push({ name: "Custom", pane: customPane, chip: customChipEl, levels: [], custom: true });
+    refreshCustomWorld();
+
     document.getElementById("levelChooseModal").style.width = (maxcols * 80 + 30) + 'px';
 
     // Keep the active world chip in sync as the user scrolls through the worlds.
@@ -1247,9 +1277,12 @@ function findLevelByKey(key) {
 // localStorage key for the proof saved for the current level at a given difficulty (default the
 // current one).  Each level has a separate saved proof per difficulty.
 function savedProofKey(d) {
-    if(!currentLevel) { return null; }
     if(d === undefined) { d = difficulty; }
-    return "proof:" + d + ":" + JSON.stringify(saveable(currentLevel));
+    // Saved custom levels key by their unique id; built-in levels by their statement.  An unsaved
+    // custom level has nowhere to save to.
+    if(currentCustom) { return "proof:" + d + ":custom:" + currentCustom.id; }
+    if(currentLevel) { return "proof:" + d + ":" + JSON.stringify(saveable(currentLevel)); }
+    return null;
 }
 
 // Whether a serialized proof represents actual progress worth restoring: at least one
@@ -1324,16 +1357,19 @@ function findEndpoint(el, sort, label) {
 // level (defaulting to the current one).  Shared by "Load" (from localStorage) and "Import"
 // (from pasted JSON).
 function restoreProof(state, level, countAsCompletion) {
-    level = level || currentLevel;
-    if(!level) {
-        alert("Restoring a proof is only supported for the built-in levels, not custom ones.");
+    // Reset to a clean slate: re-select the target level (an explicit built-in level for an Import,
+    // otherwise whatever is currently open, built-in or custom), recreating its fixed nodes and
+    // Narya.  Skip the saved-proof prompt here: we're restoring a specific proof on purpose.
+    if(level) {
+        selectCurrentLevel(level, true);
+    } else if(currentCustom) {
+        openCustomLevel(currentCustom, true);
+    } else if(currentLevel) {
+        selectCurrentLevel(currentLevel, true);
+    } else {
+        alert("There is no level to restore this proof into.");
         return;
     }
-
-    // Reset to a clean slate: this selects the level (switching to it if different from the
-    // current one) and recreates its fixed nodes (variables, hypotheses, conclusion) and Narya.
-    // Skip the saved-proof prompt here: we're restoring a specific proof on purpose.
-    selectCurrentLevel(level, true);
 
     // Restore the saved difficulty setting.
     if(typeof state.difficulty === 'number') {
@@ -1701,7 +1737,8 @@ document.getElementById("freshDowngrade").onclick = function() {
     pendingDowngrade = null;
     const key = savedProofKey();
     if(key) { localStorage.removeItem(key); }
-    selectCurrentLevel(currentLevel, true);
+    if(currentCustom) { openCustomLevel(currentCustom, true); }
+    else if(currentLevel) { selectCurrentLevel(currentLevel, true); }
 }
 
 function updateCurrentDifficulty() {
@@ -1750,6 +1787,161 @@ document.getElementById("editLevel").onclick = function () {
     document.getElementById("levelSelectBG").style.display = "flex";
 };
 
+// ===== Saved custom levels =====
+
+function loadCustomLevels() {
+    try { return JSON.parse(localStorage.getItem("customLevels")) || []; }
+    catch(e) { return []; }
+}
+function storeCustomLevels(list) {
+    localStorage.setItem("customLevels", JSON.stringify(list));
+}
+
+// A clean copy of just a level's definition fields (no ids or other props), for storing.
+function levelDefCopy(def) {
+    return {
+        parameters: def.parameters.map(function (p) { return { name: p.name, ty: p.ty }; }),
+        variables: def.variables.map(function (v) { return { name: v.name, ty: v.ty }; }),
+        hypotheses: def.hypotheses.map(function (h) { return { ty: h.ty }; }),
+        conclusion: { ty: def.conclusion.ty },
+    };
+}
+
+// A saved custom level's per-difficulty states: it's unlocked up to the difficulty it was saved at
+// (and all lower), completing one difficulty unlocks the next, and completed ones show a star.
+function customStates(cl) {
+    const states = [];
+    for(var K = 0; K < 3; K++) {
+        if(cl.completed[K]) { states.push('completed'); }
+        else if(K <= cl.unlockDifficulty || (K >= 1 && cl.completed[K - 1])) { states.push('unlocked'); }
+        else { states.push('locked'); }
+    }
+    return states;
+}
+
+// Show the lower-left "Save" button only when a custom level is loaded (built-in currentLevel unset
+// but a definition is present).
+function updateSaveButtonVisibility() {
+    document.getElementById("saveLevel").style.display = (!currentLevel && currentLevelDef) ? '' : 'none';
+}
+
+// Record that a saved custom level was completed at a difficulty (persisting it and re-rendering).
+function markCustomCompleted(cl, d) {
+    cl.completed[d] = true;
+    const list = loadCustomLevels();
+    const stored = list.find(function (c) { return c.id === cl.id; });
+    if(stored) {
+        stored.completed[d] = true;
+        storeCustomLevels(list);
+    }
+    refreshCustomWorld();
+}
+
+// Prompt for a name and save the current custom level: stored as unlocked at the current difficulty
+// (and all lower).  Re-saving under an existing name updates that level's definition.
+function saveCustomLevel() {
+    if(currentLevel || !currentLevelDef) { return; }
+    const suggested = currentCustom ? currentCustom.name : "";
+    const input = prompt("Name for this custom level:", suggested);
+    if(input === null) { return; }
+    const name = input.trim();
+    if(!name) { return; }
+    const def = levelDefCopy(currentLevelDef);
+    const list = loadCustomLevels();
+    var cl = list.find(function (c) { return c.name === name; });
+    if(cl) {
+        cl.parameters = def.parameters; cl.variables = def.variables;
+        cl.hypotheses = def.hypotheses; cl.conclusion = def.conclusion;
+        cl.unlockDifficulty = Math.max(cl.unlockDifficulty || 0, difficulty);
+    } else {
+        cl = {
+            id: "c" + Date.now() + Math.floor(Math.random() * 100000),
+            name: name,
+            parameters: def.parameters, variables: def.variables,
+            hypotheses: def.hypotheses, conclusion: def.conclusion,
+            unlockDifficulty: difficulty,
+            completed: [false, false, false],
+        };
+        list.push(cl);
+    }
+    storeCustomLevels(list);
+    currentCustom = cl;
+    document.getElementById("currentLevel").innerText = "Level: " + cl.name;
+    updateSaveButtonVisibility();
+    document.getElementById("saveLevelAfterComplete").style.display =
+        (!currentLevel && currentLevelDef) ? '' : 'none';
+    refreshCustomWorld();
+    autosave(); // keep the current proof under the now-saved level's key
+}
+
+// Open a saved custom level at its highest unlocked difficulty.
+function openCustomLevel(cl, skipSavedPrompt) {
+    const states = customStates(cl);
+    var d = 0;
+    for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
+    setDifficulty(d);
+    currentCustom = cl;
+    currentLevel = undefined;
+    currentLevelButton = undefined;
+    setLevel(levelDefCopy(cl), "all");
+    document.getElementById("currentLevel").innerText = "Level: " + cl.name;
+    updateSaveButtonVisibility();
+    if(!skipSavedPrompt) { offerSavedProof(null); }
+}
+
+// Delete a saved custom level (with confirmation).
+function deleteCustomLevel(cl) {
+    if(!confirm('Delete the custom level "' + cl.name + '"?')) { return; }
+    storeCustomLevels(loadCustomLevels().filter(function (c) { return c.id !== cl.id; }));
+    if(currentCustom && currentCustom.id === cl.id) {
+        currentCustom = null;
+        updateSaveButtonVisibility();
+    }
+    refreshCustomWorld();
+}
+
+// (Re)render the "Custom" world's rows from the saved list, and update its chip count.
+function refreshCustomWorld() {
+    if(!customRowsContainer) { return; }
+    const list = loadCustomLevels();
+    customRowsContainer.innerHTML = '';
+    if(list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "custom-empty";
+        empty.innerText = "No saved custom levels yet. Build one with Custom or Edit, then Save it.";
+        customRowsContainer.appendChild(empty);
+    } else {
+        list.forEach(function (cl) {
+            const states = customStates(cl);
+            const row = document.createElement("div");
+            row.className = "custom-row";
+            const nameEl = document.createElement("span");
+            nameEl.className = "custom-name";
+            nameEl.innerText = cl.name;
+            const marks = document.createElement("span");
+            marks.className = "custom-marks";
+            marks.innerHTML = difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2);
+            const del = document.createElement("span");
+            del.className = "custom-delete";
+            del.innerHTML = "&#10005;";
+            del.title = "Delete this custom level";
+            del.onclick = function (e) { e.stopPropagation(); deleteCustomLevel(cl); };
+            row.appendChild(nameEl);
+            row.appendChild(marks);
+            row.appendChild(del);
+            row.onclick = function () { openCustomLevel(cl); };
+            customRowsContainer.appendChild(row);
+        });
+    }
+    if(customChipEl) {
+        const prog = customChipEl.querySelector('.world-progress');
+        if(prog) { prog.innerText = list.filter(function (c) { return c.completed[0]; }).length + '/' + list.length; }
+    }
+}
+
+document.getElementById("saveLevel").onclick = saveCustomLevel;
+document.getElementById("saveLevelAfterComplete").onclick = saveCustomLevel;
+
 document.getElementById("about").onclick = function () {
     document.getElementById("aboutBG").style.display = "flex";
 };
@@ -1765,6 +1957,8 @@ function selectCurrentLevel(level, skipSavedPrompt) {
     setLevel(level, level.stage.rules.concat(extraRules));
     currentLevel = level;
     currentLevelButton = level.button;
+    currentCustom = null;
+    updateSaveButtonVisibility();
     document.getElementById("currentLevel").innerText = "Level: " + level.name;
     // If there's an autosaved proof for this level, offer to reload it (unless we're already
     // in the middle of restoring/importing a specific proof, which passes skipSavedPrompt).
@@ -2556,12 +2750,21 @@ function continue_typechecking(nodes, edges, connections, result) {
                         xhr.send(JSON.stringify(data));
                     }
                 }
+            } else if(currentCustom) {
+                // A saved custom level: record completion at this difficulty (which unlocks the
+                // next one) in the stored list and re-render the Custom world.
+                if(!proofRegisteredComplete) {
+                    proofRegisteredComplete = true;
+                    markCustomCompleted(currentCustom, difficulty);
+                }
             }
             // The proof is complete: show the (non-modal) completion pop-up at the top, tinted to
             // match the current difficulty (the same color as the conclusion box), with smart
-            // "Next" / "Next Unsolved" buttons.  This shows for a custom level too, where there is
-            // no "Next" target, so only the "Select Level" button appears.
+            // "Next" / "Next Unsolved" buttons.  For a custom level there's no "Next" target, so only
+            // "Select Level" (and "Save", for an unsaved one) appears.
             configureNextButtons();
+            document.getElementById("saveLevelAfterComplete").style.display =
+                (!currentLevel && currentLevelDef) ? '' : 'none';
             const banner = document.getElementById("levelCompleteBanner");
             banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
             banner.classList.add("shown");
@@ -2718,6 +2921,8 @@ document.getElementById("submitLevel").onclick = function () {
 
     currentLevel = undefined;
     currentLevelButton = undefined;
+    currentCustom = null;
+    updateSaveButtonVisibility();
     document.getElementById("currentLevel").innerText = "Level: Custom";
 }
 
