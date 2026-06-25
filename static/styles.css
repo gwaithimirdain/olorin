@@ -66,6 +66,8 @@ body {
     width: 100px;
     display: flex;
     flex-direction: column;
+    /* Guarantee a gap between the scrolling palette and the buttons below it. */
+    gap: 12px;
 }
 
 #palette {
