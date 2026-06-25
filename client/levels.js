@@ -450,6 +450,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "⊤" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "topHint",
                 },
                 {
@@ -499,6 +500,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "⊥" } ],
                     conclusion: { ty: "P" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "botHint",
                 },
                 {
@@ -571,6 +573,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∀x∈A,P(x)" } ],
                     conclusion: { ty: "P(a)" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "valueHint",
                 },
                 {
@@ -579,6 +582,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "∀x∈A,P" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "variableHint",
                 },
                 {
@@ -675,6 +679,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P(a)" } ],
                     conclusion: { ty: "∃x∈A,P(x)" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "exHint",
                 },
                 {
@@ -683,6 +688,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "∃x∈A,P" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" } ],
@@ -690,6 +696,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∃x∈A,P" } ],
                     conclusion: { ty: "P" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "B", ty: "Type" }, { name: "P", ty: "A×B→Type" } ],
@@ -865,6 +872,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "¬P" }, { ty: "P" } ],
                     conclusion: { ty: "Q" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "negationHint",
                 },
                 {
@@ -1085,6 +1093,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "x=x" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebraHint",
                 },
                 {
@@ -1093,6 +1102,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "(x+1)²=x²+2*x+1" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "multiplicationHint",
                 },
                 {
@@ -1101,6 +1111,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "x=y"} ],
                     conclusion: { ty: "y=x" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebra2Hint",
                 },
                 {
@@ -1109,6 +1120,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "x=y"}, { ty: "y=z"} ],
                     conclusion: { ty: "x=z" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebra3Hint",
                 },
                 {
@@ -1117,6 +1129,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "a=b²+2*d" }, { ty: "c=d²−2*b" } ],
                     conclusion: { ty: "a*b+c*d=b³+d³" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebra4Hint",
                 },
             ],
