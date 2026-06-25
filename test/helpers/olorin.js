@@ -19,14 +19,24 @@ class Olorin {
     // switches to dismissing the next ones, to test "cancel" paths.  Resolves once interactive.
     async open() {
         this._dialogAction = 'accept';
+        this._promptText = '';
         await this.page.addInitScript(() => localStorage.setItem('visited', 'true'));
-        this.page.on('dialog', (d) => (this._dialogAction === 'dismiss' ? d.dismiss() : d.accept()));
+        this.page.on('dialog', (d) => {
+            if (this._dialogAction === 'dismiss') { d.dismiss(); return; }
+            // prompt() (e.g. naming a custom level) is accepted with the configured text.
+            d.accept(d.type() === 'prompt' ? this._promptText : undefined);
+        });
         await this.page.goto('/?test=1', { waitUntil: 'load' });
         await this.page.waitForFunction(
             () => typeof window.__olorin !== 'undefined' && typeof window.Narya !== 'undefined',
             null,
             { timeout: 30000 },
         );
+    }
+
+    // The text a prompt() dialog will be accepted with (e.g. the name when saving a custom level).
+    setPromptText(text) {
+        this._promptText = text;
     }
 
     // Control how native confirm()/alert() dialogs are answered: 'accept' (default) or 'dismiss'.

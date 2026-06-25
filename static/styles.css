@@ -66,6 +66,8 @@ body {
     width: 100px;
     display: flex;
     flex-direction: column;
+    /* Guarantee a gap between the scrolling palette and the buttons below it. */
+    gap: 12px;
 }
 
 #palette {
@@ -400,6 +402,9 @@ body {
     overflow-x: clip;
     overflow-y: auto;
     display: grid;
+    /* Constrain the single column to the visible width (instead of growing to the widest content),
+       so full-width custom-level rows don't overflow and clip their right-hand marks/delete. */
+    grid-template-columns: minmax(0, 1fr);
     align-items: top;
 }
 
@@ -625,6 +630,62 @@ body {
     position: relative;
     display: flex;
     flex-direction: column;
+}
+
+/* The "Custom" world lists saved player-made levels as full-width named rows (their names don't
+   fit the tiny a-b-c boxes used for built-in levels). */
+#customRows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 4px;
+}
+
+.custom-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    border: 1px solid #000000;
+    border-radius: 8px;
+    background-color: #ffffff;
+    cursor: pointer;
+}
+
+.custom-row:hover {
+    background-color: #f0f0f0;
+}
+
+.custom-name {
+    flex: 1;
+    font-family: sans-serif;
+    word-break: break-word;
+}
+
+.custom-marks {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.custom-delete {
+    flex-shrink: 0;
+    cursor: pointer;
+    color: #aa3333;
+    font-weight: bold;
+    padding: 0 4px;
+}
+
+.custom-delete:hover {
+    color: #ff0000;
+}
+
+.custom-empty {
+    padding: 10px;
+    color: #888888;
+    font-family: sans-serif;
+    font-size: 13px;
+    text-align: center;
 }
 
 #customModal {
