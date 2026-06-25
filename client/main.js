@@ -126,6 +126,9 @@ const levelButtons = [];
 var allLevels = [];
 var currentLevel;
 var currentLevelButton;
+// The definition (parameters/variables/hypotheses/conclusion) of whatever level is currently
+// loaded, built-in or custom, so the "Edit" button can re-open the custom dialog pre-filled.
+var currentLevelDef = null;
 
 // A counter (in localStorage "time") incremented on each level completion; per-difficulty
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
@@ -1727,6 +1730,26 @@ document.getElementById("customLevel").onclick = function () {
     document.getElementById("levelSelectBG").style.display = "flex";
 };
 
+// Fill the custom-level dialog's fields from a level definition (built-in or custom).
+function fillCustomDialog(level) {
+    document.getElementById("parameters").value =
+        level.parameters.map(function (p) { return p.name + " : " + p.ty; }).join("\n");
+    document.getElementById("variables").value =
+        level.variables.map(function (v) { return v.name + " ∈ " + v.ty; }).join("\n");
+    document.getElementById("hypotheses").value =
+        level.hypotheses.map(function (h) { return h.ty; }).join("\n");
+    document.getElementById("conclusion").value = level.conclusion.ty;
+}
+
+// "Edit" opens the custom-level dialog pre-filled with the current level's definition, so the
+// player can tweak it.  Submitting the (possibly edited) dialog creates a custom level.
+document.getElementById("editLevel").onclick = function () {
+    if(!currentLevelDef) { return; }
+    fillCustomDialog(currentLevelDef);
+    document.getElementById("levelChooseBG").style.display = "none";
+    document.getElementById("levelSelectBG").style.display = "flex";
+};
+
 document.getElementById("about").onclick = function () {
     document.getElementById("aboutBG").style.display = "flex";
 };
@@ -2698,6 +2721,8 @@ document.getElementById("submitLevel").onclick = function () {
 }
 
 function setLevel(level, rulesAllowed) {
+    // Remember the raw definition so "Edit" can re-open the custom dialog pre-filled with it.
+    currentLevelDef = level;
     const new_varnames = [];
 
     // Assign ids to everything, and check that the variable names have no duplicates.
