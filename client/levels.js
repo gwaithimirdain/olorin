@@ -1327,12 +1327,6 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
                     conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
                 },
@@ -1353,6 +1347,12 @@ export const LEVELS = [
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
                     conclusion: { ty: "∃k∈ℤ,(a²−b²=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
                 },
                 {
                     parameters: [ ],
@@ -1554,6 +1554,12 @@ export const LEVELS = [
                 //     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
                 //     conclusion: { ty: "∀u∈ℝ,(u<2*x)" },
                 // },
+                {               // x neg inf => x+q neg inf
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
+                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
+                    conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
+                },
                 {               // x,y pos inf => x+y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
@@ -1565,12 +1571,6 @@ export const LEVELS = [
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
                     conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
-                },
-                {               // x neg inf => x+q neg inf
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
                 },
                 {               // x,y neg inf => x+y neg inf
                     parameters: [ ],
