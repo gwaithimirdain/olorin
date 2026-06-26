@@ -517,14 +517,14 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 used = variables;
                 bind =
                   (fun body ->
-                    let branch = Named.Branch (locate_opt None vars, body) in
+                    let branch = Named.Branch (locate_opt tm.loc vars, body) in
                     let branches = Snoc (Emp, (constr, branch)) in
                     Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None }));
                 sbind =
                   (fun body ->
                     let branch =
                       Named.Branch
-                        (locate_opt None vars, locate_opt body.loc (Named.Synth body.value)) in
+                        (locate_opt tm.loc vars, locate_opt body.loc (Named.Synth body.value)) in
                     let branches = Snoc (Emp, (constr, branch)) in
                     Named.Match { tm; sort = `Implicit; branches; refutables = None });
               } in
