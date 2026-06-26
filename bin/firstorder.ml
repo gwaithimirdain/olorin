@@ -102,6 +102,24 @@ def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus b a) (ℤ.times k n))
 "
 
+(* Raw.App now takes a *check* function and an *optional* check argument; these helpers build an
+   explicit application of a synthesizing head to a list of explicit (always-present) arguments. *)
+let some_arg (c : 'a Raw.check located) : 'a Raw.check option located = locate_opt c.loc (Some c.value)
+
+let rec apps (fn : 'a Raw.check located) (args : 'a Raw.check located list) : 'a Raw.check located =
+  match args with
+  | [] -> fn
+  | a :: args ->
+      apps (locate_opt fn.loc (Synth (App (fn, some_arg a, locate_opt None `Explicit)))) args
+
+(* Apply a synthesizing head to one explicit check argument, yielding a synth (for SFirst lists). *)
+let sapp (fn : 'a Raw.synth located) (arg : 'a Raw.check located) : 'a Raw.synth =
+  App (locate_opt fn.loc (Synth fn.value), some_arg arg, locate_opt None `Explicit)
+
+(* A normal, explicit, non-cube lambda over a single variable. *)
+let normal_lam name body =
+  Lam { name; cube = locate_opt None `Normal; implicit = `Explicit; dom = None; body }
+
 let get_const parts = Scope.lookup parts <||> String.concat "." parts ^ " not found"
 
 let get_root c =
@@ -226,7 +244,7 @@ let powers =
 
 let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
   match body with
-  | Wrap { value = Notn ((Builtins.Parens, _), n); _ } -> (
+  | Wrap { value = Notn ((Parens, _), n); _ } -> (
       match args n with
       | [ Token (LParen, _); Term body; Token (RParen, _) ] -> get_abs quant (Wrap body)
       | _ -> Builtins.invalid quant)
@@ -242,7 +260,7 @@ let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
 
 let pp_op opname obs =
   match obs with
-  | [ Term x; Token (op, wsop); Term y ] ->
+  | [ Term x; Token (op, (wsop, _)); Term y ] ->
       let px, wsx = pp_term x in
       let py, wsy = pp_term y in
       (px ^^ pp_ws `None wsx ^^ Token.pp op ^^ pp_ws `None wsop ^^ py, wsy)
@@ -252,17 +270,17 @@ let pp_op opname obs =
 let pp_quant qname obs =
   let quant, wsquant, x, wsin, ty, wscomma, Wrap body =
     match obs with
-    | [ Token (quant, wsquant); Term ty; Token (Op ",", wscomma); Term body ] ->
+    | [ Token (quant, (wsquant, _)); Term ty; Token (Op ",", (wscomma, _)); Term body ] ->
         let x, body = get_abs qname (Wrap body) in
         (quant, wsquant, x, [], Wrap ty, wscomma, body)
     | [
-     Token (quant, wsquant);
+     Token (quant, (wsquant, _));
      Term x;
-     Token (Ident [ "∈" ], wsin);
+     Token (Ident [ "∈" ], (wsin, _));
      Term ty;
-     Token (Op ",", wscomma);
+     Token (Op ",", (wscomma, _));
      Term body;
-    ] -> (quant, wsquant, get_var x, wsin, Wrap ty, wscomma, Wrap body)
+    ] -> (quant, wsquant, Builtins.get_var x, wsin, Wrap ty, wscomma, Wrap body)
     | _ -> Builtins.invalid qname in
   let pbody, wsbody = pp_term body in
   ( Token.pp quant
@@ -289,16 +307,11 @@ let () =
               | [ Term x; Token _; Term y ] ->
                   let x, y = (process ctx x, process ctx y) in
                   let oconst = get_const ostr in
-                  locate_opt loc
-                    (Synth
-                       (App
-                          ( locate_opt loc
-                              (App (locate_opt loc (Const oconst), x, locate_opt None `Explicit)),
-                            y,
-                            locate_opt None `Explicit )))
+                  apps (locate_opt loc (Synth (Const oconst))) [ x; y ]
               | _ -> Builtins.invalid name);
           print_term = Some (pp_op name);
           print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
     binops;
@@ -312,18 +325,18 @@ let () =
           | [ Token _; Term x ] ->
               let x = process ctx x in
               let nconst = get_const [ "neg" ] in
-              locate_opt loc
-                (Synth (App (locate_opt loc (Const nconst), x, locate_opt None `Explicit)))
+              apps (locate_opt loc (Synth (Const nconst))) [ x ]
           | _ -> Builtins.invalid "¬");
       print_term =
         Some
           (fun obs ->
             match obs with
-            | [ Token (neg, wsneg); Term x ] ->
+            | [ Token (neg, (wsneg, _)); Term x ] ->
                 let px, wsx = pp_term x in
                 (Token.pp neg ^^ pp_ws `None wsneg ^^ px, wsx)
             | _ -> Builtins.invalid "¬");
       print_case = None;
+      pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "¬"));
       is_case = (fun _ -> false);
     };
   List.iter
@@ -338,20 +351,17 @@ let () =
             (fun ctx obs loc ->
               match obs with
               | [ Token _; Term x; Token _; Term ty; Token _; Term body ] ->
-                  let x = get_var x in
+                  let x = Builtins.get_var x in
                   let ty = process ctx ty in
                   let body = process (Bwv.snoc ctx x) body in
                   let qconst = get_const [ qstr ] in
-                  locate_opt loc
-                    (Synth
-                       (App
-                          ( locate_opt loc
-                              (App (locate_opt loc (Const qconst), ty, locate_opt None `Explicit)),
-                            locate_opt loc (Lam (locate_opt loc x, `Normal, body)),
-                            locate_opt None `Explicit )))
+                  apps
+                    (locate_opt loc (Synth (Const qconst)))
+                    [ ty; locate_opt loc (normal_lam (locate_opt loc x) body) ]
               | _ -> Builtins.invalid qstr);
           print_term = Some (pp_quant name);
           print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
     quantifiers
@@ -384,14 +394,13 @@ let () =
                     | Synth sx ->
                         [
                           ( `Any,
-                            App
-                              ( locate_opt loc
-                                  (ImplicitSApp
-                                     ( locate_opt loc (Const (get_const [ str ])),
-                                       loc,
-                                       locate_opt x.loc sx )),
-                                y,
-                                locate_opt None `Explicit ),
+                            sapp
+                              (locate_opt loc
+                                 (ImplicitSApp
+                                    ( locate_opt loc (Const (get_const [ str ])),
+                                      loc,
+                                      locate_opt x.loc sx )))
+                              y,
                             true );
                         ]
                     | _ -> [] in
@@ -400,14 +409,13 @@ let () =
                     | Synth sy ->
                         [
                           ( `Any,
-                            App
-                              ( locate_opt loc
-                                  (ImplicitSApp
-                                     ( locate_opt loc (Const (get_const [ opp_str ])),
-                                       loc,
-                                       locate_opt y.loc sy )),
-                                x,
-                                locate_opt None `Explicit ),
+                            sapp
+                              (locate_opt loc
+                                 (ImplicitSApp
+                                    ( locate_opt loc (Const (get_const [ opp_str ])),
+                                      loc,
+                                      locate_opt y.loc sy )))
+                              x,
                             true );
                         ]
                     | _ -> [] in
@@ -417,12 +425,13 @@ let () =
             Some
               (fun obs ->
                 match obs with
-                | Term x :: Token (_, wseq) :: Term y :: _ ->
+                | Term x :: Token (_, (wseq, _)) :: Term y :: _ ->
                     let px, wsx = pp_term x in
                     let py, wsy = pp_term y in
                     (px ^^ pp_ws `None wsx ^^ Token.pp tok ^^ pp_ws `None wseq ^^ py, wsy)
                 | _ -> Builtins.invalid name);
           print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
     relations
@@ -446,14 +455,10 @@ let () =
                           ( List.map
                               (fun ty ->
                                 ( `Any,
-                                  App
-                                    ( locate_opt None
-                                        (App
-                                           ( locate_opt loc (Const (get_const (ty :: ostr))),
-                                             x,
-                                             locate_opt None `Explicit )),
-                                      y,
-                                      locate_opt None `Explicit ),
+                                  sapp
+                                    (locate_opt None
+                                       (sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x))
+                                    y,
                                   true ))
                               numbers,
                             None )))
@@ -463,12 +468,13 @@ let () =
               (fun obs ->
                 let op = if Display.chars () = `Unicode then usym else asym in
                 match obs with
-                | [ Term x; Token (_, wsop); Term y ] ->
+                | [ Term x; Token (_, (wsop, _)); Term y ] ->
                     let px, wsx = pp_term x in
                     let py, wsy = pp_term y in
                     (px ^^ pp_ws `None wsx ^^ Token.pp op ^^ pp_ws `None wsop ^^ py, wsy)
                 | _ -> Builtins.invalid name);
           print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
     algebra;
@@ -487,19 +493,14 @@ let () =
                    (SFirst
                       ( List.map
                           (fun ty ->
-                            ( `Any,
-                              App
-                                ( locate_opt loc (Const (get_const [ ty; "negate" ])),
-                                  x,
-                                  locate_opt None `Explicit ),
-                              true ))
+                            (`Any, sapp (locate_opt loc (Const (get_const [ ty; "negate" ]))) x, true))
                           numbers,
                         None )))
           | _ -> Builtins.invalid "negate");
       print_term =
         Some
           (function
-          | [ Token (_, wsop); Term x ] ->
+          | [ Token (_, (wsop, _)); Term x ] ->
               let px, wsx = pp_term x in
               ( Token.pp (if Display.chars () = `Unicode then Ident [ "−" ] else Op "-")
                 ^^ pp_ws `None wsop
@@ -507,6 +508,7 @@ let () =
                 wsx )
           | _ -> Builtins.invalid "negate");
       print_case = None;
+      pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "−"));
       is_case = (fun _ -> false);
     };
   List.iter
@@ -525,12 +527,7 @@ let () =
                        (SFirst
                           ( List.map
                               (fun ty ->
-                                ( `Any,
-                                  App
-                                    ( locate_opt loc (Const (get_const (ty :: ostr))),
-                                      x,
-                                      locate_opt None `Explicit ),
-                                  true ))
+                                (`Any, sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x, true))
                               numbers,
                             None )))
               | _ -> Builtins.invalid name);
@@ -539,11 +536,12 @@ let () =
               (fun obs ->
                 let op = if Display.chars () = `Unicode then sym else asym in
                 match obs with
-                | [ Term x; Token (_, wsop) ] ->
+                | [ Term x; Token (_, (wsop, _)) ] ->
                     let px, wsx = pp_term x in
                     (px ^^ pp_ws `None wsx ^^ Token.pp op, wsop)
                 | _ -> Builtins.invalid name);
           print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
     powers
@@ -559,7 +557,7 @@ let rec add_subtypes = function
 let install_notations () =
   List.iter
     (fun (oname, Wrap_infix onotn, ostr) ->
-      Situation.Current.add_with_print
+      Scope.Situation.add_with_print
         {
           keys = [ `Constant (get_const ostr) ];
           notn = Wrap onotn;
@@ -570,7 +568,7 @@ let install_notations () =
     binops;
   List.iter
     (fun (qname, qnotn, qstr) ->
-      Situation.Current.add_with_print
+      Scope.Situation.add_with_print
         {
           keys = [ `Constant (get_const [ qstr ]) ];
           notn = Wrap qnotn;
@@ -579,7 +577,7 @@ let install_notations () =
           inner_symbols = `Multiple (Op qname, [ None ], Op ",");
         })
     quantifiers;
-  Situation.Current.add_with_print
+  Scope.Situation.add_with_print
     {
       keys = [ `Constant (get_const [ "neg" ]) ];
       notn = Wrap neg;
@@ -589,7 +587,7 @@ let install_notations () =
     };
   List.iter
     (fun (_, tok, notn, str, _) ->
-      Situation.Current.add_with_print
+      Scope.Situation.add_with_print
         {
           keys = [ `Constant (get_const [ str ]) ];
           notn = Wrap notn;
@@ -600,7 +598,7 @@ let install_notations () =
     relations;
   List.iter
     (fun (_, _, usym, asym, Wrap_infixl onotn, ostr) ->
-      Situation.Current.add_with_print
+      Scope.Situation.add_with_print
         {
           keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
           notn = Wrap onotn;
@@ -610,7 +608,7 @@ let install_notations () =
         })
     algebra;
   let _ =
-    Situation.Current.add_user
+    Scope.Situation.add_user
       (User
          {
            name = "quot";
@@ -621,7 +619,7 @@ let install_notations () =
          }) in
   List.iter
     (fun (_, sym, _, onotn, ostr) ->
-      Situation.Current.add_with_print
+      Scope.Situation.add_with_print
         {
           keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
           notn = Wrap onotn;
@@ -630,7 +628,7 @@ let install_notations () =
           inner_symbols = `Single sym;
         })
     powers;
-  Situation.Current.add_with_print
+  Scope.Situation.add_with_print
     {
       keys = List.map (fun ty -> `Constant (get_const [ ty; "negate" ])) numbers;
       notn = Wrap negate;
@@ -639,7 +637,7 @@ let install_notations () =
       inner_symbols = `Single (Ident [ "−" ]);
     };
   let _ =
-    Situation.Current.add_user
+    Scope.Situation.add_user
       (User
          {
            name = "divisible";
@@ -649,7 +647,7 @@ let install_notations () =
            val_vars = [ "a"; "b" ];
          }) in
   let _ =
-    Situation.Current.add_user
+    Scope.Situation.add_user
       (User
          {
            name = "congruent";

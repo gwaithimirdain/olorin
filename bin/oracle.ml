@@ -113,10 +113,10 @@ let rec get_givens ctx (ty : normal) givens =
       let veqty = (CubeOf.find_top eqty).tm in
       let* op, ty', x, y = get_equality_or_inequality ctx veqty in
       match subtype_of ctx ty'.tm ty.tm with
-      | Some () ->
+      | Ok () ->
           let* rest = get_givens ctx ty (CubeOf.find_top rest).tm in
           return ((op, x, y) :: rest)
-      | None ->
+      | Error _ ->
           Error
             (Oracle_failed
                ( "input is not an equation or inequality at the same type",
@@ -153,13 +153,13 @@ let var_or_const ctx ty tm =
   | Some i -> return (`Const (Q.of_int i))
   | None -> (
       let* vars, count = S.get in
-      match Bwd.find_index (fun x -> Option.is_some (Equal.equal_at ctx tm x ty)) vars with
+      match Bwd.find_index (fun x -> Result.is_ok (Equal.equal_at ctx tm x ty)) vars with
       | None ->
           let* () = S.put (Snoc (vars, tm), count + 1) in
           return (`Var count)
       | Some i -> return (`Var (count - i - 1)))
 
-let get_poly (ctx : int) ty tm =
+let get_poly ctx ty tm =
   let open Monad.Ops (S) in
   let rec go tm =
     match Norm.view_term tm with
@@ -202,7 +202,7 @@ let get_poly (ctx : int) ty tm =
   go tm
 
 let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
-  | Permute (_, _, ctx) ->
+  | Permute { ctx; _ } ->
       let rec vars_of_ctx : type a b. (a, b) Ctx.Ordered.t -> string Bwd.t = function
         | Emp -> Emp
         | Lock ctx -> vars_of_ctx ctx
@@ -239,7 +239,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     Error (Code.Oracle_failed ("proving disequalities by algebra not allowed", PUnit))
   else
     (* Otherwise we call back to javascript for it to query z3. *)
-    let ctx, ty = (Ctx.length ctx, ty.tm) in
+    let ty = ty.tm in
     let (givens, lhs, rhs), (_vars, _count) =
       (let open Monad.Ops (S) in
        let* lhs = get_poly ctx ty lhs.tm in
