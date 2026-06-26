@@ -80,6 +80,17 @@ body {
     width: 100%;
     border-left: 1px solid #ccc;
     position: relative;
+    /* A viewport onto the (effectively unbounded) #canvas; scroll to reach nodes placed far out. */
+    overflow: auto;
+}
+
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Fill the viewport by default; resizeCanvas() grows it past this to hold far-flung nodes. */
+    min-width: 100%;
+    min-height: 100%;
 }
 
 /* Basic rule styling */

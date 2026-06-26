@@ -156,6 +156,43 @@ var unlockData = [];
 const excludeFromAll = [ "negI" ] // Classical negation suffices
 
 const diagram = document.getElementById('diagram');
+// #diagram is a fixed viewport; #canvas is the scrollable surface that actually holds the nodes,
+// so nodes dragged far out stay reachable by scrolling instead of vanishing off the window edge.
+const canvas = document.getElementById('canvas');
+
+// Grow #canvas so it contains every node (plus a margin), or shrink it back to fill the viewport
+// when everything fits.  This is what makes far-out nodes reachable via the scrollbars.
+function resizeCanvas() {
+    let maxRight = 0, maxBottom = 0;
+    nodes.forEach((x) => {
+        const el = x.node;
+        maxRight = Math.max(maxRight, el.offsetLeft + el.offsetWidth);
+        maxBottom = Math.max(maxBottom, el.offsetTop + el.offsetHeight);
+    });
+    const MARGIN = 60;
+    // Clear first so diagram.clientWidth/Height report the true viewport (minus any needed scrollbar).
+    canvas.style.width = '';
+    canvas.style.height = '';
+    // Only grow once a node actually extends past the viewport edge (so the conclusion sitting near
+    // the right edge doesn't itself trigger a scrollbar); the margin is just breathing room beyond.
+    if(maxRight > diagram.clientWidth)   { canvas.style.width  = (maxRight + MARGIN) + 'px'; }
+    if(maxBottom > diagram.clientHeight) { canvas.style.height = (maxBottom + MARGIN) + 'px'; }
+}
+
+// Nodes can be dragged up/left past the origin, where there's no scroll room to reach them; pull any
+// such node back onto the canvas so it can't be lost.  (Growth to the right/down is handled by scroll.)
+function clampNodesToCanvas() {
+    nodes.forEach((x) => {
+        const el = x.node;
+        let moved = false;
+        if(el.offsetLeft < 0) { el.style.left = '0px'; moved = true; }
+        if(el.offsetTop < 0)  { el.style.top = '0px';  moved = true; }
+        if(moved) { instance.revalidate(el); }
+    });
+}
+
+// Keep the canvas filling the window as it's resized.
+window.addEventListener('resize', resizeCanvas);
 
 // Initialize Z3
 const { init } = require('z3-solver');
@@ -169,7 +206,7 @@ init().then((z3) => {
 
 ready(() => {
     instance = newInstance({
-        container: diagram,
+        container: canvas,
         endpoint: {
             type: DotEndpoint.type,
             options: {
@@ -234,8 +271,11 @@ ready(() => {
         e.preventDefault();
         const id = e.dataTransfer.getData('text/plain');
         const box = addRuleNode(id);
-        box.style.left = `${e.clientX - diagram.offsetLeft}px`;
-        box.style.top = `${e.clientY - diagram.offsetTop}px`;
+        // Position relative to the canvas, whose rect already folds in the current scroll offset.
+        const canvasRect = canvas.getBoundingClientRect();
+        box.style.left = `${e.clientX - canvasRect.left}px`;
+        box.style.top = `${e.clientY - canvasRect.top}px`;
+        resizeCanvas();
 
         // Add endpoints appropriately for its rule type, if necessary make it larger and resizable, and prompt for variables or ascription types.  Some rules display a modal box, in which case we don't typecheck until it is submitted.
         if (addEndpointsForRule(box, id, false)) {
@@ -252,7 +292,11 @@ ready(() => {
 
     // Dragging a node to rearrange the proof changes positions without re-typechecking, so save
     // the new positions when a drag finishes.
-    instance.bind(EVENT_DRAG_STOP, autosave);
+    instance.bind(EVENT_DRAG_STOP, function () {
+        clampNodesToCanvas();
+        resizeCanvas();
+        autosave();
+    });
 
     if(SERVER) {
         // If they have a saved login, use it.
@@ -296,7 +340,7 @@ function addRuleNode(id) {
     const box = originalBox.cloneNode(true);
     box.style.position = 'absolute';
     box.id = 'rule' + (counter++);
-    diagram.appendChild(box);
+    canvas.appendChild(box);
     // Make it selectable for multi-element dragging.
     box.onmousedown = toggleDragSelected(box);
     // Add it to the master list of nodes.
@@ -522,7 +566,7 @@ let selectingStartX, selectingStartY, isSelecting, shiftSelecting = false;
 
 // Start selection on mousedown anywhere in the document.
 diagram.addEventListener('mousedown', function(e) {
-    if(e.target === diagram) {
+    if(e.target === canvas) {
         isSelecting = true;
         if(e.shiftKey) {
             shiftSelecting = true;
@@ -1445,6 +1489,8 @@ function restoreProof(state, level, countAsCompletion) {
 
     // Repositioning the nodes invalidated jsPlumb's cached geometry; revalidate before reconnecting.
     nodes.forEach((entry) => instance.revalidate(entry.node));
+    // Saved nodes may sit beyond the viewport; grow the canvas so they're reachable by scrolling.
+    resizeCanvas();
 
     // Recreate the connections, matching endpoints by their sort and label.
     (state.connections || []).forEach((c) => {
@@ -2026,6 +2072,8 @@ function deleteRule(box) {
     instance.deleteConnectionsForElement(box);
     instance.removeAllEndpoints(box);
     box.remove();
+    // Removing a far-out node may let the canvas shrink back toward the viewport.
+    resizeCanvas();
     suppressChecking = false;
     typecheck();
 }
@@ -3033,6 +3081,13 @@ function setLevel(level, rulesAllowed) {
     });
     nodes = [];
 
+    // Start each level with the canvas reset to fill the viewport, scrolled to the origin, so the
+    // context is laid out against the visible area rather than a leftover oversized canvas.
+    canvas.style.width = '';
+    canvas.style.height = '';
+    diagram.scrollLeft = 0;
+    diagram.scrollTop = 0;
+
     // Hide the rules that aren't allowed for this stage
     for (const prule of document.getElementById('palette').children) {
         if((rulesAllowed == "all" && excludeFromAll.indexOf(prule.id) === -1) || prule.id == 'buttons' || rulesAllowed.includes(prule.id)) {
@@ -3061,7 +3116,7 @@ function setLevel(level, rulesAllowed) {
         vbx.style.color = VALUECOLOR;
         vbx.id = v.id;
         vbx.onmousedown = toggleDragSelected(vbx);
-        diagram.appendChild(vbx);
+        canvas.appendChild(vbx);
         nodes.push({id: vbx.id, name: v.name, rule: 'variable', node: vbx, value: v.ty});
         instance.addEndpoint(vbx, {
             anchor: "Right",
@@ -3088,7 +3143,7 @@ function setLevel(level, rulesAllowed) {
         hyp.className = 'basic contextual rule';
         hyp.id = h.id;
         hyp.onmousedown = toggleDragSelected(hyp);
-        diagram.appendChild(hyp);
+        canvas.appendChild(hyp);
         nodes.push({id: hyp.id, rule: 'hypothesis', node: hyp, value : h.ty});
         instance.addEndpoint(hyp, {
             anchor: "Right",
@@ -3106,12 +3161,13 @@ function setLevel(level, rulesAllowed) {
     concl.className = 'basic contextual rule';
     concl.style.textAlign = 'center';
     concl.style.position = 'absolute';
-    concl.style.top = "50%";
     concl.id = conclusion.id;
     concl.onmousedown = toggleDragSelected(concl);
-    diagram.appendChild(concl);
-    // For some reason, setting .right here instead produces weird behavior with dragging.  It also apparently has to be after appendChild for the width to be calculated correctly.
+    canvas.appendChild(concl);
+    // Use pixel positions (not 50% / right) so the conclusion stays put if the canvas later grows.
+    // The left also apparently has to be set after appendChild for the width to be calculated correctly.
     concl.style.left = (diagram.clientWidth - 50 - concl.clientWidth) + 'px';
+    concl.style.top = ((diagram.clientHeight - concl.clientHeight) / 2) + 'px';
     conclusion_node = concl;
     nodes.push({id: concl.id, rule: 'conclusion', node: concl, value: conclusion.ty});
     instance.addEndpoint(concl, { anchor: "Left", target: true, parameters: {sort: "input"} });
