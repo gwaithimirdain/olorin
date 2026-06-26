@@ -450,6 +450,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "⊤" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "topHint",
                 },
                 {
@@ -499,6 +500,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "⊥" } ],
                     conclusion: { ty: "P" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "botHint",
                 },
                 {
@@ -571,6 +573,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∀x∈A,P(x)" } ],
                     conclusion: { ty: "P(a)" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "valueHint",
                 },
                 {
@@ -579,6 +582,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "∀x∈A,P" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "variableHint",
                 },
                 {
@@ -675,6 +679,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P(a)" } ],
                     conclusion: { ty: "∃x∈A,P(x)" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "exHint",
                 },
                 {
@@ -683,6 +688,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P" } ],
                     conclusion: { ty: "∃x∈A,P" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" } ],
@@ -690,6 +696,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∃x∈A,P" } ],
                     conclusion: { ty: "P" },
                     trivial: true,
+                    autoComplete: true,
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "B", ty: "Type" }, { name: "P", ty: "A×B→Type" } ],
@@ -865,6 +872,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "¬P" }, { ty: "P" } ],
                     conclusion: { ty: "Q" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "negationHint",
                 },
                 {
@@ -1085,6 +1093,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "x=x" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebraHint",
                 },
                 {
@@ -1093,6 +1102,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "(x+1)²=x²+2*x+1" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "multiplicationHint",
                 },
                 {
@@ -1101,6 +1111,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "x=y"} ],
                     conclusion: { ty: "y=x" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebra2Hint",
                 },
                 {
@@ -1109,6 +1120,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "x=y"}, { ty: "y=z"} ],
                     conclusion: { ty: "x=z" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebra3Hint",
                 },
                 {
@@ -1117,6 +1129,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "a=b²+2*d" }, { ty: "c=d²−2*b" } ],
                     conclusion: { ty: "a*b+c*d=b³+d³" },
                     trivial: true,
+                    autoComplete: true,
                     hint: "algebra4Hint",
                 },
             ],
@@ -1314,12 +1327,6 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
                     conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
                 },
@@ -1340,6 +1347,12 @@ export const LEVELS = [
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
                     conclusion: { ty: "∃k∈ℤ,(a²−b²=k*n)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
+                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
                 },
                 {
                     parameters: [ ],
@@ -1541,6 +1554,12 @@ export const LEVELS = [
                 //     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
                 //     conclusion: { ty: "∀u∈ℝ,(u<2*x)" },
                 // },
+                {               // x neg inf => x+q neg inf
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
+                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
+                    conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
+                },
                 {               // x,y pos inf => x+y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
@@ -1552,12 +1571,6 @@ export const LEVELS = [
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
                     conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
-                },
-                {               // x neg inf => x+q neg inf
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
                 },
                 {               // x,y neg inf => x+y neg inf
                     parameters: [ ],
