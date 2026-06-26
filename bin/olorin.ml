@@ -863,7 +863,17 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     match sbind tm with
     | Some stm ->
         (* Resolve to a term with De Bruijn indices.  RequireScoping true means that this will throw "ill-scoped connection" errors.  If we get any such error, that means this scope is no good, so we bail out and go on to the next one.  If we get *other* errors, we must have found a good scope and be typechecking, so we report them as the result. *)
-        Reporter.try_with ~fatal:(fun d ->
+        Reporter.try_with
+          ~emit:(fun d ->
+            (* Non-fatal diagnostics emitted while checking this candidate term (e.g. a match that
+               won't refine the goal of a disconnected fragment).  We must handle them here: this
+               whole synthesis runs outside check's ambient Reporter handler, so an unhandled emit
+               would abort the command via History.do_command, deleting its metavariables and leaving
+               dangling references ("undefined metavariable" anomaly). *)
+            match d.message with
+            | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
+            | _ -> Diagnostic.add diagnostics true d)
+          ~fatal:(fun d ->
             match d.message with
             | Ill_scoped_connection | Cyclic_term ->
                 (* But we do record the scoping diagnostic to the *overall* outside one, to be saved. *)
@@ -1063,15 +1073,39 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
     let contexts = ref [] in
+    (* Note: this deliberately does NOT wrap f in History.do_command.  We typecheck speculatively
+       many times here (every candidate scope for every disconnected port), and most of those
+       attempts raise a fatal that an inner handler catches and treats as "this scope didn't work".
+       History.do_command runs Eternity.filter_now on *any* exception escaping it, which would delete
+       the holes that attempt created; but a sibling attempt or port may already depend on those
+       holes, leaving dangling references ("undefined metavariable" anomaly).  Instead we wrap the
+       whole check in a single do_command (below) and clean everything up once with undo_all. *)
     let run f =
       Global.HolesAllowed.run ~env:(Ok ()) @@ fun () ->
-      History.do_command @@ fun () ->
       Annotate.run
         ~ctx:{ handle = (fun p -> annotate_ctx_handler contexts p) }
         ~tm:(fun p -> annotate_tm_handler labels p)
         ~ty:(fun p -> annotate_ty_handler labels p)
       @@ fun () -> f () in
-    let fatal_error =
+    (* Collect the list of output and assumption ports, in case any of them yield a synthesizing
+       term.  This needs no typechecking handlers, so we do it before entering them. *)
+    let port_list =
+      IdMap.fold
+        (fun _ (v : Vertex.t) ps ->
+          (* We do have to consider even the ones that have a wire running out of them, because it might be connected to a non-synthesizing term from which we couldn't even get started, whereas this term might itself be synthesizing.  *)
+          List.map (fun p -> (p, Dynarray.create ())) (outputs_of_vertex v @ assumptions_of_vertex v)
+          @ ps)
+        vertices [] in
+    (* Both the conclusion check and the synthesis of disconnected ports must run *inside* the same
+       Reporter (and Oracle) handlers.  Synthesizing a disconnected fragment can emit a non-fatal
+       diagnostic (e.g. a match that won't refine its goal); if that escapes the handler it becomes
+       an unhandled effect, which aborts the surrounding History.do_command, deletes the
+       metavariables that command created, and leaves other ports referencing them -- surfacing as
+       an "undefined metavariable" anomaly and leaving those ports unlabeled. *)
+    let fatal_error, ports =
+      (* A single undoable command around the whole check; see the note on `run` above.  undo_all
+         (below) reverts everything it created. *)
+      History.do_command @@ fun () ->
       Reporter.try_with
         ~emit:(fun d ->
           match d.message with
@@ -1079,7 +1113,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
           | _ -> Diagnostic.add diagnostics false d)
         ~fatal:(fun d ->
           Diagnostic.add diagnostics true d;
-          true)
+          (true, []))
       @@ fun () ->
       (* Supply the Buchberger oracle.  This has to be inside the Reporter.try_with, since it can raise typechecking errors. *)
       Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
@@ -1096,20 +1130,13 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
             ctx conclusion_tm conclusion_ty in
         () );
       (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
-      Eternity.unsolved () > 0 in
-    (* Now we collect the list of output and assumption ports, in case any of them yield a synthesizing term. *)
-    let ports =
-      IdMap.fold
-        (fun _ (v : Vertex.t) ps ->
-          (* We do have to consider even the ones that have a wire running out of them, because it might be connected to a non-synthesizing term from which we couldn't even get started, whereas this term might itself be synthesizing.  *)
-          List.map (fun p -> (p, Dynarray.create ())) (outputs_of_vertex v @ assumptions_of_vertex v)
-          @ ps)
-        vertices [] in
-    (* We go through the list repeatedly until no more progress is made, bounded to one pass per
-       port as a termination safeguard (see synth_output_ports). *)
-    let ports =
-      synth_output_ports ~fuel:(List.length ports) run vertices labels fwd_graph bwd_graph contexts
-        ports diagnostics in
+      let fatal_error = Eternity.unsolved () > 0 in
+      (* We go through the port list repeatedly until no more progress is made, bounded to one pass
+         per port as a termination safeguard (see synth_output_ports). *)
+      let ports =
+        synth_output_ports ~fuel:(List.length port_list) run vertices labels fwd_graph bwd_graph
+          contexts port_list diagnostics in
+      (fatal_error, ports) in
     (* Get rid of any created holes. *)
     History.undo_all ();
     (* Combine all the generated diagnostics. *)
