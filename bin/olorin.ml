@@ -272,9 +272,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
   (* Assumption ports are technically "cycles" but they are allowed. *)
   if source.sort = Assumption then
     (locate !loc (without_bindables (Synth (Var (`Port source, None)))), PortSet.singleton source)
-    (* Other cycles are forbidden. *)
-  else if IdSet.mem source.vertex oldseen then
-    (locate !loc (without_bindables (Synth (Fail Cyclic_term))), PortSet.empty)
+    (* Other cycles are forbidden.  We emit the error here, located on this edge, so the wire is
+       colored even on synthesis paths that skip checking the embedded failure (see
+       synth_output_port); on the conclusion path it is reported again when the failure is checked,
+       which is harmless (the wire is simply red). *)
+  else if IdSet.mem source.vertex oldseen then (
+    emit ~loc:!loc Cyclic_term;
+    (locate !loc (without_bindables (Synth (Fail Cyclic_term))), PortSet.empty))
   else
     let source_vertex =
       IdMap.find_opt source.vertex vertices
@@ -781,13 +785,24 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     [ `Found_scope of Diagnostic.js Js.t Dynarray.t | `No_scope of Diagnostic.js Js.t Dynarray.t ] =
   let scoping_diagnostics = Dynarray.create () in
   let hole_diagnostics = Dynarray.create () in
+  (* If the term extracted from this port runs through a cycle, it's invalid no matter the scope, so
+     we record that and skip the scope search below.  This matters for more than speed: resolving a
+     cyclic term succeeds (the cycle is an embedded failure node), so each attempted scope would
+     accumulate fresh scopes/contexts, and trying every one of those against every port on every
+     pass blows up super-exponentially and freezes the browser. *)
+  let cyclic = ref false in
   let tm, _ =
     Reporter.try_with ~emit:(fun d ->
         match d.message with
         | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
+        | Cyclic_term ->
+            cyclic := true;
+            Diagnostic.add scoping_diagnostics true d
         | _ -> emit_diagnostic d)
     @@ fun () -> check_of_output_port ~seen:IdSet.empty vertices bwd_graph ~edge:None p in
-  (* Now we recurse through the supplied contexts/scopes. *)
+  if !cyclic then `No_scope scoping_diagnostics
+  else
+    (* Now we recurse through the supplied contexts/scopes. *)
   let rec look_for_scope contexts =
     match contexts with
     | [] ->
@@ -876,8 +891,10 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     | None -> true in
   look_for_scope contexts
 
-(* Attempt to parse and synthesize terms for all the supplied output ports, which should *not* be the sources of any connections (otherwise, they would get included while checking or synthesizing from other ports, and their diagnostics would be incorrectly reported from this function as not knowing about those edges).  If not all of them succeed, try again with those that failed (since new scopes and contexts may have been observed while synthesizing the others).  Repeat until there is no more progress. *)
-let rec synth_output_ports (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
+(* Attempt to parse and synthesize terms for all the supplied output ports, which should *not* be the sources of any connections (otherwise, they would get included while checking or synthesizing from other ports, and their diagnostics would be incorrectly reported from this function as not knowing about those edges).  If not all of them succeed, try again with those that failed (since new scopes and contexts may have been observed while synthesizing the others).  Repeat until there is no more progress.
+
+   The [fuel] is a safety bound on the number of passes.  Each productive pass resolves at least one port and removes it from the worklist, so a valid proof never needs more passes than there are ports.  Starting [fuel] at the worklist length and spending one unit per pass therefore can't cut short any pass a real proof needs, but does guarantee termination even if some future graph pathology makes a pass report "progress" without the worklist actually shrinking. *)
+let rec synth_output_ports ~(fuel : int) (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
     (labels : (Locable.t, Label.t) Hashtbl.t) (fwd_graph : fwd_graph) (bwd_graph : bwd_graph)
     (contexts : context list ref) (ports : (Port.t * Diagnostic.js Js.t Dynarray.t) list)
     (diagnostics : Diagnostic.js Js.t Dynarray.t) =
@@ -899,8 +916,9 @@ let rec synth_output_ports (run : (unit -> unit) -> unit) (vertices : Vertex.t I
           (* If we failed to find a working scope/context, save that port to try again later, along with the diagnostics it produced this time. *)
           | `No_scope ds -> Some (p, ds))
       ports in
-  if !progress then
-    synth_output_ports run vertices labels fwd_graph bwd_graph contexts ports diagnostics
+  if !progress && fuel > 0 then
+    synth_output_ports ~fuel:(fuel - 1) run vertices labels fwd_graph bwd_graph contexts ports
+      diagnostics
   else ports
 
 (* Initialize the proof engine with the parameters, variables, hypotheses, and conclusion.  These are supplied and parsed in ordinary Narya syntax.  Because the Pauser module has to return the same value in all cases, this function returns the same type js_checked as the "check" function, but it doesn't use much of it: just 'complete' and 'error'. *)
@@ -1087,9 +1105,11 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
           List.map (fun p -> (p, Dynarray.create ())) (outputs_of_vertex v @ assumptions_of_vertex v)
           @ ps)
         vertices [] in
-    (* We go through the list repeatedly until no more progress is made. *)
+    (* We go through the list repeatedly until no more progress is made, bounded to one pass per
+       port as a termination safeguard (see synth_output_ports). *)
     let ports =
-      synth_output_ports run vertices labels fwd_graph bwd_graph contexts ports diagnostics in
+      synth_output_ports ~fuel:(List.length ports) run vertices labels fwd_graph bwd_graph contexts
+        ports diagnostics in
     (* Get rid of any created holes. *)
     History.undo_all ();
     (* Combine all the generated diagnostics. *)
