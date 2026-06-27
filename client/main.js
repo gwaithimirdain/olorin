@@ -101,6 +101,9 @@ var conclCounter = 0;
 // jsPlumb instance
 var instance;
 
+// Whether the proof engine's one-time global initialization (Narya.init) has run yet.
+var naryaInited = false;
+
 // connections to close buttons
 var connectionCloseButtons = {};
 
@@ -3043,6 +3046,18 @@ function setLevel(level, rulesAllowed) {
         ty: level.conclusion.ty,
         id: 'concl' + (conclCounter++),
     };
+
+    // One-time global initialization of the proof engine (loads the startup definitions and installs
+    // notations).  Narya's versioned global state can't be re-initialized, so this must happen exactly
+    // once for the page; every subsequent level setup reuses it.
+    if (!naryaInited) {
+        const initResult = Narya.init();
+        naryaInited = true;
+        if (initResult.error) {
+            alert(initResult.error);
+            return;
+        }
+    }
 
     // Typecheck everything.
     const result = Narya.start(parameters, variables, hypotheses, conclusion);

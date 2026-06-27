@@ -452,7 +452,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let term =
             Named.Synth
               (Named.Match
-                 { tm = locate_opt None term; sort = `Implicit; branches = Emp; refutables = None })
+                 {
+                   tm = locate_opt None term;
+                   sort = `Implicit;
+                   branches = Emp;
+                   refutables = None;
+                   highers = [];
+                 })
           in
           ({ bindables; term }, variables)
       | Abs { field; has_value = _; implicit_post } ->
@@ -519,13 +525,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 let newvariables = PortSet.diff newvariables assumptions in
                 (* We locate each branch at the location of the *match variable*, so that "No_such_constructor_in_match" errors will be associated to the input wire. *)
                 let xs = locate_opt (Loc.non_annotating tm.loc) (namevec_of_vec newvars) in
-                ( Snoc (brs, (constr, Named.Branch (xs, locate_opt None `Normal, body))),
+                ( Snoc (brs, (constr, Named.Branch (xs, `Normal None, body))),
                   Bindables.union bindables newbindables,
                   PortSet.union variables newvariables ))
               (Emp, bindables, variables) branches in
           ( {
               bindables;
-              term = Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None });
+              term = Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] });
             },
             variables )
       | Coconstr { constr; outputs } ->
@@ -549,18 +555,18 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 used = variables;
                 bind =
                   (fun body ->
-                    let branch = Named.Branch (locate_opt tm.loc vars, locate_opt None `Normal, body) in
+                    let branch = Named.Branch (locate_opt tm.loc vars, `Normal None, body) in
                     let branches = Snoc (Emp, (constr, branch)) in
-                    Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None }));
+                    Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] }));
                 sbind =
                   (fun body ->
                     let branch =
                       Named.Branch
                         ( locate_opt tm.loc vars,
-                          locate_opt None `Normal,
+                          `Normal None,
                           locate_opt body.loc (Named.Synth body.value) ) in
                     let branches = Snoc (Emp, (constr, branch)) in
-                    Named.Match { tm; sort = `Implicit; branches; refutables = None });
+                    Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] });
               } in
           let variables =
             List.fold_right
@@ -762,7 +768,11 @@ type problem = Problem : ('a, 'b) Ctx.t * (unit, 'a) Resolver.scope * kinetic va
 let problem : problem option ref = ref None
 
 (* A dummy constant used to pretend to Narya that we're executing a 'def' command. *)
-let const : Constant.t option ref = ref None
+(* The type of the dummy constant that each check typechecks the proof "into" as a potential
+   definition.  We store the type (computed once per level in `start`) rather than a constant,
+   because in Narya's versioned model a constant can only be added to the *current* origin, and each
+   check runs inside its own command/origin -- so the constant must be created fresh there. *)
+let const_ty = ref None
 
 (* Pause inside effect handlers to return to the browser *)
 module Pauser = Pauseable (struct
@@ -970,13 +980,64 @@ let rec synth_output_ports ~(fuel : int) (run : (unit -> unit) -> unit) (vertice
       diagnostics
   else ports
 
-(* Initialize the proof engine with the parameters, variables, hypotheses, and conclusion.  These are supplied and parsed in ordinary Narya syntax.  Because the Pauser module has to return the same value in all cases, this function returns the same type js_checked as the "check" function, but it doesn't use much of it: just 'complete' and 'error'. *)
+(* Catch stderr for errors during loading the startup code and the context and conclusion. *)
+let errbuf = Buffer.create 200
+
+let ok_checked () : js_checked Js.t =
+  object%js
+    val mutable complete = Js.bool false
+    val mutable callback = Js.null
+    val mutable error = Js.null
+    val mutable labels = Js.array (Array.of_list [])
+    val mutable diagnostics = Js.array (Array.of_list [])
+  end
+
+let err_checked () : js_checked Js.t =
+  (* If executing the startup code or checking the context and conclusion raised an error, we catch that error in the error buffer and return it. *)
+  Out_channel.flush stderr;
+  object%js
+    val mutable complete = Js.bool false
+    val mutable callback = Js.null
+    val mutable error = Js.some (Js.string (Buffer.contents errbuf))
+    val mutable labels = Js.array (Array.of_list [])
+    val mutable diagnostics = Js.array (Array.of_list [])
+  end
+
+(* One-time global initialization.  We enter run_top through the coroutine interface and install
+   Olorin's notations.  This MUST be called exactly once, before any `start`: Narya's versioned
+   global state (constant/metavariable tables keyed by origin) doesn't support re-running run_top,
+   so all per-level work happens in `start` below via Pauser.next, which re-enters the *same*
+   coroutine without reinitializing. *)
+let init () : js_checked Js.t =
+  let () = Sys_js.set_channel_flusher stderr (fun str -> Buffer.add_string errbuf str) in
+  Buffer.clear errbuf;
+  (* The sole non-interactive input is the startup code. *)
+  inputs := Snoc (Emp, `String startup);
+  (* Display config *)
+  number_metas := false;
+  parenthesize_arguments := true;
+  extra_spaces := false;
+  (* Olorin is plain (parametric) first-order logic and doesn't use observational/HoTT features.
+     Recent Narya makes HoTT the default, which makes typechecking (especially loading the startup
+     definitions) ~20x slower; opt out so startup stays fast. *)
+  hott := false;
+  try
+    (* We don't use ANSI codes here, since we're just displaying errors to the user in ordinary text.  When Asai gets custom markers, we can colorize these errors with HTML. *)
+    (* Olorin is non-HoTT (hott := false above), so the HoTT installer is never invoked. *)
+    Pauser.init ~use_ansi:false ~digit_vars:false ~onechar_ops ~install_hott:(fun () -> ())
+    @@ fun () ->
+    install_notations ();
+    ok_checked ()
+  with Top.Exit -> err_checked ()
+
+(* Per-level setup: parse and process the parameters, variables, hypotheses, and conclusion (in
+   ordinary Narya syntax) and build the `problem` context that the user's graph will be checked
+   against.  Runs inside the already-initialized coroutine via Pauser.next.  Like `check`, it returns
+   a js_checked, but only 'complete' and 'error' are meaningful. *)
 let start (parameters : Variable.js Js.t Js.js_array Js.t)
     (variables : Variable.js Js.t Js.js_array Js.t) (hypotheses : Variable.js Js.t Js.js_array Js.t)
     (conclusion : Variable.js Js.t) : js_checked Js.t =
-  (* Catch stderr for errors during loading the startup code and the context and conclusion. *)
-  let errbuf = Buffer.create 70 in
-  let () = Sys_js.set_channel_flusher stderr (fun str -> Buffer.add_string errbuf str) in
+  Buffer.clear errbuf;
   (* We combine the Olorin parameters, variables, and hypotheses into the Narya parameters *)
   let new_vars = ref IdMap.empty in
   let params =
@@ -989,21 +1050,8 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
          (Array.fold_right
             (fun x xs -> Variable.of_js `Hypothesis new_vars x :: xs)
             (Js.to_array hypotheses) [])) in
-  (* The sole non-interactive input is the startup code. *)
-  inputs := Snoc (Emp, `String startup);
-  (* Display config *)
-  number_metas := false;
-  parenthesize_arguments := true;
-  extra_spaces := false;
-  (* Olorin is plain (parametric) first-order logic and doesn't use observational/HoTT features.
-     Recent Narya makes HoTT the default, which makes typechecking (especially loading the startup
-     definitions) ~20x slower; opt out so startup stays fast. *)
-  hott := false;
-  (* Now we enter run_top through the coroutine interface. *)
   try
-    (* We don't use ANSI codes here, since we're just displaying errors to the user in ordinary text.  When Asai gets custom markers, we can colorize these errors with HTML. *)
-    Pauser.init ~use_ansi:false ~digit_vars:false ~onechar_ops @@ fun () ->
-    install_notations ();
+    Pauser.next @@ fun () ->
     (* We parse and process the parameters into raw terms.  *)
     let hypcount = ref 0 in
     let params =
@@ -1062,28 +1110,10 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
     (conclusion_node :=
        let id = Id.Id (Js.to_string conclusion##.id) in
        Some (id, { id; name = None; rule = Conclusion; value = Some concl_ty }));
-    let c = Constant.make (Compunit.Current.read ()) in
-    const := Some c;
-    let pi_cty = Telescope.pis cparams ty in
-    Global.add c pi_cty (`Axiom, `Parametric);
+    const_ty := Some (Telescope.pis cparams ty);
     (* Assuming all that succeeded, we return no errors to JavaScript to indicate success. *)
-    object%js
-      val mutable complete = Js.bool false
-      val mutable callback = Js.null
-      val mutable error = Js.null
-      val mutable labels = Js.array (Array.of_list [])
-      val mutable diagnostics = Js.array (Array.of_list [])
-    end
-  with Top.Exit ->
-    (* If executing the startup code or checking the context and conclusion raised an error, we catch that error in the error buffer and return it. *)
-    Out_channel.flush stderr;
-    object%js
-      val mutable complete = Js.bool false
-      val mutable callback = Js.null
-      val mutable error = Js.some (Js.string (Buffer.contents errbuf))
-      val mutable labels = Js.array (Array.of_list [])
-      val mutable diagnostics = Js.array (Array.of_list [])
-    end
+    ok_checked ()
+  with Top.Exit -> err_checked ()
 
 (* "Parse" the current graph into one or more terms and typecheck them all. *)
 let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.js_array Js.t) :
@@ -1116,15 +1146,15 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
     let contexts = ref [] in
-    (* Note: this deliberately does NOT wrap f in History.do_command.  We typecheck speculatively
-       many times here (every candidate scope for every disconnected port), and most of those
+    (* Note: this deliberately does NOT wrap f in its own command boundary.  We typecheck
+       speculatively many times here (every candidate scope for every disconnected port), and most
        attempts raise a fatal that an inner handler catches and treats as "this scope didn't work".
-       History.do_command runs Eternity.filter_now on *any* exception escaping it, which would delete
-       the holes that attempt created; but a sibling attempt or port may already depend on those
-       holes, leaving dangling references ("undefined metavariable" anomaly).  Instead we wrap the
-       whole check in a single do_command (below) and clean everything up once with undo_all. *)
+       A per-attempt command boundary rewinds the holes that attempt created on failure, but a
+       sibling attempt or port may already depend on those holes, leaving dangling references (an
+       "undefined metavariable" anomaly).  Instead we wrap the whole check in a single
+       run_command_then_undo (below), which cleans everything up once.  holes_allowed is supplied
+       there too, rather than per-attempt. *)
     let run f =
-      Global.HolesAllowed.run ~env:(Ok ()) @@ fun () ->
       Annotate.run
         ~ctx:{ handle = (fun p -> annotate_ctx_handler contexts p) }
         ~tm:(fun p -> annotate_tm_handler labels p)
@@ -1145,43 +1175,51 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
        an unhandled effect, which aborts the surrounding History.do_command, deletes the
        metavariables that command created, and leaves other ports referencing them -- surfacing as
        an "undefined metavariable" anomaly and leaving those ports unlabeled. *)
-    let fatal_error, ports =
-      (* A single undoable command around the whole check; see the note on `run` above.  undo_all
-         (below) reverts everything it created. *)
-      History.do_command @@ fun () ->
-      Reporter.try_with
-        ~emit:(fun d ->
-          match d.message with
-          | No_holes_allowed _ -> Diagnostic.add diagnostics true d
-          | _ -> Diagnostic.add diagnostics false d)
-        ~fatal:(fun d ->
-          Diagnostic.add diagnostics true d;
-          (true, []))
-      @@ fun () ->
-      (* Supply the Buchberger oracle.  This has to be inside the Reporter.try_with, since it can raise typechecking errors. *)
-      Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
-      (* Starting from the conclusion, turn the graph into a raw term with named variables. *)
-      let conclusion_ntm = bind (check_of_graph vertices bwd_graph) in
-      (* Then resolve it into one with De Bruijn indices. *)
-      let conclusion_tm =
-        RequireScoping.run ~env:false @@ fun () -> Resolve.check scope conclusion_ntm in
-      (* Now typecheck that term.  Unattached input ports are represented in the raw term by holes.  So if those places in the term are checkable, typechecking will "succeed".  Whereas if they are synthesizing it will fail with a "Nonsynthesizing" error, which will be caught by the above "Reporter.try_with".   *)
-      ( run @@ fun () ->
-        let _ =
-          Check.check
-            (Potential (Constant (Option.get !const, D.zero), Ctx.apps ctx, Ctx.lam ctx))
-            ctx conclusion_tm conclusion_ty in
-        () );
-      (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
-      let fatal_error = Eternity.unsolved () > 0 in
-      (* We go through the port list repeatedly until no more progress is made, bounded to one pass
-         per port as a termination safeguard (see synth_output_ports). *)
-      let ports =
-        synth_output_ports ~fuel:(List.length port_list) run vertices labels fwd_graph bwd_graph
-          contexts port_list diagnostics in
-      (fatal_error, ports) in
-    (* Get rid of any created holes. *)
-    History.undo_all ();
+    (* A single undoable command around the whole check; run_command_then_undo reverts everything it
+       created (the holes from an incomplete proof), so we don't have to clean up by hand.  Its own
+       return (hole positions) is irrelevant to us, so we stash the real result in a ref. *)
+    let result = ref (false, []) in
+    let _ : int option * (int * int * int) list =
+      Global.run_command_then_undo ~holes_allowed:(Ok ()) @@ fun () ->
+      (* Create the dummy "definition" constant in this command's origin (see const_ty). *)
+      let c = Constant.make () in
+      Global.add c (Option.get !const_ty) (`Axiom, `Parametric);
+      let r =
+        Reporter.try_with
+          ~emit:(fun d ->
+            match d.message with
+            | No_holes_allowed _ -> Diagnostic.add diagnostics true d
+            | _ -> Diagnostic.add diagnostics false d)
+          ~fatal:(fun d ->
+            Diagnostic.add diagnostics true d;
+            (true, []))
+        @@ fun () ->
+        (* Supply the Buchberger oracle.  This has to be inside the Reporter.try_with, since it can raise typechecking errors. *)
+        Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
+        (* Starting from the conclusion, turn the graph into a raw term with named variables. *)
+        let conclusion_ntm = bind (check_of_graph vertices bwd_graph) in
+        (* Then resolve it into one with De Bruijn indices. *)
+        let conclusion_tm =
+          RequireScoping.run ~env:false @@ fun () -> Resolve.check scope conclusion_ntm in
+        (* Now typecheck that term.  Unattached input ports are represented in the raw term by holes.  So if those places in the term are checkable, typechecking will "succeed".  Whereas if they are synthesizing it will fail with a "Nonsynthesizing" error, which will be caught by the above "Reporter.try_with".   *)
+        ( run @@ fun () ->
+          let _ =
+            Check.check
+              (Potential (Constant (c, D.zero), Ctx.apps ctx, Ctx.lam ctx))
+              ctx conclusion_tm conclusion_ty in
+          () );
+        (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
+        let fatal_error = Global.unsolved_holes () > 0 in
+        (* We go through the port list repeatedly until no more progress is made, bounded to one pass
+           per port as a termination safeguard (see synth_output_ports). *)
+        let ports =
+          synth_output_ports ~fuel:(List.length port_list) run vertices labels fwd_graph bwd_graph
+            contexts port_list diagnostics in
+        (fatal_error, ports) in
+      result := r;
+      (* run_command_then_undo wants (offset, make_msg); we report holes ourselves, so neither. *)
+      (None, fun _ -> None) in
+    let fatal_error, ports = !result in
     (* Combine all the generated diagnostics. *)
     List.iter (fun (_, ds) -> Dynarray.append diagnostics ds) ports;
     object%js
@@ -1209,6 +1247,11 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
 let _ =
   Js.export "Narya"
     (object%js
+       (* One-time global initialization; call exactly once before the first `start`. *)
+       method init =
+         Oracle.Callback.halt ();
+         init ()
+
        method start (parameters : Variable.js Js.t Js.js_array Js.t)
            (variables : Variable.js Js.t Js.js_array Js.t)
            (hypotheses : Variable.js Js.t Js.js_array Js.t) (conclusion : Variable.js Js.t) =

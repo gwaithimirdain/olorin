@@ -209,8 +209,8 @@ let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
         | Snoc (ctx, Invis _, _) -> vars_of_ctx ctx
         | Snoc (ctx, Vis { vars; _ }, _) -> (
             match NICubeOf.find_top vars with
-            | Some x -> Snoc (vars_of_ctx ctx, x)
-            | None -> vars_of_ctx ctx) in
+            | `Named x -> Snoc (vars_of_ctx ctx, x)
+            | `Anon _ -> vars_of_ctx ctx) in
       vars_of_ctx ctx
 
 (* We memorize the results of calls to reduce, so we don't have to re-make them every time. *)
