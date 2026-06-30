@@ -33,11 +33,19 @@ If you have **only** changed JavaScript or CSS (not the OCaml), you can skip the
 
 ## Serving Olorin
 
-Once `static/` has been built, it is self-contained: serve that directory with any static file server.  For local use:
+Once `static/` has been built, it is self-contained: serve that directory with any static file server.  For local use on the same machine:
 ```
 npx http-server static -o -p 9999
 ```
-The page needs [cross-origin isolation](https://web.dev/coop-coep/) (for `SharedArrayBuffer`, used by Z3); `coi-serviceworker.js` provides this by reloading the page to turn it on, so a plain static server like `http-server` works.  Alternatively, serve it from a custom server that sets the cross-origin headers itself, in which case `coi-serviceworker.js` is unnecessary.
+The Algebra and Inequality worlds use Z3, whose WebAssembly build is multithreaded and therefore needs `SharedArrayBuffer`.  The browser only exposes `SharedArrayBuffer` when the page is **both** [cross-origin isolated](https://web.dev/coop-coep/) (the `Cross-Origin-Opener-Policy`/`Cross-Origin-Embedder-Policy` headers) **and** in a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) (`https://…` or `http://localhost`).  `http://localhost` is a secure context, and `coi-serviceworker.js` supplies the isolation headers (by reloading the page once to turn them on), so a plain `http-server` works there.
+
+A bare-IP LAN URL such as `http://192.168.1.5:9999` is **not** a secure context, so `SharedArrayBuffer` is unavailable no matter what — and `coi-serviceworker.js` can't help (service workers don't even register on a non-localhost `http` origin).  Z3 then fails with `pthread_create: environment does not support SharedArrayBuffer`.  To run Olorin over a LAN, serve it over HTTPS instead:
+```
+npm run serve
+```
+This serves `static/` over HTTPS with the cross-origin-isolation headers, using an auto-generated self-signed certificate (in the gitignored `.certs/`, with a SAN covering `localhost` and your detected LAN IPs) and binding all interfaces.  Open the printed `https://<your-LAN-IP>:8443/` URL on each device and accept the self-signed-certificate warning once.  (Pass a port and/or root dir as arguments, e.g. `npm run serve -- 9443`.)
+
+Alternatively, serve from any custom server that sets the cross-origin headers itself over HTTPS, in which case `coi-serviceworker.js` is unnecessary.
 
 The runtime assets (`main.bundle.js`, `olorin.bc.js`, `z3-built.*`, `coi-serviceworker.js`) are not checked into git, so a fresh checkout has none of them until you build — `npm run build:static` puts them all in `static/`.
 

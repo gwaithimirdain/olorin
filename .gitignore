@@ -34,7 +34,6 @@ _opam/
 
 # Javascript dependencies
 node_modules/
-package-lock.json
 
 # Reduce dependency
 reduce-algebra
