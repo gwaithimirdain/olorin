@@ -1196,20 +1196,31 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
         @@ fun () ->
         (* Supply the Buchberger oracle.  This has to be inside the Reporter.try_with, since it can raise typechecking errors. *)
         Check.Oracle.run ~ask:Oracle.ask @@ fun () ->
-        (* Starting from the conclusion, turn the graph into a raw term with named variables. *)
-        let conclusion_ntm = bind (check_of_graph vertices bwd_graph) in
-        (* Then resolve it into one with De Bruijn indices. *)
-        let conclusion_tm =
-          RequireScoping.run ~env:false @@ fun () -> Resolve.check scope conclusion_ntm in
-        (* Now typecheck that term.  Unattached input ports are represented in the raw term by holes.  So if those places in the term are checkable, typechecking will "succeed".  Whereas if they are synthesizing it will fail with a "Nonsynthesizing" error, which will be caught by the above "Reporter.try_with".   *)
-        ( run @@ fun () ->
-          let _ =
-            Check.check
-              (Potential (Constant (c, D.zero), Ctx.apps ctx, Ctx.lam ctx))
-              ctx conclusion_tm conclusion_ty in
-          () );
-        (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
-        let fatal_error = Global.unsolved_holes () > 0 in
+        (* Check the term connected to the conclusion, in its own error handler.  A fatal error here
+           (e.g. an incomplete box wired to the goal, whose empty input port is a non-synthesizing
+           term in a synthesizing position) means this proof is incomplete, but it must not abort
+           the whole check: the disconnected fragments below still get synthesized, so their ports
+           and wires keep their labels.  Emitted (non-fatal) diagnostics pass on out to the handler
+           installed above. *)
+        let fatal_error =
+          Reporter.try_with ~fatal:(fun d ->
+              Diagnostic.add diagnostics true d;
+              true)
+          @@ fun () ->
+          (* Starting from the conclusion, turn the graph into a raw term with named variables. *)
+          let conclusion_ntm = bind (check_of_graph vertices bwd_graph) in
+          (* Then resolve it into one with De Bruijn indices. *)
+          let conclusion_tm =
+            RequireScoping.run ~env:false @@ fun () -> Resolve.check scope conclusion_ntm in
+          (* Now typecheck that term.  Unattached input ports are represented in the raw term by holes.  So if those places in the term are checkable, typechecking will "succeed".  Whereas if they are synthesizing it will fail with a "Nonsynthesizing" error, which will be caught by the "Reporter.try_with" just above. *)
+          ( run @@ fun () ->
+            let _ =
+              Check.check
+                (Potential (Constant (c, D.zero), Ctx.apps ctx, Ctx.lam ctx))
+                ctx conclusion_tm conclusion_ty in
+            () );
+          (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
+          Global.unsolved_holes () > 0 in
         (* We go through the port list repeatedly until no more progress is made, bounded to one pass
            per port as a termination safeguard (see synth_output_ports). *)
         let ports =
