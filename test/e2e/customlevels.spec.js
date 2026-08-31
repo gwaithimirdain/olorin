@@ -5,31 +5,9 @@ const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 
 // Build a custom level via the custom-level dialog (P |- P by default).
-async function buildCustom(olorin, opts = {}) {
-    const { parameters = 'P : Type', variables = '', hypotheses = 'P', conclusion = 'P' } = opts;
-    await olorin.page.evaluate(() => {
-        document.getElementById('selectLevel').click();
-        document.getElementById('customLevel').click();
-    });
-    await olorin.page.fill('#parameters', parameters);
-    await olorin.page.fill('#variables', variables);
-    await olorin.page.fill('#hypotheses', hypotheses);
-    await olorin.page.fill('#conclusion', conclusion);
-    await olorin.page.click('#submitLevel');
-    await olorin.dismissHints();
-}
-
-async function openChooser(olorin) {
-    await olorin.page.evaluate(() => {
-        const bg = document.getElementById('levelChooseBG');
-        if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
-    });
-}
-
-function customNames(olorin) {
-    return olorin.page.evaluate(() =>
-        Array.from(document.querySelectorAll('#customRows .custom-name')).map((e) => e.innerText));
-}
+const buildCustom = (olorin, opts) => olorin.buildCustom(opts);
+const openChooser = (olorin) => olorin.openChooser();
+const customNames = (olorin) => olorin.customLevelNames();
 
 // The lock state of a custom row's three difficulty marks (true = locked).
 function rowLocks(olorin) {

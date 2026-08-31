@@ -1313,8 +1313,12 @@ function serializeProof() {
 
     return {
         // The level this proof belongs to (parameters, variables, hypotheses, conclusion), so
-        // an imported proof can be matched to (or used to switch to) the right level.
-        level: currentLevel ? saveable(currentLevel) : undefined,
+        // an imported proof can be matched to (or used to switch to) the right level.  Custom
+        // levels export their whole definition, so an import elsewhere can recreate the level.
+        level: currentLevelDefinition(),
+        // The name of the saved custom level this proof belongs to, if any, used to pre-fill the
+        // prompt when an import has to recreate it.
+        levelName: currentCustom ? currentCustom.name : undefined,
         // Whether the proof is currently complete (the conclusion has turned a color).
         complete: conclusion_node !== null && conclusion_node.style.backgroundColor !== "",
         difficulty: difficulty,
@@ -1331,10 +1335,38 @@ function serializeProof() {
     };
 }
 
+// The definition (parameters, variables, hypotheses, conclusion) identifying the level that's
+// currently open: the "saveable" statement of a built-in level, or the full definition of a
+// custom one (saved or not).  Undefined only before any level has been set up.
+function currentLevelDefinition() {
+    if(currentLevel) { return saveable(currentLevel); }
+    if(currentLevelDef) { return levelDefCopy(currentLevelDef); }
+    return undefined;
+}
+
+// The identity of the currently open level as a JSON string, comparable with the "level" field
+// of an exported proof, or null if there is no level.
+function currentLevelKey() {
+    const def = currentLevelDefinition();
+    return def ? JSON.stringify(def) : null;
+}
+
+// Whether an imported proof's "level" field carries a usable level definition (so a custom level
+// could be built from it).
+function isLevelDef(def) {
+    return !!def && Array.isArray(def.parameters) && Array.isArray(def.variables) &&
+        Array.isArray(def.hypotheses) && !!def.conclusion && typeof def.conclusion.ty === 'string';
+}
+
 // Find the built-in level whose identity (saveable parameters/hypotheses/conclusion) matches
 // the given JSON.stringify(saveable(...)) key, or undefined if none does.
 function findLevelByKey(key) {
     return allLevels.find(function (l) { return JSON.stringify(saveable(l)) === key; });
+}
+
+// Find the saved custom level with the same statement as the given key, or undefined if none has.
+function findCustomLevelByKey(key) {
+    return loadCustomLevels().find(function (c) { return JSON.stringify(levelDefCopy(c)) === key; });
 }
 
 // localStorage key under which the proof for the currently selected level is saved.
@@ -1430,6 +1462,9 @@ function restoreProof(state, level, countAsCompletion) {
         openCustomLevel(currentCustom, true);
     } else if(currentLevel) {
         selectCurrentLevel(currentLevel, true);
+    } else if(currentLevelDef) {
+        // An unsaved custom level: rebuild it from the definition it was set up with.
+        setLevel(levelDefCopy(currentLevelDef), "all");
     } else {
         alert("There is no level to restore this proof into.");
         return;
@@ -1572,23 +1607,63 @@ document.getElementById("submitImport").onclick = function() {
     }
     // If the proof was exported from a different level, offer to switch to that level.
     const importedKey = state.level ? JSON.stringify(state.level) : null;
-    const currentKey = currentLevel ? JSON.stringify(saveable(currentLevel)) : null;
-    if(importedKey && importedKey !== currentKey) {
+    if(importedKey && importedKey !== currentLevelKey()) {
+        // A built-in level, or a custom level we've already saved, with the same statement.
         const target = findLevelByKey(importedKey);
-        if(!target) {
+        const custom = target ? null : findCustomLevelByKey(importedKey);
+        if(target || custom) {
+            if(!confirm("You're trying to import a proof that doesn't match the current level.  Switch to the level it was exported from?")) {
+                return;
+            }
+            document.getElementById("importBG").style.display = "none";
+            if(target) { restoreProof(state, target); }
+            else { restoreProofIntoCustom(state, custom); }
+            return;
+        }
+        // Otherwise the proof came from a custom level we don't have.  If it carries the level's
+        // definition, we can recreate it as a new custom level, under a name the player picks.
+        if(!isLevelDef(state.level)) {
             alert("This proof was exported from a level that isn't available, so it can't be imported.");
             return;
         }
-        if(!confirm("You're trying to import a proof that doesn't match the current level.  Switch to the level it was exported from?")) {
-            return;
-        }
+        const created = createImportedCustom(state);
+        if(!created) { return; }
         document.getElementById("importBG").style.display = "none";
-        restoreProof(state, target);
+        restoreProofIntoCustom(state, created);
         return;
     }
     document.getElementById("importBG").style.display = "none";
     restoreProof(state);
 };
+
+// Save a new custom level built from an imported proof's level definition, prompting for its name
+// (pre-filled with the name it was exported under).  Returns the saved level, or null if the
+// player cancelled.
+function createImportedCustom(state) {
+    const suggested = typeof state.levelName === 'string' ? state.levelName : "";
+    const input = prompt("This proof comes from a custom level you don't have.  Name for the new custom level:", suggested);
+    if(input === null) { return null; }
+    const name = input.trim();
+    if(!name) { return null; }
+    // Re-using an existing name would overwrite that level's statement, so ask first.
+    if(loadCustomLevels().some(function (c) { return c.name === name; }) &&
+       !confirm('You already have a custom level named "' + name + '".  Replace its statement with the imported one?')) {
+        return null;
+    }
+    // Unlock it up to the difficulty the imported proof was made at, so it opens there.
+    const d = typeof state.difficulty === 'number' ? state.difficulty : 0;
+    const cl = storeCustomLevelNamed(name, levelDefCopy(state.level), d);
+    refreshCustomWorld();
+    return cl;
+}
+
+// Switch to a saved custom level and rebuild an imported proof in it.
+function restoreProofIntoCustom(state, cl) {
+    currentCustom = cl;
+    currentLevel = undefined;
+    currentLevelButton = undefined;
+    restoreProof(state);
+}
 
 // Test instrumentation seam.  When the page is loaded with "?test" in the URL, we expose a
 // small read/drive API on window.__olorin so the Playwright suite can create wire
@@ -1918,29 +1993,36 @@ function saveCustomLevel() {
     saveCustomLevelNamed(name);
 }
 
-// Save the current custom level under the given (already non-empty) name, without prompting.  Used
-// by the Save button (via saveCustomLevel) and by the custom dialog's optional Name field.
-function saveCustomLevelNamed(name) {
-    if(currentLevel || !currentLevelDef) { return; }
-    const def = levelDefCopy(currentLevelDef);
+// Store a custom level with the given (already non-empty) name and definition, unlocked at the
+// given difficulty (and all lower).  Re-using an existing name updates that level's statement,
+// keeping its id and completion record.  Returns the stored level.
+function storeCustomLevelNamed(name, def, unlockDifficulty) {
     const list = loadCustomLevels();
     var cl = list.find(function (c) { return c.name === name; });
     if(cl) {
         cl.parameters = def.parameters; cl.variables = def.variables;
         cl.hypotheses = def.hypotheses; cl.conclusion = def.conclusion;
-        cl.unlockDifficulty = Math.max(cl.unlockDifficulty || 0, difficulty);
+        cl.unlockDifficulty = Math.max(cl.unlockDifficulty || 0, unlockDifficulty);
     } else {
         cl = {
             id: "c" + Date.now() + Math.floor(Math.random() * 100000),
             name: name,
             parameters: def.parameters, variables: def.variables,
             hypotheses: def.hypotheses, conclusion: def.conclusion,
-            unlockDifficulty: difficulty,
+            unlockDifficulty: unlockDifficulty,
             completed: [false, false, false],
         };
         list.push(cl);
     }
     storeCustomLevels(list);
+    return cl;
+}
+
+// Save the current custom level under the given (already non-empty) name, without prompting.  Used
+// by the Save button (via saveCustomLevel) and by the custom dialog's optional Name field.
+function saveCustomLevelNamed(name) {
+    if(currentLevel || !currentLevelDef) { return; }
+    const cl = storeCustomLevelNamed(name, levelDefCopy(currentLevelDef), difficulty);
     currentCustom = cl;
     document.getElementById("currentLevel").innerText = "Level: " + cl.name;
     updateSaveButtonVisibility();

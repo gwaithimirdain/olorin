@@ -85,6 +85,56 @@ class Olorin {
         await this.dismissHints();
     }
 
+    // Open the level chooser if it isn't already showing.
+    async openChooser() {
+        await this.page.evaluate(() => {
+            const bg = document.getElementById('levelChooseBG');
+            if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
+        });
+    }
+
+    // Build (and set) a custom level through the custom-level dialog, defaulting to P |- P.  With a
+    // `name`, the dialog's Name field saves it to the Custom world on submit.
+    async buildCustom(opts = {}) {
+        const { name = '', parameters = 'P : Type', variables = '', hypotheses = 'P', conclusion = 'P' } = opts;
+        await this.openChooser();
+        await this.page.click('#customLevel');
+        await this.page.fill('#customName', name);
+        await this.page.fill('#parameters', parameters);
+        await this.page.fill('#variables', variables);
+        await this.page.fill('#hypotheses', hypotheses);
+        await this.page.fill('#conclusion', conclusion);
+        await this.page.click('#submitLevel');
+        await this.dismissHints();
+    }
+
+    // The names of the saved custom levels, as listed in the Custom world (needs the chooser open).
+    customLevelNames() {
+        return this.page.evaluate(() =>
+            Array.from(document.querySelectorAll('#customRows .custom-name')).map((e) => e.innerText));
+    }
+
+    // Open a saved custom level by clicking its row in the Custom world.
+    async openCustomLevel(name) {
+        await this.openChooser();
+        await this.page.evaluate((n) => {
+            const row = Array.from(document.querySelectorAll('#customRows .custom-row'))
+                  .find((r) => r.querySelector('.custom-name').innerText === n);
+            row.click();
+        }, name);
+        await this.dismissHints();
+    }
+
+    // Delete a saved custom level via its row's ✕ (the confirm is auto-accepted).
+    async deleteCustomLevel(name) {
+        await this.openChooser();
+        await this.page.evaluate((n) => {
+            const row = Array.from(document.querySelectorAll('#customRows .custom-row'))
+                  .find((r) => r.querySelector('.custom-name').innerText === n);
+            row.querySelector('.custom-delete').click();
+        }, name);
+    }
+
     // Whether the level hint overlay is currently showing.
     hintVisible() {
         return this.page.isVisible('#hintBG');

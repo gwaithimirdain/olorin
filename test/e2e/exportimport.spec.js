@@ -4,6 +4,15 @@
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 
+// A custom-level statement that deliberately matches no built-in level, so importing it has to go
+// through the custom-level path (P |- P, for instance, is just level 1-1-1).  It's proved by a
+// single wire from the hypothesis to the conclusion.
+const CUSTOM = {
+    parameters: 'P : Type\nQ : Type\nR : Type',
+    hypotheses: '(P∧Q)∧R',
+    conclusion: '(P∧Q)∧R',
+};
+
 test.describe('Export / Import', () => {
     let olorin;
 
@@ -71,6 +80,88 @@ test.describe('Export / Import', () => {
         expect(await olorin.currentLevelName()).toBe('1-1-2');
         expect(await olorin.structuralState()).toEqual(before);
         expect(await olorin.isVisible('#importBG')).toBe(true);
+    });
+
+    test('exports a custom level\'s full definition, and its name when saved', async () => {
+        await olorin.buildCustom({ name: 'My Lemma', ...CUSTOM });
+        expect(await olorin.currentLevelName()).toBe('My Lemma');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+
+        const parsed = JSON.parse(await olorin.exportText());
+        expect(parsed.level).toEqual({
+            parameters: [{ name: 'P', ty: 'Type' }, { name: 'Q', ty: 'Type' }, { name: 'R', ty: 'Type' }],
+            variables: [],
+            hypotheses: [{ ty: '(P∧Q)∧R' }],
+            conclusion: { ty: '(P∧Q)∧R' },
+        });
+        expect(parsed.levelName).toBe('My Lemma');
+    });
+
+    test('an unsaved custom level still exports its definition (with no name)', async () => {
+        await olorin.buildCustom({ parameters: 'P : Type\nQ : Type', hypotheses: 'P\nQ', conclusion: 'P∧Q' });
+        expect(await olorin.currentLevelName()).toBe('Custom');
+
+        const parsed = JSON.parse(await olorin.exportText());
+        expect(parsed.level.conclusion).toEqual({ ty: 'P∧Q' });
+        expect(parsed.levelName).toBeUndefined();
+    });
+
+    test('importing a proof from an unknown custom level creates it under a chosen name', async () => {
+        // Prove a saved custom level and export it, then delete the level so the import has
+        // nothing to match against.
+        await olorin.buildCustom({ name: 'Gone', ...CUSTOM });
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        const exported = await olorin.exportText();
+        await olorin.deleteCustomLevel('Gone'); // confirm auto-accepted
+        await olorin.selectLevel('1-1-2');
+
+        // The import prompts for a name for the new custom level; accept it as "Rebuilt".
+        olorin.setPromptText('Rebuilt');
+        await olorin.importText(exported);
+
+        expect(await olorin.currentLevelName()).toBe('Rebuilt');
+        await olorin.openChooser();
+        expect(await olorin.customLevelNames()).toEqual(['Rebuilt']);
+        await olorin.page.click('#cancelChooseLevel');
+
+        // The level was rebuilt from the exported definition, with the proof restored in it.
+        expect(await olorin.connections()).toHaveLength(1);
+        expect(await olorin.isComplete()).toBe(true);
+    });
+
+    test('importing a proof from a saved custom level switches to it', async () => {
+        await olorin.buildCustom({ name: 'Mine', ...CUSTOM });
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        const exported = await olorin.exportText();
+        await olorin.selectLevel('1-1-2');
+
+        await olorin.importText(exported); // "switch level?" confirm auto-accepted
+
+        expect(await olorin.currentLevelName()).toBe('Mine');
+        expect(await olorin.isComplete()).toBe(true);
+        // It switched to the existing level rather than creating a duplicate.
+        await olorin.openChooser();
+        expect(await olorin.customLevelNames()).toEqual(['Mine']);
+    });
+
+    test('cancelling the name prompt leaves no custom level and no import', async () => {
+        await olorin.buildCustom({ name: 'Gone', ...CUSTOM });
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        const exported = await olorin.exportText();
+        await olorin.deleteCustomLevel('Gone');
+        await olorin.selectLevel('1-1-2');
+        const before = await olorin.structuralState();
+
+        // Dismissing the prompt() cancels the import outright.
+        olorin.setDialogAction('dismiss');
+        await olorin.importText(exported);
+
+        expect(await olorin.currentLevelName()).toBe('1-1-2');
+        expect(await olorin.structuralState()).toEqual(before);
+        expect(await olorin.isVisible('#importBG')).toBe(true);
+        await olorin.page.click('#cancelImport');
+        await olorin.openChooser();
+        expect(await olorin.customLevelNames()).toEqual([]);
     });
 
     test('rejects invalid JSON without changing the proof', async () => {
