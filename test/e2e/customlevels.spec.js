@@ -100,6 +100,59 @@ test.describe('Custom levels', () => {
         expect(await customNames(olorin)).toEqual([]);
     });
 
+    test('Clear resets the proof on a saved custom level', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildCustom(olorin, { parameters: 'P : Type\nQ : Type', hypotheses: 'P\nQ', conclusion: 'P∧Q' });
+        olorin.setPromptText('Clearable');
+        await page.click('#saveLevel');
+        await olorin.dragRule('andI', 450, 250);
+        expect((await olorin.nodes()).some((n) => n.rule === 'andI')).toBe(true);
+
+        await olorin.clear(); // confirm auto-accepted
+
+        // The level stays open (with its own fixed nodes), and the added rule and autosave are gone.
+        expect(await olorin.currentLevelName()).toBe('Clearable');
+        expect((await olorin.nodes()).some((n) => n.rule === 'andI')).toBe(false);
+        expect(await olorin.nodes()).toHaveLength(3); // two hypotheses and the conclusion
+        expect(await olorin.savedProof()).toBeNull();
+    });
+
+    test('Clear resets the proof on an unsaved custom level', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildCustom(olorin, { parameters: 'P : Type\nQ : Type', hypotheses: 'P\nQ', conclusion: 'P∧Q' });
+        await olorin.dragRule('andI', 450, 250);
+
+        await olorin.clear();
+
+        expect(await olorin.currentLevelName()).toBe('Custom');
+        expect((await olorin.nodes()).some((n) => n.rule === 'andI')).toBe(false);
+        expect(await olorin.nodes()).toHaveLength(3);
+    });
+
+    test('Clear keeps a reduced difficulty on a custom level', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildCustom(olorin);
+        olorin.setPromptText('Reducible');
+        await page.click('#saveLevel');
+        // Solve it at novice so adept unlocks, then re-open at adept and reduce back to novice.
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        // (No saved-proof prompt: the novice proof is saved under the novice key, not adept's.)
+        await olorin.openCustomLevel('Reducible');
+        expect(await page.textContent('#currentDifficulty')).toContain('Adept');
+        await page.click('#reduceDifficulty');
+        // Reducing offers the proof saved at novice; keep the (empty) current one.
+        await page.click('#keepCurrentDowngrade');
+        expect(await page.textContent('#currentDifficulty')).toContain('Novice');
+
+        await olorin.clear();
+
+        // Clearing re-opens the level where we are, not back at the highest unlocked difficulty.
+        expect(await page.textContent('#currentDifficulty')).toContain('Novice');
+    });
+
     test('a saved custom level remembers an in-progress proof', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();

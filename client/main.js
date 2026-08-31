@@ -1263,12 +1263,12 @@ document.getElementById("selectLevel").onclick = function() {
     document.getElementById("levelChooseBG").style.display = "flex";
 };
 
-// To clear the current proof, discard its autosave and re-select the current level fresh.
+// To clear the current proof, discard its autosave and re-open the current level fresh.
 document.getElementById("clearProof").onclick = function() {
     if(confirm("This will clear your current proof and reset to the beginning of this level!  It cannot be un-done.  Are you sure?")) {
         const key = savedProofKey();
         if(key) { localStorage.removeItem(key); }
-        selectCurrentLevel(currentLevel, true);
+        reopenCurrentLevel();
     }
 }
 
@@ -1458,14 +1458,7 @@ function restoreProof(state, level, countAsCompletion) {
     // Narya.  Skip the saved-proof prompt here: we're restoring a specific proof on purpose.
     if(level) {
         selectCurrentLevel(level, true);
-    } else if(currentCustom) {
-        openCustomLevel(currentCustom, true);
-    } else if(currentLevel) {
-        selectCurrentLevel(currentLevel, true);
-    } else if(currentLevelDef) {
-        // An unsaved custom level: rebuild it from the definition it was set up with.
-        setLevel(levelDefCopy(currentLevelDef), "all");
-    } else {
+    } else if(!reopenCurrentLevel()) {
         alert("There is no level to restore this proof into.");
         return;
     }
@@ -1878,8 +1871,7 @@ document.getElementById("freshDowngrade").onclick = function() {
     pendingDowngrade = null;
     const key = savedProofKey();
     if(key) { localStorage.removeItem(key); }
-    if(currentCustom) { openCustomLevel(currentCustom, true); }
-    else if(currentLevel) { selectCurrentLevel(currentLevel, true); }
+    reopenCurrentLevel();
 }
 
 function updateCurrentDifficulty() {
@@ -2032,12 +2024,15 @@ function saveCustomLevelNamed(name) {
     autosave(); // keep the current proof under the now-saved level's key
 }
 
-// Open a saved custom level at its highest unlocked difficulty.
-function openCustomLevel(cl, skipSavedPrompt) {
-    const states = customStates(cl);
-    var d = 0;
-    for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
-    setDifficulty(d);
+// Open a saved custom level at its highest unlocked difficulty, or (with keepDifficulty) at
+// whatever difficulty is currently set, for re-opening the level we're already on.
+function openCustomLevel(cl, skipSavedPrompt, keepDifficulty) {
+    if(!keepDifficulty) {
+        const states = customStates(cl);
+        var d = 0;
+        for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
+        setDifficulty(d);
+    }
     currentCustom = cl;
     currentLevel = undefined;
     currentLevelButton = undefined;
@@ -2045,6 +2040,18 @@ function openCustomLevel(cl, skipSavedPrompt) {
     document.getElementById("currentLevel").innerText = "Level: " + cl.name;
     updateSaveButtonVisibility();
     if(!skipSavedPrompt) { offerSavedProof(null); }
+}
+
+// Re-set-up whichever level is currently open -- built-in, saved custom, or unsaved custom --
+// recreating its fixed nodes and discarding the current diagram, without prompting about a saved
+// proof.  The difficulty is left alone, so this can't bump a reduced one back up.  Returns false
+// if no level is open at all.
+function reopenCurrentLevel() {
+    if(currentCustom) { openCustomLevel(currentCustom, true, true); }
+    else if(currentLevel) { selectCurrentLevel(currentLevel, true); }
+    else if(currentLevelDef) { setLevel(levelDefCopy(currentLevelDef), "all"); }
+    else { return false; }
+    return true;
 }
 
 // Delete a saved custom level (with confirmation).
