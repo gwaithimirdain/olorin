@@ -16,7 +16,8 @@ jobs:
         ocaml-compiler: 5
     - uses: actions/setup-node@v4
     - run: opam install dune
-    - run: opam exec -- dune build olorin.opam
+    # Release profile, to match npm run build:static below (see scripts/build-static.sh).
+    - run: opam exec -- dune build --profile release olorin.opam
     - run: opam install . --deps-only
     - run: npm install
     # Build static/ (OCaml -> JS, webpack bundle, copy z3/coi runtime assets).

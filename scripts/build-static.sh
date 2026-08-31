@@ -10,9 +10,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Build in the release profile: dune's dev profile has js_of_ocaml emit an inline source map
+# whose sources are absolute paths on the build machine, which browsers then try (and refuse) to
+# load as file:/// URLs, and which bloats olorin.bc.js from under 1MB to over 13MB.
 echo "==> dune build (OCaml -> JS)"
-opam exec -- dune build olorin.opam
-opam exec -- dune build
+opam exec -- dune build --profile release olorin.opam
+opam exec -- dune build --profile release
 
 echo "==> webpack bundle"
 npm run build
