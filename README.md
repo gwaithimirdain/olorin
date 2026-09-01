@@ -75,6 +75,22 @@ which rebuilds `static/` (via `build:static`, so the `dune` build is incremental
 
 Run the suite via `npm run test:e2e` (not a bare `playwright test`): the npm script uses the project's local `@playwright/test`, whereas a global `playwright` is the browser-automation package only and will report `error: unknown command 'test'`.
 
+### Proof fixtures
+
+One of the specs proves *every* level: for each one it restores a known-good proof and asserts the app still marks it complete, so a change to the rules, the typechecker, or the proof-restoring logic that breaks a level fails the build.  Those proofs live in `test/fixtures/proofs/`, one file per level, named by a hash of the level's statement rather than by its number — so inserting, moving, or renumbering levels in `client/levels.js` never invalidates them.  Only editing a statement retires its fixture, which is as it should be: the old proof may no longer prove it.
+
+Fixtures are captured by solving a level in a real browser and saving the result, and are only written once the app confirms the proof is **complete**, so they're correct by construction.  With `static/` built, the auto-solver does as many as it can:
+```
+npm run gen:fixtures                                # solve every level the strategies can
+node test/generate-fixtures.js --only 1-2-1,1-2-2   # just these levels
+node test/generate-fixtures.js --list               # which levels are covered (no browser needed)
+```
+Its strategies are propositional (∧-elimination and modus ponens forwards; ⊤/∧/∨/⇒ introduction backwards), so most levels have to be proved by hand instead: solve one in the app, click **Export**, save the JSON, and file it with
+```
+node test/add-fixture.js exported.json
+```
+which reads the level out of the proof itself — there's no level name to type, and no way to file a proof under the wrong level.  Levels with no fixture yet are reported by the suite as a tracked TODO rather than a failure, so coverage grows a level at a time.  See [`test/README.md`](test/README.md) for the details.
+
 ## Olorin server
 
 The above instructions compile a version of Olorin that runs entirely client-side in the user's browser, saving the list of completed levels locally in the browser.  There is also a version that stores that information on a server associated with the user's email address; this is intended mainly for students in a class, so that the instructor can download a spreadsheet of grades by student and level.  To compile this version of Olorin, simply change the definition `SERVER = false` in `client/main.js` to say `true` instead, and proceed as above.
