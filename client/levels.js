@@ -1058,6 +1058,7 @@ export const LEVELS = [
             ]
           },
           { name: "¬¬₂",
+            bonus: true,
             rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE", "allI", "allE", "exI", "exE" ],
             levels: [
                 {
