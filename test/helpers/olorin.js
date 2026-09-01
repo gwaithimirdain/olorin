@@ -61,6 +61,15 @@ class Olorin {
         return this.page.evaluate((n) => window.__olorin.levelStates(n), name);
     }
 
+    // The completion record stored for a level ({complete, difficulty, times}), or null if none.
+    completionRecord(name) {
+        return this.page.evaluate((n) => {
+            const key = window.__olorin.completionKey(n);
+            const v = key && localStorage.getItem(key);
+            return v ? JSON.parse(v) : null;
+        }, name);
+    }
+
     // Whether a level's chooser button is highlighted as "active" (has an unlocked, uncompleted
     // difficulty).
     levelActive(name) {
@@ -77,7 +86,9 @@ class Olorin {
             const bg = document.getElementById('levelChooseBG');
             if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
         });
-        await this.page.click(`#worlds .level[data-name="${name}"]`);
+        // Click the number, not the button's centre: in test mode the difficulty marks swallow
+        // clicks of their own (double-clicking one toggles that difficulty's completion).
+        await this.page.click(`#worlds .level[data-name="${name}"] .level-number`);
         await this.page.waitForFunction(
             (n) => document.getElementById('currentLevel').innerText.includes(n),
             name,

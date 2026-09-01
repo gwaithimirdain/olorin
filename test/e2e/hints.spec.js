@@ -17,7 +17,7 @@ async function selectLevelKeepingHint(page, name) {
         const bg = document.getElementById('levelChooseBG');
         if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
     });
-    await page.click(`#worlds .level[data-name="${name}"]`);
+    await page.click(`#worlds .level[data-name="${name}"] .level-number`);
     await page.waitForFunction((n) => document.getElementById('currentLevel').innerText.includes(n), name);
 }
 

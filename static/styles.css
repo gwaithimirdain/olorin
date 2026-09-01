@@ -545,6 +545,13 @@ body {
     color: #999999;
     cursor: default;
 }
+/* In test mode a locked level keeps its three difficulty marks (each a completion toggle) instead
+   of collapsing to one padlock beside the number, so it keeps the normal stacked layout too. */
+.level.level-locked.level-toggles {
+    flex-direction: column;
+    gap: 1px;
+    cursor: pointer;
+}
 
 /* An "active" level (has an unlocked, uncompleted difficulty): bright glow so the player can
    see at a glance where to work next. */

@@ -110,6 +110,29 @@ Two things go through a tiny **test seam** instead, `window.__olorin`, which the
 Ports are identified the way the app identifies them: `{ vertex, sort, label }`, e.g.
 `{ vertex: 'hyp0', sort: 'output' }` or `{ vertex: andId, sort: 'input', label: 'fst' }`.
 
+## Test mode
+
+`?test` does two more things beyond exposing that seam, useful for playing with the game by hand
+as well as for the suite:
+
+- **Every level is playable**, whatever the unlock rules say, and it opens at the current
+  difficulty rather than the highest unlocked one.
+- **Double-clicking one of a level's three difficulty marks toggles its completion** at that
+  difficulty, so the unlock rules can be experimented with directly instead of by hand-editing
+  `localStorage`.  Locked levels keep their three marks (greyed) instead of collapsing to a single
+  padlock, so every difficulty of every level can be toggled.
+
+Completion is stored as the highest difficulty completed, so toggling *adept* on marks novice as
+completed too, and toggling it off leaves the level completed at novice.  No completion *time* is
+recorded, so a toggled level never triggers rule 7 (a just-completed lower difficulty re-locking
+the next); and the auto-completion rule still applies afterwards, so toggling a higher difficulty
+*off* on an `autoComplete` level that is unlocked there will immediately re-complete it.
+
+Because the marks are toggles, a click on one doesn't open the level — click the level's number
+(that's what the page object's `selectLevel` does).
+
+Open `http://localhost:8123/?test` (or any other server for `static/`) to use this by hand.
+
 ## Adding tests
 
 Instantiate the page object and go:

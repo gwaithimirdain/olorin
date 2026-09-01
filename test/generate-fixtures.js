@@ -205,7 +205,7 @@ async function solveLevel(page, level) {
         const bg = document.getElementById('levelChooseBG');
         if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
     });
-    await page.click(`#worlds .level[data-name="${level.name}"]`);
+    await page.click(`#worlds .level[data-name="${level.name}"] .level-number`);
     await page.waitForFunction((n) => document.getElementById('currentLevel').innerText.includes(n), level.name);
     await dismissModals(page);
 

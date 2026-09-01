@@ -831,7 +831,7 @@ function makeLevelSelect(res) {
                 if(past.complete) { worldDone++; }
 
                 // Render the button showing the number and per-difficulty lock/unlock/done marks.
-                renderLevelButton(b, name, levelDifficultyStates(level, past, unlockData));
+                renderLevelButton(b, name, levelDifficultyStates(level, past, unlockData), level);
                 b.addEventListener('click', function () { chooseLevel(level); } );
                 stageGrid.appendChild(b);
                 levelButtons.push(b);
@@ -980,7 +980,7 @@ function updateLevelSelect(res) {
         world.stages.forEach(function (stage, y) {
             stage.levels.forEach(function (level, z) {
                 const past = getPast(res, level);
-                renderLevelButton(level.button, level.name, levelDifficultyStates(level, past, unlockData));
+                renderLevelButton(level.button, level.name, levelDifficultyStates(level, past, unlockData), level);
             });
         });
     });
@@ -1172,14 +1172,21 @@ function difficultyMark(state, d) {
 
 // Render a level's button: its number, a row of three per-difficulty marks, and a top stripe in
 // the highest completed difficulty's color (the normal black border when nothing is completed).
-function renderLevelButton(b, name, states) {
+// In test mode `level` is used to make the marks double-clickable (see makeMarksToggleable).
+function renderLevelButton(b, name, states, level) {
     b.className = 'level';
     b.style.borderTop = '';
-    // A fully locked level (novice not yet unlocked) is shown disabled, with a lock in front.
+    // A fully locked level (novice not yet unlocked) is shown disabled, with a lock in front --
+    // except in test mode, where every level is playable and every mark is a toggle, so all three
+    // marks are shown (greyed) rather than the single summary padlock.
     if(states[0] === 'locked') {
         b.classList.add('level-locked');
-        b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
-        return;
+        if(!TEST_MODE) {
+            b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
+            return;
+        }
+        // Still greyed as locked, but laid out like any other level (number above its marks).
+        b.classList.add('level-toggles');
     }
     // "Active" = has a difficulty that's unlocked but not yet completed: where to work next.
     if(states.includes('unlocked')) { b.classList.add('level-active'); }
@@ -1190,6 +1197,47 @@ function renderLevelButton(b, name, states) {
     var hc = -1;
     for(var d = 0; d < 3; d++) { if(states[d] === 'completed') { hc = d; } }
     if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
+    if(TEST_MODE && level) { makeMarksToggleable(b, level); }
+}
+
+// ===== Test-mode completion toggles =====
+// With "?test" in the URL every level is playable; on top of that, double-clicking one of a level's
+// three difficulty marks flips whether the level counts as completed at that difficulty, so the
+// unlock rules can be experimented with directly instead of by hand-editing localStorage.
+function makeMarksToggleable(b, level) {
+    b.title = 'Test mode: double-click a mark to toggle this level\'s completion at that difficulty';
+    const marks = b.querySelectorAll('.level-marks .lvmark');
+    marks.forEach(function (mark, d) {
+        // A mark's own clicks mustn't open the level (a double-click would open it twice).
+        mark.addEventListener('click', function (e) { e.stopPropagation(); });
+        mark.addEventListener('dblclick', function (e) {
+            e.stopPropagation();
+            toggleCompletedAt(level, d);
+        });
+    });
+}
+
+// Flip a level's completion at difficulty d.  Completion is stored as the HIGHEST difficulty
+// completed, so turning d on records "completed up to d", and turning it off records "completed up
+// to d-1" (clearing the record entirely at novice).  No completion *time* is recorded, so rule 7
+// (a just-completed lower difficulty re-locking the next) doesn't apply to a toggled level; and
+// re-rendering re-applies the auto-completion rule, which may immediately re-complete a higher
+// difficulty of an `autoComplete` level that is unlocked there.
+function toggleCompletedAt(level, d) {
+    const key = JSON.stringify(saveable(level));
+    const past = getPast(null, level);
+    const completed = past.complete && past.difficulty >= d;
+    if(completed && d === 0) {
+        localStorage.removeItem(key);
+    } else {
+        localStorage.setItem(key, JSON.stringify({
+            complete: true,
+            difficulty: completed ? d - 1 : Math.max(past.difficulty || 0, d),
+        }));
+    }
+    // Re-render every level (this completion feeds the unlock rules) and this world's chip count.
+    updateLevelSelect(null);
+    refreshWorldProgress(level.worldPaneIndex);
 }
 
 // Recompute, for every world and stage, how many of its levels are complete at each difficulty
@@ -1695,6 +1743,11 @@ if (new URLSearchParams(window.location.search).has("test")) {
         levelStates: (name) => {
             const lvl = allLevels.find((l) => l.name === name);
             return lvl ? levelDifficultyStates(lvl, getPast(null, lvl), unlockData) : null;
+        },
+        // The localStorage key a level's completion is recorded under, by name.
+        completionKey: (name) => {
+            const lvl = allLevels.find((l) => l.name === name);
+            return lvl ? JSON.stringify(saveable(lvl)) : null;
         },
     };
 }
