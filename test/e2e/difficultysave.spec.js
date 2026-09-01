@@ -2,17 +2,13 @@
 // starts blank (no prompt), and reducing the difficulty offers to restore the lower difficulty's
 // saved proof, keep the current one, or start fresh.
 
-const fs = require('fs');
-const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 const { find, completionKey, prereqSeeds } = require('../lib/levels');
+const { hasFixture, readFixture, readFixtureText } = require('../lib/fixtures');
 
 // Levels are picked out of levels.js by what these tests need of them -- never by id, which shifts
 // whenever a level is inserted -- among those with a captured proof in test/fixtures/proofs.
-const FIXTURES = path.join(__dirname, '..', 'fixtures', 'proofs');
-const hasFixture = (l) => fs.existsSync(path.join(FIXTURES, `${l.name}.json`));
-const fixtureOf = (l) => fs.readFileSync(path.join(FIXTURES, `${l.name}.json`), 'utf8');
 
 // A level proved by a single wire, for the plain saved-proof tests.
 const SIMPLE = find((l) => hasFixture(l) && l.variables.length === 0
@@ -23,9 +19,9 @@ const SIMPLE = find((l) => hasFixture(l) && l.variables.length === 0
 // first world means its only unlock prerequisites are the ones prereqSeeds seeds below.
 const MANUAL = find((l) => hasFixture(l) && !l.autoComplete && l.world === 1,
     'a non-auto-completing first-world level backed by a fixture proof');
-const simpleProof = fixtureOf(SIMPLE);
-const manualProofRaw = fixtureOf(MANUAL);
-const manualProof = JSON.parse(manualProofRaw);
+const simpleProof = readFixtureText(SIMPLE);
+const manualProofRaw = readFixtureText(MANUAL);
+const manualProof = readFixture(MANUAL);
 
 test.describe('Per-difficulty saved proofs', () => {
     test('a level opens blank with no prompt at a difficulty that has no saved proof', async ({ page }) => {

@@ -2,9 +2,11 @@
 //
 // For each level it drives the real app in a browser, plans and builds a proof using a small
 // propositional strategy, and — only if the app confirms the proof is COMPLETE — writes the
-// exported JSON to test/fixtures/proofs/<name>.json.  Because every written fixture is verified
-// complete by the real typechecker, generated fixtures are correct by construction.  Levels it
-// can't solve are left without a fixture (they show up as `fixme` in the levels spec).
+// exported JSON to test/fixtures/proofs/, under a hash of the level's statement (see
+// lib/fixtures.js), so renumbering the levels never invalidates a fixture.  Because every written
+// fixture is verified complete by the real typechecker, generated fixtures are correct by
+// construction.  Levels it can't solve are left without a fixture (they show up as `fixme` in the
+// levels spec).
 //
 // Strategy (propositional, no case-split / classical / quantifiers):
 //   - forward: derive new facts from hypotheses by ∧-elimination and modus ponens
@@ -13,15 +15,19 @@
 //
 // Usage (static/ must be built; see scripts/build-static.sh):
 //   node test/generate-fixtures.js [--only 1-2-1,1-3-4]
+//   node test/generate-fixtures.js --list          # what's covered, without solving anything
+//
+// Levels that can't be auto-solved can be captured by hand instead: solve one in the app, click
+// Export, and file the JSON with `node test/add-fixture.js <exported.json>`.
 
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { chromium } = require('@playwright/test');
 const { allLevels } = require('./lib/levels');
+const { FIXTURE_DIR, writeFixture, coverage } = require('./lib/fixtures');
 
 const PORT = process.env.OLORIN_PORT || 8127;
-const FIXTURE_DIR = path.join(__dirname, 'fixtures', 'proofs');
 
 // ---- type-string analysis (principal binary connective; no full parser) ----
 
@@ -224,11 +230,17 @@ async function solveLevel(page, level) {
     return complete ? page.evaluate(() => window.__olorin.serialize()) : null;
 }
 
-function fixturePath(name) {
-    return path.join(FIXTURE_DIR, `${name}.json`);
+// Report which levels have a fixture, and any fixture whose statement is no longer in levels.js
+// (a level whose statement was edited, or that was deleted).
+function list() {
+    const { covered, orphans, dir } = coverage(allLevels());
+    for (const { file, level } of covered) console.log(`  ${level.name}  ${file}`);
+    for (const file of orphans) console.log(`  (orphan: no level states this) ${file}`);
+    console.log(`\n${covered.length}/${allLevels().length} levels covered, ${orphans.length} orphaned, in ${dir}`);
 }
 
 async function main() {
+    if (process.argv.includes('--list')) return list();
     const onlyArg = process.argv.indexOf('--only');
     const only = onlyArg >= 0 ? new Set(process.argv[onlyArg + 1].split(',')) : null;
 
@@ -253,9 +265,9 @@ async function main() {
             console.log(`  ${level.name}: error ${e.message}`);
         }
         if (state) {
-            fs.writeFileSync(fixturePath(level.name), JSON.stringify(state, null, 2) + '\n');
+            const file = path.basename(writeFixture(level, state));
             solved++;
-            console.log(`  ${level.name}: solved`);
+            console.log(`  ${level.name}: solved -> ${file}`);
         } else {
             console.log(`  ${level.name}: not auto-solved`);
         }
