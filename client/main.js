@@ -2824,9 +2824,11 @@ function callback_to_z3(callback) {
 // Wire labels sit at the middle of their wire, so wires running close together -- one port fanning
 // out to two nearby inputs, say -- end up with their labels on top of each other.  After labeling,
 // slide the ones that collide along their own wire: each label tries positions stepping out from
-// the middle and takes the first that clears every label already placed (or, failing that, the one
-// that overlaps them least).  Positions are predicted from the connector's own geometry, so this
-// costs one repaint of the wires that actually moved, not one per position tried.
+// the middle and takes the first that clears everything already in the way (or, failing that, the
+// one that covers least of it).  In the way means the labels already placed, plus the things that
+// can't move: the boxes themselves and the type labels on unconnected ports.  Positions are
+// predicted from the connector's own geometry, so this costs one repaint of the wires that
+// actually moved, not one per position tried.
 const LABEL_LOCATIONS = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9];
 // Labels closer than this (in pixels) count as colliding, so they don't end up flush against
 // each other either.
@@ -2836,6 +2838,19 @@ function overlapArea(a, b) {
     const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) + LABEL_GAP;
     const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) + LABEL_GAP;
     return (w > 0 && h > 0) ? w * h : 0;
+}
+
+// The rectangles a wire label should keep off: every box in the diagram, and the type labels shown
+// beside unconnected output ports.  Neither can be moved out of the way, so they're fixed.
+function labelObstacles() {
+    const fixed = [];
+    const add = function (el) {
+        const r = el.getBoundingClientRect();
+        if(r.width > 0 && r.height > 0) { fixed.push({ x: r.x, y: r.y, w: r.width, h: r.height }); }
+    };
+    nodes.forEach(function (x) { add(x.node); });
+    document.querySelectorAll('#canvas .lowerOutputLabel, #canvas .upperOutputLabel').forEach(add);
+    return fixed;
 }
 
 function spreadWireLabels() {
@@ -2862,9 +2877,10 @@ function spreadWireLabels() {
             });
         });
     });
-    if(labels.length < 2) { return; }
+    if(labels.length === 0) { return; }
 
-    const placed = [];
+    // Seed with the immovable things, so a label prefers a spot clear of them too.
+    const placed = labelObstacles();
     const moved = new Set();
     labels.forEach(function (lb) {
         var best = null;
@@ -2876,8 +2892,11 @@ function spreadWireLabels() {
                 y: lb.cy + (p.y - lb.origin.y) - lb.h / 2,
                 w: lb.w, h: lb.h,
             };
+            // Cost each collision by how much of the LABEL it hides, so a big box doesn't outweigh
+            // several small labels just by being big.
+            const area = lb.w * lb.h;
             var cost = 0;
-            placed.forEach(function (q) { cost += overlapArea(rect, q); });
+            placed.forEach(function (q) { cost += Math.min(overlapArea(rect, q), area); });
             if(best === null || cost < best.cost) { best = { loc: loc, rect: rect, cost: cost }; }
             if(cost === 0) { break; }
         }

@@ -355,6 +355,25 @@ class Olorin {
         return pairs;
     }
 
+    // Wire labels that intersect something that can't move out of their way: a box, or the type
+    // label beside an unconnected port.  Reported as [label text, what it covers].
+    overlappingObstacles() {
+        return this.page.evaluate(() => {
+            const box = (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
+            const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+            const labels = Array.from(document.querySelectorAll('#canvas .connLabel'));
+            const fixed = Array.from(document.querySelectorAll(
+                '#canvas .basic, #canvas .lowerOutputLabel, #canvas .upperOutputLabel'));
+            const out = [];
+            for (const l of labels) {
+                for (const f of fixed) {
+                    if (hit(box(l), box(f))) out.push([l.innerText, f.id || f.innerText]);
+                }
+            }
+            return out;
+        });
+    }
+
     // A representation of the proof state that is independent of the auto-generated node
     // ids (which change when a level is reset), suitable for asserting round-trip equality.
     // Nodes are tagged by rule + position, so same-rule nodes are still distinguished.

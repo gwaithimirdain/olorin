@@ -89,6 +89,8 @@ test.describe('Overlapping labels', () => {
 
         expect(await olorin.labelRects()).toHaveLength(3); // both wires are still labeled
         expect(await olorin.overlappingLabels()).toEqual([]);
+        // The boxes and the port labels can't move, so labels keep off them too.
+        expect(await olorin.overlappingObstacles()).toEqual([]);
 
         // ...and they stay apart when the box moves.
         await olorin.dragNode(andI, -120, 90);
@@ -98,6 +100,25 @@ test.describe('Overlapping labels', () => {
         await olorin.setConnectorStyle('curved');
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andI, sort: 'input', label: 'fst' });
         expect(await olorin.overlappingLabels()).toEqual([]);
+    });
+
+    test('a box dropped where a label sits pushes the label off it', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({ parameters: 'P : Type', hypotheses: 'P', conclusion: 'P' });
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        const before = (await olorin.labelRects())[0];
+
+        // Drop an unrelated box right on top of that label.
+        const origin = await page.evaluate(() => {
+            const r = document.getElementById('diagram').getBoundingClientRect();
+            return { x: r.x, y: r.y };
+        });
+        await olorin.dragRule('andI', before.x - origin.x - 10, before.y - origin.y - 10);
+
+        // The box can't move, so the label slid along its wire to somewhere clear of it.
+        expect(await olorin.overlappingObstacles()).toEqual([]);
+        expect((await olorin.labelRects())[0].x).not.toBeCloseTo(before.x, 0);
     });
 
     test('the labels of a cluttered proof do not collide', async ({ page }) => {
@@ -111,5 +132,6 @@ test.describe('Overlapping labels', () => {
         await olorin.restore(STATE);
         await expect.poll(() => wireLabels(page), { timeout: 20000 }).toHaveLength(6);
         expect(await olorin.overlappingLabels()).toEqual([]);
+        expect(await olorin.overlappingObstacles()).toEqual([]);
     });
 });
