@@ -71,3 +71,45 @@ test.describe('Wire labels', () => {
             expect.arrayContaining(['x∈ℚ', '(x=3*y)∧(1−x=4*y)', 'x−1∈ℚ', 'x*(x−1)=0']));
     });
 });
+
+// Wire labels are drawn in the middle of their wire, so wires that run close together used to end
+// up with their labels stacked on top of each other, unreadable.  Colliding labels now slide along
+// their own wire until they're clear.
+test.describe('Overlapping labels', () => {
+    test('a port fanning out to two nearby inputs keeps its labels apart', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // P |- P∧P, proved by wiring the one hypothesis into both inputs of an andI box: two wires
+        // a couple of dozen pixels apart, whose midpoints (and labels) all but coincide.
+        await olorin.buildCustom({ parameters: 'P : Type', hypotheses: 'P', conclusion: 'P∧P' });
+        const andI = await olorin.dragRule('andI', 450, 250);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andI, sort: 'input', label: 'fst' });
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andI, sort: 'input', label: 'snd' });
+        await olorin.connect({ vertex: andI, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+
+        expect(await olorin.labelRects()).toHaveLength(3); // both wires are still labeled
+        expect(await olorin.overlappingLabels()).toEqual([]);
+
+        // ...and they stay apart when the box moves.
+        await olorin.dragNode(andI, -120, 90);
+        expect(await olorin.overlappingLabels()).toEqual([]);
+
+        // ...and with curved wires, whose midpoints sit elsewhere again.
+        await olorin.setConnectorStyle('curved');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andI, sort: 'input', label: 'fst' });
+        expect(await olorin.overlappingLabels()).toEqual([]);
+    });
+
+    test('the labels of a cluttered proof do not collide', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            variables: 'x ∈ ℚ\ny ∈ ℚ',
+            hypotheses: '(x=3*y)∧(1−x=4*y)',
+            conclusion: '(x=3/7) ∧ (y=1/7)',
+        });
+        await olorin.restore(STATE);
+        await expect.poll(() => wireLabels(page), { timeout: 20000 }).toHaveLength(6);
+        expect(await olorin.overlappingLabels()).toEqual([]);
+    });
+});

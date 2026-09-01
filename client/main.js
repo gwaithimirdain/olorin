@@ -298,6 +298,8 @@ ready(() => {
     instance.bind(EVENT_DRAG_STOP, function () {
         clampNodesToCanvas();
         resizeCanvas();
+        // Dragging a box moves its wires, which can push labels onto each other.
+        spreadWireLabels();
         autosave();
     });
 
@@ -2819,6 +2821,76 @@ function callback_to_z3(callback) {
     return solver;
 }
 
+// Wire labels sit at the middle of their wire, so wires running close together -- one port fanning
+// out to two nearby inputs, say -- end up with their labels on top of each other.  After labeling,
+// slide the ones that collide along their own wire: each label tries positions stepping out from
+// the middle and takes the first that clears every label already placed (or, failing that, the one
+// that overlaps them least).  Positions are predicted from the connector's own geometry, so this
+// costs one repaint of the wires that actually moved, not one per position tried.
+const LABEL_LOCATIONS = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9];
+// Labels closer than this (in pixels) count as colliding, so they don't end up flush against
+// each other either.
+const LABEL_GAP = 4;
+
+function overlapArea(a, b) {
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) + LABEL_GAP;
+    const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) + LABEL_GAP;
+    return (w > 0 && h > 0) ? w * h : 0;
+}
+
+function spreadWireLabels() {
+    // Measure every wire label where it currently sits.  A label jsPlumb hasn't drawn yet has no
+    // size; leave it for the next typecheck rather than guessing at it.
+    const labels = [];
+    instance.getConnections().forEach(function (c) {
+        if(!c.connector) { return; }
+        // Both the type we compute for a wire and the one the player types on it (at adept and
+        // master) sit in the middle of the wire, so both can collide.
+        ["label", "userLabel"].forEach(function (id) {
+            const ovl = c.getOverlay(id);
+            if(!ovl || !ovl.canvas) { return; }
+            if(typeof ovl.getLabel === 'function' && ovl.getLabel() === "") { return; }
+            const r = ovl.canvas.getBoundingClientRect();
+            if(r.width === 0 || r.height === 0) { return; }
+            labels.push({
+                conn: c, ovl: ovl, w: r.width, h: r.height,
+                // Where the label sits now, and the point on the wire it's drawn from: the
+                // difference between two points on a path is the same in page coordinates as in
+                // the connector's own, so any other position can be predicted without moving it.
+                cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+                origin: c.connector.pointOnPath(ovl.location),
+            });
+        });
+    });
+    if(labels.length < 2) { return; }
+
+    const placed = [];
+    const moved = new Set();
+    labels.forEach(function (lb) {
+        var best = null;
+        for(var i = 0; i < LABEL_LOCATIONS.length; i++) {
+            const loc = LABEL_LOCATIONS[i];
+            const p = lb.conn.connector.pointOnPath(loc);
+            const rect = {
+                x: lb.cx + (p.x - lb.origin.x) - lb.w / 2,
+                y: lb.cy + (p.y - lb.origin.y) - lb.h / 2,
+                w: lb.w, h: lb.h,
+            };
+            var cost = 0;
+            placed.forEach(function (q) { cost += overlapArea(rect, q); });
+            if(best === null || cost < best.cost) { best = { loc: loc, rect: rect, cost: cost }; }
+            if(cost === 0) { break; }
+        }
+        placed.push(best.rect);
+        if(best.loc !== lb.ovl.location) {
+            lb.ovl.setLocation(best.loc);
+            moved.add(lb.conn.source);
+        }
+    });
+    // Repaint only the wires whose labels actually moved.
+    moved.forEach(function (el) { instance.revalidate(el); });
+}
+
 function continue_typechecking(nodes, edges, connections, result) {
     // If a callback string was supplied, we pass it off to Z3 and wait for a response.
     if(result.callback) {
@@ -2947,6 +3019,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                 c.connector.removeOverlay("label");
             }
         });
+        // With the labels final, move any that landed on top of each other apart.
+        spreadWireLabels();
         // If the level is complete, color the goal and level green.
         if(result.complete) {
             diagram.style.backgroundColor = COLORS[difficulty][0].backgroundColor;

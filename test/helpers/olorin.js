@@ -335,6 +335,26 @@ class Olorin {
         return this.page.isVisible(selector);
     }
 
+    // The on-screen rectangle of every wire label currently drawn.
+    labelRects() {
+        return this.page.evaluate(() =>
+            Array.from(document.querySelectorAll('#canvas .connLabel')).map((e) => {
+                const r = e.getBoundingClientRect();
+                return { text: e.innerText, x: r.x, y: r.y, w: r.width, h: r.height };
+            }));
+    }
+
+    // Pairs of wire labels whose rectangles intersect (by text, for a legible failure message).
+    async overlappingLabels() {
+        const rs = await this.labelRects();
+        const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        const pairs = [];
+        for (let i = 0; i < rs.length; i++) {
+            for (let j = i + 1; j < rs.length; j++) if (hit(rs[i], rs[j])) pairs.push([rs[i].text, rs[j].text]);
+        }
+        return pairs;
+    }
+
     // A representation of the proof state that is independent of the auto-generated node
     // ids (which change when a level is reset), suitable for asserting round-trip equality.
     // Nodes are tagged by rule + position, so same-rule nodes are still distinguished.
