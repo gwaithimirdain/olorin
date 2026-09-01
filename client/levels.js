@@ -11,6 +11,13 @@
 //                       require both, or [] for no stage prerequisite at all.  Entries reaching
 //                       back past the first stage of the world are ignored.
 //
+//   bonus: true         Extra credit: this stage's levels are left out of its world's totals, so
+//                       the percentages that open worlds and difficulties (>= 80% of the previous
+//                       world, >= 50% of the next one, ...) are of the non-bonus levels only.
+//                       Solving a bonus level can then never open a world, nor be needed to.  Its
+//                       own stage still counts normally, so the stage rules (a stage needing its
+//                       predecessors, a level needing the ones before it) treat it like any other.
+//
 export const LEVELS = [
     { name: "Proposition world",
       stages: [

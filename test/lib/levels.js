@@ -63,12 +63,25 @@ function worldNames() {
 
 const inWorld = (w) => allLevels().filter((l) => l.world === w);
 const inStage = (w, s) => allLevels().filter((l) => l.world === w && l.stage === s);
-// A world's stages, in order, each as its list of levels.
-const stagesInWorld = (w) => {
-    const stages = [];
-    for (const l of inWorld(w)) (stages[l.stage - 1] ||= []).push(l);
-    return stages;
-};
+// A world's stages, in order, with the unlock options they declare in levels.js: `previous` (which
+// stages back this one requires, defaulted to [1] here) and `bonus` (left out of the world total).
+function stagesInWorld(w) {
+    const { LEVELS } = loadLevelsModule();
+    return LEVELS[w - 1].stages.map(function (stage, i) {
+        return {
+            number: i + 1,
+            name: stage.name,
+            previous: stage.previous || [1],
+            bonus: !!stage.bonus,
+            levels: inStage(w, i + 1),
+        };
+    });
+}
+
+// The stages `stage` requires to be complete (its `previous` entries that name a real stage),
+// given that world's stages.
+const prereqStages = (stage, stages) =>
+    stage.previous.map(function (n) { return stages[stage.number - 1 - n]; }).filter(Boolean);
 const worldCount = () => worldNames().length;
 
 // The first level matching a predicate.  `what` describes what was wanted, so a levels.js change
@@ -159,7 +172,7 @@ const prereqSeeds = (level, difficulty) =>
     prereqs(level, difficulty).flatMap(([levels, d]) => completions(levels, d));
 
 module.exports = {
-    allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, find,
+    allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, prereqStages, find,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, completions, thresholdCount, prereqs, prereqSeeds,
 };

@@ -61,12 +61,12 @@ class Olorin {
         return this.page.evaluate((n) => window.__olorin.levelStates(n), name);
     }
 
-    // Set (null clears) a stage's `previous` list -- which stages back the unlock rule requires --
-    // by 1-based world and stage number, and re-render the chooser.
-    setStagePrevious(world, stage, previous) {
+    // Set (null clears) one of a stage's unlock options -- 'previous' or 'bonus' -- by 1-based
+    // world and stage number, and re-render the chooser.
+    setStageOption(world, stage, option, value) {
         return this.page.evaluate(
-            ({ w, s, p }) => window.__olorin.setStagePrevious(w, s, p),
-            { w: world, s: stage, p: previous },
+            ({ w, s, o, v }) => window.__olorin.setStageOption(w, s, o, v),
+            { w: world, s: stage, o: option, v: value },
         );
     }
 

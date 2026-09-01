@@ -1106,6 +1106,8 @@ function fraction(done, total) {
 // is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
 // Whether a world's three inter-world gates (rules 1-3) pass at difficulty K -- i.e. whether the
 // world itself is "open" at K (individual levels still need the stage/level rules 4-6).
+// The percentages are of each world's non-bonus levels; a `bonus` stage is left out of the totals
+// entirely (see computeUnlockData), so solving one can never open a world, nor be needed to.
 function worldGatesPass(w, K, data) {
     // 1. The previous world is >= 80% complete at difficulty K (unless this is the first world).
     if(w > 0 && fraction(data[w - 1].done[K], data[w - 1].total) < 0.8) { return false; }
@@ -1258,6 +1260,10 @@ function computeUnlockData(res) {
             // `previous` is which stages back this one's rule-4 prerequisite is; see difficultyUnlocked.
             const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
                          previous: stage.previous };
+            // A `bonus` stage is extra credit: its levels are left out of the world's totals, so the
+            // inter-world percentages (rules 1-3) are fractions of the non-bonus levels only.  They
+            // still count for their own stage, so the stage rules (4-6) treat them like any other.
+            const counts = !stage.bonus;
             stage.levels.forEach(function (level) {
                 const p = getPast(res, level);
                 const cd = p.complete ? p.difficulty : -1;
@@ -1265,9 +1271,12 @@ function computeUnlockData(res) {
                 sd.levelTimes.push(p.times || null);
                 sd.hasHint.push(!!level.hint);
                 sd.total++;
-                wd.total++;
+                if(counts) { wd.total++; }
                 for(var K = 0; K <= 2; K++) {
-                    if(cd >= K) { sd.done[K]++; wd.done[K]++; }
+                    if(cd >= K) {
+                        sd.done[K]++;
+                        if(counts) { wd.done[K]++; }
+                    }
                 }
             });
             wd.stages.push(sd);
@@ -1759,12 +1768,12 @@ if (new URLSearchParams(window.location.search).has("test")) {
             const lvl = allLevels.find((l) => l.name === name);
             return lvl ? JSON.stringify(saveable(lvl)) : null;
         },
-        // Set (null clears) a stage's `previous` list -- which stages back rule 4 requires -- by
-        // 1-based world and stage number, and re-render.  Lets the rule be tested whether or not a
-        // stage in levels.js currently declares one.
-        setStagePrevious: (world, stage, previous) => {
+        // Set (null clears) one of a stage's unlock options -- "previous" or "bonus" -- by 1-based
+        // world and stage number, and re-render.  Lets those rules be tested whether or not a stage
+        // in levels.js currently declares them.
+        setStageOption: (world, stage, option, value) => {
             const st = LEVELS[world - 1].stages[stage - 1];
-            if(previous === null) { delete st.previous; } else { st.previous = previous; }
+            if(value === null) { delete st[option]; } else { st[option] = value; }
             updateLevelSelect(null);
         },
     };
