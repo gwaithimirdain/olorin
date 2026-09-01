@@ -3,6 +3,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { firstLevel } = require('../lib/levels');
 
 // Build a custom level via the custom-level dialog (P |- P by default).
 const buildCustom = (olorin, opts) => olorin.buildCustom(opts);
@@ -21,7 +22,7 @@ test.describe('Custom levels', () => {
     test('the Save button shows only on a custom level', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(firstLevel().name);
         expect(await page.isVisible('#saveLevel')).toBe(false); // built-in
         await buildCustom(olorin);
         expect(await olorin.currentLevelName()).toBe('Custom');

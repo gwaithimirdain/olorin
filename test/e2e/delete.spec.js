@@ -3,6 +3,11 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { conjunctionLevel } = require('../lib/levels');
+
+// P, Q |- P∧Q, in a stage with the ∧ rules: two hypotheses, one conclusion, and both
+// andI and andE in the palette.  Selected from levels.js so a renumbering can't break it.
+const LEVEL = conjunctionLevel();
 
 // Rubber-band select the whole diagram (covering every node) with a real mouse drag.
 async function selectAll(page) {
@@ -22,7 +27,7 @@ test.describe('Deleting selected nodes', () => {
     test('Delete removes all selected rule boxes but keeps the fixed context nodes', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1'); // P, Q |- P∧Q : two hypotheses, one conclusion
+        await olorin.selectLevel(LEVEL.name);
         await olorin.dragRule('andI', 400, 200);
         await olorin.dragRule('andI', 400, 400);
         expect(ruleCount(await olorin.nodes(), 'andI')).toBe(2);
@@ -39,7 +44,7 @@ test.describe('Deleting selected nodes', () => {
     test('Backspace deletes the selection too', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1');
+        await olorin.selectLevel(LEVEL.name);
         await olorin.dragRule('andI', 400, 250);
         await selectAll(page);
         await page.keyboard.press('Backspace');

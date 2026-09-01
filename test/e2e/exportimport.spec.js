@@ -3,15 +3,24 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { oneWireLevel, otherLevel, isBuiltinStatement } = require('../lib/levels');
+
+// A level proved by a single wire from its hypothesis to the conclusion, and any other level to
+// switch to; both from levels.js rather than named, since inserting a level renumbers the rest.
+const LEVEL = oneWireLevel();
+const ELSEWHERE = otherLevel(LEVEL);
 
 // A custom-level statement that deliberately matches no built-in level, so importing it has to go
-// through the custom-level path (P |- P, for instance, is just level 1-1-1).  It's proved by a
+// through the custom-level path (P |- P, for instance, is a built-in level).  It's proved by a
 // single wire from the hypothesis to the conclusion.
 const CUSTOM = {
     parameters: 'P : Type\nQ : Type\nR : Type',
     hypotheses: '(P∧Q)∧R',
     conclusion: '(P∧Q)∧R',
 };
+if (isBuiltinStatement({ hypotheses: CUSTOM.hypotheses.split('\n'), conclusion: CUSTOM.conclusion })) {
+    throw new Error('CUSTOM is now a built-in level; pick a statement levels.js does not state.');
+}
 
 test.describe('Export / Import', () => {
     let olorin;
@@ -22,7 +31,7 @@ test.describe('Export / Import', () => {
     });
 
     test('exports the proof as JSON and imports it back', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         const andId = await olorin.dragRule('andI', 420, 230);
         await olorin.connect(
             { vertex: 'hyp0', sort: 'output' },
@@ -47,37 +56,37 @@ test.describe('Export / Import', () => {
     });
 
     test('imports a proof from another level after confirming a switch', async () => {
-        // Export a completed proof from 1-1-1.
-        await olorin.selectLevel('1-1-1');
+        // Export a completed proof from a one-wire level.
+        await olorin.selectLevel(LEVEL.name);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const exported = await olorin.exportText();
         expect(JSON.parse(exported).level).toBeTruthy(); // the level is embedded
 
         // Move to a different level, then import: it should offer to switch back, and (with
-        // the confirm accepted) switch to 1-1-1 and restore the proof.
-        await olorin.selectLevel('1-1-2');
-        expect(await olorin.currentLevelName()).toBe('1-1-2');
+        // the confirm accepted) switch back to it and restore the proof.
+        await olorin.selectLevel(ELSEWHERE.name);
+        expect(await olorin.currentLevelName()).toBe(ELSEWHERE.name);
 
         await olorin.importText(exported);
 
-        expect(await olorin.currentLevelName()).toBe('1-1-1');
+        expect(await olorin.currentLevelName()).toBe(LEVEL.name);
         expect(await olorin.connections()).toHaveLength(1);
         expect(await olorin.isComplete()).toBe(true);
     });
 
     test('cancelling the level-switch prompt leaves the current level untouched', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const exported = await olorin.exportText();
 
-        await olorin.selectLevel('1-1-2');
+        await olorin.selectLevel(ELSEWHERE.name);
         const before = await olorin.structuralState();
 
         // Dismiss the "switch level?" confirm: the import should be cancelled.
         olorin.setDialogAction('dismiss');
         await olorin.importText(exported);
 
-        expect(await olorin.currentLevelName()).toBe('1-1-2');
+        expect(await olorin.currentLevelName()).toBe(ELSEWHERE.name);
         expect(await olorin.structuralState()).toEqual(before);
         expect(await olorin.isVisible('#importBG')).toBe(true);
     });
@@ -113,7 +122,7 @@ test.describe('Export / Import', () => {
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const exported = await olorin.exportText();
         await olorin.deleteCustomLevel('Gone'); // confirm auto-accepted
-        await olorin.selectLevel('1-1-2');
+        await olorin.selectLevel(ELSEWHERE.name);
 
         // The import prompts for a name for the new custom level; accept it as "Rebuilt".
         olorin.setPromptText('Rebuilt');
@@ -133,7 +142,7 @@ test.describe('Export / Import', () => {
         await olorin.buildCustom({ name: 'Mine', ...CUSTOM });
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const exported = await olorin.exportText();
-        await olorin.selectLevel('1-1-2');
+        await olorin.selectLevel(ELSEWHERE.name);
 
         await olorin.importText(exported); // "switch level?" confirm auto-accepted
 
@@ -149,14 +158,14 @@ test.describe('Export / Import', () => {
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const exported = await olorin.exportText();
         await olorin.deleteCustomLevel('Gone');
-        await olorin.selectLevel('1-1-2');
+        await olorin.selectLevel(ELSEWHERE.name);
         const before = await olorin.structuralState();
 
         // Dismissing the prompt() cancels the import outright.
         olorin.setDialogAction('dismiss');
         await olorin.importText(exported);
 
-        expect(await olorin.currentLevelName()).toBe('1-1-2');
+        expect(await olorin.currentLevelName()).toBe(ELSEWHERE.name);
         expect(await olorin.structuralState()).toEqual(before);
         expect(await olorin.isVisible('#importBG')).toBe(true);
         await olorin.page.click('#cancelImport');
@@ -165,7 +174,7 @@ test.describe('Export / Import', () => {
     });
 
     test('rejects invalid JSON without changing the proof', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const before = await olorin.structuralState();
 

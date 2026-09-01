@@ -3,6 +3,11 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { conjunctionLevel } = require('../lib/levels');
+
+// P, Q |- P∧Q, in a stage with the ∧ rules: two hypotheses, one conclusion, and both
+// andI and andE in the palette.  Selected from levels.js so a renumbering can't break it.
+const LEVEL = conjunctionLevel();
 
 // Map each connection to its connector type, keyed by its target port (label, or sort).
 const styles = (state) => Object.fromEntries(
@@ -13,7 +18,7 @@ test.describe('Connector styles', () => {
     test('saved proofs remember angled vs curved wires', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1'); // P, Q |- P∧Q
+        await olorin.selectLevel(LEVEL.name);
         const andId = await olorin.dragRule('andI', 500, 250);
 
         // First wire angled, the other two curved.

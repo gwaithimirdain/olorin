@@ -4,6 +4,11 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { conjunctionLevel } = require('../lib/levels');
+
+// P, Q |- P∧Q, in a stage with the ∧ rules: two hypotheses, one conclusion, and both
+// andI and andE in the palette.  Selected from levels.js so a renumbering can't break it.
+const LEVEL = conjunctionLevel();
 
 const geom = (page) =>
     page.evaluate(() => {
@@ -22,7 +27,7 @@ test.describe('Scrollable diagram canvas', () => {
     test('a node dropped past the right edge grows the canvas and stays reachable', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1');
+        await olorin.selectLevel(LEVEL.name);
 
         const before = await geom(page);
         // No scrolling needed yet: the canvas just fills the viewport.
@@ -42,7 +47,7 @@ test.describe('Scrollable diagram canvas', () => {
     test('a node dragged up/left past the origin is clamped back onto the canvas', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1');
+        await olorin.selectLevel(LEVEL.name);
         const id = await olorin.dragRule('andI', 300, 300);
 
         // Drag it far up and to the left, past the top-left corner.
@@ -56,7 +61,7 @@ test.describe('Scrollable diagram canvas', () => {
     test('deleting a far-out node lets the canvas shrink back to the viewport', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1');
+        await olorin.selectLevel(LEVEL.name);
         const view = (await geom(page)).viewW;
 
         const id = await olorin.dragRule('andI', view + 600, 200);

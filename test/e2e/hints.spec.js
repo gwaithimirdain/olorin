@@ -3,6 +3,12 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { hintedLevel, otherLevel } = require('../lib/levels');
+
+// A level that pops a hint on its first visit and has a hypothesis to wire a partial proof from,
+// plus any other level to leave for; taken from levels.js rather than named, since ids shift.
+const HINTED = hintedLevel((l) => l.hypotheses.length > 0);
+const ELSEWHERE = otherLevel(HINTED);
 
 // Open the chooser if needed and click a level, WITHOUT auto-dismissing its hint (so the test
 // can observe whether the hint popped up).
@@ -20,8 +26,8 @@ test.describe('Hints', () => {
         const olorin = new Olorin(page);
         await olorin.open();
 
-        // First visit to 1-1-1 (which has a hint): it pops up automatically.
-        await selectLevelKeepingHint(page, '1-1-1');
+        // First visit to a level with a hint: it pops up automatically.
+        await selectLevelKeepingHint(page, HINTED.name);
         expect(await olorin.hintVisible()).toBe(true);
         await olorin.dismissHints();
 
@@ -30,8 +36,8 @@ test.describe('Hints', () => {
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andId, sort: 'input', label: 'fst' });
 
         // Leave and come back: the hint must NOT pop up again (it's been seen)...
-        await olorin.selectLevel('1-1-2');
-        await selectLevelKeepingHint(page, '1-1-1');
+        await olorin.selectLevel(ELSEWHERE.name);
+        await selectLevelKeepingHint(page, HINTED.name);
         expect(await olorin.hintVisible()).toBe(false);
 
         // ...and loading the saved proof must not pop it up either.

@@ -4,6 +4,11 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { conjunctionLevel } = require('../lib/levels');
+
+// P, Q |- P∧Q, in a stage with the ∧ rules: two hypotheses, one conclusion, and both
+// andI and andE in the palette.  Selected from levels.js so a renumbering can't break it.
+const LEVEL = conjunctionLevel();
 
 const out = (v, l) => ({ vertex: v, sort: 'output', label: l });
 const inp = (v, l) => ({ vertex: v, sort: 'input', label: l });
@@ -25,7 +30,7 @@ test.describe('Cyclic proofs', () => {
     test('two andE nodes wired into a cycle: no hang, an offending wire turns red', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1'); // rules andI + andE
+        await olorin.selectLevel(LEVEL.name);
         const a = await olorin.dragRule('andE', 300, 120);
         const b = await olorin.dragRule('andE', 600, 320);
         await olorin.connect(out(a, 'fst'), inp(b, undefined));
@@ -36,7 +41,7 @@ test.describe('Cyclic proofs', () => {
     test('andI/andE cycle is also flagged without hanging', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1');
+        await olorin.selectLevel(LEVEL.name);
         const i = await olorin.dragRule('andI', 300, 120);
         const e = await olorin.dragRule('andE', 600, 320);
         await olorin.connect(out(e, 'fst'), inp(i, 'fst'));
@@ -47,7 +52,7 @@ test.describe('Cyclic proofs', () => {
     test('breaking the cycle lets a normal proof still complete (synthesis still works)', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.selectLevel('1-2-1'); // P, Q |- P/\Q
+        await olorin.selectLevel(LEVEL.name);
         // A straightforward andI proof of P/\Q from the two hypotheses.
         const andI = await olorin.dragRule('andI', 450, 200);
         await olorin.connect(out('hyp0', undefined), inp(andI, 'fst'));

@@ -7,24 +7,42 @@
 //   5. all but 2 of the levels before C in the stage are complete at K
 //   6. (novice only) every earlier level in the stage that has a hint is complete
 //
-// Hint facts used below (from levels.js): 1-1-1, 1-1-2, 1-2-1 and 1-2-3 all have hints.
+// The levels below are selected structurally from levels.js (the first level, its stage, the stage
+// after it), never by id: inserting a level renumbers everything after it.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { allLevels, thresholdCount } = require('../lib/levels');
+const { inWorld, inStage, firstLevel, completions, thresholdCount } = require('../lib/levels');
 
-const LV = allLevels();
-const key = (name) => JSON.stringify(LV.find((l) => l.name === name).saveable);
-const inWorld = (A) => LV.filter((l) => l.name.startsWith(A + '-')).map((l) => l.name);
-const inStage = (A, B) => LV.filter((l) => l.name.startsWith(A + '-' + B + '-')).map((l) => l.name);
-const done = (names, difficulty) => names.map((n) => [key(n), JSON.stringify({ complete: true, difficulty })]);
+const FIRST = firstLevel();                            // all a fresh player has unlocked
+const STAGE1 = inStage(FIRST.world, FIRST.stage);      // the stage it opens in
+const AFTER_FIRST = STAGE1[1];                         // gated on FIRST's hint at novice (rule 6)
+const STAGE2 = inStage(FIRST.world, FIRST.stage + 1);  // the stage after it (rule 4)
+const FOURTH = STAGE2[3];                              // 3 predecessors, so rule 5 wants 1 of them
+// A level that is NOT auto-completed at a higher difficulty (it has wires worth redoing), so its
+// adept can be locked and unlocked on its own for rules 5 and 7.
+const MANUAL = STAGE2.find((l) => !l.autoComplete);
 
-const W1 = inWorld('1');
-const W2 = inWorld('2');
+// The tests below read these facts out of levels.js; say so plainly if it stops providing them.
+for (const [ok, what] of [
+    [FIRST.hint, 'the first level has a hint (rule 6)'],
+    [FIRST.trivial && FIRST.autoComplete, 'the first level is trivial and auto-completing'],
+    [AFTER_FIRST, 'the first stage has at least two levels'],
+    [FOURTH, 'the second stage has at least four levels'],
+    [MANUAL && MANUAL.index > 1, 'the second stage has a non-auto-completing level after its first'],
+]) {
+    if (!ok) throw new Error(`This suite assumes ${what}; update its selectors for levels.js.`);
+}
+
+const W1 = inWorld(FIRST.world);
+const W2 = inWorld(FIRST.world + 1);
 // Completion counts that match the app's world gates, derived from the actual level totals so the
 // tests don't break when a world's size changes:
 const W2_HALF = thresholdCount(W2.length, 0.5); // world 2 >= 50% novice (rule 2)
 const W1_MOST = thresholdCount(W1.length, 0.8); // world 1 >= 80% novice (rule 1); W1_MOST-1 is below
+// A level of the next world, locked until this world is 80% done (rule 1); the first one has no
+// stage or predecessor gates of its own.
+const NEXT_WORLD = W2[0];
 
 async function open(page, pairs) {
     const olorin = new Olorin(page);
@@ -34,119 +52,119 @@ async function open(page, pairs) {
 }
 
 test.describe('Per-difficulty unlocking', () => {
-    test('a fresh player has only level 1-1-1 unlocked (novice)', async ({ page }) => {
+    test('a fresh player has only the first level unlocked (novice)', async ({ page }) => {
         const olorin = await open(page);
-        expect(await olorin.levelStates('1-1-1')).toEqual(['unlocked', 'locked', 'locked']);
-        // 1-1-2 is locked: its predecessor 1-1-1 has a hint and isn't completed (rule 6).
-        expect((await olorin.levelStates('1-1-2'))[0]).toBe('locked');
+        expect(await olorin.levelStates(FIRST.name)).toEqual(['unlocked', 'locked', 'locked']);
+        // The next level in the stage is locked: its predecessor has a hint and isn't completed (rule 6).
+        expect((await olorin.levelStates(AFTER_FIRST.name))[0]).toBe('locked');
         // The next stage is locked until the previous stage is 70% done (rule 4).
-        expect((await olorin.levelStates('1-2-1'))[0]).toBe('locked');
+        expect((await olorin.levelStates(STAGE2[0].name))[0]).toBe('locked');
     });
 
     test('"active" levels (an unlocked, uncompleted difficulty) are highlighted', async ({ page }) => {
-        // 1-1-1 completed at every difficulty -> not active; 1-1-2 then unlocked at novice -> active.
-        const olorin = await open(page, done(['1-1-1'], 2));
-        expect(await olorin.levelActive('1-1-1')).toBe(false); // fully completed
-        expect(await olorin.levelActive('1-1-2')).toBe(true);  // unlocked, not done
-        expect(await olorin.levelActive('1-2-1')).toBe(false); // locked
+        // The first level completed at every difficulty -> not active; the next one then unlocks at
+        // novice -> active.
+        const olorin = await open(page, completions([FIRST], 2));
+        expect(await olorin.levelActive(FIRST.name)).toBe(false);       // fully completed
+        expect(await olorin.levelActive(AFTER_FIRST.name)).toBe(true);  // unlocked, not done
+        expect(await olorin.levelActive(STAGE2[0].name)).toBe(false);   // locked
     });
 
     test('rule 6: a level unlocks once the hinted level before it is completed', async ({ page }) => {
-        const olorin = await open(page, done(['1-1-1'], 0));
-        expect((await olorin.levelStates('1-1-2'))[0]).toBe('unlocked');
+        const olorin = await open(page, completions([FIRST], 0));
+        expect((await olorin.levelStates(AFTER_FIRST.name))[0]).toBe('unlocked');
     });
 
     test('rule 6 is novice-only: adept ignores the hint prerequisite', async ({ page }) => {
-        // World 2 >= 50% at novice satisfies rule 2 for 1-1-2 adept; 1-1-1 is NOT completed.
-        const olorin = await open(page, done(W2.slice(0, W2_HALF), 0));
-        // Novice stays locked (rule 6 wants 1-1-1 done); adept unlocks (rule 6 doesn't apply).
-        // 1-1-2 is autoComplete, but its novice isn't solved, so it isn't auto-completed -- it just
-        // unlocks at adept.
-        expect(await olorin.levelStates('1-1-2')).toEqual(['locked', 'unlocked', 'locked']);
+        // World 2 >= 50% at novice satisfies rule 2 for adept; the first level is NOT completed.
+        const olorin = await open(page, completions(W2.slice(0, W2_HALF), 0));
+        // Novice stays locked (rule 6 wants the hinted level done); adept unlocks (rule 6 doesn't
+        // apply).  An auto-completing level whose novice isn't solved isn't auto-completed either --
+        // it just unlocks at adept.
+        expect(await olorin.levelStates(AFTER_FIRST.name)).toEqual(['locked', 'unlocked', 'locked']);
     });
 
     test('auto-complete: a trivial level stays merely unlocked until its novice is solved', async ({ page }) => {
-        // 1-1-1 unlocks at adept (world 2 >= 50% novice) but its novice hasn't been solved, so it is
-        // NOT auto-completed -- the player must solve it at least once.
-        const olorin = await open(page, done(W2.slice(0, W2_HALF), 0));
-        expect(await olorin.levelStates('1-1-1')).toEqual(['unlocked', 'unlocked', 'locked']);
+        // The first level unlocks at adept (world 2 >= 50% novice) but its novice hasn't been solved,
+        // so it is NOT auto-completed -- the player must solve it at least once.
+        const olorin = await open(page, completions(W2.slice(0, W2_HALF), 0));
+        expect(await olorin.levelStates(FIRST.name)).toEqual(['unlocked', 'unlocked', 'locked']);
     });
 
     test('auto-complete: once novice is solved, a trivial level completes its higher difficulties', async ({ page }) => {
-        // With 1-1-1's novice solved and adept unlocked, adept auto-completes (no wires worth
-        // redoing).  Master stays locked (needs world 2 at adept).
-        const olorin = await open(page, done(W2.slice(0, W2_HALF), 0).concat(done(['1-1-1'], 0)));
-        expect(await olorin.levelStates('1-1-1')).toEqual(['completed', 'completed', 'locked']);
+        // With its novice solved and adept unlocked, adept auto-completes (no wires worth redoing).
+        // Master stays locked (needs world 2 at adept).
+        const olorin = await open(page, completions(W2.slice(0, W2_HALF), 0).concat(completions([FIRST], 0)));
+        expect(await olorin.levelStates(FIRST.name)).toEqual(['completed', 'completed', 'locked']);
         // Auto-completing never advances the global completion counter.
         expect(await page.evaluate(() => localStorage.getItem('time'))).toBeNull();
     });
 
     test('rule 4: a stage opens when the previous stage is 70% complete', async ({ page }) => {
-        // Stage 1-1 fully done opens stage 1-2; its first level (no hinted predecessor) unlocks.
-        const olorin = await open(page, done(inStage('1', '1'), 0));
-        expect((await olorin.levelStates('1-2-1'))[0]).toBe('unlocked');
+        // The first stage fully done opens the next one; its first level (no hinted predecessor) unlocks.
+        const olorin = await open(page, completions(STAGE1, 0));
+        expect((await olorin.levelStates(STAGE2[0].name))[0]).toBe('unlocked');
     });
 
-    test('rule 1: world 2 opens only when world 1 is >= 80% complete at novice', async ({ page }) => {
+    test('rule 1: the next world opens only when this one is >= 80% complete at novice', async ({ page }) => {
         // One short of 80% of world 1 -> world 2 stays locked.
-        const a = await open(page, done(W1.slice(0, W1_MOST - 1), 0));
-        expect((await a.levelStates('2-2-1'))[0]).toBe('locked');
+        const a = await open(page, completions(W1.slice(0, W1_MOST - 1), 0));
+        expect((await a.levelStates(NEXT_WORLD.name))[0]).toBe('locked');
         await page.close();
     });
 
-    test('rule 1: world 2 is reachable at >= 80%', async ({ page }) => {
-        const olorin = await open(page, done(W1.slice(0, W1_MOST), 0));
-        expect((await olorin.levelStates('2-2-1'))[0]).toBe('unlocked');
+    test('rule 1: the next world is reachable at >= 80%', async ({ page }) => {
+        const olorin = await open(page, completions(W1.slice(0, W1_MOST), 0));
+        expect((await olorin.levelStates(NEXT_WORLD.name))[0]).toBe('unlocked');
     });
 
     test('rule 2: adept of a level needs the next world >= 50% complete at novice', async ({ page }) => {
         const a = await open(page);
-        expect((await a.levelStates('1-1-1'))[1]).toBe('locked');
+        expect((await a.levelStates(FIRST.name))[1]).toBe('locked');
         await page.close();
     });
 
     test('rule 2: adept unlocks with enough novice progress in the next world', async ({ page }) => {
-        // 1-1-1 adept unlocks with world 2 >= 50% novice (rule 2).  Its novice isn't solved here, so
-        // it isn't auto-completed -- it just unlocks.
-        const olorin = await open(page, done(W2.slice(0, W2_HALF), 0));
-        expect((await olorin.levelStates('1-1-1'))[1]).toBe('unlocked');
+        // Adept unlocks with world 2 >= 50% novice (rule 2).  This level's novice isn't solved here,
+        // so it isn't auto-completed -- it just unlocks.
+        const olorin = await open(page, completions(W2.slice(0, W2_HALF), 0));
+        expect((await olorin.levelStates(FIRST.name))[1]).toBe('unlocked');
     });
 
-    // For 1-2-4 adept: rule 2 (world 2 >= 50% novice), rule 4 (stage 1-1 >= 70% adept), and rule 5
-    // (>= 1 of the first three of stage 1-2 done at adept).  Rule 6 doesn't apply at adept.
-    const rule5Base = () => done(W2.slice(0, W2_HALF), 0).concat(done(inStage('1', '1'), 1));
+    // For the 4th level of the second stage at adept: rule 2 (world 2 >= 50% novice), rule 4 (the
+    // first stage >= 70% adept), and rule 5 (>= 1 of the three levels before it done at adept).
+    // Rule 6 doesn't apply at adept.
+    const rule5Base = () => completions(W2.slice(0, W2_HALF), 0).concat(completions(STAGE1, 1));
 
     test('rule 5: a 4th level is locked with none of its predecessors done (adept)', async ({ page }) => {
         const olorin = await open(page, rule5Base());
-        expect((await olorin.levelStates('1-2-4'))[1]).toBe('locked');
+        expect((await olorin.levelStates(FOURTH.name))[1]).toBe('locked');
     });
 
     test('rule 5: that 4th level unlocks once one predecessor is done (adept)', async ({ page }) => {
-        const olorin = await open(page, rule5Base().concat(done(['1-2-1'], 1)));
-        expect((await olorin.levelStates('1-2-4'))[1]).toBe('unlocked');
+        const olorin = await open(page, rule5Base().concat(completions([STAGE2[0]], 1)));
+        expect((await olorin.levelStates(FOURTH.name))[1]).toBe('unlocked');
     });
 
-    // Adept of 1-2-5 (a non-trivial, non-auto-completed level) is reachable once world 2 is >= 50%
-    // novice (rule 2), stage 1-1 is complete at adept (rule 4), and its stage-1-2 predecessors are
-    // complete at adept (rule 5); rule 7 then gates it on how recently this level's novice was
-    // completed (global "time" counts completions).
-    const rule7Base = (time, noviceTime) => done(W2.slice(0, W2_HALF), 0)
-        .concat(done(inStage('1', '1'), 1))
-        .concat(done(['1-2-1', '1-2-2', '1-2-3', '1-2-4'], 1))
-        .concat([
-            ['time', String(time)],
-            [key('1-2-5'), JSON.stringify({ complete: true, difficulty: 0, times: { 0: noviceTime } })],
-        ]);
+    // Adept of a non-auto-completed level is reachable once world 2 is >= 50% novice (rule 2), the
+    // first stage is complete at adept (rule 4), and its own stage predecessors are complete at
+    // adept (rule 5); rule 7 then gates it on how recently this level's novice was completed
+    // (the global "time" counts completions).
+    const rule7Base = (time, noviceTime) => completions(W2.slice(0, W2_HALF), 0)
+        .concat(completions(STAGE1, 1))
+        .concat(completions(STAGE2.slice(0, MANUAL.index - 1), 1))
+        .concat([['time', String(time)]])
+        .concat(completions([MANUAL], 0, { times: { 0: noviceTime } }));
 
     test('rule 7: a recently-completed lower difficulty re-locks the higher one', async ({ page }) => {
         // Novice completed at time 10, only 5 completions ago (global time 15) -> adept re-locked.
         const olorin = await open(page, rule7Base(15, 10));
-        expect((await olorin.levelStates('1-2-5'))[1]).toBe('locked');
+        expect((await olorin.levelStates(MANUAL.name))[1]).toBe('locked');
     });
 
     test('rule 7: the higher difficulty unlocks again after more than 10 completions', async ({ page }) => {
         // Novice completed 15 completions ago (global time 25) -> adept available again.
         const olorin = await open(page, rule7Base(25, 10));
-        expect((await olorin.levelStates('1-2-5'))[1]).toBe('unlocked');
+        expect((await olorin.levelStates(MANUAL.name))[1]).toBe('unlocked');
     });
 });

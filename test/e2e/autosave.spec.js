@@ -3,6 +3,12 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { oneWireLevel, otherLevel } = require('../lib/levels');
+
+// A level proved by a single wire (so a completed proof is one connection), and any other
+// level to switch away to; both picked from levels.js rather than named, since ids shift.
+const LEVEL = oneWireLevel();
+const ELSEWHERE = otherLevel(LEVEL);
 
 test.describe('Autosave', () => {
     let olorin;
@@ -13,7 +19,7 @@ test.describe('Autosave', () => {
     });
 
     test('saves on change and offers to reload it on return', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         // A freshly selected level with no saved progress does not prompt.
         expect(await olorin.savedPromptVisible()).toBe(false);
 
@@ -25,8 +31,8 @@ test.describe('Autosave', () => {
         const before = await olorin.structuralState();
 
         // Switch away and back: the autosaved (partial) proof should be offered.
-        await olorin.selectLevel('1-1-2');
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(ELSEWHERE.name);
+        await olorin.selectLevel(LEVEL.name);
         expect(await olorin.savedPromptVisible()).toBe(true);
         expect(await olorin.savedPromptText()).toContain('partial');
 
@@ -35,15 +41,15 @@ test.describe('Autosave', () => {
     });
 
     test('discarding the prompt starts fresh and forgets the save', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         const andId = await olorin.dragRule('andI', 420, 230);
         await olorin.connect(
             { vertex: 'hyp0', sort: 'output' },
             { vertex: andId, sort: 'input', label: 'fst' },
         );
 
-        await olorin.selectLevel('1-1-2');
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(ELSEWHERE.name);
+        await olorin.selectLevel(LEVEL.name);
         expect(await olorin.savedPromptVisible()).toBe(true);
 
         await olorin.discardSaved();
@@ -51,18 +57,18 @@ test.describe('Autosave', () => {
         expect((await olorin.nodes()).every((n) => n.rule !== 'andI')).toBe(true);
 
         // The save was discarded, so returning again does not prompt.
-        await olorin.selectLevel('1-1-2');
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(ELSEWHERE.name);
+        await olorin.selectLevel(LEVEL.name);
         expect(await olorin.savedPromptVisible()).toBe(false);
     });
 
     test('a completed proof is autosaved and restores as complete', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         expect(await olorin.isComplete()).toBe(true);
 
-        await olorin.selectLevel('1-1-2');
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(ELSEWHERE.name);
+        await olorin.selectLevel(LEVEL.name);
         expect(await olorin.savedPromptVisible()).toBe(true);
         expect(await olorin.savedPromptText()).toContain('complete');
 
@@ -71,7 +77,7 @@ test.describe('Autosave', () => {
     });
 
     test('Clear discards the autosave so it is not offered again', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         const andId = await olorin.dragRule('andI', 420, 230);
         await olorin.connect(
             { vertex: 'hyp0', sort: 'output' },
@@ -81,22 +87,22 @@ test.describe('Autosave', () => {
         await olorin.clear();
         expect(await olorin.connections()).toHaveLength(0);
 
-        await olorin.selectLevel('1-1-2');
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(ELSEWHERE.name);
+        await olorin.selectLevel(LEVEL.name);
         expect(await olorin.savedPromptVisible()).toBe(false);
     });
 
     test('autosaves are scoped per level', async () => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         await olorin.dragRule('andI', 420, 230);
 
-        // 1-1-2 has its own (empty) state and must not show 1-1-1's saved proof.
-        await olorin.selectLevel('1-1-2');
+        // The other level has its own (empty) state and must not show this one's saved proof.
+        await olorin.selectLevel(ELSEWHERE.name);
         expect(await olorin.savedPromptVisible()).toBe(false);
     });
 
     test('rearranging a node by dragging saves its new position', async ({ page }) => {
-        await olorin.selectLevel('1-1-1');
+        await olorin.selectLevel(LEVEL.name);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         const before = (await olorin.savedProof()).nodes.find((n) => n.id === 'hyp0').top;
 
