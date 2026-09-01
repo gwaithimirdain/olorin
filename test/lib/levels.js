@@ -63,6 +63,12 @@ function worldNames() {
 
 const inWorld = (w) => allLevels().filter((l) => l.world === w);
 const inStage = (w, s) => allLevels().filter((l) => l.world === w && l.stage === s);
+// A world's stages, in order, each as its list of levels.
+const stagesInWorld = (w) => {
+    const stages = [];
+    for (const l of inWorld(w)) (stages[l.stage - 1] ||= []).push(l);
+    return stages;
+};
 const worldCount = () => worldNames().length;
 
 // The first level matching a predicate.  `what` describes what was wanted, so a levels.js change
@@ -153,7 +159,7 @@ const prereqSeeds = (level, difficulty) =>
     prereqs(level, difficulty).flatMap(([levels, d]) => completions(levels, d));
 
 module.exports = {
-    allLevels, worldNames, worldCount, inWorld, inStage, find,
+    allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, find,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, completions, thresholdCount, prereqs, prereqSeeds,
 };

@@ -61,6 +61,15 @@ class Olorin {
         return this.page.evaluate((n) => window.__olorin.levelStates(n), name);
     }
 
+    // Set (null clears) a stage's `previous` list -- which stages back the unlock rule requires --
+    // by 1-based world and stage number, and re-render the chooser.
+    setStagePrevious(world, stage, previous) {
+        return this.page.evaluate(
+            ({ w, s, p }) => window.__olorin.setStagePrevious(w, s, p),
+            { w: world, s: stage, p: previous },
+        );
+    }
+
     // The completion record stored for a level ({complete, difficulty, times}), or null if none.
     completionRecord(name) {
         return this.page.evaluate((n) => {

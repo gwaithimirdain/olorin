@@ -1,3 +1,16 @@
+// The game's levels, as worlds -> stages -> levels.
+//
+// A stage is { name, rules, levels }: its label in the chooser, the palette rules its levels may
+// use, and the levels themselves.  It may also carry:
+//
+//   previous: [N, ...]  Which stages back this stage's "previous stage" unlock requirement looks,
+//                       instead of the default [1] (just the stage before it).  Each stage listed
+//                       must be >= 70% complete at a difficulty before this stage's levels unlock
+//                       at it.  Use [2] when this stage continues the one two back rather than its
+//                       immediate neighbour (two independent tracks side by side), [1, 2] to
+//                       require both, or [] for no stage prerequisite at all.  Entries reaching
+//                       back past the first stage of the world are ignored.
+//
 export const LEVELS = [
     { name: "Proposition world",
       stages: [

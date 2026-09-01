@@ -3,7 +3,8 @@
 //   1. world A-1 >= 80% complete at K          (unless A is the first world)
 //   2. world A+1 >= 50% complete at K-1        (unless K=0 or A is the last world)
 //   3. world A-2 >= 50% complete at K+1        (unless A is first/second world or K=2)
-//   4. world A stage B-1 >= 70% complete at K  (unless B is the first stage)
+//   4. world A stage B-1 >= 70% complete at K  (unless B is the first stage; a stage can name
+//      other stages to require with a `previous` list -- see the last describe block)
 //   5. all but 2 of the levels before C in the stage are complete at K
 //   6. (novice only) every earlier level in the stage that has a hint is complete
 //
@@ -12,7 +13,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { inWorld, inStage, firstLevel, completions, thresholdCount } = require('../lib/levels');
+const { inWorld, inStage, stagesInWorld, firstLevel, completions, thresholdCount } = require('../lib/levels');
 
 const FIRST = firstLevel();                            // all a fresh player has unlocked
 const STAGE1 = inStage(FIRST.world, FIRST.stage);      // the stage it opens in
@@ -166,5 +167,68 @@ test.describe('Per-difficulty unlocking', () => {
         // Novice completed 15 completions ago (global time 25) -> adept available again.
         const olorin = await open(page, rule7Base(25, 10));
         expect((await olorin.levelStates(MANUAL.name))[1]).toBe('unlocked');
+    });
+});
+
+// Rule 4 normally looks at the stage immediately before this one.  A stage can say otherwise with
+// a `previous` list of how many stages back each of its prerequisites is (default [1]) -- so two
+// tracks can run side by side, or a stage can require several, or none.  No stage in levels.js
+// declares one yet, so these drive it through test mode's setStagePrevious.
+test.describe('Rule 4: a stage\'s "previous" list', () => {
+    const STAGES = stagesInWorld(FIRST.world);
+    if (STAGES.length < 3) {
+        throw new Error('This suite assumes the first world has at least three stages; update it.');
+    }
+    const [S1, S2, S3] = STAGES;
+
+    // Complete a whole stage (at novice), which is what rule 4 asks about.
+    const stageDone = (levels) => completions(levels, 0);
+
+    test('by default a stage needs the one right before it', async ({ page }) => {
+        const olorin = await open(page, stageDone(S1));
+        expect((await olorin.levelStates(S2[0].name))[0]).toBe('unlocked'); // its stage is done
+        expect((await olorin.levelStates(S3[0].name))[0]).toBe('locked');  // stage 2 isn't
+    });
+
+    test('previous: [2] looks past the stage in between', async ({ page }) => {
+        const olorin = await open(page, stageDone(S1));
+        await olorin.setStagePrevious(FIRST.world, 3, [2]);
+        // Stage 3 now asks for stage 1, which is complete -- stage 2 no longer matters.
+        expect((await olorin.levelStates(S3[0].name))[0]).toBe('unlocked');
+    });
+
+    test('previous: [1, 2] requires both of them', async ({ page }) => {
+        const olorin = await open(page, stageDone(S1));
+        await olorin.setStagePrevious(FIRST.world, 3, [1, 2]);
+        expect((await olorin.levelStates(S3[0].name))[0]).toBe('locked'); // stage 2 still isn't done
+        await page.close();
+    });
+
+    test('previous: [1, 2] unlocks once both are complete', async ({ page }) => {
+        const olorin = await open(page, stageDone(S1).concat(stageDone(S2)));
+        await olorin.setStagePrevious(FIRST.world, 3, [1, 2]);
+        expect((await olorin.levelStates(S3[0].name))[0]).toBe('unlocked');
+    });
+
+    test('previous: [] asks for no stage at all', async ({ page }) => {
+        const olorin = await open(page); // nothing completed anywhere
+        expect((await olorin.levelStates(S2[0].name))[0]).toBe('locked');
+        await olorin.setStagePrevious(FIRST.world, 2, []);
+        expect((await olorin.levelStates(S2[0].name))[0]).toBe('unlocked');
+    });
+
+    test('prerequisites reaching back past the first stage are ignored', async ({ page }) => {
+        const olorin = await open(page);
+        // Stage 1 has no stage before it, so [1] (and [3]) name nothing and impose nothing.
+        await olorin.setStagePrevious(FIRST.world, 1, [1, 3]);
+        expect((await olorin.levelStates(FIRST.name))[0]).toBe('unlocked');
+    });
+
+    test('clearing it restores the default', async ({ page }) => {
+        const olorin = await open(page, stageDone(S1));
+        await olorin.setStagePrevious(FIRST.world, 3, [2]);
+        expect((await olorin.levelStates(S3[0].name))[0]).toBe('unlocked');
+        await olorin.setStagePrevious(FIRST.world, 3, null);
+        expect((await olorin.levelStates(S3[0].name))[0]).toBe('locked');
     });
 });

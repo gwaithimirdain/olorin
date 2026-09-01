@@ -1121,8 +1121,16 @@ function difficultyUnlocked(w, s, c, K, data) {
     const stage = world.stages[s];
     // Rules 1-3: the world must be open at this difficulty.
     if(!worldGatesPass(w, K, data)) { return false; }
-    // 4. The previous stage of this world is >= 70% complete at K (unless this is the first stage).
-    if(s > 0 && fraction(world.stages[s - 1].done[K], world.stages[s - 1].total) < 0.7) { return false; }
+    // 4. Each of this stage's prerequisite stages is >= 70% complete at K.  By default that's the
+    //    single stage right before it; a stage can instead declare `previous: [...]` in levels.js,
+    //    listing how many stages back each prerequisite is -- [2] to look past the stage in between
+    //    (for two independent tracks), [1, 2] to require both, [] for no stage prerequisite at all.
+    //    Entries reaching back past the first stage are ignored, so the first stage is unrestricted.
+    const previous = stage.previous || [1];
+    for(var pi = 0; pi < previous.length; pi++) {
+        const ps = s - previous[pi];
+        if(ps >= 0 && fraction(world.stages[ps].done[K], world.stages[ps].total) < 0.7) { return false; }
+    }
     // 5. All but (at most) 2 of the levels before this one in the stage are complete at K -- so a
     //    stage's first three levels are available as soon as it opens.
     var completedBefore = 0;
@@ -1247,7 +1255,9 @@ function computeUnlockData(res) {
     unlockData = LEVELS.map(function (world) {
         const wd = { total: 0, done: [0, 0, 0], stages: [] };
         world.stages.forEach(function (stage) {
-            const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [] };
+            // `previous` is which stages back this one's rule-4 prerequisite is; see difficultyUnlocked.
+            const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
+                         previous: stage.previous };
             stage.levels.forEach(function (level) {
                 const p = getPast(res, level);
                 const cd = p.complete ? p.difficulty : -1;
@@ -1748,6 +1758,14 @@ if (new URLSearchParams(window.location.search).has("test")) {
         completionKey: (name) => {
             const lvl = allLevels.find((l) => l.name === name);
             return lvl ? JSON.stringify(saveable(lvl)) : null;
+        },
+        // Set (null clears) a stage's `previous` list -- which stages back rule 4 requires -- by
+        // 1-based world and stage number, and re-render.  Lets the rule be tested whether or not a
+        // stage in levels.js currently declares one.
+        setStagePrevious: (world, stage, previous) => {
+            const st = LEVELS[world - 1].stages[stage - 1];
+            if(previous === null) { delete st.previous; } else { st.previous = previous; }
+            updateLevelSelect(null);
         },
     };
 }

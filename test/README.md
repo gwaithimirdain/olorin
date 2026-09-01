@@ -105,7 +105,10 @@ Two things go through a tiny **test seam** instead, `window.__olorin`, which the
   connection through the same `instance.connect` path a user drag would trigger (it still
   fires the app's connection handler, typechecking, and labelling).
 - **Reading proof state for assertions** — `__olorin.nodes()`, `connections()`,
-  `complete()`, `savedProofKey()`.
+  `complete()`, `savedProofKey()`, `levelStates(name)`, `completionKey(name)`.
+- **Setting a stage's `previous` list** — `__olorin.setStagePrevious(world, stage, list)` overrides
+  which stages back the unlock rules require of a stage (see `client/levels.js`), so that rule can
+  be tested whether or not a stage in the game declares one.
 
 Ports are identified the way the app identifies them: `{ vertex, sort, label }`, e.g.
 `{ vertex: 'hyp0', sort: 'output' }` or `{ vertex: andId, sort: 'input', label: 'fst' }`.
