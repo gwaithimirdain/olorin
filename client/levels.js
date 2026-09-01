@@ -220,6 +220,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨",
+            previous: [3],
             rules: [ "orE", "orI1", "orI2" ],
             levels: [
                 {
@@ -335,6 +336,7 @@ export const LEVELS = [
             ]
           },
           { name: "∧∨⇒",
+            previous: [1, 3],
             rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
             levels: [
                 {
@@ -684,6 +686,7 @@ export const LEVELS = [
             ]
           },
           { name: "∃⇒⊤⊥",
+            previous: [],
             rules: [ "impI", "impE", "exE", "exI", "topI", "botE" ],
             levels: [
                 {
@@ -797,6 +800,7 @@ export const LEVELS = [
             ]
           },
           { name: "∃∀⇒",
+            previous: [1, 3],
             rules: [ "impI", "impE", "exE", "exI", "allI", "allE" ],
             levels: [
                 {
