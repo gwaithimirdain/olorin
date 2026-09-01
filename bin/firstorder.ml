@@ -96,6 +96,8 @@ axiom 𝕊.square : 𝕊 → 𝕊
 axiom 𝕊.cube : 𝕊 → 𝕊
 axiom 𝕊.fourth : 𝕊 → 𝕊
 
+notation \"ω\" ≔ omega.
+
 axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
