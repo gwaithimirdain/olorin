@@ -340,7 +340,11 @@ class Olorin {
         return this.page.evaluate(() =>
             Array.from(document.querySelectorAll('#canvas .connLabel')).map((e) => {
                 const r = e.getBoundingClientRect();
-                return { text: e.innerText, x: r.x, y: r.y, w: r.width, h: r.height };
+                return {
+                    text: e.innerText, x: r.x, y: r.y, w: r.width, h: r.height,
+                    // Set on the two types shown on a wire whose ends disagree about the type.
+                    mismatch: e.classList.contains('mismatchLabel'),
+                };
             }));
     }
 
@@ -363,7 +367,8 @@ class Olorin {
             const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
             const labels = Array.from(document.querySelectorAll('#canvas .connLabel'));
             const fixed = Array.from(document.querySelectorAll(
-                '#canvas .basic, #canvas .lowerOutputLabel, #canvas .upperOutputLabel'));
+                '#canvas .basic, #canvas .lowerOutputLabel, #canvas .upperOutputLabel, '
+                + '#canvas .lowerInputLabel, #canvas .middleInputLabel, #canvas .upperInputLabel'));
             const out = [];
             for (const l of labels) {
                 for (const f of fixed) {

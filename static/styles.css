@@ -517,6 +517,10 @@ body {
     align-items: center;
 }
 
+/* The two types written on a wire whose ends disagree about them, in the same red as the wire. */
+.connLabel.mismatchLabel {
+    color: #ff0000;
+}
 .lvmark {
     display: inline-flex;
     align-items: center;

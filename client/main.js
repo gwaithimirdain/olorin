@@ -2745,6 +2745,11 @@ function typecheck() {
         if(!c.parameters.ty && ovl) {
             ovl.setLabel("");
         }
+        // The two ends of a type-mismatch label belong to the error we're about to recompute.
+        MISMATCH_LABELS.forEach(function (m) {
+            const mo = c.getOverlay(m.id);
+            if(mo) { mo.setLabel(""); }
+        });
 
         return {
             id: conn_id,
@@ -2821,6 +2826,35 @@ function callback_to_z3(callback) {
     return solver;
 }
 
+// A wire whose ends disagree about the type gets both types written on it, each at its own end:
+// what the source port produces, and what the target port expected.  They're ordinary wire labels,
+// so the label-spreading below moves them out of each other's way like any other.
+const MISMATCH_LABELS = [
+    { id: "gotLabel", home: 0.25, field: "got" },
+    { id: "expectedLabel", home: 0.75, field: "expected" },
+];
+
+// Show the two types of an Unequal_synthesized_type diagnostic on the wire it was reported for.
+// Diagnostics that aren't type mismatches carry neither type, and leave the wire's own label alone.
+function labelTypeMismatch(edge, d) {
+    if(d.got == null || d.expected == null) { return; }
+    // The two ends say it better than one type in the middle would.
+    const own = edge.getOverlay("label");
+    if(own) { own.setLabel(""); }
+    MISMATCH_LABELS.forEach(function (m) {
+        const lbl = d[m.field];
+        const ovl = edge.getOverlay(m.id);
+        if(ovl) {
+            ovl.setLabel(lbl);
+        } else {
+            edge.addOverlay({ type: "Label", options: {
+                id: m.id, label: lbl, location: m.home, cssClass: "connLabel mismatchLabel",
+            } });
+        }
+    });
+    instance.revalidate(edge.source);
+}
+
 // Wire labels sit at the middle of their wire, so wires running close together -- one port fanning
 // out to two nearby inputs, say -- end up with their labels on top of each other.  After labeling,
 // slide the ones that collide along their own wire: each label tries positions stepping out from
@@ -2829,7 +2863,12 @@ function callback_to_z3(callback) {
 // can't move: the boxes themselves and the type labels on unconnected ports.  Positions are
 // predicted from the connector's own geometry, so this costs one repaint of the wires that
 // actually moved, not one per position tried.
-const LABEL_LOCATIONS = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9];
+// How far from its home position along the wire a label may be pushed, in steps of this size.
+const LABEL_STEPS = [0, -0.08, 0.08, -0.16, 0.16, -0.24, 0.24, -0.32, 0.32, -0.4, 0.4];
+// Positions to try for a label whose home is `home`, nearest first, kept clear of the wire's ends.
+function labelLocations(home) {
+    return LABEL_STEPS.map(function (d) { return Math.min(0.9, Math.max(0.1, home + d)); });
+}
 // Labels closer than this (in pixels) count as colliding, so they don't end up flush against
 // each other either.
 const LABEL_GAP = 4;
@@ -2849,7 +2888,9 @@ function labelObstacles() {
         if(r.width > 0 && r.height > 0) { fixed.push({ x: r.x, y: r.y, w: r.width, h: r.height }); }
     };
     nodes.forEach(function (x) { add(x.node); });
-    document.querySelectorAll('#canvas .lowerOutputLabel, #canvas .upperOutputLabel').forEach(add);
+    document.querySelectorAll('#canvas .lowerOutputLabel, #canvas .upperOutputLabel, ' +
+                              '#canvas .lowerInputLabel, #canvas .middleInputLabel, ' +
+                              '#canvas .upperInputLabel').forEach(add);
     return fixed;
 }
 
@@ -2861,7 +2902,7 @@ function spreadWireLabels() {
         if(!c.connector) { return; }
         // Both the type we compute for a wire and the one the player types on it (at adept and
         // master) sit in the middle of the wire, so both can collide.
-        ["label", "userLabel"].forEach(function (id) {
+        ["label", "userLabel", "gotLabel", "expectedLabel"].forEach(function (id) {
             const ovl = c.getOverlay(id);
             if(!ovl || !ovl.canvas) { return; }
             if(typeof ovl.getLabel === 'function' && ovl.getLabel() === "") { return; }
@@ -2874,6 +2915,8 @@ function spreadWireLabels() {
                 // the connector's own, so any other position can be predicted without moving it.
                 cx: r.x + r.width / 2, cy: r.y + r.height / 2,
                 origin: c.connector.pointOnPath(ovl.location),
+                // A mismatch label belongs at its own end of the wire, not in the middle.
+                locations: labelLocations(id === "gotLabel" ? 0.25 : id === "expectedLabel" ? 0.75 : 0.5),
             });
         });
     });
@@ -2884,8 +2927,8 @@ function spreadWireLabels() {
     const moved = new Set();
     labels.forEach(function (lb) {
         var best = null;
-        for(var i = 0; i < LABEL_LOCATIONS.length; i++) {
-            const loc = LABEL_LOCATIONS[i];
+        for(var i = 0; i < lb.locations.length; i++) {
+            const loc = lb.locations[i];
             const p = lb.conn.connector.pointOnPath(loc);
             const rect = {
                 x: lb.cx + (p.x - lb.origin.x) - lb.w / 2,
@@ -3031,15 +3074,6 @@ function continue_typechecking(nodes, edges, connections, result) {
                 }
             }
         });
-        // Now delete the label overlays for the connectors that didn't get set.
-        edges.forEach(function(c) {
-            const ovl = c.connector.getOverlay("label");
-            if(ovl && ovl.getLabel() === "") {
-                c.connector.removeOverlay("label");
-            }
-        });
-        // With the labels final, move any that landed on top of each other apart.
-        spreadWireLabels();
         // If the level is complete, color the goal and level green.
         if(result.complete) {
             diagram.style.backgroundColor = COLORS[difficulty][0].backgroundColor;
@@ -3130,6 +3164,10 @@ function continue_typechecking(nodes, edges, connections, result) {
                             if(edge.parameters.userLabel) {
                                 edge.parameters.userLabel.style.color = "#ff0000";
                             }
+                            // At novice, a wire whose two ends disagree about the type says so:
+                            // the type coming out of the source at that end, the one the target
+                            // wanted at the other.
+                            if(difficulty === 0) { labelTypeMismatch(edge, d); }
                         } else if (loc.sort === "input" || loc.sort === "subgoal") {
                             console.log("error at " + loc.id + " " + loc.sort + " " + loc.label + ": ");
                             console.log(d.text);
@@ -3195,6 +3233,15 @@ function continue_typechecking(nodes, edges, connections, result) {
                 alert("Your proof isn't complete and correct, but I don't think I've given you any idea why.  This is a bug; please report to the developer.");
             }
         }
+        // Now delete the label overlays (ordinary and mismatch) that didn't get set this time, and
+        // move whatever is left off each other and off the boxes.
+        edges.forEach(function(c) {
+            ["label"].concat(MISMATCH_LABELS.map(function (m) { return m.id; })).forEach(function (id) {
+                const ovl = c.connector.getOverlay(id);
+                if(ovl && ovl.getLabel() === "") { c.connector.removeOverlay(id); }
+            });
+        });
+        spreadWireLabels();
     }
 
     // Persist the current proof on every change, now that we know whether it's complete.

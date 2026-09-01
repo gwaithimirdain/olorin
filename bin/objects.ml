@@ -369,10 +369,26 @@ module Diagnostic = struct
     method isfatal : bool Js.t Js.prop
     method locs : js_loc Js.t Js.js_array Js.t Js.prop
     method text : Js.js_string Js.t Js.prop
+    (* For a type mismatch on a wire, the two types that don't match: what the term coming out of
+       the source port synthesized, and what the target port expected.  Null for anything else. *)
+    method got : Js.js_string Js.t Js.opt Js.prop
+    method expected : Js.js_string Js.t Js.opt Js.prop
   end
+
+  (* Pretty-print a printable, or nothing if printing it raises (as unparsing sometimes does). *)
+  let printed (pr : printable) : Js.js_string Js.t Js.opt =
+    Core.Reporter.try_with ~fatal:(fun _ -> Js.null) @@ fun () ->
+    Js.some (Js.string (Core.Reporter.print_to_string pr))
+
+  (* The two types of a type mismatch, for the client to label the offending wire with. *)
+  let mismatched_types (d : 'm Asai.Diagnostic.t) =
+    match (d.message :> Code.t) with
+    | Unequal_synthesized_type { got; expected; _ } -> (printed got, printed expected)
+    | _ -> (Js.null, Js.null)
 
   let to_js f (d : 'm Asai.Diagnostic.t) : js Js.t =
     let locs, str = Loc.js_and_content d.explanation.loc in
+    let got, expected = mismatched_types d in
     let buf = Buffer.create 70 in
     Sys_js.set_channel_flusher stdout (fun s -> Buffer.add_string buf s);
     Core.Reporter.display ~use_ansi:false ~output:stdout
@@ -382,6 +398,8 @@ module Diagnostic = struct
       val mutable isfatal = Js.bool f
       val mutable locs = locs
       val mutable text = Js.string (Buffer.contents buf)
+      val mutable got = got
+      val mutable expected = expected
     end
 
   (* Add a diagnostic to a dynamic array of them, flattening multiple-error combinations. *)

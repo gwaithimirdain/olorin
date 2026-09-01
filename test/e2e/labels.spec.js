@@ -130,8 +130,75 @@ test.describe('Overlapping labels', () => {
             conclusion: '(x=3/7) ∧ (y=1/7)',
         });
         await olorin.restore(STATE);
-        await expect.poll(() => wireLabels(page), { timeout: 20000 }).toHaveLength(6);
+        // Six wires carry a type, and one of them is a type mismatch showing both of its types.
+        await expect.poll(() => wireLabels(page), { timeout: 20000 })
+            .toEqual(expect.arrayContaining(['x∈ℚ', '(x=3*y)∧(1−x=4*y)', 'x−1∈ℚ', 'x*(x−1)=0']));
+        expect((await olorin.labelRects()).length).toBeGreaterThanOrEqual(6);
         expect(await olorin.overlappingLabels()).toEqual([]);
         expect(await olorin.overlappingObstacles()).toEqual([]);
+    });
+});
+
+// A wire whose ends disagree about the type is drawn red; at novice it also says what the two
+// types are, each written at its own end of the wire.
+test.describe('Type-mismatch labels', () => {
+    // How many wires are drawn in the error color.
+    const redWires = (page) => page.evaluate(() =>
+        Array.from(document.querySelectorAll('#canvas svg path'))
+            .filter((p) => p.getAttribute('stroke') === '#ff0000').length);
+
+    async function mismatchLevel(olorin) {
+        // P∧Q, Q |- P: wiring either hypothesis straight to the goal is a type error.
+        await olorin.buildCustom({ parameters: 'P : Type\nQ : Type', hypotheses: 'P∧Q\nQ', conclusion: 'P' });
+    }
+
+    test('a red wire is labeled with both types, one at each end', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await mismatchLevel(olorin);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+
+        await expect.poll(() => redWires(page)).toBeGreaterThan(0);
+        const labels = await olorin.labelRects();
+        expect(labels.map((l) => l.text).sort()).toEqual(['P', 'P∧Q']);
+        expect(labels.every((l) => l.mismatch)).toBe(true);
+        // The type coming out of the hypothesis is written nearer the hypothesis, the one the goal
+        // wanted nearer the goal (the hypothesis is on the left, the conclusion on the right).
+        const got = labels.find((l) => l.text === 'P∧Q');
+        const expected = labels.find((l) => l.text === 'P');
+        expect(got.x).toBeLessThan(expected.x);
+    });
+
+    test('the labels go away once the wire typechecks', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await mismatchLevel(olorin);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        await expect.poll(async () => (await olorin.labelRects()).length).toBe(2);
+
+        // Take the P out of the P∧Q with an andE box, which is the proof the level wants.
+        // (Clearing rebuilds the level's fixed nodes, so their ids are fresh.)
+        await olorin.clear();
+        const fixed = await olorin.nodes();
+        const hyp = fixed.find((n) => n.rule === 'hypothesis').id;
+        const concl = fixed.find((n) => n.rule === 'conclusion').id;
+        const andE = await olorin.dragRule('andE', 450, 250);
+        await olorin.connect({ vertex: hyp, sort: 'output' }, { vertex: andE, sort: 'input' });
+        await olorin.connect({ vertex: andE, sort: 'output', label: 'fst' }, { vertex: concl, sort: 'input' });
+
+        expect(await olorin.isComplete()).toBe(true);
+        expect(await redWires(page)).toBe(0);
+        expect((await olorin.labelRects()).some((l) => l.mismatch)).toBe(false);
+    });
+
+    test('above novice the wire is red but the types are not spelled out', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.seed([['difficulty', '1']]); // adept
+        await olorin.open();
+        await mismatchLevel(olorin);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+
+        await expect.poll(() => redWires(page)).toBeGreaterThan(0);
+        expect((await olorin.labelRects()).some((l) => l.mismatch)).toBe(false);
     });
 });
