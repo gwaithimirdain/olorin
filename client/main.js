@@ -497,11 +497,14 @@ function addEndpointsForRule(box, id, restore) {
             parameters: { sort: "output", hasValue: true },
             paintStyle: { fill: VALUECOLOR },
         });
+        // Double-clicking the box re-opens the dialog to edit what it says.
+        box.addEventListener('dblclick', function () { editExpr(box); });
         // Prompt for the expression
         if(!restore) {
             document.getElementById("expressionBG").style.display = "flex";
             const expr = document.getElementById('expression');
             expr.dataset.name = box.id;
+            expr.dataset.editing = "";
             expr.focus();
         }
         typecheck_now = false;
@@ -2362,6 +2365,20 @@ function cancelAscription() {
     ascribeBG.style.display = "none";
 }
 
+// Re-open the expression dialog on a box that already has one, so an expression can be corrected
+// in place instead of deleting the box and wiring a new one up.  Double-clicking a box does this.
+function editExpr(box) {
+    const expr = document.getElementById('expression');
+    const node = nodes.find(function (x) { return x.id === box.id; });
+    expr.dataset.name = box.id;
+    // Cancelling an edit leaves the box alone; cancelling a brand-new one removes it (cancelExpr).
+    expr.dataset.editing = "true";
+    expr.value = (node && node.value) || '';
+    document.getElementById("expressionBG").style.display = "flex";
+    expr.focus();
+    expr.select();
+}
+
 // And the modal box that prompts for an expression
 function submitExpr() {
     const exprBG = document.getElementById("expressionBG");
@@ -2385,20 +2402,26 @@ function submitExpr() {
     box.style.padding = "0px 8px 0px 8px"
     // And empty and hide the modal dialog
     expr.value = '';
+    expr.dataset.editing = "";
     exprBG.style.display = "none";
-    // And typecheck, since that was delayed when the rule was added.
+    // And typecheck: either that was delayed when the rule was added, or the expression just changed.
     typecheck();
 }
 
 function cancelExpr() {
     const exprBG = document.getElementById("expressionBG");
     const expr = document.getElementById('expression');
-    for (var i in nodes) {
-        if (nodes[i].id === expr.dataset.name) {
-            deleteRule(nodes[i].node);
+    // Cancelling the prompt for a new box means it was never made, so it goes away; cancelling an
+    // edit of an existing one leaves it (and its wires) exactly as they were.
+    if(expr.dataset.editing !== "true") {
+        for (var i in nodes) {
+            if (nodes[i].id === expr.dataset.name) {
+                deleteRule(nodes[i].node);
+            }
         }
     }
     expr.value = '';
+    expr.dataset.editing = "";
     exprBG.style.display = "none";
 }
 
