@@ -153,6 +153,8 @@ let onechar_ops =
     (0x2074, Ident [ "⁴" ]);
     (0x2223, Ident [ "∣" ]);
     (0x2261, Ident [ "≡" ]);
+    (0x2264, Ident [ "≤" ]);
+    (0x2265, Ident [ "≥" ]);
   |]
 
 type (_, _, _) identity +=
