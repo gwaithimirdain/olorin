@@ -1710,21 +1710,31 @@ export const LEVELS = [
 ]
 
 // Take an object that may have extra fields and strip out everything but the intrinsic properties of a level, so that we can JSON.stringify it and use it as a key into localStorage or CouchDB.
+// What a level is stored under: the statement it asks you to prove, and nothing about where it sits
+// in the game.  Completions, saved proofs, grade records and test fixtures are all keyed by this, so
+// levels can be added, moved or renumbered without anybody losing progress.
 export function saveable(level) {
-    // For legacy support, so students who completed levels with ∸ will still see them as completed even though we changed the notation to −.
-    if(level.saveable) {
-        return {
-            parameters: level.saveable.parameters,
-            variables: level.saveable.variables,
-            hypotheses: level.saveable.hypotheses,
-            conclusion: level.saveable.conclusion,
-        };
-    } else {
-        return {
-            parameters: level.parameters,
-            variables: level.variables,
-            hypotheses: level.hypotheses,
-            conclusion: level.conclusion,
-        };
-    }
+    return {
+        parameters: level.parameters,
+        variables: level.variables,
+        hypotheses: level.hypotheses,
+        conclusion: level.conclusion,
+    };
+}
+
+// DEPRECATED.  What a level was stored under before its notation changed -- the prefix minus went
+// from ∸ to − in April 2025 -- for the levels that carry a `saveable` block above.  Records written
+// before that change are still filed under it, so the client copies them to the current key when it
+// finds them (migrateLegacyRecords in main.js); nothing else consults it.
+//
+// Once every student has opened the game since that migration shipped (September 2026) -- from
+// mid-2027, say -- the `saveable` blocks, this function and the migration can all be deleted.
+export function legacySaveable(level) {
+    if(!level.saveable) { return null; }
+    return {
+        parameters: level.saveable.parameters,
+        variables: level.saveable.variables,
+        hypotheses: level.saveable.hypotheses,
+        conclusion: level.saveable.conclusion,
+    };
 }

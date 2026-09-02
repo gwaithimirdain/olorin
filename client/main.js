@@ -1,5 +1,5 @@
 import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
-import { LEVELS, saveable } from "./levels.js"
+import { LEVELS, saveable, legacySaveable } from "./levels.js"
 import { SERVER } from "./config.js"
 
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
@@ -315,6 +315,7 @@ ready(() => {
         }
     } else {
         // We can make the level-select boxes right away using localStorage, and start the user out by having them select a level.
+        migrateLegacyRecords(null);
         makeLevelSelect(null);
         levelChooseBG.style.display = "flex";
         // But if they haven't been here before, we show them the intro page first.
@@ -717,6 +718,7 @@ function login(email, course) {
                 loginError.style.visibility = 'hidden';
                 document.getElementById("loginBG").style.display = "none";
                 // The response includes the information about past levels, used to color the level select buttons.  If the level select buttons have already been created, we just re-color and re-star them; otherwise we do that while creating them.
+                migrateLegacyRecords(res);
                 if(levelButtons.length > 0) {
                     updateLevelSelect(res);
                 } else {
@@ -1080,6 +1082,70 @@ difficultyRadios.forEach(function (radios, i) {
         radio.onclick = function () { setDifficulty(i); };
     });
 });
+
+// DEPRECATED, with the `saveable` blocks in levels.js: the key a level's records were filed under
+// before its notation changed (∸ to −, April 2025), or null for the levels that never moved.
+function legacyKeyOf(level) {
+    const old = legacySaveable(level);
+    return old ? JSON.stringify(old) : null;
+}
+
+// Copy anything still filed under a level's pre-2025 key to the key it uses now: the completion
+// record and each difficulty's saved proof.  The old copies are left alone, so a browser still
+// running a cached older build goes on finding them.  `res` is the server's records for a logged-in
+// student, which are migrated (and saved back) as well.
+//
+// This runs at startup and after logging in.  Once every student has been through it, this function
+// and the `saveable` blocks it reads can go; see levels.js.
+function migrateLegacyRecords(res) {
+    LEVELS.forEach(function (world) {
+        world.stages.forEach(function (stage) {
+            stage.levels.forEach(function (level) {
+                const old = legacyKeyOf(level);
+                if(!old) { return; }
+                const key = JSON.stringify(saveable(level));
+                // The completion record, from the server's copy if we're logged in.
+                if(res) {
+                    if(res[old] !== undefined && res[key] === undefined) {
+                        res[key] = res[old];
+                        localStorage.setItem(key, JSON.stringify(res[key]));
+                        saveSolvedToServer(key, res[key], res.difficulty || 0, res.world || 0);
+                    }
+                } else if(localStorage.getItem(key) === null) {
+                    const record = localStorage.getItem(old);
+                    if(record !== null) { localStorage.setItem(key, record); }
+                }
+                // And the proof saved at each difficulty.
+                for(var d = 0; d < 3; d++) {
+                    if(localStorage.getItem("proof:" + d + ":" + key) === null) {
+                        const proof = localStorage.getItem("proof:" + d + ":" + old);
+                        if(proof !== null) { localStorage.setItem("proof:" + d + ":" + key, proof); }
+                    }
+                }
+            });
+        });
+    });
+}
+
+// Record a completed level on the server, under the key its statement gives it.  The difficulty and
+// world go along with it: the server keeps the most recent ones, to reopen the game where the
+// student left off.
+function saveSolvedToServer(key, value, difficulty, world) {
+    if(!SERVER) { return; }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/solve', true);
+    xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            // Success, nothing to be done
+        } else {
+            let res = JSON.parse(xhr.responseText);
+            alert("Error saving completed proof (" + res.error + ").  Check your Internet connection, and then delete and replace a wire to re-trigger saving.")
+        }
+    };
+    const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: world };
+    xhr.send(JSON.stringify(data));
+}
 
 // Get the user's past success on a given level, perhaps using a database result
 function getPast(res, level) {
@@ -1459,9 +1525,12 @@ function isLevelDef(def) {
 }
 
 // Find the built-in level whose identity (saveable parameters/hypotheses/conclusion) matches
-// the given JSON.stringify(saveable(...)) key, or undefined if none does.
+// the given JSON.stringify(saveable(...)) key, or undefined if none does.  A proof exported before
+// a level's notation changed carries the statement it had then, so those are matched too
+// (DEPRECATED along with the `saveable` blocks in levels.js).
 function findLevelByKey(key) {
-    return allLevels.find(function (l) { return JSON.stringify(saveable(l)) === key; });
+    return allLevels.find(function (l) { return JSON.stringify(saveable(l)) === key; })
+        || allLevels.find(function (l) { return legacyKeyOf(l) === key; });
 }
 
 // Find the saved custom level with the same statement as the given key, or undefined if none has.
@@ -3243,19 +3312,7 @@ function continue_typechecking(nodes, edges, connections, result) {
                     announceNewlyUnlockedWorlds(beforeGates);
                     if(SERVER) {
                         // Save it to the server too
-                        const xhr = new XMLHttpRequest();
-                        xhr.open('POST', '/solve', true);
-                        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
-                        xhr.onload = function() {
-                            if (xhr.status === 200) {
-                                // Success, nothing to be done
-                            } else {
-                                let res = JSON.parse(xhr.responseText);
-                                alert("Error saving completed proof (" + res.error + ").  Check your Internet connection, and then delete and replace a wire to re-trigger saving.")
-                            }
-                        };
-                        const data = { email: localStorage.getItem("email"), key: key, value: value, difficulty: difficulty, world: currentWorld };
-                        xhr.send(JSON.stringify(data));
+                        saveSolvedToServer(key, value, difficulty, currentWorld);
                     }
                 }
             } else if(currentCustom) {

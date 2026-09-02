@@ -1,5 +1,5 @@
 import { Parser } from '@json2csv/plainjs';
-import { LEVELS, saveable } from "./levels.js";
+import { LEVELS, saveable, legacySaveable } from "./levels.js";
 
 const loginError = document.getElementById("loginError");
 
@@ -30,7 +30,15 @@ submit.onclick = function() {
                         stage.levels.forEach(function (level, z) {
                             const name = (x+1) + '-' + (y+1) + '-' + (z+1);
                             fields.push(name);
-                            numbers.push({name: name, str: JSON.stringify(saveable(level))});
+                            // DEPRECATED (see levels.js): a student who solved one of the levels
+                            // whose notation changed, and hasn't opened the game since the client
+                            // started migrating those records, still has it under the old key.
+                            const old = legacySaveable(level);
+                            numbers.push({
+                                name: name,
+                                str: JSON.stringify(saveable(level)),
+                                legacy: old ? JSON.stringify(old) : null,
+                            });
                         });
                     });
                 });
@@ -39,11 +47,10 @@ submit.onclick = function() {
                     transforms:  [ function(oldrec) {
                         const newrec = { email: oldrec.key };
                         numbers.forEach(function (level) {
-                            if(oldrec.doc && oldrec.doc[level.str] && oldrec.doc[level.str].complete) {
-                                newrec[level.name] = oldrec.doc[level.str].difficulty + 1;
-                            } else {
-                                newrec[level.name] = 0;
-                            }
+                            const solved = oldrec.doc
+                                  && (oldrec.doc[level.str]
+                                      || (level.legacy ? oldrec.doc[level.legacy] : null));
+                            newrec[level.name] = solved && solved.complete ? solved.difficulty + 1 : 0;
                         });
                         console.log(newrec);
                         return newrec;

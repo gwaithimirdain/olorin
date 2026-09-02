@@ -17,7 +17,7 @@ function loadLevelsModule() {
     const transformed = src
         .replace(/export\s+const\s+/g, 'const ')
         .replace(/export\s+function\s+/g, 'function ')
-        + '\nreturn { LEVELS, saveable };';
+        + '\nreturn { LEVELS, saveable, legacySaveable };';
     // eslint-disable-next-line no-new-func
     return new Function(transformed)();
 }
@@ -28,7 +28,7 @@ function loadLevelsModule() {
 let cached = null;
 function allLevels() {
     if (cached) return cached;
-    const { LEVELS, saveable } = loadLevelsModule();
+    const { LEVELS, saveable, legacySaveable } = loadLevelsModule();
     const out = [];
     LEVELS.forEach((world, x) => {
         world.stages.forEach((stage, y) => {
@@ -41,6 +41,9 @@ function allLevels() {
                     worldName: world.name,
                     rules: stage.rules,
                     saveable: saveable(level),
+                    // DEPRECATED (see client/levels.js): the statement this level was stored under
+                    // before its notation changed, for the few levels that moved; null otherwise.
+                    legacySaveable: legacySaveable(level),
                     parameters: level.parameters.map((p) => p.name),
                     variables: level.variables.map((v) => v.name),
                     hypotheses: level.hypotheses.map((h) => h.ty),
@@ -136,6 +139,11 @@ function isBuiltinStatement({ hypotheses, conclusion }) {
 // The localStorage key under which a level's completion is recorded.
 const completionKey = (level) => JSON.stringify(level.saveable);
 
+// The key it was recorded under before its statement's notation changed, or null.  Only the
+// migration tests should need this.
+const legacyCompletionKey = (level) =>
+    level.legacySaveable ? JSON.stringify(level.legacySaveable) : null;
+
 // Seed pairs (for Olorin.seed) marking each level complete at a difficulty.  `extra` is merged
 // into the stored record, for the per-difficulty completion `times` rule 7 reads.
 const completions = (levels, difficulty, extra) =>
@@ -174,5 +182,6 @@ const prereqSeeds = (level, difficulty) =>
 module.exports = {
     allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, prereqStages, find,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, hintedLevel, otherLevel, nextLevel,
-    isBuiltinStatement, completionKey, completions, thresholdCount, prereqs, prereqSeeds,
+    isBuiltinStatement, completionKey, legacyCompletionKey, completions, thresholdCount, prereqs,
+    prereqSeeds,
 };
