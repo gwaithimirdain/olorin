@@ -1,5 +1,5 @@
 import { Parser } from '@json2csv/plainjs';
-import { LEVELS, saveable, legacySaveable } from "./levels.js";
+import { LEVELS, saveable, legacySaveables } from "./levels.js";
 
 const loginError = document.getElementById("loginError");
 
@@ -33,11 +33,10 @@ submit.onclick = function() {
                             // DEPRECATED (see levels.js): a student who solved one of the levels
                             // whose notation changed, and hasn't opened the game since the client
                             // started migrating those records, still has it under the old key.
-                            const old = legacySaveable(level);
                             numbers.push({
                                 name: name,
                                 str: JSON.stringify(saveable(level)),
-                                legacy: old ? JSON.stringify(old) : null,
+                                legacy: legacySaveables(level).map((s) => JSON.stringify(s)),
                             });
                         });
                     });
@@ -49,7 +48,7 @@ submit.onclick = function() {
                         numbers.forEach(function (level) {
                             const solved = oldrec.doc
                                   && (oldrec.doc[level.str]
-                                      || (level.legacy ? oldrec.doc[level.legacy] : null));
+                                      || level.legacy.map((k) => oldrec.doc[k]).find(Boolean));
                             newrec[level.name] = solved && solved.complete ? solved.difficulty + 1 : 0;
                         });
                         console.log(newrec);

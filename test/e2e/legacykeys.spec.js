@@ -9,13 +9,15 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { allLevels, completionKey, legacyCompletionKey } = require('../lib/levels');
+const { allLevels, completionKey, legacyCompletionKeys } = require('../lib/levels');
 
 // A level whose statement's notation changed, so its records may be under the older key.
-const MOVED = allLevels().find((l) => l.legacySaveable);
+const MOVED = allLevels().find((l) => l.legacySaveables.length > 0);
 if (!MOVED) {
     throw new Error('No level carries a legacy `saveable` block any more; delete this spec with it.');
 }
+// The statement it was stored under before it was restated.
+const OLD_KEY = legacyCompletionKeys(MOVED)[0];
 
 const record = (page, key) => page.evaluate((k) => {
     const v = localStorage.getItem(k);
@@ -29,8 +31,8 @@ test.describe('Records under a level\'s pre-2025 key', () => {
     test('are copied to the key the level uses now', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.seed([
-            [legacyCompletionKey(MOVED), solved],
-            ['proof:0:' + legacyCompletionKey(MOVED), proof],
+            [OLD_KEY, solved],
+            ['proof:0:' + OLD_KEY, proof],
         ]);
         await olorin.open();
 
@@ -40,14 +42,14 @@ test.describe('Records under a level\'s pre-2025 key', () => {
         // ...and the level reads as completed, which is the point of the exercise.
         expect((await olorin.levelStates(MOVED.name))[0]).toBe('completed');
         // The old copies are left where they are, for an older cached build of the game.
-        expect(await record(page, legacyCompletionKey(MOVED))).toEqual(JSON.parse(solved));
+        expect(await record(page, OLD_KEY)).toEqual(JSON.parse(solved));
     });
 
     test('never overwrite what is already stored under the current key', async ({ page }) => {
         const newer = JSON.stringify({ complete: true, difficulty: 2 });
         const olorin = new Olorin(page);
         await olorin.seed([
-            [legacyCompletionKey(MOVED), solved],
+            [OLD_KEY, solved],
             [completionKey(MOVED), newer],
         ]);
         await olorin.open();
@@ -62,7 +64,7 @@ test.describe('Records under a level\'s pre-2025 key', () => {
 
         // An export from before the notation changed names the statement the level had then.
         await olorin.importText(JSON.stringify({
-            level: MOVED.legacySaveable, complete: false, difficulty: 0, nodes: [], connections: [],
+            level: MOVED.legacySaveables[0], complete: false, difficulty: 0, nodes: [], connections: [],
         }));
 
         // It's recognized as that level, rather than offering to build a custom one from it.
@@ -72,7 +74,7 @@ test.describe('Records under a level\'s pre-2025 key', () => {
     test('a level that never moved is untouched', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        const staying = allLevels().filter((l) => !l.legacySaveable);
+        const staying = allLevels().filter((l) => l.legacySaveables.length === 0);
         // Nothing was invented for the levels with no old key: a fresh profile stays empty.
         const keys = await page.evaluate(() => Object.keys(localStorage));
         expect(keys.filter((k) => k.startsWith('{'))).toEqual([]);

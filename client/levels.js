@@ -1271,65 +1271,117 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(n=2*k)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(n²=2*k)" },
+                    hypotheses: [ { ty: "2 ∣ n" } ],
+                    conclusion: { ty: "2 ∣ n²" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(n=2*k)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(n²=2*k)" },
+                    }
                 },
                 // 0 is not synthesizing )-:
                 // {
                 //     parameters: [ ],
                 //     variables: [ { name: "a", ty: "ℤ" } ],
                 //     hypotheses: [ ],
-                //     conclusion: { ty: "∃k∈ℤ,(0=k*a)" },
+                //     conclusion: { ty: "a ∣ 0" },
                 // },
                 {
                     parameters: [ ],
                     variables: [ { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "∃k∈ℤ,(b=k*1)" },
+                    hypotheses: [  ],
+                    conclusion: { ty: "1 ∣ b" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "b", ty: "ℤ" } ],
+                        hypotheses: [  ],
+                        conclusion: { ty: "∃k∈ℤ,(b=k*1)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(2*b=k*a)" },
-                    // hypotheses: [ { ty: "a ∣ b" } ],
-                    // conclusion: { ty: "a ∣ 2*b" },
+                    hypotheses: [ { ty: "a ∣ b" } ],
+                    conclusion: { ty: "a ∣ 2*b" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(2*b=k*a)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(b+a=k*a)" },
+                    hypotheses: [ { ty: "a ∣ b" } ],
+                    conclusion: { ty: "a ∣ b+a" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(b+a=k*a)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(b²=k*a²)" },
+                    hypotheses: [ { ty: "a ∣ b" } ],
+                    conclusion: { ty: "a² ∣ b²" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(b²=k*a²)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(b*c=k*a*c)" },
+                    hypotheses: [ { ty: "a ∣ b" } ],
+                    conclusion: { ty: "a*c ∣ b*c" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(b*c=k*a*c)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(b*c=k*a)" },
+                    hypotheses: [ { ty: "a ∣ b" } ],
+                    conclusion: { ty: "a ∣ b*c" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(b*c=k*a)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" }, { ty: "∃k∈ℤ,(c=k*a)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(b+c=k*a)" },
+                    hypotheses: [ { ty: "a ∣ b" }, { ty: "a ∣ c" } ],
+                    conclusion: { ty: "a ∣ b+c" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" }, { ty: "∃k∈ℤ,(c=k*a)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(b+c=k*a)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" }, { ty: "∃k∈ℤ,(c=k*b)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(c=k*a)" },
+                    hypotheses: [ { ty: "a ∣ b" }, { ty: "b ∣ c" } ],
+                    conclusion: { ty: "a ∣ c" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" }, { ty: "∃k∈ℤ,(c=k*b)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(c=k*a)" },
+                    }
                 },
             ],
           },
@@ -1339,68 +1391,130 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "∃k∈ℤ,(a−a=k*n)" },
+                    hypotheses: [  ],
+                    conclusion: { ty: "a ≡ a (mod n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [  ],
+                        conclusion: { ty: "∃k∈ℤ,(a−a=k*n)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(b−a=k*n)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−b=k*(−n))" },
+                    hypotheses: [ { ty: "a ≡ b (mod n)" } ],
+                    conclusion: { ty: "b ≡ a (mod n)" },
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                         hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(a−b=k*(∸n))" },
+                        conclusion: { ty: "∃k∈ℤ,(b−a=k*n)" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "a ≡ b (mod n)" } ],
+                    conclusion: { ty: "a ≡ b (mod (−n))" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(a−b=k*(∸n))" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(a−b=k*(−n))" },
+                        },
+                    ]
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "a ≡ b (mod n)" } ],
+                    conclusion: { ty: "a*c ≡ b*c (mod n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [  ],
+                    conclusion: { ty: "a ≡ b (mod 1)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                        hypotheses: [  ],
+                        conclusion: { ty: "∃k∈ℤ,(a−b=k*1)" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "a ≡ b (mod 0)" } ],
+                    conclusion: { ty: "a=b" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*0)" } ],
+                        conclusion: { ty: "a=b" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "a ≡ b (mod n)" } ],
+                    conclusion: { ty: "a² ≡ b² (mod n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a²−b²=k*n)" },
                     }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "∃k∈ℤ,(a−b=k*1)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*0)" } ],
-                    conclusion: { ty: "a=b" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a²−b²=k*n)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
+                    hypotheses: [ { ty: "a ≡ b (mod n)" }, { ty: "b ≡ c (mod n)" } ],
+                    conclusion: { ty: "a ≡ c (mod n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(b−c=k*n)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−c=k*n)" }, { ty: "∃k∈ℤ,(b−d=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,((a+b)−(c+d)=k*n)" },
+                    hypotheses: [ { ty: "a ≡ c (mod n)" }, { ty: "b ≡ d (mod n)" } ],
+                    conclusion: { ty: "(a+b) ≡ (c+d) (mod n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−c=k*n)" }, { ty: "∃k∈ℤ,(b−d=k*n)" } ],
+                        conclusion: { ty: "∃k∈ℤ,((a+b)−(c+d)=k*n)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,((a+b)−(c+d)=k*n)" }, { ty: "∃k∈ℤ,(b−d=k*n)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
+                    hypotheses: [ { ty: "(a+b) ≡ (c+d) (mod n)" }, { ty: "b ≡ d (mod n)" } ],
+                    conclusion: { ty: "a ≡ c (mod n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,((a+b)−(c+d)=k*n)" }, { ty: "∃k∈ℤ,(b−d=k*n)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a−c=k*n)" },
+                    }
                 },
             ],
           },
@@ -1410,14 +1524,26 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(n=k*m)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a−b=k*m)" },
+                    hypotheses: [ { ty: "a ≡ b (mod n)" }, { ty: "m ∣ n" } ],
+                    conclusion: { ty: "a ≡ b (mod m)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(n=k*m)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a−b=k*m)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(c=k*m)" } ],
-                    conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*(m*n))" },
+                    hypotheses: [ { ty: "a ≡ b (mod n)" }, { ty: "m ∣ c" } ],
+                    conclusion: { ty: "a*c ≡ b*c (mod m*n)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(c=k*m)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*(m*n))" },
+                    }
                 },
                 // Just for testing number systems and subtypes
                 // {
@@ -1722,19 +1848,27 @@ export function saveable(level) {
     };
 }
 
-// DEPRECATED.  What a level was stored under before its notation changed -- the prefix minus went
-// from ∸ to − in April 2025 -- for the levels that carry a `saveable` block above.  Records written
-// before that change are still filed under it, so the client copies them to the current key when it
-// finds them (migrateLegacyRecords in main.js); nothing else consults it.
+// DEPRECATED.  What a level was stored under before its statement was written differently -- the
+// prefix minus went from ∸ to − in April 2025, and the divisibility and congruence levels were
+// restated with the ∣ and ≡ notations in September 2026 -- for the levels that carry a `saveable`
+// block above.  Records written before a change are still filed under the statement it replaced, so
+// the client copies them to the current key when it finds them (migrateLegacyRecords in main.js);
+// nothing else consults them.
 //
-// Once every student has opened the game since that migration shipped (September 2026) -- from
-// mid-2027, say -- the `saveable` blocks, this function and the migration can all be deleted.
-export function legacySaveable(level) {
-    if(!level.saveable) { return null; }
-    return {
-        parameters: level.saveable.parameters,
-        variables: level.saveable.variables,
-        hypotheses: level.saveable.hypotheses,
-        conclusion: level.saveable.conclusion,
-    };
+// A level restated twice lists both of its old statements, so give `saveable` an array in that
+// case; a single statement (the common case) may be written on its own.
+//
+// Once every student has opened the game since a change shipped, that change's `saveable` entries
+// can be deleted -- and once none are left, so can this function and the migration.
+export function legacySaveables(level) {
+    if(!level.saveable) { return []; }
+    const old = Array.isArray(level.saveable) ? level.saveable : [ level.saveable ];
+    return old.map(function (s) {
+        return {
+            parameters: s.parameters,
+            variables: s.variables,
+            hypotheses: s.hypotheses,
+            conclusion: s.conclusion,
+        };
+    });
 }

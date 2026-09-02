@@ -1,5 +1,5 @@
 import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
-import { LEVELS, saveable, legacySaveable } from "./levels.js"
+import { LEVELS, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
@@ -1083,11 +1083,11 @@ difficultyRadios.forEach(function (radios, i) {
     });
 });
 
-// DEPRECATED, with the `saveable` blocks in levels.js: the key a level's records were filed under
-// before its notation changed (∸ to −, April 2025), or null for the levels that never moved.
-function legacyKeyOf(level) {
-    const old = legacySaveable(level);
-    return old ? JSON.stringify(old) : null;
+// DEPRECATED, with the `saveable` blocks in levels.js: the keys a level's records were filed under
+// before its statement was last written differently -- one per earlier statement, and none at all
+// for the levels that never moved.
+function legacyKeysOf(level) {
+    return legacySaveables(level).map(function (old) { return JSON.stringify(old); });
 }
 
 // Copy anything still filed under a level's pre-2025 key to the key it uses now: the completion
@@ -1101,27 +1101,27 @@ function migrateLegacyRecords(res) {
     LEVELS.forEach(function (world) {
         world.stages.forEach(function (stage) {
             stage.levels.forEach(function (level) {
-                const old = legacyKeyOf(level);
-                if(!old) { return; }
                 const key = JSON.stringify(saveable(level));
-                // The completion record, from the server's copy if we're logged in.
-                if(res) {
-                    if(res[old] !== undefined && res[key] === undefined) {
-                        res[key] = res[old];
-                        localStorage.setItem(key, JSON.stringify(res[key]));
-                        saveSolvedToServer(key, res[key], res.difficulty || 0, res.world || 0);
+                legacyKeysOf(level).forEach(function (old) {
+                    // The completion record, from the server's copy if we're logged in.
+                    if(res) {
+                        if(res[old] !== undefined && res[key] === undefined) {
+                            res[key] = res[old];
+                            localStorage.setItem(key, JSON.stringify(res[key]));
+                            saveSolvedToServer(key, res[key], res.difficulty || 0, res.world || 0);
+                        }
+                    } else if(localStorage.getItem(key) === null) {
+                        const record = localStorage.getItem(old);
+                        if(record !== null) { localStorage.setItem(key, record); }
                     }
-                } else if(localStorage.getItem(key) === null) {
-                    const record = localStorage.getItem(old);
-                    if(record !== null) { localStorage.setItem(key, record); }
-                }
-                // And the proof saved at each difficulty.
-                for(var d = 0; d < 3; d++) {
-                    if(localStorage.getItem("proof:" + d + ":" + key) === null) {
-                        const proof = localStorage.getItem("proof:" + d + ":" + old);
-                        if(proof !== null) { localStorage.setItem("proof:" + d + ":" + key, proof); }
+                    // And the proof saved at each difficulty.
+                    for(var d = 0; d < 3; d++) {
+                        if(localStorage.getItem("proof:" + d + ":" + key) === null) {
+                            const proof = localStorage.getItem("proof:" + d + ":" + old);
+                            if(proof !== null) { localStorage.setItem("proof:" + d + ":" + key, proof); }
+                        }
                     }
-                }
+                });
             });
         });
     });
@@ -1530,7 +1530,7 @@ function isLevelDef(def) {
 // (DEPRECATED along with the `saveable` blocks in levels.js).
 function findLevelByKey(key) {
     return allLevels.find(function (l) { return JSON.stringify(saveable(l)) === key; })
-        || allLevels.find(function (l) { return legacyKeyOf(l) === key; });
+        || allLevels.find(function (l) { return legacyKeysOf(l).includes(key); });
 }
 
 // Find the saved custom level with the same statement as the given key, or undefined if none has.
