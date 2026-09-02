@@ -70,6 +70,15 @@ class Olorin {
         );
     }
 
+    // Set (null clears) one of a world's unlock options -- 'previous' -- by 1-based world number,
+    // and re-render the chooser.
+    setWorldOption(world, option, value) {
+        return this.page.evaluate(
+            ({ w, o, v }) => window.__olorin.setWorldOption(w, o, v),
+            { w: world, o: option, v: value },
+        );
+    }
+
     // The completion record stored for a level ({complete, difficulty, times}), or null if none.
     completionRecord(name) {
         return this.page.evaluate((n) => {

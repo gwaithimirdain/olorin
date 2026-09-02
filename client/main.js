@@ -1118,15 +1118,27 @@ function fraction(done, total) {
 // is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
 // Whether a world's three inter-world gates (rules 1-3) pass at difficulty K -- i.e. whether the
 // world itself is "open" at K (individual levels still need the stage/level rules 4-6).
-// The percentages are of each world's non-bonus levels; a `bonus` stage is left out of the totals
-// entirely (see computeUnlockData), so solving one can never open a world, nor be needed to.
+//
+// Which worlds a world follows is its `previous` list in levels.js, defaulting to [1], the world
+// right before it (see computeUnlockData); each gate then asks about ALL the worlds it names, so a
+// world following two others waits for both.  The percentages are of each world's non-bonus levels;
+// a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
 function worldGatesPass(w, K, data) {
-    // 1. The previous world is >= 80% complete at difficulty K (unless this is the first world).
-    if(w > 0 && fraction(data[w - 1].done[K], data[w - 1].total) < 0.8) { return false; }
-    // 2. The next world is >= 50% complete at K-1 (unless K is 0, or this is the last world).
-    if(K > 0 && w < data.length - 1 && fraction(data[w + 1].done[K - 1], data[w + 1].total) < 0.5) { return false; }
-    // 3. The world two back is >= 50% complete at K+1 (unless this is the first/second world or K=2).
-    if(w >= 2 && K < 2 && fraction(data[w - 2].done[K + 1], data[w - 2].total) < 0.5) { return false; }
+    const world = data[w];
+    // 1. Every world this one follows is >= 80% complete at difficulty K.
+    if(world.previous.some(function (p) { return fraction(data[p].done[K], data[p].total) < 0.8; })) {
+        return false;
+    }
+    // 2. Every world that follows this one is >= 50% complete at K-1 (unless K is 0).
+    if(K > 0 && world.followers.some(function (f) {
+        return fraction(data[f].done[K - 1], data[f].total) < 0.5;
+    })) { return false; }
+    // 3. Every world followed by a world this one follows is >= 50% complete at K+1 (unless K=2).
+    if(K < 2 && world.previous.some(function (p) {
+        return data[p].previous.some(function (q) {
+            return fraction(data[q].done[K + 1], data[q].total) < 0.5;
+        });
+    })) { return false; }
     return true;
 }
 
@@ -1266,8 +1278,13 @@ function toggleCompletedAt(level, d) {
 // (>= K) and each level's completed difficulty, from the saved results.  Drives the unlock rule.
 function computeUnlockData(res) {
     globalTime = parseInt(localStorage.getItem("time")) || 0;
-    unlockData = LEVELS.map(function (world) {
-        const wd = { total: 0, done: [0, 0, 0], stages: [] };
+    unlockData = LEVELS.map(function (world, w) {
+        // Which worlds this one follows: `previous` lists how many worlds back each is, defaulting
+        // to the world right before it.  Entries reaching back past the first world are ignored, so
+        // the first world follows nothing; `followers` (filled in below) is the reverse relation.
+        const previous = (world.previous || [1]).map(function (n) { return w - n; })
+              .filter(function (i) { return i >= 0; });
+        const wd = { total: 0, done: [0, 0, 0], stages: [], previous: previous, followers: [] };
         world.stages.forEach(function (stage) {
             // `previous` is which stages back this one's rule-4 prerequisite is; see difficultyUnlocked.
             const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
@@ -1294,6 +1311,10 @@ function computeUnlockData(res) {
             wd.stages.push(sd);
         });
         return wd;
+    });
+    // Now that every world's `previous` is resolved, record each one's followers.
+    unlockData.forEach(function (wd, w) {
+        wd.previous.forEach(function (p) { unlockData[p].followers.push(w); });
     });
 }
 
@@ -1797,6 +1818,12 @@ if (new URLSearchParams(window.location.search).has("test")) {
         setStageOption: (world, stage, option, value) => {
             const st = LEVELS[world - 1].stages[stage - 1];
             if(value === null) { delete st[option]; } else { st[option] = value; }
+            updateLevelSelect(null);
+        },
+        // The same for a world's own options ("previous"), by 1-based world number.
+        setWorldOption: (world, option, value) => {
+            const w = LEVELS[world - 1];
+            if(value === null) { delete w[option]; } else { w[option] = value; }
             updateLevelSelect(null);
         },
     };

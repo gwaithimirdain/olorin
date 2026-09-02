@@ -1,5 +1,16 @@
 // The game's levels, as worlds -> stages -> levels.
 //
+// A world is { name, stages }: its title in the chooser and the stages it holds.  It may also carry:
+//
+//   previous: [N, ...]  Which worlds this one follows, as how many worlds back each is, instead of
+//                       the default [1] (the world right before it).  All three of the rules that
+//                       open a world ask about every world named, and about the whole relation:
+//                       this world opens at a difficulty once every world it follows is >= 80%
+//                       complete at that difficulty, every world THEY follow is >= 50% complete one
+//                       difficulty higher, and every world that follows THIS one is >= 50% complete
+//                       one difficulty lower.  Entries reaching back past the first world are
+//                       ignored, so the first world follows nothing, and [] follows nothing either.
+//
 // A stage is { name, rules, levels }: its label in the chooser, the palette rules its levels may
 // use, and the levels themselves.  It may also carry:
 //

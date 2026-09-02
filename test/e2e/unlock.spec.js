@@ -13,7 +13,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { inWorld, inStage, stagesInWorld, prereqStages, firstLevel, completions, thresholdCount } = require('../lib/levels');
+const { inWorld, inStage, stagesInWorld, prereqStages, firstLevel, worldNames, completions, thresholdCount } = require('../lib/levels');
 
 const FIRST = firstLevel();                            // all a fresh player has unlocked
 const STAGE1 = inStage(FIRST.world, FIRST.stage);      // the stage it opens in
@@ -294,5 +294,83 @@ test.describe('A stage marked "bonus"', () => {
         const olorin = await open(page, prereqStages(BEFORE, STAGES).flatMap(done).concat(done(BEFORE)));
         await olorin.setStageOption(FIRST.world, BEFORE.number, 'bonus', true);
         expect((await olorin.levelStates(AFTER.levels[0].name))[0]).toBe('unlocked');
+    });
+});
+
+// Which worlds a world follows is its own `previous` list, defaulting to [1].  All three of the
+// rules that open a world quantify over the relation: every world it follows must be 80% done at
+// this difficulty, every world THEY follow 50% done one difficulty up, and every world that follows
+// THIS one 50% done one difficulty down.  These set the lists through test mode's setWorldOption.
+test.describe('Rules 1-3: a world\'s "previous" list', () => {
+    const WORLDS = worldNames().length;
+    if (WORLDS < 3) {
+        throw new Error('This suite assumes there are at least three worlds; update it.');
+    }
+    // The first level of a world, whose own stage and level rules ask for nothing.
+    const opener = (w) => inWorld(w)[0];
+    const done = (w, difficulty) => completions(inWorld(w), difficulty);
+    const state = async (olorin, w) => (await olorin.levelStates(opener(w).name))[0];
+    const adept = async (olorin, w) => (await olorin.levelStates(opener(w).name))[1];
+
+    test('by default a world follows the one before it', async ({ page }) => {
+        // World 1 is finished, but world 3 waits on world 2, not on world 1.
+        const olorin = await open(page, done(1, 0));
+        expect(await state(olorin, 3)).toBe('locked');
+        await page.close();
+    });
+
+    test('previous: [2] looks past the world in between', async ({ page }) => {
+        const olorin = await open(page, done(1, 0));
+        await olorin.setWorldOption(3, 'previous', [2]);
+        // World 3 now follows world 1, which is done -- and world 1 follows nothing, so the
+        // grandparent rule asks for nothing either.
+        expect(await state(olorin, 3)).toBe('unlocked');
+    });
+
+    test('previous: [1, 2] waits for both of them', async ({ page }) => {
+        // World 1 done at adept (so the grandparent rule is satisfied too), world 2 untouched.
+        const olorin = await open(page, done(1, 1));
+        await olorin.setWorldOption(3, 'previous', [1, 2]);
+        expect(await state(olorin, 3)).toBe('locked');
+        await page.close();
+    });
+
+    test('previous: [1, 2] opens once both are done', async ({ page }) => {
+        const olorin = await open(page, done(1, 1).concat(done(2, 0)));
+        await olorin.setWorldOption(3, 'previous', [1, 2]);
+        expect(await state(olorin, 3)).toBe('unlocked');
+    });
+
+    test('previous: [] follows no world at all', async ({ page }) => {
+        const olorin = await open(page); // nothing completed anywhere
+        expect(await state(olorin, 2)).toBe('locked');
+        await olorin.setWorldOption(2, 'previous', []);
+        expect(await state(olorin, 2)).toBe('unlocked');
+    });
+
+    test('a world\'s followers gate its higher difficulties', async ({ page }) => {
+        // World 1 done at adept opens world 2 at novice, but world 2's ADEPT waits on the world
+        // that follows it (rule 2), which nothing has been done in.
+        const olorin = await open(page, done(1, 1));
+        expect(await adept(olorin, 2)).toBe('locked');
+
+        // Point world 3 elsewhere and world 2 has no follower left to wait for.
+        await olorin.setWorldOption(3, 'previous', []);
+        expect(await adept(olorin, 2)).toBe('unlocked');
+    });
+
+    test('the worlds a world\'s predecessors follow gate it one difficulty up', async ({ page }) => {
+        // Worlds 1 and 2 done at novice: world 3 still waits on world 1 at ADEPT (rule 3).
+        const olorin = await open(page, done(1, 0).concat(done(2, 0)));
+        expect(await state(olorin, 3)).toBe('locked');
+
+        // World 3 following world 1 directly leaves nothing beyond it to ask about.
+        await olorin.setWorldOption(3, 'previous', [2]);
+        expect(await state(olorin, 3)).toBe('unlocked');
+    });
+
+    test('...and opens once they are done at that difficulty', async ({ page }) => {
+        const olorin = await open(page, done(1, 1).concat(done(2, 0)));
+        expect(await state(olorin, 3)).toBe('unlocked');
     });
 });
