@@ -1765,6 +1765,17 @@ if (new URLSearchParams(window.location.search).has("test")) {
             const lvl = allLevels.find((l) => l.name === name);
             return lvl ? levelDifficultyStates(lvl, getPast(null, lvl), unlockData) : null;
         },
+        // Every port in the diagram, with the type currently shown for it (if any) -- the label on
+        // an output/assumption port, or the type recorded for an input/subgoal port.
+        ports: () => nodes.flatMap((n) =>
+            instance.getEndpoints(n.node).map((ep) => {
+                const ovl = ep.getOverlay("customLabel");
+                const shown = ovl && ovl.canvas ? ovl.canvas.innerText.trim() : undefined;
+                return {
+                    vertex: n.id, sort: ep.parameters.sort, label: ep.parameters.label,
+                    type: shown || n.node.dataset["label:" + ep.parameters.sort + ":" + ep.parameters.label],
+                };
+            })),
         // The localStorage key a level's completion is recorded under, by name.
         completionKey: (name) => {
             const lvl = allLevels.find((l) => l.name === name);
