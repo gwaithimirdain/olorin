@@ -101,7 +101,7 @@ notation \"ω\" ≔ omega.
 axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
-def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus b a) (ℤ.times k n))
+def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
 "
 
 (* Raw.App now takes a *check* function and an *optional* check argument; these helpers build an
@@ -665,7 +665,7 @@ let install_notations () =
                            ( (LParen, `None, []),
                              Op
                                ( (Ident [ "mod" ], `Nobreak, []),
-                                 Var (("b", `None, []), Op_nil (RParen, [])) ) ) ) ) );
+                                 Var (("n", `None, []), Op_nil (RParen, [])) ) ) ) ) );
            key = `Constant (get_const [ "congruent" ]);
            val_vars = [ "a"; "b"; "n" ];
          }) in
