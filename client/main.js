@@ -2274,12 +2274,34 @@ function deleteRule(box) {
 }
 
 // When a node needs a new bound variable, we prompt the user with a modal dialog.
+// Renaming a bound variable renames the binder, but not any of the places the player has written a
+// name out by hand: the text in an expression or ascription box, or a type typed on a wire (which
+// only happens at adept and master).  We don't try to substitute into those, so if the proof has
+// any of them, say so -- without checking whether this particular variable is used there, since
+// the point is to prompt a look rather than to be exhaustive.
+function renameWarningText() {
+    const boxes = nodes.some(function (x) { return x.rule === 'asc' || x.rule === 'expr'; });
+    const wires = difficulty > 0;
+    if(!boxes && !wires) { return ""; }
+    const places =
+        boxes && wires ? "your expression and ascription boxes, and the types you've written on wires"
+        : boxes ? "your expression and ascription boxes"
+        : "the types you've written on wires";
+    return "Renaming changes where the variable is bound, but not " + places +
+        ".  If any of them mention the old name, you'll need to change them yourself.";
+}
+
 function openVariableDialog(id, current, editing) {
     const variableBG = document.getElementById("variableBG");
     const variableList = document.getElementById("variableList");
     const newvar = document.getElementById('newvar');
 
     variableBG.style.display = "flex";
+    // A rename can leave hand-written names behind; a brand-new variable has no old name to leave.
+    const warning = document.getElementById("renameWarning");
+    const caution = editing ? renameWarningText() : "";
+    warning.innerText = caution;
+    warning.classList.toggle("shown", caution !== "");
     // The names already taken -- not counting the one we're renaming, which is up for grabs.
     const taken = varnames.filter(function (v) { return v !== current; });
     variableList.innerText = taken.length > 0 ? taken.join(" ") : "<none>";

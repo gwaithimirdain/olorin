@@ -364,6 +364,17 @@ body {
     align-items: center;
 }
 
+/* A caution inside a modal dialog, e.g. what renaming a bound variable won't do for you. */
+.dialog-warning {
+    display: none;
+    border-left: 4px solid #d08700;
+    background-color: #fdf6e3;
+    padding: 6px 10px;
+    margin-top: 12px;
+}
+.dialog-warning.shown {
+    display: block;
+}
 .modal {
     background-color: white;
     padding: 20px;

@@ -177,8 +177,10 @@ test.describe('Ascription boxes', () => {
 test.describe('Boxes that bind a variable', () => {
     let olorin;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
         olorin = new Olorin(page);
+        // One test is about the types typed on wires, which only happens above novice.
+        if (testInfo.title.includes('above novice')) await olorin.seed([['difficulty', '1']]);
         await olorin.open();
         // ∀-introduction needs a goal worth introducing into; the level's own x is already taken.
         await olorin.buildCustom({ parameters: 'A : Type\nP : A→Type', variables: 'x ∈ ℤ',
@@ -241,6 +243,53 @@ test.describe('Boxes that bind a variable', () => {
         await expect(page.locator('#variableBG')).toBeVisible();
         await page.click('#cancelVariable');
         expect(await boundName(page, id)).toBe('y');
+    });
+
+    // Renaming can't reach into text the player wrote by hand, so the dialog says so when the
+    // proof has anywhere that could contain it.
+    const warning = (page) => page.evaluate(() => {
+        const w = document.getElementById('renameWarning');
+        return w.classList.contains('shown') ? w.innerText : null;
+    });
+
+    test('renaming warns about hand-written names when a box could hold one', async ({ page }) => {
+        const id = await olorin.dragRule('allI', 420, 240);
+        await enterVariable(page, 'y');
+
+        // Nothing written by hand yet, and novice types no wires: no warning.
+        await page.dblclick('#' + id);
+        expect(await warning(page)).toBeNull();
+        await page.click('#cancelVariable');
+
+        // Add an expression box, and the rename dialog cautions about it.
+        await olorin.dragRule('expr', 600, 400);
+        await page.waitForSelector('#expressionBG', { state: 'visible' });
+        await page.fill('#expression', 'x+1');
+        await page.click('#submitExpression');
+
+        await page.dblclick('#' + id);
+        expect(await warning(page)).toContain('expression and ascription boxes');
+        expect(await warning(page)).not.toContain('wires');
+    });
+
+    test('the warning covers typed wire labels above novice', async ({ page }) => {
+        const id = await olorin.dragRule('allI', 420, 240);
+        await enterVariable(page, 'y');
+        await page.dblclick('#' + id);
+
+        expect(await warning(page)).toContain("types you've written on wires");
+    });
+
+    test('a brand-new variable is not warned about', async ({ page }) => {
+        // An expression box is present, but naming a *new* binder leaves nothing behind.
+        await olorin.dragRule('expr', 600, 400);
+        await page.waitForSelector('#expressionBG', { state: 'visible' });
+        await page.fill('#expression', 'x+1');
+        await page.click('#submitExpression');
+
+        await olorin.dragRule('allI', 420, 240);
+        await page.waitForSelector('#variableBG', { state: 'visible' });
+        expect(await warning(page)).toBeNull();
     });
 
     test('cancelling a rename leaves the box alone, but cancelling a new box removes it', async ({ page }) => {
