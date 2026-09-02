@@ -408,6 +408,8 @@ function addEndpointsForRule(box, id, restore) {
         box.style.height = '50px';
         makeResizable(box);
         if(id === 'allI') {
+            // Double-clicking the box re-opens the dialog to rename the variable it binds.
+            box.addEventListener('dblclick', function () { editVariable(box); });
             if(!restore) { getVariable(box.id); }
             typecheck_now = false;
         }
@@ -440,6 +442,8 @@ function addEndpointsForRule(box, id, restore) {
             connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
         });
         instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        // Double-clicking the box re-opens the dialog to rename the variable it binds.
+        box.addEventListener('dblclick', function () { editVariable(box); });
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
     } else if (id === 'exI') {
@@ -472,10 +476,13 @@ function addEndpointsForRule(box, id, restore) {
     } else if (id === 'asc') {
         instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input"} });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+        // Double-clicking the box re-opens the dialog to edit the type it ascribes.
+        box.addEventListener('dblclick', function () { editAscription(box); });
         if(!restore) {
             document.getElementById("ascribeBG").style.display = "flex";
             const ascribe = document.getElementById('ascribe');
             ascribe.dataset.name = box.id;
+            ascribe.dataset.editing = "";
             ascribe.focus();
         }
         typecheck_now = false;
@@ -2267,35 +2274,53 @@ function deleteRule(box) {
 }
 
 // When a node needs a new bound variable, we prompt the user with a modal dialog.
-function getVariable(name) {
+function openVariableDialog(id, current, editing) {
     const variableBG = document.getElementById("variableBG");
     const variableList = document.getElementById("variableList");
     const newvar = document.getElementById('newvar');
 
     variableBG.style.display = "flex";
-    if(varnames.length > 0) {
-        variableList.innerText = varnames.join(" ");
-    } else {
-        variableList.innerText = "<none>";
-    }
-    newvar.dataset.name = name;
+    // The names already taken -- not counting the one we're renaming, which is up for grabs.
+    const taken = varnames.filter(function (v) { return v !== current; });
+    variableList.innerText = taken.length > 0 ? taken.join(" ") : "<none>";
+    newvar.dataset.name = id;
+    // Cancelling an edit leaves the box alone; cancelling a brand-new one removes it.
+    newvar.dataset.editing = editing ? "true" : "";
+    newvar.value = current;
     newvar.focus();
+    newvar.select();
+}
+
+// Prompt for the variable a newly added ∀-introduction or ∃-elimination binds.
+function getVariable(id) {
+    openVariableDialog(id, '', false);
+}
+
+// Re-open that dialog on a box that already binds one, to rename it.  Double-clicking does this.
+function editVariable(box) {
+    openVariableDialog(box.id, box.dataset.variable || '', true);
 }
 
 // When that modal dialog is submitted, we save the variable name and hide it.
 function submitNewVariable() {
     const variableBG = document.getElementById("variableBG");
     const newvar = document.getElementById('newvar');
+    const box = document.getElementById(newvar.dataset.name);
+    // When renaming, the name this box binds now is the one being replaced, so it isn't taken.
+    const previous = newvar.dataset.editing === "true" ? box.dataset.variable : undefined;
 
     if(!Narya.checkVariable(newvar.value).complete) {
         alert("Invalid variable name");
         newvar.focus();
-    } else if(varnames.includes(newvar.value)) {
+    } else if(varnames.includes(newvar.value) && newvar.value !== previous) {
         // Enforce the Barendregt convention.
         alert("New variable name must be different from all existing variables");
         newvar.focus();
     } else {
-        // Save it in the list of variable names
+        // Save it in the list of variable names, in place of the one it replaces
+        if(previous !== undefined) {
+            varnames = varnames.filter(function (v) { return v !== previous; });
+        }
         varnames.push(newvar.value);
         // Attach it to the node that prompted for it.  NOTE: This doesn't allow a single node to contain more than one variable name.
         for (var i in nodes) {
@@ -2304,11 +2329,12 @@ function submitNewVariable() {
             }
         }
         // Save the variable associated to the rule box.  This allows us to remove it from the global list of used variables when that rule is deleted.
-        document.getElementById(newvar.dataset.name).dataset.variable = newvar.value;
+        box.dataset.variable = newvar.value;
         // And empty and hide the modal dialog
         newvar.value = '';
+        newvar.dataset.editing = "";
         variableBG.style.display = "none";
-        // And typecheck, since that was delayed
+        // And typecheck: either that was delayed when the rule was added, or the name just changed.
         typecheck();
     }
 }
@@ -2316,16 +2342,35 @@ function submitNewVariable() {
 function cancelNewVariable() {
     const variableBG = document.getElementById("variableBG");
     const newvar = document.getElementById('newvar');
-    for (var i in nodes) {
-        if (nodes[i].id === newvar.dataset.name) {
-            deleteRule(nodes[i].node);
+    // Cancelling the prompt for a new box means it was never made, so it goes away; cancelling a
+    // rename of an existing one leaves it (and its wires) exactly as they were.
+    if(newvar.dataset.editing !== "true") {
+        for (var i in nodes) {
+            if (nodes[i].id === newvar.dataset.name) {
+                deleteRule(nodes[i].node);
+            }
         }
     }
     newvar.value = '';
+    newvar.dataset.editing = "";
     variableBG.style.display = "none";
 }
 
 // Similarly, submit the modal box that prompts for an ascription
+// Re-open the ascription dialog on a box that already has a type, so it can be corrected in place
+// instead of deleting the box and wiring a new one up.  Double-clicking a box does this.
+function editAscription(box) {
+    const ascribe = document.getElementById('ascribe');
+    const node = nodes.find(function (x) { return x.id === box.id; });
+    ascribe.dataset.name = box.id;
+    // Cancelling an edit leaves the box alone; cancelling a brand-new one removes it.
+    ascribe.dataset.editing = "true";
+    ascribe.value = (node && node.value) || '';
+    document.getElementById("ascribeBG").style.display = "flex";
+    ascribe.focus();
+    ascribe.select();
+}
+
 function submitAscription() {
     const ascribeBG = document.getElementById("ascribeBG");
     const ascribe = document.getElementById('ascribe');
@@ -2348,20 +2393,26 @@ function submitAscription() {
     box.style.padding = "0px 8px 0px 8px"
     // And empty and hide the modal dialog
     ascribe.value = '';
+    ascribe.dataset.editing = "";
     ascribeBG.style.display = "none";
-    // And typecheck, since that was delayed when the rule was added.
+    // And typecheck: either that was delayed when the rule was added, or the type just changed.
     typecheck();
 }
 
 function cancelAscription() {
     const ascribeBG = document.getElementById("ascribeBG");
     const ascribe = document.getElementById('ascribe');
-    for (var i in nodes) {
-        if (nodes[i].id === ascribe.dataset.name) {
-            deleteRule(nodes[i].node);
+    // Cancelling the prompt for a new box means it was never made, so it goes away; cancelling an
+    // edit of an existing one leaves it (and its wires) exactly as they were.
+    if(ascribe.dataset.editing !== "true") {
+        for (var i in nodes) {
+            if (nodes[i].id === ascribe.dataset.name) {
+                deleteRule(nodes[i].node);
+            }
         }
     }
     ascribe.value = '';
+    ascribe.dataset.editing = "";
     ascribeBG.style.display = "none";
 }
 

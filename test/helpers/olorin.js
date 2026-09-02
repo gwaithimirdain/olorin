@@ -265,6 +265,11 @@ class Olorin {
         return this.page.evaluate(() => window.__olorin.nodes());
     }
 
+    // The variable names currently in use: the level's own, plus those bound by boxes in the proof.
+    varnames() {
+        return this.page.evaluate(() => window.__olorin.varnames());
+    }
+
     connections() {
         return this.page.evaluate(() => window.__olorin.connections());
     }
