@@ -100,4 +100,16 @@ let rules =
               [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
             inputs = [ "x"; "y"; "xy0" ];
           } );
+      ( "deceq",
+        User
+          {
+            consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
+            inputs = [ "x"; "y" ];
+          } );
+      ( "tord",
+        User
+          {
+            consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
+            inputs = [ "x"; "y" ];
+          } );
     ]

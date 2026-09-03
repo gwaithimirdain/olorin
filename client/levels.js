@@ -476,7 +476,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "expr", "alg", "integral" ],
+            rules: [ "orI1", "orI2", "orE", "expr", "alg", "integral", "deceq", "tord" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],

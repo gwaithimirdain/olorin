@@ -546,6 +546,22 @@ function addEndpointsForRule(box, id, restore) {
             parameters: {sort: "input", label: "xy0", side: "lower"},
         });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    } else if (id === 'deceq' || id === 'tord') {
+        // Two numbers in, a disjunction about them out.  Which number system they range over is
+        // as open as it is for integral above, hence unknownSet on the empty ports.
+        instance.addEndpoint(box, {
+            anchor: [0, 0.2, -1, 0],
+            target: true,
+            parameters: { sort: "input", label: "x", hasValue: true, side: "upper", unknownSet: true },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, {
+            anchor: [0, 0.8, -1, 0],
+            target: true,
+            parameters: { sort: "input", label: "y", hasValue: true, side: "lower", unknownSet: true },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
     }
     return typecheck_now;
 }

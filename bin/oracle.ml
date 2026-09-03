@@ -143,6 +143,13 @@ let rec get_posint tm =
 
 let rec pow p n = if n <= 0 then `Const Q.one else `Times (pow p (n - 1), p)
 
+(* Whether a translated expression is a rational literal.  get_poly folds a numeral, and a quotient
+   of numerals, into a constant, so the only other shape to allow for is a minus sign in front. *)
+let rec is_literal : Symbolic.t -> bool = function
+  | `Const _ -> true
+  | `Neg x -> is_literal x
+  | _ -> false
+
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
   (* Subterms we can't interpret, each standing for an opaque variable. *)
@@ -259,49 +266,52 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
   let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
-  (* The quantifier eliminator can prove disequalities, but we don't let it, since we want the student to prove those by contradiction. *)
-  if goal_op = `Neq then
-    Error (Code.Oracle_failed (Explain.Oracle.disequality, PUnit))
-  else
-    (* Otherwise we call back to javascript for it to query z3. *)
-    let ty = ty.tm in
-    let (givens, lhs, rhs), { denoms; _ } =
-      (let open Monad.Ops (S) in
-       let* lhs = get_poly ctx ty lhs.tm in
-       let* rhs = get_poly ctx ty rhs.tm in
-       let open Mlist.Monadic (S) in
-       let* givens =
-         mmapM
-           (fun [ (op, (x : normal), (y : normal)) ] ->
-             let* x = get_poly ctx ty x.tm in
-             let* y = get_poly ctx ty y.tm in
-             return (op, x, y))
-           [ givens ] in
-       return (givens, lhs, rhs))
-        { vars = Emp; count = 0; denoms = Emp } in
-    (* We negate the goal, since Z3 checks for satisfiability.  This involves negating the operator and also swapping the order of the arguments (although in the case of (dis)equalities swapping the arguments does nothing). *)
-    let neg_goal_op =
-      match goal_op with
-      | `Eq -> `Neq
-      | `Neq -> `Eq
-      | `Lt -> `Le
-      | `Le -> `Lt in
-    (* Encoding division faithfully means the goal query below is sound whatever the denominators
-       turn out to be, since a statement about a quotient by zero is then a statement about an
-       unspecified value.  But answering such questions isn't what the student wants: writing a
-       quotient whose denominator might vanish is a mistake, so we insist the hypotheses force each
-       denominator nonzero, and say which one doesn't when they don't.  Note this asks Z3 to prove
-       a disequality, which we don't allow as a *goal*, but this is our own side condition rather
-       than something the student is being credited with proving. *)
-    let* () =
-      let open Mlist.Monadic (E) in
-      miterM
-        (fun [ (den, src) ] ->
-          if unsat ((`Eq, den, `Const Q.zero) :: givens) then Ok ()
-          else
-            Error
-              (Code.Oracle_failed
-                 (Explain.Oracle.zero_denominator, Printable.PVal (ctx, src))))
-        [ Bwd.to_list denoms ] in
-    if unsat ((neg_goal_op, rhs, lhs) :: givens) then Ok ()
-    else Error (Code.Oracle_failed (Explain.Oracle.unprovable, PUnit))
+  let ty = ty.tm in
+  let (givens, lhs, rhs), { denoms; _ } =
+    (let open Monad.Ops (S) in
+     let* lhs = get_poly ctx ty lhs.tm in
+     let* rhs = get_poly ctx ty rhs.tm in
+     let open Mlist.Monadic (S) in
+     let* givens =
+       mmapM
+         (fun [ (op, (x : normal), (y : normal)) ] ->
+           let* x = get_poly ctx ty x.tm in
+           let* y = get_poly ctx ty y.tm in
+           return (op, x, y))
+         [ givens ] in
+     return (givens, lhs, rhs))
+      { vars = Emp; count = 0; denoms = Emp } in
+  (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
+     literals, like 0≠1.  A disequality with anything else in it is one we want the student to
+     prove by contradiction. *)
+  let* () =
+    if goal_op = `Neq && not (is_literal lhs && is_literal rhs) then
+      Error (Code.Oracle_failed (Explain.Oracle.disequality, PUnit))
+    else Ok () in
+  (* We negate the goal, since Z3 checks for satisfiability.  This involves negating the operator and also swapping the order of the arguments (although in the case of (dis)equalities swapping the arguments does nothing). *)
+  let neg_goal_op =
+    match goal_op with
+    | `Eq -> `Neq
+    | `Neq -> `Eq
+    | `Lt -> `Le
+    | `Le -> `Lt in
+  (* Encoding division faithfully means the goal query below is sound whatever the denominators
+     turn out to be, since a statement about a quotient by zero is then a statement about an
+     unspecified value.  But answering such questions isn't what the student wants: writing a
+     quotient whose denominator might vanish is a mistake, so we insist the hypotheses force each
+     denominator nonzero, and say which one doesn't when they don't.  Note this asks Z3 to prove
+     a disequality between things that aren't literals, which we don't allow as a *goal*, but
+     this is our own side condition rather than something the student is being credited with
+     proving. *)
+  let* () =
+    let open Mlist.Monadic (E) in
+    miterM
+      (fun [ (den, src) ] ->
+        if unsat ((`Eq, den, `Const Q.zero) :: givens) then Ok ()
+        else
+          Error
+            (Code.Oracle_failed
+               (Explain.Oracle.zero_denominator, Printable.PVal (ctx, src))))
+      [ Bwd.to_list denoms ] in
+  if unsat ((neg_goal_op, rhs, lhs) :: givens) then Ok ()
+  else Error (Code.Oracle_failed (Explain.Oracle.unprovable, PUnit))

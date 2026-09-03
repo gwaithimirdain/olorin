@@ -59,8 +59,9 @@ let oracle_failed str (p : printable) =
       (printed p)
   else if str = Oracle.disequality then
     Some
-      "The algebra block won't prove a ≠ statement outright: that one is for you to prove by \
-       contradiction.  Assume the two sides are equal, and derive a contradiction from that."
+      "The algebra block won't prove a ≠ statement outright unless both sides are plain numbers: \
+       that one is for you to prove by contradiction.  Assume the two sides are equal, and derive \
+       a contradiction from that."
   else if str = Oracle.not_a_relation then
     Option.map
       (fun ty ->

@@ -59,6 +59,8 @@ axiom ℤ.cube : ℤ → ℤ
 axiom ℤ.fourth : ℤ → ℤ
 
 axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
+axiom ℤ.deceq (x y : ℤ) : lor (eq ℤ x y) (neq ℤ x y)
+axiom ℤ.tord (x y : ℤ) : lor (le ℤ x y) (gt ℤ x y)
 
 def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) ]
 axiom ℚ.plus : ℚ → ℚ → ℚ
@@ -72,6 +74,8 @@ axiom ℚ.cube : ℚ → ℚ
 axiom ℚ.fourth : ℚ → ℚ
 
 axiom ℚ.integral (x y : ℚ) : eq ℚ (ℚ.times x y) 0 → lor (eq ℚ x 0) (eq ℚ y 0)
+axiom ℚ.deceq (x y : ℚ) : lor (eq ℚ x y) (neq ℚ x y)
+axiom ℚ.tord (x y : ℚ) : lor (le ℚ x y) (gt ℚ x y)
 
 def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) ]
 axiom ℝ.plus : ℝ → ℝ → ℝ
@@ -85,6 +89,8 @@ axiom ℝ.cube : ℝ → ℝ
 axiom ℝ.fourth : ℝ → ℝ
 
 axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (eq ℝ y 0)
+axiom ℝ.deceq (x y : ℝ) : lor (eq ℝ x y) (neq ℝ x y)
+axiom ℝ.tord (x y : ℝ) : lor (le ℝ x y) (gt ℝ x y)
 
 def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | omega. ]
 axiom 𝕊.plus : 𝕊 → 𝕊 → 𝕊
@@ -100,6 +106,8 @@ axiom 𝕊.fourth : 𝕊 → 𝕊
 notation \"ω\" ≔ omega.
 
 axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
+axiom 𝕊.deceq (x y : 𝕊) : lor (eq 𝕊 x y) (neq 𝕊 x y)
+axiom 𝕊.tord (x y : 𝕊) : lor (le 𝕊 x y) (gt 𝕊 x y)
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
@@ -439,7 +447,28 @@ let () =
                             true );
                         ]
                     | _ -> [] in
-                  locate_opt loc (Synth (SFirst (xterm @ yterm, None)))
+                  (* If neither side synthesizes -- "0≠1", where both sides are numerals -- there is
+                     nothing to read the number system off, so we try them in order, as the
+                     arithmetic operations do, and take the first (smallest) one that works. *)
+                  let numterms =
+                    match (xterm, yterm) with
+                    | [], [] ->
+                        List.map
+                          (fun ty ->
+                            ( `Any,
+                              sapp
+                                (locate_opt loc
+                                   (sapp
+                                      (locate_opt loc
+                                         (sapp
+                                            (locate_opt loc (Const (get_const [ str ])))
+                                            (locate_opt loc (Synth (Const (get_const [ ty ]))))))
+                                      x))
+                                y,
+                              true ))
+                          numbers
+                    | _ -> [] in
+                  locate_opt loc (Synth (SFirst (xterm @ yterm @ numterms, None)))
               | _ -> Builtins.invalid name);
           print_term =
             Some

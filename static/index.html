@@ -100,7 +100,9 @@
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc">🏷</div>
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr">expr</div>
         <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg">alg</div>
-        <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral">?*?=0</div>
+        <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral">?·?=0</div>
+        <div class="basic logical rule" style="text-align: center" id="deceq" data-rule="deceq">=∨≠</div>
+        <div class="basic logical rule" style="text-align: center" id="tord" data-rule="tord">≤∨&gt;</div>
       </div>
       <div style="display: block; align-items: end" id="buttons">
         <button id="exportProof" class="proofOption" title="Copy this proof out as JSON text">Export</button>
@@ -686,7 +688,7 @@
       <div id="integralHint" class="modal hint" style="width: 600px">
         The algebra block can only prove equations or inequalities, but there are some important "algebraic" facts that are disjunctions.
         One is that if the product of two numbers is zero, one or the other of them must be zero.
-        If you need this fact, use the block labeled "?*?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
+        If you need this fact, use the block labeled "?·?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
         <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block">
         <b>Warning:</b> do not connect blue "value" wires to "alg" boxes!
         All the inputs to an "alg" box must be <i>equations</i> (or inequalities), as those are the only things I can do algebra with.
