@@ -141,6 +141,32 @@ test.describe('Overlapping labels', () => {
 
 // A wire whose ends disagree about the type is drawn red; at novice it also says what the two
 // types are, each written at its own end of the wire.
+// A value port shows "? ∈ <set>" while it's empty.  For the ∧-elimination-style boxes the set
+// comes from the goal and is real, but the "integral" box picks its number system with an SFirst
+// over ℤ, ℚ, ℝ and 𝕊, and with these ports empty that resolves to whichever goes through first --
+// never the set the player is actually working in.  So it says the set is unknown as well.
+test.describe('A value port whose set is not yet determined', () => {
+    async function integralPorts(page, conclusion) {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'a ∈ ℝ\nb ∈ ℝ', hypotheses: 'a*b=0', conclusion,
+        });
+        const nodes = await olorin.nodes();
+        const concl = nodes.find((n) => n.rule === 'conclusion').id;
+        const box = await olorin.dragRule('integral', 300, 150);
+        await olorin.connect({ vertex: box, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        const ports = await page.evaluate(() => window.__olorin.ports());
+        return ['x', 'y'].map((l) =>
+            (ports.find((p) => p.vertex === box && p.sort === 'input' && p.label === l) || {}).type);
+    }
+
+    test('the integral box leaves the set open on its empty value inputs', async ({ page }) => {
+        expect(await integralPorts(page, '(a=0)∨(b=0)')).toEqual(['? ∈ ?', '? ∈ ?']);
+    });
+});
+
 test.describe('Type-mismatch labels', () => {
     // How many wires are drawn in the error color.
     const redWires = (page) => page.evaluate(() =>

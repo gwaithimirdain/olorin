@@ -522,13 +522,18 @@ function addEndpointsForRule(box, id, restore) {
         instance.addEndpoint(box, {
             anchor: [0, 0.1, -1, 0],
             target: true,
-            parameters: { sort: "input", label: "x", hasValue: true, side: "upper" },
+            // unknownSet: which number system x and y range over isn't settled while these ports
+            // are empty.  The User rule in olorin.ml offers ℤ.integral, ℚ.integral, ℝ.integral and
+            // 𝕊.integral as an SFirst, and with a hole here the typechecker just takes the first
+            // that goes through -- ℤ when nothing is wired up, 𝕊 once something is -- so whatever
+            // it reports for these ports is a guess, and not the set the player is working in.
+            parameters: { sort: "input", label: "x", hasValue: true, side: "upper", unknownSet: true },
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, {
             anchor: [0, 0.5, -1, 0],
             target: true,
-            parameters: { sort: "input", label: "y", hasValue: true, side: "middle" },
+            parameters: { sort: "input", label: "y", hasValue: true, side: "middle", unknownSet: true },
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, {
@@ -3451,7 +3456,10 @@ function continue_typechecking(nodes, edges, connections, result) {
                                                 create:(component) => {
                                                     const d = document.createElement("div");
                                                     if(endpoint.parameters.hasValue) {
-                                                        ty = "? ∈ " + ty;
+                                                        // A port whose set isn't determined until
+                                                        // something is wired in leaves that open
+                                                        // too, rather than showing a guess.
+                                                        ty = "? ∈ " + (endpoint.parameters.unknownSet ? "?" : ty);
                                                     }
                                                     const ety = escapeHtml(ty);
                                                     if(endpoint.parameters.side === "upper") {
