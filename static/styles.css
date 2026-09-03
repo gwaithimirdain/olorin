@@ -336,7 +336,9 @@ body {
     font-weight: bold;
     width: 20px;
     height: 20px;
-    display: none;
+    /* Hidden with visibility rather than display, so it is still laid out and can be measured:
+       spreadWireLabels needs its size and position to keep the wire labels off it. */
+    visibility: hidden;
 }
 
 .rule .closebutton {
@@ -346,7 +348,7 @@ body {
 }
 
 .rule:hover .closebutton {
-    display: block;
+    visibility: visible;
 }
 
 /* Modal dialogs and their backgrounds that fade the rest of the page */

@@ -392,6 +392,11 @@ class Olorin {
     }
 
     // The on-screen rectangle of every wire label currently drawn.
+    // Each wire's delete-X: where it sits along its wire (1 = the target end) and its rectangle.
+    closeButtons() {
+        return this.page.evaluate(() => window.__olorin.closeButtons());
+    }
+
     labelRects() {
         return this.page.evaluate(() =>
             Array.from(document.querySelectorAll('#canvas .connLabel')).map((e) => {
