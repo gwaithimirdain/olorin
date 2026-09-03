@@ -2998,6 +2998,8 @@ function symbolic_to_z3(sym) {
         return symbolic_to_z3(sym.args[0]).sub(symbolic_to_z3(sym.args[1]));
     } else if(sym.head === "mul") {
         return symbolic_to_z3(sym.args[0]).mul(symbolic_to_z3(sym.args[1]));
+    } else if(sym.head === "div") {
+        return symbolic_to_z3(sym.args[0]).div(symbolic_to_z3(sym.args[1]));
     } else if(sym.head === "neg") {
         return symbolic_to_z3(sym.args[0]).neg();
     } else if(sym.head === "val") {

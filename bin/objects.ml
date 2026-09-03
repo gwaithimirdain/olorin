@@ -417,7 +417,16 @@ module Symbolic = struct
   end
 
   type t =
-    [ `Plus of t * t | `Minus of t * t | `Times of t * t | `Neg of t | `Var of int | `Const of Q.t ]
+    [ `Plus of t * t
+    | `Minus of t * t
+    | `Times of t * t
+    | (* Z3's real division is total, with the value at a zero denominator left uninterpreted, so
+         this is a faithful encoding of a division whose denominator we haven't (yet) shown to be
+         nonzero. *)
+      `Div of t * t
+    | `Neg of t
+    | `Var of int
+    | `Const of Q.t ]
 
   let to_js_head (head : string) (args : js Js.t list) : js Js.t =
     object%js
@@ -429,6 +438,7 @@ module Symbolic = struct
     | `Plus (x, y) -> to_js_head "add" [ to_js x; to_js y ]
     | `Minus (x, y) -> to_js_head "sub" [ to_js x; to_js y ]
     | `Times (x, y) -> to_js_head "mul" [ to_js x; to_js y ]
+    | `Div (x, y) -> to_js_head "div" [ to_js x; to_js y ]
     | `Neg x -> to_js_head "neg" [ to_js x ]
     | `Const n -> to_js_head "val" [ to_js_head (Q.to_string n) [] ]
     | `Var x -> to_js_head "const" [ to_js_head ("H" ^ string_of_int x) [] ]
@@ -437,6 +447,7 @@ module Symbolic = struct
     | `Plus (p, q) -> "Plus(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Minus (p, q) -> "Minus(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Times (p, q) -> "Times(" ^ to_string p ^ ", " ^ to_string q ^ ")"
+    | `Div (p, q) -> "Div(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Neg p -> "Negate(" ^ to_string p ^ ")"
     | `Var i -> "Var(" ^ string_of_int i ^ ")"
     | `Const n -> "Const(" ^ Q.to_string n ^ ")"
