@@ -13,6 +13,7 @@ open Reporter
 module Oracle = struct
   let unprovable = "can't prove equality/inequality"
   let zero_denominator = "can't prove this denominator is nonzero"
+  let negative_base = "can't prove this is nonnegative"
   let disequality = "proving disequalities by algebra not allowed"
   let not_a_relation = "not an equality or inequality"
   let mixed_types = "input is not an equation or inequality at the same type"
@@ -56,6 +57,14 @@ let oracle_failed str (p : printable) =
         "The algebra block can't tell that" ^ display den
         ^ "is nonzero, and dividing by it only means anything if it is.  Wire in a hypothesis \
            saying it isn't zero, or one that forces that.")
+      (printed p)
+  else if str = Oracle.negative_base then
+    Option.map
+      (fun b ->
+        "The algebra block can't tell that" ^ display b
+        ^ "is nonnegative, and an even root of it -- a square root, a fourth root -- only means \
+           anything if it is.  Wire in a hypothesis saying it isn't negative, or one that forces \
+           that.")
       (printed p)
   else if str = Oracle.disequality then
     Some

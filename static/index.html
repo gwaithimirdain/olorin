@@ -263,9 +263,11 @@
             <tr><td>Multiplication</td><td><tt>x*y</tt></td><td>(not <tt>xy</tt>)</tr>
             <tr><td>Exponentiation</td><td><tt>x^y</tt></td></tr>
             <tr><td>Division</td><td><tt>x/2</tt></td><td>(or <tt>1/2*x</tt> or <tt>0.5*x</tt>)</tr>
+            <tr><td>Roots</td><td><tt>x^(1/2)</tt></td><td>(a square root; <tt>x^(1/3)</tt> a cube root)</tr>
           </tbody>
         </table>
         <p>At present you can only divide by fixed positive integers, and of course only if the intended type of this expression is a number system that allows division.</p>
+        <p>A power with a fraction for its exponent is a root, and only makes sense in the real numbers or the surreals, so writing one turns the whole statement into a statement about those.  An <i>even</i> root — a square root, a fourth root — also needs its base to be nonnegative, and the algebra block will ask you to have proved that, just as it asks you to have proved a denominator nonzero.  Odd roots ask nothing: every real number has a cube root.</p>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitExpression" style="font-size: 16px">Submit</button>
           <button id="cancelExpression" style="font-size: 16px">Cancel</button><br/>

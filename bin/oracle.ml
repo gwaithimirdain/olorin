@@ -143,45 +143,106 @@ let rec get_posint tm =
 
 let rec pow p n = if n <= 0 then `Const Q.one else `Times (pow p (n - 1), p)
 
-(* Whether a translated expression is a rational literal.  get_poly folds a numeral, and a quotient
-   of numerals, into a constant, so the only other shape to allow for is a minus sign in front. *)
-let rec is_literal : Symbolic.t -> bool = function
-  | `Const _ -> true
-  | `Neg x -> is_literal x
-  | _ -> false
+(* A translated expression read back as a rational literal, if it is one.  get_poly folds a numeral,
+   and a quotient of numerals, into a constant, so the only other shape to allow for is a minus sign
+   in front. *)
+let rec rational_of : Symbolic.t -> Q.t option = function
+  | `Const q -> Some q
+  | `Neg x -> Option.map Q.neg (rational_of x)
+  | _ -> None
+
+let is_literal x = Option.is_some (rational_of x)
+
+(* Past this we would be building a polynomial nothing could decide anyway, and the exponent might
+   not even fit in an int, so we give up and treat the power as an opaque term: sound, but nothing
+   about it will be provable. *)
+let max_exponent = 1000
+
+(* Something the translation turned up, recorded in the order it was met.  get_poly works bottom
+   up, so a subterm's steps come before those of the term containing it, and 'ask' below walks them
+   in that order. *)
+type step =
+  (* What a fresh variable stands for: the relations defining a root. *)
+  | Define of Relation.t list
+  (* A denominator, which the hypotheses have to force to be nonzero, paired with the term it came
+     from so we can point at it in an error. *)
+  | Nonzero of Symbolic.t * kinetic value
+  (* Likewise the base of an even root, which they have to force to be nonnegative. *)
+  | Nonneg of Symbolic.t * kinetic value
 
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
-  (* Subterms we can't interpret, each standing for an opaque variable. *)
+  (* Subterms we can't interpret, each standing for an opaque variable.  A root's variable is one of
+     these, keyed by the power it came from, so that writing the same root twice gets the same
+     variable and states its definition once. *)
   vars : kinetic value Bwd.t;
   count : int;
-  (* The denominator of every division we've met, paired with the term it came from so we can point
-     at it in an error.  Each one is an obligation, discharged in 'ask' below. *)
-  denoms : (Symbolic.t * kinetic value) Bwd.t;
+  (* The definitions and obligations met along the way, oldest first. *)
+  steps : step Bwd.t;
 }
 
 module S = Monad.State (struct
   type t = translation
 end)
 
-let var_or_const ctx ty tm =
+(* The variable standing for a subterm we can't express directly, and whether we have just met that
+   subterm for the first time -- so that a root states its definition once however often it is
+   written. *)
+let var_for ctx ty tm : (Symbolic.t * bool) S.t =
+  let open Monad.Ops (S) in
+  let* ({ vars; count; _ } as st) = S.get in
+  match Bwd.find_index (fun x -> Result.is_ok (Equal.equal_at ctx tm x ty)) vars with
+  | None ->
+      let* () = S.put { st with vars = Snoc (vars, tm); count = count + 1 } in
+      return (`Var count, true)
+  | Some i -> return (`Var (count - i - 1), false)
+
+let var_or_const ctx ty tm : Symbolic.t S.t =
   let open Monad.Ops (S) in
   match get_posint tm with
   | Some i -> return (`Const (Q.of_int i))
-  | None -> (
-      let* ({ vars; count; _ } as st) = S.get in
-      match Bwd.find_index (fun x -> Result.is_ok (Equal.equal_at ctx tm x ty)) vars with
-      | None ->
-          let* () = S.put { st with vars = Snoc (vars, tm); count = count + 1 } in
-          return (`Var count)
-      | Some i -> return (`Var (count - i - 1)))
+  | None ->
+      let* v, _ = var_for ctx ty tm in
+      return v
 
 let get_poly ctx ty tm =
   let open Monad.Ops (S) in
-  (* Record a denominator as an obligation to be discharged before we trust any answer. *)
-  let add_denom den src =
+  let add_step step =
     let* st = S.get in
-    S.put { st with denoms = Snoc (st.denoms, (den, src)) } in
+    S.put { st with steps = Snoc (st.steps, step) } in
+  (* A base raised to a rational power.  An integer power is repeated multiplication as before, and
+     a negative one is the reciprocal of the positive one, so it carries the ordinary
+     nonzero-denominator obligation.  A genuine p/q needs a fresh variable s for the root, defined
+     by s^q = base^p.  For even q that leaves two candidates, so we pin s down as the nonnegative
+     one -- and then the base itself has to be nonnegative, or "s >= 0 and s^q = base^p" has no
+     solution at all and would prove anything.  Odd roots are total on the reals and need neither.
+     'src' is the term to point at if an obligation can't be discharged. *)
+  let power tm base e src =
+    let n, d = (Q.num e, Q.den e) in
+    if not (Z.fits_int n && Z.fits_int d && Z.leq (Z.abs n) (Z.of_int max_exponent)
+            && Z.leq d (Z.of_int max_exponent)) then var_or_const ctx ty tm
+    else
+      let n, d = (Z.to_int n, Z.to_int d) in
+      (* base^n, with a negative n written as a reciprocal so the denominator obligation applies. *)
+      let numerator () =
+        if n >= 0 then return (pow base n)
+        else
+          let p = pow base (-n) in
+          let* () = add_step (Nonzero (p, src)) in
+          return (`Div (`Const Q.one, p)) in
+      if d = 1 then numerator ()
+      else
+        let even = d mod 2 = 0 in
+        let* () = if even then add_step (Nonneg (base, src)) else return () in
+        let* rhs = numerator () in
+        let* s, fresh = var_for ctx ty tm in
+        let* () =
+          if fresh then
+            add_step
+              (Define
+                 ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
+          else return () in
+        return s in
   let rec go tm =
     match Norm.view_term tm with
     (* Binary operation *)
@@ -196,18 +257,20 @@ let get_poly ctx ty tm =
         | "minus" -> return (`Minus (px, py))
         | "times" -> return (`Times (px, py))
         | "divide" -> (
-            match (px, py) with
-            (* A quotient of numerals is just a rational constant, and carries no obligation. *)
-            | `Const a, `Const b when not (Q.equal b Q.zero) -> return (`Const (Q.div a b))
+            (* A quotient of numerals is just a rational constant, and carries no obligation.  We
+               ask rational_of rather than matching on `Const, so that a minus sign in front of
+               either of them doesn't stop the fold: "−1/2" parses as (−1)/2. *)
+            match (rational_of px, rational_of py) with
+            | Some a, Some b when not (Q.equal b Q.zero) -> return (`Const (Q.div a b))
             (* Otherwise we hand the division to Z3 as a division.  Z3's real division is total,
                with the value at a zero denominator left uninterpreted, so this is sound however
                the denominator turns out; but we also require it to be provably nonzero. *)
             | _ ->
-                let* () = add_denom py (CubeOf.find_top y).tm in
+                let* () = add_step (Nonzero (py, (CubeOf.find_top y).tm)) in
                 return (`Div (px, py)))
         | "pow" -> (
-            match get_posint (CubeOf.find_top y).tm with
-            | Some e -> return (pow px e)
+            match rational_of py with
+            | Some e -> power tm px e (CubeOf.find_top x).tm
             | None -> var_or_const ctx ty tm)
         | _ -> var_or_const ctx ty tm)
     (* Unary operation *)
@@ -215,7 +278,10 @@ let get_poly ctx ty tm =
       when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) -> (
         let* x = go (CubeOf.find_top x).tm in
         match Firstorder.get_root name with
-        | "negate" -> return (`Neg x)
+        | "negate" -> (
+            match rational_of x with
+            | Some q -> return (`Const (Q.neg q))
+            | None -> return (`Neg x))
         | "square" -> return (`Times (x, x))
         | "cube" -> return (`Times (`Times (x, x), x))
         | "fourth" -> return (`Times (`Times (x, x), `Times (x, x)))
@@ -267,7 +333,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
   let ty = ty.tm in
-  let (givens, lhs, rhs), { denoms; _ } =
+  let (givens, lhs, rhs), { steps; _ } =
     (let open Monad.Ops (S) in
      let* lhs = get_poly ctx ty lhs.tm in
      let* rhs = get_poly ctx ty rhs.tm in
@@ -280,7 +346,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            return (op, x, y))
          [ givens ] in
      return (givens, lhs, rhs))
-      { vars = Emp; count = 0; denoms = Emp } in
+      { vars = Emp; count = 0; steps = Emp } in
   (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
      literals, like 0≠1.  A disequality with anything else in it is one we want the student to
      prove by contradiction. *)
@@ -299,19 +365,28 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      turn out to be, since a statement about a quotient by zero is then a statement about an
      unspecified value.  But answering such questions isn't what the student wants: writing a
      quotient whose denominator might vanish is a mistake, so we insist the hypotheses force each
-     denominator nonzero, and say which one doesn't when they don't.  Note this asks Z3 to prove
-     a disequality between things that aren't literals, which we don't allow as a *goal*, but
-     this is our own side condition rather than something the student is being credited with
-     proving. *)
-  let* () =
-    let open Mlist.Monadic (E) in
-    miterM
-      (fun [ (den, src) ] ->
-        if unsat ((`Eq, den, `Const Q.zero) :: givens) then Ok ()
+     denominator nonzero, and say which one doesn't when they don't.  An even root's base is the
+     same kind of side condition, and worse if neglected: an unsatisfiable definition would let the
+     block prove anything at all.  (Both ask Z3 to prove a disequality or an inequality about
+     things that aren't literals, which we don't allow as a *goal*; but these are our own side
+     conditions rather than something the student is being credited with proving.)
+
+     So we walk the steps in the order the translation met them, innermost first, discharging each
+     obligation against the hypotheses and the definitions before it, and gathering the definitions
+     for the goal query.  An obligation never sees its own definition: "s >= 0 and s*s = x" implies
+     x >= 0 all by itself, so checking with that in hand would be no check at all. *)
+  let rec discharge facts = function
+    | [] -> Ok facts
+    | Define defs :: rest -> discharge (defs @ facts) rest
+    | Nonzero (den, src) :: rest ->
+        if unsat ((`Eq, den, `Const Q.zero) :: facts) then discharge facts rest
         else
           Error
-            (Code.Oracle_failed
-               (Explain.Oracle.zero_denominator, Printable.PVal (ctx, src))))
-      [ Bwd.to_list denoms ] in
-  if unsat ((neg_goal_op, rhs, lhs) :: givens) then Ok ()
+            (Code.Oracle_failed (Explain.Oracle.zero_denominator, Printable.PVal (ctx, src)))
+    | Nonneg (base, src) :: rest ->
+        if unsat ((`Lt, base, `Const Q.zero) :: facts) then discharge facts rest
+        else
+          Error (Code.Oracle_failed (Explain.Oracle.negative_base, Printable.PVal (ctx, src))) in
+  let* facts = discharge givens (Bwd.to_list steps) in
+  if unsat ((neg_goal_op, rhs, lhs) :: facts) then Ok ()
   else Error (Code.Oracle_failed (Explain.Oracle.unprovable, PUnit))

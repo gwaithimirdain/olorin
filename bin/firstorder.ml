@@ -67,7 +67,7 @@ axiom ℚ.plus : ℚ → ℚ → ℚ
 axiom ℚ.minus : ℚ → ℚ → ℚ
 axiom ℚ.times : ℚ → ℚ → ℚ
 axiom ℚ.divide : ℚ → ℚ → ℚ
-axiom ℚ.pow : ℚ → ℕ → ℚ
+axiom ℚ.pow : ℚ → ℤ → ℚ
 axiom ℚ.negate : ℚ → ℚ
 axiom ℚ.square : ℚ → ℚ
 axiom ℚ.cube : ℚ → ℚ
@@ -82,7 +82,7 @@ axiom ℝ.plus : ℝ → ℝ → ℝ
 axiom ℝ.minus : ℝ → ℝ → ℝ
 axiom ℝ.times : ℝ → ℝ → ℝ
 axiom ℝ.divide : ℝ → ℝ → ℝ
-axiom ℝ.pow : ℝ → ℕ → ℝ
+axiom ℝ.pow : ℝ → ℚ → ℝ
 axiom ℝ.negate : ℝ → ℝ
 axiom ℝ.square : ℝ → ℝ
 axiom ℝ.cube : ℝ → ℝ
@@ -97,7 +97,7 @@ axiom 𝕊.plus : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.minus : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.times : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.divide : 𝕊 → 𝕊 → 𝕊
-axiom 𝕊.pow : 𝕊 → ℕ → 𝕊
+axiom 𝕊.pow : 𝕊 → ℚ → 𝕊
 axiom 𝕊.negate : 𝕊 → 𝕊
 axiom 𝕊.square : 𝕊 → 𝕊
 axiom 𝕊.cube : 𝕊 → 𝕊
