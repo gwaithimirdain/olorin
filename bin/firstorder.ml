@@ -59,6 +59,9 @@ axiom ℤ.cube : ℤ → ℤ
 axiom ℤ.fourth : ℤ → ℤ
 
 axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
+axiom ℤ.abs : ℤ → ℤ
+axiom ℤ.min : ℤ → ℤ → ℤ
+axiom ℤ.max : ℤ → ℤ → ℤ
 axiom ℤ.deceq (x y : ℤ) : lor (eq ℤ x y) (neq ℤ x y)
 axiom ℤ.tord (x y : ℤ) : lor (le ℤ x y) (gt ℤ x y)
 
@@ -74,6 +77,9 @@ axiom ℚ.cube : ℚ → ℚ
 axiom ℚ.fourth : ℚ → ℚ
 
 axiom ℚ.integral (x y : ℚ) : eq ℚ (ℚ.times x y) 0 → lor (eq ℚ x 0) (eq ℚ y 0)
+axiom ℚ.abs : ℚ → ℚ
+axiom ℚ.min : ℚ → ℚ → ℚ
+axiom ℚ.max : ℚ → ℚ → ℚ
 axiom ℚ.deceq (x y : ℚ) : lor (eq ℚ x y) (neq ℚ x y)
 axiom ℚ.tord (x y : ℚ) : lor (le ℚ x y) (gt ℚ x y)
 
@@ -89,6 +95,9 @@ axiom ℝ.cube : ℝ → ℝ
 axiom ℝ.fourth : ℝ → ℝ
 
 axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (eq ℝ y 0)
+axiom ℝ.abs : ℝ → ℝ
+axiom ℝ.min : ℝ → ℝ → ℝ
+axiom ℝ.max : ℝ → ℝ → ℝ
 axiom ℝ.deceq (x y : ℝ) : lor (eq ℝ x y) (neq ℝ x y)
 axiom ℝ.tord (x y : ℝ) : lor (le ℝ x y) (gt ℝ x y)
 axiom ℝ.sqrt : ℝ → ℝ
@@ -107,6 +116,9 @@ axiom 𝕊.fourth : 𝕊 → 𝕊
 notation \"ω\" ≔ omega.
 
 axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
+axiom 𝕊.abs : 𝕊 → 𝕊
+axiom 𝕊.min : 𝕊 → 𝕊 → 𝕊
+axiom 𝕊.max : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.deceq (x y : 𝕊) : lor (eq 𝕊 x y) (neq 𝕊 x y)
 axiom 𝕊.tord (x y : 𝕊) : lor (le 𝕊 x y) (gt 𝕊 x y)
 axiom 𝕊.sqrt : 𝕊 → 𝕊
@@ -194,6 +206,9 @@ type (_, _, _) identity +=
   | Div : (No.nonstrict opn, No.three, No.strict opn) identity
   | Negate : (closed, No.three, No.nonstrict opn) identity
   | Sqrt : (closed, No.four, No.nonstrict opn) identity
+  | Abs : (closed, No.plus_omega, closed) identity
+  | Min : (closed, No.plus_omega, closed) identity
+  | Max : (closed, No.plus_omega, closed) identity
   | Pow : (No.nonstrict opn, No.four, No.strict opn) identity
   | Square : (No.strict opn, No.four, closed) identity
   | Cube : (No.strict opn, No.four, closed) identity
@@ -226,6 +241,13 @@ let negate : (closed, No.three, No.nonstrict opn) notation = (Negate, Prefixr No
 (* Tighter than · and −, so "√x·y" is (√x)·y, but loose enough to reach over a power or a
    superscript, so "√x²" is √(x²) as the radical sign's bar would have it. *)
 let sqrtn : (closed, No.four, No.nonstrict opn) notation = (Sqrt, Prefixr No.four)
+(* All three are outfix -- closed at both ends -- so they need no tightness of their own.  ∣x∣
+   borrows the ∣ of divisibility: an infix notation that is a prefix of an outfix one is allowed to
+   be ambiguous with it, and parsing resolves in favour of the infix, which is the reading that
+   can't be recovered with parentheses. *)
+let absn : (closed, No.plus_omega, closed) notation = (Abs, Outfix)
+let minn : (closed, No.plus_omega, closed) notation = (Min, Outfix)
+let maxn : (closed, No.plus_omega, closed) notation = (Max, Outfix)
 let square : (No.strict opn, No.four, closed) notation = (Square, Postfix No.four)
 let cube : (No.strict opn, No.four, closed) notation = (Cube, Postfix No.four)
 let fourth : (No.strict opn, No.four, closed) notation = (Fourth, Postfix No.four)
@@ -601,6 +623,98 @@ let () =
       pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "√"));
       is_case = (fun _ -> false);
     };
+  make absn
+    {
+      name = "∣∣";
+      tree = Closed_entry (eop (Ident [ "∣" ]) (term (Ident [ "∣" ]) (Done_closed absn)));
+      processor =
+        (fun ctx obs loc ->
+          match obs with
+          | [ Token _; Term x; Token _ ] ->
+              let x = process ctx x in
+              locate_opt loc
+                (Synth
+                   (SFirst
+                      ( List.map
+                          (fun ty ->
+                            (`Any, sapp (locate_opt loc (Const (get_const [ ty; "abs" ]))) x, true))
+                          numbers,
+                        None )))
+          | _ -> Builtins.invalid "∣∣");
+      print_term =
+        Some
+          (function
+          | [ Token (_, (wsbar, _)); Term x; Token (_, (wsend, _)) ] ->
+              let px, wsx = pp_term x in
+              ( Token.pp (Ident [ "∣" ])
+                ^^ pp_ws `None wsbar
+                ^^ px
+                ^^ pp_ws `None wsx
+                ^^ Token.pp (Ident [ "∣" ]),
+                wsend )
+          | _ -> Builtins.invalid "∣∣");
+      print_case = None;
+      pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "∣∣"));
+      is_case = (fun _ -> false);
+    };
+  List.iter
+    (fun (name, onotn, ostr) ->
+      make onotn
+        {
+          name;
+          tree =
+            Closed_entry
+              (eop (Ident [ name ]) (op LParen (term (Op ",") (term RParen (Done_closed onotn)))));
+          processor =
+            (fun ctx obs loc ->
+              match obs with
+              | [ Token _; Token _; Term x; Token _; Term y; Token _ ] ->
+                  let x, y = (process ctx x, process ctx y) in
+                  locate_opt loc
+                    (Synth
+                       (SFirst
+                          ( List.map
+                              (fun ty ->
+                                ( `Any,
+                                  sapp
+                                    (locate_opt None
+                                       (sapp (locate_opt loc (Const (get_const [ ty; ostr ]))) x))
+                                    y,
+                                  true ))
+                              numbers,
+                            None )))
+              | _ -> Builtins.invalid name);
+          print_term =
+            Some
+              (function
+              | [
+               Token (_, (wsname, _));
+               Token (_, (wslp, _));
+               Term x;
+               Token (_, (wscomma, _));
+               Term y;
+               Token (_, (wsrp, _));
+              ] ->
+                  let px, wsx = pp_term x in
+                  let py, wsy = pp_term y in
+                  ( Token.pp (Ident [ name ])
+                    ^^ pp_ws `None wsname
+                    ^^ Token.pp LParen
+                    ^^ pp_ws `None wslp
+                    ^^ px
+                    ^^ pp_ws `None wsx
+                    ^^ Token.pp (Op ",")
+                    ^^ pp_ws `None wscomma
+                    ^^ py
+                    ^^ pp_ws `None wsy
+                    ^^ Token.pp RParen,
+                    wsrp )
+              | _ -> Builtins.invalid name);
+          print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
+          is_case = (fun _ -> false);
+        })
+    [ ("min", minn, "min"); ("max", maxn, "max") ];
   List.iter
     (fun (name, sym, asym, onotn, ostr) ->
       make onotn
@@ -724,6 +838,26 @@ let install_notations () =
       val_vars = [ "x" ];
       inner_symbols = `Single (Ident [ "√" ]);
     };
+  Scope.Situation.add_with_print
+    {
+      keys = List.map (fun ty -> `Constant (get_const [ ty; "abs" ])) numbers;
+      notn = Wrap absn;
+      pat_vars = [ "x" ];
+      val_vars = [ "x" ];
+      inner_symbols = `Multiple (Ident [ "∣" ], [ None ], Ident [ "∣" ]);
+    };
+  List.iter
+    (fun (name, onotn, ostr) ->
+      Scope.Situation.add_with_print
+        {
+          keys = List.map (fun ty -> `Constant (get_const [ ty; ostr ])) numbers;
+          notn = Wrap onotn;
+          pat_vars = [ "x"; "y" ];
+          val_vars = [ "x"; "y" ];
+          inner_symbols =
+            `Multiple (Ident [ name ], [ Some LParen; None; Some (Op ","); None ], RParen);
+        })
+    [ ("min", minn, "min"); ("max", maxn, "max") ];
   let _ =
     Scope.Situation.add_user
       (User

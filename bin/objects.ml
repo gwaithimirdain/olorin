@@ -436,6 +436,11 @@ module Symbolic = struct
          nonzero. *)
       `Div of t * t
     | `Neg of t
+    | (* Z3 has no absolute value, minimum or maximum of its own; each is a conditional, built on
+         the JavaScript side where the conditional lives. *)
+      `Abs of t
+    | `Min of t * t
+    | `Max of t * t
     | `Var of int
     | `Const of Q.t ]
 
@@ -451,6 +456,9 @@ module Symbolic = struct
     | `Times (x, y) -> to_js_head "mul" [ to_js x; to_js y ]
     | `Div (x, y) -> to_js_head "div" [ to_js x; to_js y ]
     | `Neg x -> to_js_head "neg" [ to_js x ]
+    | `Abs x -> to_js_head "abs" [ to_js x ]
+    | `Min (x, y) -> to_js_head "min" [ to_js x; to_js y ]
+    | `Max (x, y) -> to_js_head "max" [ to_js x; to_js y ]
     | `Const n -> to_js_head "val" [ to_js_head (Q.to_string n) [] ]
     | `Var x -> to_js_head "const" [ to_js_head ("H" ^ string_of_int x) [] ]
 
@@ -460,6 +468,9 @@ module Symbolic = struct
     | `Times (p, q) -> "Times(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Div (p, q) -> "Div(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Neg p -> "Negate(" ^ to_string p ^ ")"
+    | `Abs p -> "Abs(" ^ to_string p ^ ")"
+    | `Min (p, q) -> "Min(" ^ to_string p ^ ", " ^ to_string q ^ ")"
+    | `Max (p, q) -> "Max(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Var i -> "Var(" ^ string_of_int i ^ ")"
     | `Const n -> "Const(" ^ Q.to_string n ^ ")"
 end

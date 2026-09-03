@@ -28,7 +28,7 @@ const VALUECOLOR = "#0000ff";
 const CLOSE_BUTTON_HOME = 0.8;
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
@@ -55,6 +55,7 @@ const KEYS = [
     { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
+    { unicode: '∣', keys: [ '\\mid ', '\\abs ', '\\divides ' ] },
     { unicode: '√', keys: [ '\\sqrt ', '\\surd ' ] },
     { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
@@ -217,10 +218,12 @@ window.addEventListener('resize', resizeCanvas);
 const { init } = require('z3-solver');
 var Solver;
 var Real;
+var If;
 init().then((z3) => {
     const ctx = new z3.Context('main');
     Solver = ctx.Solver;
     Real = ctx.Real;
+    If = ctx.If;
 });
 
 ready(() => {
@@ -3123,6 +3126,19 @@ function symbolic_to_z3(sym) {
         return symbolic_to_z3(sym.args[0]).div(symbolic_to_z3(sym.args[1]));
     } else if(sym.head === "neg") {
         return symbolic_to_z3(sym.args[0]).neg();
+    // Z3 has no |x|, min or max over the reals, but each is a conditional, and a conditional
+    // between two polynomials is still something the nonlinear solver decides.
+    } else if(sym.head === "abs") {
+        const x = symbolic_to_z3(sym.args[0]);
+        return If(x.ge(0), x, x.neg());
+    } else if(sym.head === "min") {
+        const x = symbolic_to_z3(sym.args[0]);
+        const y = symbolic_to_z3(sym.args[1]);
+        return If(x.le(y), x, y);
+    } else if(sym.head === "max") {
+        const x = symbolic_to_z3(sym.args[0]);
+        const y = symbolic_to_z3(sym.args[1]);
+        return If(x.le(y), y, x);
     } else if(sym.head === "val") {
         return Real.val(sym.args[0].head);
     } else if(sym.head === "const") {

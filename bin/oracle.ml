@@ -256,6 +256,8 @@ let get_poly ctx ty tm =
         | "plus" -> return (`Plus (px, py))
         | "minus" -> return (`Minus (px, py))
         | "times" -> return (`Times (px, py))
+        | "min" -> return (`Min (px, py))
+        | "max" -> return (`Max (px, py))
         | "divide" -> (
             (* A quotient of numerals is just a rational constant, and carries no obligation.  We
                ask rational_of rather than matching on `Const, so that a minus sign in front of
@@ -280,6 +282,7 @@ let get_poly ctx ty tm =
         let* x = go src in
         match Firstorder.get_root name with
         | "sqrt" -> power tm x (Q.of_ints 1 2) src
+        | "abs" -> return (`Abs x)
         | "negate" -> (
             match rational_of x with
             | Some q -> return (`Const (Q.neg q))
