@@ -2777,17 +2777,30 @@ function makePalette(palid, eltid, chars) {
     addShortcuts(eltid);
 }
 
+// Replace every shortcut key sequence in a string with the character it stands for.
+function substituteShortcuts(str) {
+    KEYS.forEach(function (entry) {
+        entry.regexes.forEach(function (re) {
+            str = str.replace(re, entry.unicode);
+        });
+    });
+    return str;
+}
+
 // Detect shortcut key sequences in a text box
 function addShortcuts(eltid) {
     const elt = document.getElementById(eltid);
     elt.addEventListener('input', () => {
-        var text = elt.value;
-        KEYS.forEach(function (entry) {
-            entry.regexes.forEach(function (re) {
-                text = text.replace(re, entry.unicode);
-            });
-        });
+        const text = substituteShortcuts(elt.value);
+        // Leave the box alone when there was nothing to replace, so that ordinary typing never
+        // goes near the cursor.
+        if(text === elt.value) { return; }
+        // Assigning to value drops the cursor at the end of the box, so work out where it belongs
+        // first: at the end of whatever preceded it, once that has been through the same
+        // substitutions, since they are what changed its length.
+        const caret = substituteShortcuts(elt.value.slice(0, elt.selectionStart)).length;
         elt.value = text;
+        elt.setSelectionRange(caret, caret);
     });
 }
 

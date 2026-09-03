@@ -333,3 +333,49 @@ test.describe('Boxes that bind a variable', () => {
         expect((await olorin.nodes()).some((n) => n.rule === 'exE')).toBe(false);
     });
 });
+
+// Shortcut sequences are replaced as they are typed, by rewriting the box's whole contents.  That
+// drops the cursor at the end of the box unless it is put back, which used to lose the player's
+// place -- and worse, broke every shortcut of more than one keystroke typed anywhere but the end,
+// since the second keystroke landed at the end rather than beside the first: "**2" in the middle
+// of "ab" gave "a·b·2" rather than "a²b".
+test.describe('Shortcut sequences', () => {
+    // Type `keys` into the conclusion box of the custom-level dialog, starting from `initial` with
+    // the cursor `at` characters in, and report what the box says and where the cursor ended up.
+    async function typeAt(page, initial, at, keys) {
+        const box = page.locator('#conclusion');
+        await box.fill(initial);
+        await page.evaluate((n) => document.getElementById('conclusion').setSelectionRange(n, n), at);
+        await box.pressSequentially(keys);
+        return {
+            text: await box.inputValue(),
+            cursor: await page.evaluate(() => document.getElementById('conclusion').selectionStart),
+        };
+    }
+
+    test.beforeEach(async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.openChooser();
+        await page.click('#customLevel');
+    });
+
+    test('leave the cursor after what they inserted, not at the end of the box', async ({ page }) => {
+        for (const [keys, text] of [['*', 'x·y'], ['-', 'x−y'], ['|', 'x∣y'],
+                                    ['\\land ', 'x∧y'], ['<=>', 'x⇔y']]) {
+            expect(await typeAt(page, 'xy', 1, keys)).toEqual({ text, cursor: 2 });
+        }
+    });
+
+    test('of more than one keystroke work in the middle of a box', async ({ page }) => {
+        expect(await typeAt(page, 'ab', 1, '**2')).toEqual({ text: 'a²b', cursor: 2 });
+        expect(await typeAt(page, 'ab', 1, '--')).toEqual({ text: 'a∸b', cursor: 2 });
+        expect(await typeAt(page, 'ab', 1, '|->')).toEqual({ text: 'a↦b', cursor: 2 });
+    });
+
+    test('still work at either end', async ({ page }) => {
+        expect(await typeAt(page, 'xy', 2, '*')).toEqual({ text: 'xy·', cursor: 3 });
+        expect(await typeAt(page, 'xy', 0, '*')).toEqual({ text: '·xy', cursor: 1 });
+    });
+});
+
