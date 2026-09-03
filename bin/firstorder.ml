@@ -42,7 +42,7 @@ axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs 
 axiom oracle (A : Type) (x : A) (C : Type) : C
 
 axiom lt (A : Type) (x y : A) : Type
-axiom le (A : Type) (x y : A) : Type
+def le (A : Type) (x y : A) : Type ≔ data [ left. (_ : lt A x y) | right. (_ : eq A x y) ]
 def gt (A : Type) (x y : A) : Type ≔ lt A y x
 def ge (A : Type) (x y : A) : Type ≔ le A y x
 
