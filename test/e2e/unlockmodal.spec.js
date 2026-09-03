@@ -4,19 +4,39 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { inWorld, worldNames, oneWireLevel, iffIdentityLevel, completions, thresholdCount } = require('../lib/levels');
+const { worlds, world, followerWorlds, worldGateSeeds, oneWireLevel, completions,
+        thresholdCount } = require('../lib/levels');
+const { hasFixture, readFixture } = require('../lib/fixtures');
 
-// Levels and worlds come from levels.js rather than being named, since ids shift when levels are
-// added or reordered: a level proved by one wire in the first world, and a "P ⇔ P" in any later
-// world (the second test is about the world before that one, whichever it turns out to be).
+// Levels and worlds are chosen structurally, never by id or by position: which worlds completing
+// one opens is the declared `previous` relation, not the order the worlds appear in.
+
+// For the novice announcement: a level proved by one wire, and a world that follows its world --
+// which finishing 80% of that world opens (rule 1).
 const FIRST = oneWireLevel();
-const IFF = iffIdentityLevel((l) => l.world > FIRST.world);
-const WORLDS = worldNames();
-const W1 = inWorld(FIRST.world);
-const W2 = inWorld(IFF.world);
-// Counts derived from the actual world sizes, so the tests don't break when a world's size changes.
-const W1_MOST = thresholdCount(W1.length, 0.8); // world 1 >= 80% novice (rule 1)
-const W2_HALF = thresholdCount(W2.length, 0.5); // world 2 >= 50% novice (rule 2)
+const OPENED = followerWorlds(FIRST.world)[0];
+// A world's percentage is of its non-bonus levels, and this is the fewest of them that reach
+// rule 1's 80%; one less stays below it.
+const W1 = world(FIRST.world).counted;
+const W1_MOST = thresholdCount(W1.length, 0.8);
+
+// For the adept announcement: the first world follows no world, so rules 1 and 3 ask nothing of it
+// and its Adept is gated by rule 2 alone -- every world that follows it at >= 50% novice.  Pushing
+// the last of those over that half therefore opens it at Adept, and it is the first Adept unlock.
+const TARGET = worlds()[0];
+const half = (w) => thresholdCount(w.counted.length, 0.5);
+// The world to push over: one that follows TARGET and whose own first level has a captured proof,
+// so the test can just restore it (an opener has no stage or predecessor gates of its own).
+const CROSSER = followerWorlds(TARGET.number).find((w) => hasFixture(w.levels[0]));
+const SOLVE = CROSSER && CROSSER.levels[0];
+
+for (const [ok, what] of [
+    [OPENED, 'some world follows the first level\'s world'],
+    [CROSSER, 'some world follows the first world and has a fixture proof for its first level'],
+    [SOLVE && half(CROSSER) >= 2, 'that world needs at least two levels to reach half complete'],
+]) {
+    if (!ok) throw new Error(`This suite assumes ${what}; update its selectors for levels.js.`);
+}
 
 test.describe('Unlock announcement', () => {
     test('opening a new world is announced (without a difficulty explanation for novice)', async ({ page }) => {
@@ -31,29 +51,35 @@ test.describe('Unlock announcement', () => {
 
         expect(await olorin.unlockModalVisible()).toBe(true);
         const text = await olorin.unlockModalText();
-        expect(text).toContain(`${WORLDS[FIRST.world]} is now unlocked at Novice difficulty!`);
+        expect(text).toContain(`${OPENED.name} is now unlocked at Novice difficulty!`);
         // Novice isn't a newly-available difficulty, so no explanation is included.
         expect(text).not.toContain('At Novice difficulty');
     });
 
     test('the first unlock at a new difficulty includes that difficulty\'s explanation', async ({ page }) => {
         const olorin = new Olorin(page);
-        // One short of world 2's 50% (excluding the level we'll solve); finishing it reaches 50% at
-        // novice, which opens world 1 at Adept -- the first Adept unlock (rule 2).
-        await olorin.seed(completions(W2.filter((l) => l !== IFF).slice(0, W2_HALF - 1), 0));
+        await olorin.seed(
+            // Enough of TARGET to open CROSSER at novice, so the level we solve is reachable.
+            worldGateSeeds(CROSSER.number, 0)
+            // Every other world that follows TARGET already past its half, so CROSSER is the last
+            // one holding rule 2 shut.
+            .concat(followerWorlds(TARGET.number)
+                .filter((w) => w.number !== CROSSER.number)
+                .flatMap((w) => completions(w.counted.slice(0, half(w)), 0)))
+            // And CROSSER itself one short of its half, not counting the level we're about to solve.
+            .concat(completions(
+                CROSSER.counted.filter((l) => l !== SOLVE).slice(0, half(CROSSER) - 1), 0)));
         await olorin.open();
-        await olorin.selectLevel(IFF.name);
+        await olorin.selectLevel(SOLVE.name);
+        expect((await olorin.levelStates(SOLVE.name))[0]).toBe('unlocked');
 
-        // Prove P ⇔ P: an iff-introduction whose two brackets connect assumption to subgoal.
-        const iff = await olorin.dragRule('iffI', 500, 250);
-        await olorin.connect({ vertex: iff, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        await olorin.connect({ vertex: iff, sort: 'assumption', label: 'ltor' }, { vertex: iff, sort: 'subgoal', label: 'ltor' });
-        await olorin.connect({ vertex: iff, sort: 'assumption', label: 'rtol' }, { vertex: iff, sort: 'subgoal', label: 'rtol' });
-        await olorin.page.waitForTimeout(200);
+        // Solving it takes CROSSER to half complete at novice, which opens TARGET at Adept.
+        await olorin.restore(readFixture(SOLVE));
+        await olorin.waitForTypecheck();
         expect(await olorin.isComplete()).toBe(true);
 
         const text = await olorin.unlockModalText();
-        expect(text).toContain(`${WORLDS[IFF.world - 2]} is now unlocked at Adept difficulty!`);
+        expect(text).toContain(`${TARGET.name} is now unlocked at Adept difficulty!`);
         // First time Adept becomes available -> its explanation from the About box is shown.
         expect(text).toContain('At Adept difficulty');
     });

@@ -15,10 +15,10 @@ const SIMPLE = find((l) => hasFixture(l) && l.variables.length === 0
                         && l.hypotheses.length === 1 && l.conclusion === l.hypotheses[0],
     'proved by one wire and backed by a fixture proof');
 // A level with a rule-to-rule (internal) wire, so it is NOT auto-completed -- used for the re-lock
-// tests (the easy levels auto-complete at adept and can't be downgraded-from).  Keeping it in the
-// first world means its only unlock prerequisites are the ones prereqSeeds seeds below.
-const MANUAL = find((l) => hasFixture(l) && !l.autoComplete && l.world === 1,
-    'a non-auto-completing first-world level backed by a fixture proof');
+// tests (the easy levels auto-complete at adept and can't be downgraded-from).  Wherever it sits,
+// prereqSeeds below opens its world and its own stage for it.
+const MANUAL = find((l) => hasFixture(l) && !l.autoComplete,
+    'a non-auto-completing level backed by a fixture proof');
 const simpleProof = readFixtureText(SIMPLE);
 const manualProofRaw = readFixtureText(MANUAL);
 const manualProof = readFixture(MANUAL);
