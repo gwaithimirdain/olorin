@@ -116,10 +116,10 @@ test.describe('Error explanations', () => {
         const olorin = new Olorin(page);
         await olorin.open();
 
-        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x*x=x' }, toConclusion('alg'));
+        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·x=x' }, toConclusion('alg'));
         expect(await explanationFor(olorin, 'E3000')).toContain("couldn't prove this");
 
-        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x*(1/x)=1' }, toConclusion('alg'));
+        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·(1/x)=1' }, toConclusion('alg'));
         const denom = await explanationFor(olorin, 'E3000');
         expect(denom).toContain("can't tell that");
         expect(denom).toContain('\n    x\n');
@@ -187,7 +187,7 @@ test.describe('The wire-error tooltip', () => {
         expect(await olorin.wireTooltip()).toContain('This wire carries a proof of');
         await olorin.unhoverWire();
         // Re-state the level so the same wiring is now an algebra failure instead.
-        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x*x=x' }, toConclusion('alg'));
+        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·x=x' }, toConclusion('alg'));
         await olorin.hoverWire(0.25);
         expect(await olorin.wireTooltip()).toContain('algebra block');
     });

@@ -141,10 +141,16 @@ export const LEVELS = [
                     parameters: [ { name: "x", ty: "ℤ" } ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "(x+1)²=x²+2*x+1" },
+                    conclusion: { ty: "(x+1)²=x²+2·x+1" },
                     trivial: true,
                     autoComplete: true,
                     hint: "multiplicationHint",
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ ],
+                        conclusion: { ty: "(x+1)²=x²+2*x+1" },
+                    }
                 },
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -167,11 +173,17 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "a=b²+2*d" }, { ty: "c=d²−2*b" } ],
-                    conclusion: { ty: "a*b+c*d=b³+d³" },
+                    hypotheses: [ { ty: "a=b²+2·d" }, { ty: "c=d²−2·b" } ],
+                    conclusion: { ty: "a·b+c·d=b³+d³" },
                     trivial: true,
                     autoComplete: true,
                     hint: "algebra4Hint",
+                    saveable: {
+                        parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "d", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "a=b²+2*d" }, { ty: "c=d²−2*b" } ],
+                        conclusion: { ty: "a*b+c*d=b³+d³" },
+                    }
                 },
                 {
                     parameters: [ { name: "x", ty: "ℝ" } ],
@@ -204,14 +216,26 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "(x=3*y)∧(1−x=4*y)" } ],
+                    hypotheses: [ { ty: "(x=3·y)∧(1−x=4·y)" } ],
                     conclusion: { ty: "(x=3/7)∧(y=1/7)" },
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "(x=3*y)∧(1−x=4*y)" } ],
+                        conclusion: { ty: "(x=3/7)∧(y=1/7)" },
+                    }
                 },
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "(x−y=3*x²)∧(y=x−x²)" } ],
+                    hypotheses: [ { ty: "(x−y=3·x²)∧(y=x−x²)" } ],
                     conclusion: { ty: "(x=0)∧(y=0)" },
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "(x−y=3*x²)∧(y=x−x²)" } ],
+                        conclusion: { ty: "(x=0)∧(y=0)" },
+                    }
                 },
             ]
           },
@@ -457,24 +481,42 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "(x=y+1)∨(2*x=3−y)" } ],
-                    conclusion: { ty: "2*x²−x*y−y²=5*x−2*y−3" },
+                    hypotheses: [ { ty: "(x=y+1)∨(2·x=3−y)" } ],
+                    conclusion: { ty: "2·x²−x·y−y²=5·x−2·y−3" },
                     trivial: true,
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "(x=y+1)∨(2*x=3−y)" } ],
+                        conclusion: { ty: "2*x²−x*y−y²=5*x−2*y−3" },
+                    }
                 },
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     variables: [ ],
                     hypotheses: [ { ty: "(x+y=1)∨(x−y=1)" } ],
-                    conclusion: { ty: "x²+1=y²+2*x" },
+                    conclusion: { ty: "x²+1=y²+2·x" },
                     trivial: true,
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "(x+y=1)∨(x−y=1)" } ],
+                        conclusion: { ty: "x²+1=y²+2*x" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "x*y=0" } ],
+                    hypotheses: [ { ty: "x·y=0" } ],
                     conclusion: { ty: "(x=0)∨(y=0)" },
                     trivial: true,
                     hint: "integralHint",
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "x*y=0" } ],
+                        conclusion: { ty: "(x=0)∨(y=0)" },
+                    }
                 },
                 {
                     parameters: [ ],
@@ -504,14 +546,22 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
+                    hypotheses: [ { ty: "(x²−2·x−3=0)∨(x²+3·x+2=0)" } ],
                     conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "x", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
-                        conclusion: { ty: "(x=3)∨((x=∸1)∨(x=∸2))" },
-                    }
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "x", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
+                            conclusion: { ty: "(x=3)∨((x=∸1)∨(x=∸2))" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "x", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "(x²−2*x−3=0)∨(x²+3*x+2=0)" } ],
+                            conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
+                        },
+                    ]
                 },
             ],
           },
@@ -906,13 +956,21 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
                     hypotheses: [ { ty: "a ∣ b" } ],
-                    conclusion: { ty: "a ∣ 2*b" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(2*b=k*a)" },
-                    }
+                    conclusion: { ty: "a ∣ 2·b" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(2*b=k*a)" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "a ∣ b" } ],
+                            conclusion: { ty: "a ∣ 2*b" },
+                        },
+                    ]
                 },
                 {
                     parameters: [ ],
@@ -942,25 +1000,41 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
                     hypotheses: [ { ty: "a ∣ b" } ],
-                    conclusion: { ty: "a*c ∣ b*c" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(b*c=k*a*c)" },
-                    }
+                    conclusion: { ty: "a·c ∣ b·c" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(b*c=k*a*c)" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "a ∣ b" } ],
+                            conclusion: { ty: "a*c ∣ b*c" },
+                        },
+                    ]
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
                     hypotheses: [ { ty: "a ∣ b" } ],
-                    conclusion: { ty: "a ∣ b*c" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(b*c=k*a)" },
-                    }
+                    conclusion: { ty: "a ∣ b·c" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(b=k*a)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(b*c=k*a)" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "a ∣ b" } ],
+                            conclusion: { ty: "a ∣ b*c" },
+                        },
+                    ]
                 },
                 {
                     parameters: [ ],
@@ -1039,13 +1113,21 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "a ≡ b (mod n)" } ],
-                    conclusion: { ty: "a*c ≡ b*c (mod n)" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
-                    }
+                    conclusion: { ty: "a·c ≡ b·c (mod n)" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*n)" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "a ≡ b (mod n)" } ],
+                            conclusion: { ty: "a*c ≡ b*c (mod n)" },
+                        },
+                    ]
                 },
                 {
                     parameters: [ ],
@@ -1140,13 +1222,21 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "a ≡ b (mod n)" }, { ty: "m ∣ c" } ],
-                    conclusion: { ty: "a*c ≡ b*c (mod m*n)" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(c=k*m)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*(m*n))" },
-                    }
+                    conclusion: { ty: "a·c ≡ b·c (mod m·n)" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∃k∈ℤ,(a−b=k*n)" }, { ty: "∃k∈ℤ,(c=k*m)" } ],
+                            conclusion: { ty: "∃k∈ℤ,(a*c−b*c=k*(m*n))" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" }, { name: "m", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "a ≡ b (mod n)" }, { ty: "m ∣ c" } ],
+                            conclusion: { ty: "a*c ≡ b*c (mod m*n)" },
+                        },
+                    ]
                 },
                 // Just for testing number systems and subtypes
                 // {
@@ -1293,7 +1383,7 @@ export const LEVELS = [
                 //     parameters: [ { name: "x", ty: "𝕊" } ],
                 //     variables: [ ],
                 //     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
-                //     conclusion: { ty: "∀u∈ℝ,(u<2*x)" },
+                //     conclusion: { ty: "∀u∈ℝ,(u<2·x)" },
                 // },
                 {               // x neg inf => x+q neg inf
                     parameters: [ ],
@@ -1307,11 +1397,17 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
                     conclusion: { ty: "∀u∈ℝ,(u<x+y)" },
                 },
-                {               // x,y pos inf => x*y pos inf
+                {               // x,y pos inf => x·y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
-                    conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
+                    conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x·y))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
+                        conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
+                    }
                 },
                 {               // x,y neg inf => x+y neg inf
                     parameters: [ ],
@@ -1319,17 +1415,29 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
                     conclusion: { ty: "∀u∈ℝ,(x+y<u)" },
                 },
-                {               // x,y neg inf => x*y pos inf
+                {               // x,y neg inf => x·y pos inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
+                    conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x·y))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
+                        conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
+                    }
                 },
-                {               // x pos inf, y neg inf => x*y neg inf
+                {               // x pos inf, y neg inf => x·y neg inf
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u<0)⇒(x*y<u))" },
+                    conclusion: { ty: "∀u∈ℝ,((u<0)⇒(x·y<u))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(y<u)" } ],
+                        conclusion: { ty: "∀u∈ℝ,((u<0)⇒(x*y<u))" },
+                    }
                 },
             ],
           },
@@ -1365,13 +1473,25 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" } ],
                     hypotheses: [ { ty: "x>0"}, { ty: "∀u∈ℝ,((u>0)⇒(x<u))" }, ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒(2*x<u))" },
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒(2·x<u))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "x>0"}, { ty: "∀u∈ℝ,((u>0)⇒(x<u))" }, ],
+                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒(2*x<u))" },
+                    }
                 },
-                {               // x,y pos infinitesimal => x*y infinitesimal
+                {               // x,y pos infinitesimal => x·y infinitesimal
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                     hypotheses: [ { ty: "x>0" }, { ty: "y>0" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x*y)∧(x*y<u)))" },
+                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x·y)∧(x·y<u)))" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "x>0" }, { ty: "y>0" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
+                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x*y)∧(x*y<u)))" },
+                    }
                 },
             ],
           },
@@ -1481,13 +1601,25 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=x)" },
+                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x·y=x)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ ],
+                        hypotheses: [ ],
+                        conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=x)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=y)" },
+                    conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x·y=y)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ ],
+                        hypotheses: [ ],
+                        conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=y)" },
+                    }
                 },
                 // TODO: How can we give them 1≠0?  Probably rlqe can prove it... if we allow it to prove ≠s.
                 // {
@@ -1500,7 +1632,7 @@ export const LEVELS = [
                 //     parameters: [ ],
                 //     variables: [ ],
                 //     hypotheses: [ ],
-                //     conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x*y=1)" },
+                //     conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x·y=1)" },
                 // },
             ],
           },
@@ -1786,8 +1918,14 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "y+x=2*y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
+                    hypotheses: [ { ty: "y+x=2·y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
                     conclusion: { ty: "y≠0" },
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "y+x=2*y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
+                        conclusion: { ty: "y≠0" },
+                    }
                 },
             ],
           },
@@ -1797,32 +1935,58 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a*x=0)" } ],
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x=0)" } ],
                     conclusion: { ty: "a=0" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
-                    conclusion: { ty: "a=−4" },
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "a", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
-                        conclusion: { ty: "a=∸4" },
+                        hypotheses: [ { ty: "∀x∈ℤ,(a*x=0)" } ],
+                        conclusion: { ty: "a=0" },
                     }
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a*x≠0)" } ],
-                    conclusion: { ty: "a≠0" },
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+6·x=a)" } ],
+                    conclusion: { ty: "a=−4" },
+                    saveable: [
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
+                            conclusion: { ty: "a=∸4" },
+                        },
+                        {
+                            parameters: [ ],
+                            variables: [ { name: "a", ty: "ℤ" } ],
+                            hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
+                            conclusion: { ty: "a=−4" },
+                        },
+                    ]
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀k∈ℤ,(a≠3*k)" } ],
-                    conclusion: { ty: "∀k∈ℤ,(a≠6*k)" },
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x≠0)" } ],
+                    conclusion: { ty: "a≠0" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∀x∈ℤ,(a*x≠0)" } ],
+                        conclusion: { ty: "a≠0" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∀k∈ℤ,(a≠3·k)" } ],
+                    conclusion: { ty: "∀k∈ℤ,(a≠6·k)" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∀k∈ℤ,(a≠3*k)" } ],
+                        conclusion: { ty: "∀k∈ℤ,(a≠6*k)" },
+                    }
                 },
                 {
                     parameters: [ ],
@@ -1845,14 +2009,26 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "∀k∈ℤ,(a*k≠3*b−a)" } ],
-                    conclusion: { ty: "∀k∈ℤ,(a*k≠b)" },
+                    hypotheses: [ { ty: "∀k∈ℤ,(a·k≠3·b−a)" } ],
+                    conclusion: { ty: "∀k∈ℤ,(a·k≠b)" },
+                    saveable: {
+                        parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "∀k∈ℤ,(a*k≠3*b−a)" } ],
+                        conclusion: { ty: "∀k∈ℤ,(a*k≠b)" },
+                    }
                 },
                 {
                     parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "∀k∈ℤ,(a*k*c≠b*c)" } ],
-                    conclusion: { ty: "∀k∈ℤ,(a*k≠b)" },
+                    hypotheses: [ { ty: "∀k∈ℤ,(a·k·c≠b·c)" } ],
+                    conclusion: { ty: "∀k∈ℤ,(a·k≠b)" },
+                    saveable: {
+                        parameters: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" }, { name: "c", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "∀k∈ℤ,(a*k*c≠b*c)" } ],
+                        conclusion: { ty: "∀k∈ℤ,(a*k≠b)" },
+                    }
                 },
             ],
           },
@@ -1874,11 +2050,11 @@ export function saveable(level) {
 }
 
 // DEPRECATED.  What a level was stored under before its statement was written differently -- the
-// prefix minus went from ∸ to − in April 2025, and the divisibility and congruence levels were
-// restated with the ∣ and ≡ notations in September 2026 -- for the levels that carry a `saveable`
-// block above.  Records written before a change are still filed under the statement it replaced, so
-// the client copies them to the current key when it finds them (migrateLegacyRecords in main.js);
-// nothing else consults them.
+// prefix minus went from ∸ to − in April 2025, the divisibility and congruence levels were
+// restated with the ∣ and ≡ notations in September 2026, and multiplication went from * to · the
+// same month -- for the levels that carry a `saveable` block above.  Records written before a
+// change are still filed under the statement it replaced, so the client copies them to the current
+// key when it finds them (migrateLegacyRecords in main.js); nothing else consults them.
 //
 // A level restated twice lists both of its old statements, so give `saveable` an array in that
 // case; a single statement (the common case) may be written on its own.

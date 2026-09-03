@@ -148,6 +148,7 @@ let onechar_ops =
     (0x22A5, Ident [ "⊥" ]);
     (0x22A4, Ident [ "⊤" ]);
     (0x2212, Ident [ "−" ]);
+    (0xB7, Ident [ "·" ]);
     (0x2260, Ident [ "≠" ]);
     (0xB2, Ident [ "²" ]);
     (0xB3, Ident [ "³" ]);
@@ -243,7 +244,13 @@ let algebra =
       Wrap_infixl minus,
       [ "minus" ],
       numbers );
-    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, [ "times" ], numbers);
+    ( "·",
+      [ Ident [ "·" ]; Op "*" ],
+      Ident [ "·" ],
+      Op "*",
+      Wrap_infixl times,
+      [ "times" ],
+      numbers );
     ("/", [ Op "/" ], Op "/", Op "/", Wrap_infixl div, [ "divide" ], fields);
     ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "pow" ], numbers);
   ]

@@ -36,17 +36,17 @@ test.describe('Algebra over rational functions', () => {
         expect(await algebraProves(olorin, { conclusion: '1/2+1/2=1' })).toBe(true);
     });
 
-    test('x*(1/x)=1 needs x≠0, and follows from it', async ({ page }) => {
+    test('x·(1/x)=1 needs x≠0, and follows from it', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await algebraProves(olorin, {
             variables: 'x ∈ ℝ',
-            conclusion: 'x*(1/x)=1',
+            conclusion: 'x·(1/x)=1',
         })).toBe(false);
         expect(await algebraProves(olorin, {
             variables: 'x ∈ ℝ',
             hypotheses: ['x≠0'],
-            conclusion: 'x*(1/x)=1',
+            conclusion: 'x·(1/x)=1',
         })).toBe(true);
     });
 
@@ -70,7 +70,7 @@ test.describe('Algebra over rational functions', () => {
         expect(await algebraProves(olorin, {
             variables: 'x ∈ ℝ\ny ∈ ℝ',
             hypotheses: ['x≠0', 'y≠0'],
-            conclusion: '1/x+1/y=(x+y)/(x*y)',
+            conclusion: '1/x+1/y=(x+y)/(x·y)',
         })).toBe(true);
     });
 
@@ -110,7 +110,7 @@ test.describe('Algebra over rational functions', () => {
         expect(await algebraProves(olorin, {
             variables: 'x ∈ 𝕊',
             hypotheses: ['x≠0'],
-            conclusion: 'x*(1/x)=1',
+            conclusion: 'x·(1/x)=1',
         })).toBe(true);
     });
 

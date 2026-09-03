@@ -66,9 +66,11 @@ const KEYS = [
     { unicode: 'ℝ', keys: [ '\\R ' ] },
     { unicode: 'ℂ', keys: [ '\\C ' ] },
     { unicode: '𝕊', keys: [ '\\S ' ] },
-    { unicode: '²', keys: [ '^2', '**2' ] },
-    { unicode: '³', keys: [ '^3', '**3' ] },
-    { unicode: '⁴', keys: [ '^4', '**4' ] },
+    // ··2 is what typing **2 leaves behind, each * having already become a ·
+    { unicode: '²', keys: [ '^2', '**2', '··2' ] },
+    { unicode: '³', keys: [ '^3', '**3', '··3' ] },
+    { unicode: '⁴', keys: [ '^4', '**4', '··4' ] },
+    { unicode: '·', keys: [ '*' ] }, // has to come last, so ** in a power is read before either * becomes ·
 ].map(function (entry) {
     entry.regexes = entry.keys.map(function (str) { return new RegExp(escapeRegex(str), 'g'); });
     return entry

@@ -16,7 +16,7 @@ const STATE = {
     level: {
         parameters: [],
         variables: [{ name: 'x', ty: 'ℚ' }, { name: 'y', ty: 'ℚ' }],
-        hypotheses: [{ ty: '(x=3*y)∧(1−x=4*y)' }],
+        hypotheses: [{ ty: '(x=3·y)∧(1−x=4·y)' }],
         conclusion: { ty: '(x=3/7) ∧ (y=1/7)' },
     },
     complete: false,
@@ -24,7 +24,7 @@ const STATE = {
     nodes: [
         { id: 'var2', rule: 'variable', left: '50px', top: '10px', name: 'x', value: 'ℚ' },
         { id: 'var3', rule: 'variable', left: '50px', top: '62px', name: 'y', value: 'ℚ' },
-        { id: 'hyp1', rule: 'hypothesis', left: '50px', top: '526px', value: '(x=3*y)∧(1−x=4*y)' },
+        { id: 'hyp1', rule: 'hypothesis', left: '50px', top: '526px', value: '(x=3·y)∧(1−x=4·y)' },
         { id: 'concl1', rule: 'conclusion', left: '1383px', top: '449px', value: '(x=3/7) ∧ (y=1/7)' },
         { id: 'rule0', rule: 'integral', left: '515px', top: '385px' },
         { id: 'rule1', rule: 'alg', left: '359px', top: '590px' },
@@ -54,21 +54,21 @@ test.describe('Wire labels', () => {
         await olorin.open();
         await olorin.buildCustom({
             variables: 'x ∈ ℚ\ny ∈ ℚ',
-            hypotheses: '(x=3*y)∧(1−x=4*y)',
+            hypotheses: '(x=3·y)∧(1−x=4·y)',
             conclusion: '(x=3/7) ∧ (y=1/7)',
         });
         await olorin.restore(STATE);
 
         // The wires of the disconnected fragment keep their labels, alongside the goal's own wire.
         await expect.poll(() => wireLabels(page), { timeout: 20000 }).toEqual(
-            expect.arrayContaining(['x∈ℚ', '(x=3*y)∧(1−x=4*y)', 'x−1∈ℚ', 'x*(x−1)=0', '(x=3/7)∧(y=1/7)']));
+            expect.arrayContaining(['x∈ℚ', '(x=3·y)∧(1−x=4·y)', 'x−1∈ℚ', 'x·(x−1)=0', '(x=3/7)∧(y=1/7)']));
 
         // Removing the wire into the conclusion leaves the fragment labeled just the same.
         const detached = JSON.parse(JSON.stringify(STATE));
         detached.connections = detached.connections.filter((c) => c.target.vertex !== 'concl1');
         await olorin.restore(detached);
         await expect.poll(() => wireLabels(page), { timeout: 20000 }).toEqual(
-            expect.arrayContaining(['x∈ℚ', '(x=3*y)∧(1−x=4*y)', 'x−1∈ℚ', 'x*(x−1)=0']));
+            expect.arrayContaining(['x∈ℚ', '(x=3·y)∧(1−x=4·y)', 'x−1∈ℚ', 'x·(x−1)=0']));
     });
 });
 
@@ -126,13 +126,13 @@ test.describe('Overlapping labels', () => {
         await olorin.open();
         await olorin.buildCustom({
             variables: 'x ∈ ℚ\ny ∈ ℚ',
-            hypotheses: '(x=3*y)∧(1−x=4*y)',
+            hypotheses: '(x=3·y)∧(1−x=4·y)',
             conclusion: '(x=3/7) ∧ (y=1/7)',
         });
         await olorin.restore(STATE);
         // Six wires carry a type, and one of them is a type mismatch showing both of its types.
         await expect.poll(() => wireLabels(page), { timeout: 20000 })
-            .toEqual(expect.arrayContaining(['x∈ℚ', '(x=3*y)∧(1−x=4*y)', 'x−1∈ℚ', 'x*(x−1)=0']));
+            .toEqual(expect.arrayContaining(['x∈ℚ', '(x=3·y)∧(1−x=4·y)', 'x−1∈ℚ', 'x·(x−1)=0']));
         expect((await olorin.labelRects()).length).toBeGreaterThanOrEqual(6);
         expect(await olorin.overlappingLabels()).toEqual([]);
         expect(await olorin.overlappingObstacles()).toEqual([]);
@@ -231,7 +231,7 @@ test.describe('A value port whose set is not yet determined', () => {
         const olorin = new Olorin(page);
         await olorin.open();
         await olorin.buildCustom({
-            parameters: '', variables: 'a ∈ ℝ\nb ∈ ℝ', hypotheses: 'a*b=0', conclusion,
+            parameters: '', variables: 'a ∈ ℝ\nb ∈ ℝ', hypotheses: 'a·b=0', conclusion,
         });
         const nodes = await olorin.nodes();
         const concl = nodes.find((n) => n.rule === 'conclusion').id;
