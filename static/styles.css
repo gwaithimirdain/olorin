@@ -787,6 +787,14 @@ body {
     background-color: #ffffff;
     padding: 5px;
     margin: 2px;
+    /* A label sits at the middle of its wire, right where you'd aim to hover the wire itself, so
+       it lets the pointer through to the wire underneath.  The user-entered ones are clickable,
+       so they take it back. */
+    pointer-events: none;
+}
+
+.connLabel.userLabel {
+    pointer-events: auto;
 }
 
 .connLabelValue {
@@ -795,6 +803,23 @@ body {
 
 .userLabel {
     cursor: pointer;
+}
+
+/* The explanation of a wire's error, shown while the pointer is over that wire.  It never takes
+   the pointer itself, so moving along the wire doesn't make it flicker. */
+
+#wireTooltip {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    max-width: 34em;
+    padding: 8px 10px;
+    background-color: #ffffff;
+    border: 2px solid #ff0000;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    pointer-events: none;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* labels on endpoints */

@@ -7,9 +7,10 @@ const { Olorin } = require('../helpers/olorin');
 const { inWorld, worldNames, oneWireLevel, iffIdentityLevel, completions, thresholdCount } = require('../lib/levels');
 
 // Levels and worlds come from levels.js rather than being named, since ids shift when levels are
-// added: a level proved by one wire in the first world, and a "P ⇔ P" in the world after it.
+// added or reordered: a level proved by one wire in the first world, and a "P ⇔ P" in any later
+// world (the second test is about the world before that one, whichever it turns out to be).
 const FIRST = oneWireLevel();
-const IFF = iffIdentityLevel((l) => l.world === FIRST.world + 1);
+const IFF = iffIdentityLevel((l) => l.world > FIRST.world);
 const WORLDS = worldNames();
 const W1 = inWorld(FIRST.world);
 const W2 = inWorld(IFF.world);

@@ -251,7 +251,8 @@ ready(() => {
     });
 
     // Make close buttons on connections appear on hover, and stay for a second
-    instance.bind(EVENT_CONNECTION_MOUSEOVER, (conn) => {
+    instance.bind(EVENT_CONNECTION_MOUSEOVER, (conn, e) => {
+        showWireTooltip(conn, e);
         if(connectionCloseButtons[conn.id]) {
             connectionCloseButtons[conn.id].button.style.display = 'block';
             if(connectionCloseButtons[conn.id].timeout) {
@@ -261,6 +262,7 @@ ready(() => {
         }
     });
     instance.bind(EVENT_CONNECTION_MOUSEOUT, (conn) => {
+        hideWireTooltip();
         if(connectionCloseButtons[conn.id]) {
             if(connectionCloseButtons[conn.id].timeout) {
                 clearTimeout(connectionCloseButtons[conn.id].timeout);
@@ -1852,6 +1854,13 @@ if (new URLSearchParams(window.location.search).has("test")) {
             const te = findEndpoint(document.getElementById(t.vertex), t.sort, t.label);
             instance.connect({ source: se, target: te });
         },
+        // The diagnostics from the last typecheck (code, text and locations of each error).
+        diagnostics: () => lastDiagnostics.map((d) => ({
+            code: d.code, isfatal: d.isfatal, text: d.text, explanation: d.explanation, locs: d.locs,
+        })),
+        // What hovering each wire currently in error would say, in connection order.
+        wireErrors: () => instance.getConnections()
+            .map((c) => c.parameters.errorText).filter((t) => t !== undefined),
         difficulty: () => difficulty,
         varnames: () => varnames.slice(),
         savedProofKey,
@@ -2834,6 +2843,37 @@ document.addEventListener('mouseup', () => {
 });
 
 
+// A wire marked red carries the reason in its parameters; while the pointer is over it, say so.
+// Narya's own text is the fallback for the errors Explain doesn't have a student-facing version
+// of, so a red wire always explains itself somehow.
+function showWireTooltip(conn, e) {
+    const text = conn.parameters.errorText;
+    if(!text) { return; }
+    const tip = document.getElementById("wireTooltip");
+    // textContent, not innerText: the newlines are rendered by the pre-wrap on #wireTooltip, and
+    // innerText would replace them with <br> and lose the indentation.
+    tip.textContent = text;
+    tip.style.display = 'block';
+    // Follow the pointer, falling back to the middle of the wire if the event carries no position.
+    var x, y;
+    if(e && typeof e.clientX === 'number') {
+        x = e.clientX + 14;
+        y = e.clientY + 16;
+    } else {
+        const r = conn.connector.canvas.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2 + 16;
+    }
+    // Keep it on screen (it's already displayed, so it can be measured).
+    const tr = tip.getBoundingClientRect();
+    tip.style.left = Math.max(4, Math.min(x, window.innerWidth - tr.width - 4)) + 'px';
+    tip.style.top = Math.max(4, Math.min(y, window.innerHeight - tr.height - 4)) + 'px';
+}
+
+function hideWireTooltip() {
+    document.getElementById("wireTooltip").style.display = 'none';
+}
+
 // Set the color of a connection
 function setStrokeColor(conn, color) {
     const sty = conn.getPaintStyle();
@@ -2921,6 +2961,7 @@ function typecheck() {
     if(suppressChecking) { return; }
 
     document.getElementById("typecheckingBG").style.display = 'flex';
+    hideWireTooltip();
 
     console.log("typechecking with " + nodes.length + " nodes");
     var connctr = 0;
@@ -2941,6 +2982,8 @@ function typecheck() {
         if(c.parameters.userLabel) {
             c.parameters.userLabel.style.color = '';
         }
+        // Last time's error is no longer this wire's, whatever this typecheck decides.
+        c.parameters.errorText = undefined;
         instance.revalidate(c.source);
 
         // Clear the label overlays.  For some reason, if we *delete* all the overlays here and then add later the ones we want, some of them don't get displayed until the nodes are dragged around.  So instead we set the label text of all existing overlays to empty here, and later we delete only the overlays with empty label text.
@@ -3159,6 +3202,19 @@ function spreadWireLabels() {
     moved.forEach(function (el) { instance.revalidate(el); });
 }
 
+// The diagnostics from the most recent completed typecheck, for the test seam to read.
+var lastDiagnostics = [];
+
+// Narya formats a diagnostic for a terminal: a "￫ error[E0401]" header, then lines flagged with
+// ￮ or ￭.  For a tooltip we want just what it says, so drop the header and the flags.
+function plainDiagnosticText(text) {
+    return text.split(/[\r\n]+/)
+        .filter(function (l) { return !/^\s*￫/.test(l); })
+        .map(function (l) { return l.replace(/^\s*[￮￭]\s?/, ''); })
+        .join('\n')
+        .trim();
+}
+
 function continue_typechecking(nodes, edges, connections, result) {
     // If a callback string was supplied, we pass it off to Z3 and wait for a response.
     if(result.callback) {
@@ -3170,6 +3226,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         return;
     }
 
+    lastDiagnostics = result.diagnostics || [];
     const diagram = document.getElementById('diagram');
     
     // Display results
@@ -3344,7 +3401,7 @@ function continue_typechecking(nodes, edges, connections, result) {
             // The proof is no longer complete; a later re-completion counts afresh.
             proofRegisteredComplete = false;
             var somethingRed = false;
-            // result.diagnostics is an array of objects of type {isfatal:bool, locs, text:string}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
+            // result.diagnostics is an array of objects of type {isfatal:bool, code:string, text:string, explanation:string opt, locs}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
             result.diagnostics.forEach(function (d) {
                 // Make the edges with fatal errors red, if we're not on master difficulty
                 if(d.isfatal && difficulty <= 1) {
@@ -3352,6 +3409,11 @@ function continue_typechecking(nodes, edges, connections, result) {
                         if(loc.isEdge) {
                             const edge = connections[loc.id];
                             setStrokeColor(edge, "#ff0000");
+                            // Keep the first error reported for this wire; later ones are usually
+                            // knock-on effects of it.
+                            if(!edge.parameters.errorText) {
+                                edge.parameters.errorText = d.explanation || plainDiagnosticText(d.text);
+                            }
                             instance.revalidate(edge.source);
                             console.log(d.text);
                             somethingRed = true;

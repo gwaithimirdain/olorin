@@ -320,6 +320,41 @@ class Olorin {
             () => getComputedStyle(document.getElementById('typecheckingBG')).display === 'none');
     }
 
+    // Move the pointer onto a point along a wire's path (0 = source end, 1 = target end).  A
+    // right-angled connector's bounding box is mostly empty, so we walk the path itself.
+    async hoverWire(frac = 0.5, index = 0) {
+        const pt = await this.page.evaluate(({ f, i }) => {
+            const path = document.querySelectorAll('.jtk-connector path')[i];
+            if (!path) { return null; }
+            const p = path.getPointAtLength(path.getTotalLength() * f);
+            const m = path.getScreenCTM();
+            return { x: p.x * m.a + p.y * m.c + m.e, y: p.x * m.b + p.y * m.d + m.f };
+        }, { f: frac, i: index });
+        if (!pt) { throw new Error('no wire ' + index + ' to hover'); }
+        await this.page.mouse.move(pt.x, pt.y);
+    }
+
+    // Move the pointer off any wire.
+    async unhoverWire() {
+        await this.page.mouse.move(5, 5);
+    }
+
+    // The text showing in the wire-error tooltip, or null when it isn't showing.
+    async wireTooltip() {
+        if (!(await this.page.isVisible('#wireTooltip'))) { return null; }
+        return this.page.textContent('#wireTooltip');
+    }
+
+    // The diagnostics from the last typecheck: {code, isfatal, text, explanation, locs} each.
+    diagnostics() {
+        return this.page.evaluate(() => window.__olorin.diagnostics());
+    }
+
+    // What hovering each wire currently in error would say.
+    wireErrors() {
+        return this.page.evaluate(() => window.__olorin.wireErrors());
+    }
+
     isComplete() {
         return this.page.evaluate(() => window.__olorin.complete());
     }

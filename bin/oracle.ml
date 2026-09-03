@@ -82,7 +82,7 @@ let rec get_equality_or_inequality ctx tm =
         if Some name = eq then return `Eq
         else if Some name = lt then return `Lt
         else if Some name = le then return `Le
-        else Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
+        else Error (Code.Oracle_failed (Explain.Oracle.not_a_relation, Printable.PVal (ctx, tm)))
       in
       return (op, CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
   | Neu { head = Const { name; ins }; args = Arg (Emp, tm, tyins); _ }
@@ -93,7 +93,7 @@ let rec get_equality_or_inequality ctx tm =
       | `Neq -> return (`Eq, ty, lhs, rhs)
       | `Lt -> return (`Le, ty, rhs, lhs)
       | `Le -> return (`Lt, ty, rhs, lhs))
-  | _ -> Error (Code.Oracle_failed ("not an equality or inequality", Printable.PVal (ctx, tm)))
+  | _ -> Error (Code.Oracle_failed (Explain.Oracle.not_a_relation, Printable.PVal (ctx, tm)))
 
 let rec get_givens ctx (ty : normal) givens =
   let open Monad.Ops (E) in
@@ -119,7 +119,7 @@ let rec get_givens ctx (ty : normal) givens =
       | Error _ ->
           Error
             (Oracle_failed
-               ( "input is not an equation or inequality at the same type",
+               ( Explain.Oracle.mixed_types,
                  Printable.PNormal (ctx, CubeOf.find_top eqty) )))
   | Neu { head = Const { name; ins }; args = Emp; _ }
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
@@ -261,7 +261,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let* givens = get_givens ctx ty givens.tm in
   (* The quantifier eliminator can prove disequalities, but we don't let it, since we want the student to prove those by contradiction. *)
   if goal_op = `Neq then
-    Error (Code.Oracle_failed ("proving disequalities by algebra not allowed", PUnit))
+    Error (Code.Oracle_failed (Explain.Oracle.disequality, PUnit))
   else
     (* Otherwise we call back to javascript for it to query z3. *)
     let ty = ty.tm in
@@ -301,7 +301,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
           else
             Error
               (Code.Oracle_failed
-                 ("can't prove this denominator is nonzero", Printable.PVal (ctx, src))))
+                 (Explain.Oracle.zero_denominator, Printable.PVal (ctx, src))))
         [ Bwd.to_list denoms ] in
     if unsat ((neg_goal_op, rhs, lhs) :: givens) then Ok ()
-    else Error (Code.Oracle_failed ("can't prove equality/inequality", PUnit))
+    else Error (Code.Oracle_failed (Explain.Oracle.unprovable, PUnit))
