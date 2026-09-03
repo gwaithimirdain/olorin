@@ -203,9 +203,6 @@ test.describe('A custom level that does not parse', () => {
         page.on('pageerror', (e) => crashes.push(String(e)));
 
         // Several in a row, since the wedge showed up on the attempt after the first failure.
-        // A refused statement builds no diagram: setLevel alerts and gives up before laying one
-        // out.  (It has already relabelled the level by then, which is why the label isn't the
-        // thing to look at.)
         for (const bad of ['x +', '∀', '((x', 'x ∈ ∈']) {
             await submit(page, bad);
             expect(await olorin.nodes()).toEqual([]);
@@ -224,5 +221,19 @@ test.describe('A custom level that does not parse', () => {
         await olorin.waitForTypecheck();
         expect(await olorin.isComplete()).toBe(true);
         expect(crashes).toEqual([]);
+    });
+
+    test('leaves the level you were on exactly as it was', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        page.on('dialog', (d) => {});
+        await olorin.selectLevel(firstLevel().name);
+        const was = await olorin.nodes();
+
+        await submit(page, 'x +');
+
+        // The label used to say "Custom" for a level that never opened.
+        expect(await olorin.currentLevelName()).toBe(firstLevel().name);
+        expect(await olorin.nodes()).toEqual(was);
     });
 });

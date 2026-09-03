@@ -2325,10 +2325,10 @@ function openCustomLevel(cl, skipSavedPrompt, keepDifficulty) {
         for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
         setDifficulty(d);
     }
+    if(!setLevel(levelDefCopy(cl), "all")) { return; }
     currentCustom = cl;
     currentLevel = undefined;
     currentLevelButton = undefined;
-    setLevel(levelDefCopy(cl), "all");
     document.getElementById("currentLevel").innerText = "Level: " + cl.name;
     updateSaveButtonVisibility();
     if(!skipSavedPrompt) { offerSavedProof(null); }
@@ -2411,7 +2411,7 @@ document.getElementById("doneUnlock").onclick = function () {
 };
 
 function selectCurrentLevel(level, skipSavedPrompt) {
-    setLevel(level, level.stage.rules.concat(extraRules));
+    if(!setLevel(level, level.stage.rules.concat(extraRules))) { return; }
     currentLevel = level;
     currentLevelButton = level.button;
     currentCustom = null;
@@ -3686,12 +3686,14 @@ document.getElementById("submitLevel").onclick = function () {
 
     const conclusion = { ty : conclText.value };
 
-    setLevel({
+    const accepted = setLevel({
         parameters: parameters,
         variables: variables,
         hypotheses: hypotheses,
         conclusion: conclusion,
     }, "all");
+    // Narya wouldn't have it: it has said why, and we stay on whatever level we were on.
+    if(!accepted) { return; }
 
     currentLevel = undefined;
     currentLevelButton = undefined;
@@ -3702,8 +3704,13 @@ document.getElementById("submitLevel").onclick = function () {
     if(customName) { saveCustomLevelNamed(customName); }
 }
 
+// Set up a level: lay out its context and conclusion and hand the statement to Narya.  Returns
+// whether Narya accepted it -- a statement that doesn't parse is reported and nothing is laid out,
+// and the caller must then leave the level it was on alone rather than relabel it for one that
+// never opened.
 function setLevel(level, rulesAllowed) {
-    // Remember the raw definition so "Edit" can re-open the custom dialog pre-filled with it.
+    // Remember the raw definition so "Edit" can re-open the custom dialog pre-filled with it, even
+    // if it turns out not to parse -- that is how the player gets back what they typed to fix it.
     currentLevelDef = level;
     const new_varnames = [];
 
@@ -3749,7 +3756,7 @@ function setLevel(level, rulesAllowed) {
         naryaInited = true;
         if (initResult.error) {
             alert(initResult.error);
-            return;
+            return false;
         }
     }
 
@@ -3757,7 +3764,7 @@ function setLevel(level, rulesAllowed) {
     const result = Narya.start(parameters, variables, hypotheses, conclusion);
     if (result.error) {
         alert(result.error);
-        return;
+        return false;
     }
     console.log("initialized Narya");
 
@@ -3904,6 +3911,7 @@ function setLevel(level, rulesAllowed) {
     } else {
         document.getElementById("showHint").style.display = 'none';
     }
+    return true;
 }
 
 function clearLevelSelect () {
