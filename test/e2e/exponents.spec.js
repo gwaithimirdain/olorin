@@ -198,6 +198,40 @@ test.describe('The √ symbol', () => {
         })).toBe(true);
     });
 
+    // It is the one symbol here with no ASCII spelling to fall back on -- · and − have * and - --
+    // so as well as the \sqrt shortcut it gets a button, next to the other relations and before
+    // the number systems.
+    test('has a palette button, on every box that has a palette', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.openChooser();
+        await page.click('#customLevel');
+        await page.fill('#customName', '');
+        await page.fill('#parameters', '');
+        await page.fill('#variables', 'x ∈ ℝ');
+        await page.fill('#hypotheses', '0≤x');
+        await page.fill('#conclusion', '');
+        for (const pal of ['paramPalette', 'varPalette', 'hypPalette', 'conclPalette', 'ascPalette', 'wirePalette']) {
+            await expect(page.locator(`#${pal} .unicode-button`, { hasText: '√' })).toHaveCount(1);
+        }
+        // Click it, and it lands at the cursor and leaves the cursor after it.
+        await page.click('#conclPalette .unicode-button:has-text("√")');
+        await page.locator('#conclusion').pressSequentially('x·x^(1/2) = x');
+        expect(await page.inputValue('#conclusion')).toBe('√x·x^(1/2) = x');
+
+        // And what it typed is a statement the algebra block can prove.
+        await page.click('#submitLevel');
+        await olorin.dismissHints();
+        const nodes = await olorin.nodes();
+        const alg = await olorin.dragRule('alg', 600, 200);
+        await olorin.connect({ vertex: nodes.find((n) => n.rule === 'hypothesis').id, sort: 'output' },
+                             { vertex: alg, sort: 'input' });
+        await olorin.connect({ vertex: alg, sort: 'output' },
+                             { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
+    });
+
     test('is what gets printed back, rather than the power it stands for', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();

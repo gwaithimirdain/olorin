@@ -28,7 +28,7 @@ const VALUECOLOR = "#0000ff";
 const CLOSE_BUTTON_HOME = 0.8;
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
