@@ -755,7 +755,8 @@ function login(email, course) {
 // A short label for a world's index chip, e.g. "Quantifier world" -> "Quantifier".  A few names
 // have an explicit short form; the rest just drop " world" and keep the first word.
 const SHORT_WORLD_NAMES = {
-    "Advanced proposition world": "Adv. Proposition",
+    "Advanced proposition world": "Adv. Prop.",
+    "Advanced quantifier world": "Adv. Quant.",
 };
 function shortWorldName(name) {
     if(SHORT_WORLD_NAMES[name]) { return SHORT_WORLD_NAMES[name]; }
