@@ -1278,6 +1278,24 @@ function difficultyMark(state, d) {
     return '<span class="lvmark locked" style="color:' + color + '">' + LOCK_SVG + '</span>';
 }
 
+// A level that has a hint carries an "i" in the top-right corner of its button.  While the level
+// is open the "i" is blue and clicking it shows the hint without leaving the chooser; while the
+// level is locked it is grey and inert, so it says a hint is waiting without giving it away.
+function addHintBubble(b, level, unlocked) {
+    if(!level || !level.hint) { return; }
+    const bubble = document.createElement('div');
+    bubble.className = 'hintbubble' + (unlocked ? '' : ' locked');
+    bubble.innerText = 'i';
+    bubble.title = unlocked ? "Show this level's hint" : "This level has a hint";
+    bubble.addEventListener('click', function (e) {
+        // The button underneath opens the level, which is never what a click on the badge meant --
+        // so it swallows the click whether or not it has a hint to show.
+        e.stopPropagation();
+        if(unlocked) { showHintById(level.hint); }
+    });
+    b.appendChild(bubble);
+}
+
 // Render a level's button: its number, a row of three per-difficulty marks, and a top stripe in
 // the highest completed difficulty's color (the normal black border when nothing is completed).
 // In test mode `level` is used to make the marks double-clickable (see makeMarksToggleable).
@@ -1291,6 +1309,7 @@ function renderLevelButton(b, name, states, level) {
         b.classList.add('level-locked');
         if(!TEST_MODE) {
             b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
+            addHintBubble(b, level, false);
             return;
         }
         // Still greyed as locked, but laid out like any other level (number above its marks).
@@ -1305,6 +1324,7 @@ function renderLevelButton(b, name, states, level) {
     var hc = -1;
     for(var d = 0; d < 3; d++) { if(states[d] === 'completed') { hc = d; } }
     if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
+    addHintBubble(b, level, states[0] !== 'locked');
     if(TEST_MODE && level) { makeMarksToggleable(b, level); }
 }
 
@@ -2099,9 +2119,16 @@ function updateCurrentDifficulty() {
     }
 }
 
-function showHint() {
+// Show a hint by its id.  Only showing it on the level itself records that it's been seen: a hint
+// read from the chooser is browsing, and shouldn't cost the player the greeting when they get
+// there.
+function showHintById(hint) {
     document.getElementById("hintBG").style.display = 'flex';
-    document.getElementById(currentHint).style.display = 'block';
+    document.getElementById(hint).style.display = 'block';
+}
+
+function showHint() {
+    showHintById(currentHint);
     localStorage.setItem(currentHint, "true");
 }
 

@@ -507,6 +507,8 @@ body {
     justify-content: center;
     gap: 1px;
     padding: 3px;
+    /* so the hint bubble can sit in the corner */
+    position: relative;
     background-color: #ffffff;
     font-size: 16px;
     font-family: sans-serif;
@@ -566,6 +568,32 @@ body {
     flex-direction: column;
     gap: 1px;
     cursor: pointer;
+}
+
+/* A level that has a hint says so with an "i" filling its top-right corner: blue while the level
+   is open, where clicking it shows the hint, and grey while the level is locked.  The level box
+   clips its own rounded corner, so the square outer corner here comes out rounded to match. */
+
+.hintbubble {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 15px;
+    height: 15px;
+    border-bottom-left-radius: 8px;
+    background-color: #0055cc;
+    color: #ffffff;
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-weight: bold;
+    font-size: 12px;
+    line-height: 14px;
+    cursor: pointer;
+}
+
+.hintbubble.locked {
+    background-color: #aaaaaa;
+    cursor: default;
 }
 
 /* An "active" level (has an unlocked, uncompleted difficulty): bright glow so the player can
