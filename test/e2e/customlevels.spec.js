@@ -223,6 +223,28 @@ test.describe('A custom level that does not parse', () => {
         expect(crashes).toEqual([]);
     });
 
+    // clearLevelSelect, which hides the dialog and empties its fields, is called from inside
+    // setLevel below the acceptance checks -- so a refused statement leaves the dialog up with
+    // what was typed still in it, to be corrected in place.
+    test('leaves the dialog open, with what was typed still in it', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        page.on('dialog', (d) => {});
+        await submit(page, 'x +');
+
+        expect(await page.isVisible('#customModal')).toBe(true);
+        expect(await page.inputValue('#conclusion')).toBe('x +');
+        expect(await page.inputValue('#variables')).toBe('x ∈ ℝ');
+
+        // Correct it where it stands, without reopening anything.
+        await page.fill('#conclusion', 'x=x');
+        await page.click('#submitLevel');
+        await olorin.dismissHints();
+        expect(await page.isVisible('#customModal')).toBe(false);
+        expect(await olorin.currentLevelName()).toBe('Custom');
+        expect((await olorin.nodes()).map((n) => n.rule)).toEqual(['variable', 'conclusion']);
+    });
+
     test('leaves the level you were on exactly as it was', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
