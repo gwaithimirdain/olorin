@@ -395,10 +395,13 @@ let () =
     quantifiers
 
 (* We don't need separate unicode/ascii versions of these because we detect and print relations specially in the Oracle. *)
+(* The last component is the relation to state instead when the two sides have to be swapped -- see
+   yterm below, where only the right-hand side synthesizes and so has to come first.  That is the
+   relation *reversed*, not negated: "x < y" is "y > x", and "x = y" is "y = x". *)
 let relations =
   [
-    ("=", Token.Op "=", equals, "eq", "neq");
-    ("≠", Ident [ "≠" ], neq, "neq", "eq");
+    ("=", Token.Op "=", equals, "eq", "eq");
+    ("≠", Ident [ "≠" ], neq, "neq", "neq");
     ("<", Op "<", lt, "lt", "gt");
     (">", Op ">", gt, "gt", "lt");
     ("≤", Ident [ "≤" ], le, "le", "ge");
