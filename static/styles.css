@@ -756,7 +756,7 @@ body {
     position: relative;
     display: flex;
     flex-direction: column;
-    width: 600px;
+    width: 650px;
     /* Clip to the rounded corners; the inner #customScroll does the scrolling, so its scrollbar is
        inset within the modal's padding and the rounded right-hand corners stay visible. */
     overflow: hidden;
@@ -788,6 +788,16 @@ body {
 #customScroll textarea,
 #customScroll input {
     box-sizing: border-box;
+}
+
+#ascribeModal {
+    width: 650px;
+    overflow: hidden;
+}
+
+#wireModal {
+    width: 650px;
+    overflow: hidden;
 }
 
 #chooseLevelButtons {

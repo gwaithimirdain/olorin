@@ -28,12 +28,12 @@ const VALUECOLOR = "#0000ff";
 const CLOSE_BUTTON_HOME = 0.8;
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊', 'ε', 'δ'];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
 // hasn't got a key for.
-const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴'];
+const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴', 'ε', 'δ'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
@@ -75,6 +75,8 @@ const KEYS = [
     { unicode: 'ℝ', keys: [ '\\R ' ] },
     { unicode: 'ℂ', keys: [ '\\C ' ] },
     { unicode: '𝕊', keys: [ '\\S ' ] },
+    { unicode: 'ε', keys: [ '\\eps ', '\\epsilon ' ] },
+    { unicode: 'δ', keys: [ '\\delta ' ] },
     // ··2 is what typing **2 leaves behind, each * having already become a ·
     { unicode: '²', keys: [ '^2', '**2', '··2' ] },
     { unicode: '³', keys: [ '^3', '**3', '··3' ] },
