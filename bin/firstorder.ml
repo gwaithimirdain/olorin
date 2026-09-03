@@ -48,8 +48,6 @@ def ge (A : Type) (x y : A) : Type ≔ le A y x
 
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 
-def ℕ₊ : Type ≔ data [ one. | suc. (_:ℕ₊) ]
-
 def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) ]
 axiom ℤ.plus : ℤ → ℤ → ℤ
 axiom ℤ.minus : ℤ → ℤ → ℤ
@@ -62,10 +60,11 @@ axiom ℤ.fourth : ℤ → ℤ
 
 axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (eq ℤ y 0)
 
-def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) | quot. (_:ℚ) (_:ℕ₊) ]
+def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) ]
 axiom ℚ.plus : ℚ → ℚ → ℚ
 axiom ℚ.minus : ℚ → ℚ → ℚ
 axiom ℚ.times : ℚ → ℚ → ℚ
+axiom ℚ.divide : ℚ → ℚ → ℚ
 axiom ℚ.pow : ℚ → ℕ → ℚ
 axiom ℚ.negate : ℚ → ℚ
 axiom ℚ.square : ℚ → ℚ
@@ -74,10 +73,11 @@ axiom ℚ.fourth : ℚ → ℚ
 
 axiom ℚ.integral (x y : ℚ) : eq ℚ (ℚ.times x y) 0 → lor (eq ℚ x 0) (eq ℚ y 0)
 
-def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) | quot. (_:ℝ) (_:ℕ₊) ]
+def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) ]
 axiom ℝ.plus : ℝ → ℝ → ℝ
 axiom ℝ.minus : ℝ → ℝ → ℝ
 axiom ℝ.times : ℝ → ℝ → ℝ
+axiom ℝ.divide : ℝ → ℝ → ℝ
 axiom ℝ.pow : ℝ → ℕ → ℝ
 axiom ℝ.negate : ℝ → ℝ
 axiom ℝ.square : ℝ → ℝ
@@ -86,10 +86,11 @@ axiom ℝ.fourth : ℝ → ℝ
 
 axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (eq ℝ y 0)
 
-def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | quot. (_:𝕊) (_:ℕ₊) | omega. ]
+def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | omega. ]
 axiom 𝕊.plus : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.minus : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.times : 𝕊 → 𝕊 → 𝕊
+axiom 𝕊.divide : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.pow : 𝕊 → ℕ → 𝕊
 axiom 𝕊.negate : 𝕊 → 𝕊
 axiom 𝕊.square : 𝕊 → 𝕊
@@ -153,6 +154,8 @@ let onechar_ops =
     (0x2074, Ident [ "⁴" ]);
     (0x2223, Ident [ "∣" ]);
     (0x2261, Ident [ "≡" ]);
+    (0x2264, Ident [ "≤" ]);
+    (0x2265, Ident [ "≥" ]);
   |]
 
 type (_, _, _) identity +=
@@ -228,13 +231,21 @@ let binops =
 type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -> infixl
 
 let numbers = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
+let fields = [ "ℚ"; "ℝ"; "𝕊" ]
 
 let algebra =
   [
-    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, [ "plus" ]);
-    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, [ "minus" ]);
-    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, [ "times" ]);
-    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "pow" ]);
+    ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, [ "plus" ], numbers);
+    ( "−",
+      [ Ident [ "−" ]; Op "-" ],
+      Ident [ "−" ],
+      Op "-",
+      Wrap_infixl minus,
+      [ "minus" ],
+      numbers );
+    ("*", [ Op "*" ], Op "*", Op "*", Wrap_infixl times, [ "times" ], numbers);
+    ("/", [ Op "/" ], Op "/", Op "/", Wrap_infixl div, [ "divide" ], fields);
+    ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "pow" ], numbers);
   ]
 
 let powers =
@@ -440,7 +451,7 @@ let () =
 
 let () =
   List.iter
-    (fun (name, syms, usym, asym, Wrap_infixl onotn, ostr) ->
+    (fun (name, syms, usym, asym, Wrap_infixl onotn, ostr, tys) ->
       make onotn
         {
           name;
@@ -462,7 +473,7 @@ let () =
                                        (sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x))
                                     y,
                                   true ))
-                              numbers,
+                              tys,
                             None )))
               | _ -> Builtins.invalid name);
           print_term =
@@ -599,26 +610,16 @@ let install_notations () =
         })
     relations;
   List.iter
-    (fun (_, _, usym, asym, Wrap_infixl onotn, ostr) ->
+    (fun (_, _, usym, asym, Wrap_infixl onotn, ostr, tys) ->
       Scope.Situation.add_with_print
         {
-          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
+          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) tys;
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];
           inner_symbols = `Single (if Display.chars () = `Unicode then usym else asym);
         })
     algebra;
-  let _ =
-    Scope.Situation.add_user
-      (User
-         {
-           name = "quot";
-           fixity = Infixl No.three;
-           pattern = Var (("x", `None, []), Var_nil ((Op "/", `None, []), ("y", [])));
-           key = `Constr (Constr.intern "quot", 2);
-           val_vars = [ "x"; "y" ];
-         }) in
   List.iter
     (fun (_, sym, _, onotn, ostr) ->
       Scope.Situation.add_with_print

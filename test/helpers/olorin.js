@@ -313,6 +313,13 @@ class Olorin {
         await this.page.click(style === 'curved' ? '#curvedConnectors' : '#angleConnectors');
     }
 
+    // Wait for a typecheck to settle.  Anything the algebra block sends to Z3 answers
+    // asynchronously, so a proof isn't readable the moment the last wire is connected.
+    async waitForTypecheck() {
+        await this.page.waitForFunction(
+            () => getComputedStyle(document.getElementById('typecheckingBG')).display === 'none');
+    }
+
     isComplete() {
         return this.page.evaluate(() => window.__olorin.complete());
     }

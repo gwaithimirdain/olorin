@@ -143,8 +143,18 @@ let rec get_posint tm =
 
 let rec pow p n = if n <= 0 then `Const Q.one else `Times (pow p (n - 1), p)
 
+(* State threaded through the translation of a term into a Z3 expression. *)
+type translation = {
+  (* Subterms we can't interpret, each standing for an opaque variable. *)
+  vars : kinetic value Bwd.t;
+  count : int;
+  (* The denominator of every division we've met, paired with the term it came from so we can point
+     at it in an error.  Each one is an obligation, discharged in 'ask' below. *)
+  denoms : (Symbolic.t * kinetic value) Bwd.t;
+}
+
 module S = Monad.State (struct
-  type t = kinetic value Bwd.t * int
+  type t = translation
 end)
 
 let var_or_const ctx ty tm =
@@ -152,15 +162,19 @@ let var_or_const ctx ty tm =
   match get_posint tm with
   | Some i -> return (`Const (Q.of_int i))
   | None -> (
-      let* vars, count = S.get in
+      let* ({ vars; count; _ } as st) = S.get in
       match Bwd.find_index (fun x -> Result.is_ok (Equal.equal_at ctx tm x ty)) vars with
       | None ->
-          let* () = S.put (Snoc (vars, tm), count + 1) in
+          let* () = S.put { st with vars = Snoc (vars, tm); count = count + 1 } in
           return (`Var count)
       | Some i -> return (`Var (count - i - 1)))
 
 let get_poly ctx ty tm =
   let open Monad.Ops (S) in
+  (* Record a denominator as an obligation to be discharged before we trust any answer. *)
+  let add_denom den src =
+    let* st = S.get in
+    S.put { st with denoms = Snoc (st.denoms, (den, src)) } in
   let rec go tm =
     match Norm.view_term tm with
     (* Binary operation *)
@@ -174,6 +188,16 @@ let get_poly ctx ty tm =
         | "plus" -> return (`Plus (px, py))
         | "minus" -> return (`Minus (px, py))
         | "times" -> return (`Times (px, py))
+        | "divide" -> (
+            match (px, py) with
+            (* A quotient of numerals is just a rational constant, and carries no obligation. *)
+            | `Const a, `Const b when not (Q.equal b Q.zero) -> return (`Const (Q.div a b))
+            (* Otherwise we hand the division to Z3 as a division.  Z3's real division is total,
+               with the value at a zero denominator left uninterpreted, so this is sound however
+               the denominator turns out; but we also require it to be provably nonzero. *)
+            | _ ->
+                let* () = add_denom py (CubeOf.find_top y).tm in
+                return (`Div (px, py)))
         | "pow" -> (
             match get_posint (CubeOf.find_top y).tm with
             | Some e -> return (pow px e)
@@ -189,15 +213,6 @@ let get_poly ctx ty tm =
         | "cube" -> return (`Times (`Times (x, x), x))
         | "fourth" -> return (`Times (`Times (x, x), `Times (x, x)))
         | _ -> var_or_const ctx ty tm)
-    (* Fraction with positive integer denominator *)
-    | Constr (constr, dim, [ num; den ]) when constr = Constr.intern "quot" -> (
-        match D.compare_zero dim with
-        | Zero -> (
-            let* num = go (CubeOf.find_top num) in
-            match get_posint (CubeOf.find_top den) with
-            | Some n -> return (`Times (`Const (Q.make Z.one (Z.of_int n)), num))
-            | None -> var_or_const ctx ty tm)
-        | Pos _ -> var_or_const ctx ty tm)
     | _ -> var_or_const ctx ty tm in
   go tm
 
@@ -215,6 +230,16 @@ let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
 
 (* We memorize the results of calls to reduce, so we don't have to re-make them every time. *)
 let answers : (Relation.t list, bool) Hashtbl.t = Hashtbl.create 20
+
+(* Ask Z3 whether a conjunction of relations is unsatisfiable, i.e. whether its negation is
+   provable.  Each question is asked at most once. *)
+let unsat (command : Relation.t list) =
+  match Hashtbl.find_opt answers command with
+  | Some result -> result
+  | None ->
+      let result = Effect.perform (Callback.Callback command) in
+      Hashtbl.add answers command result;
+      result
 
 let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
@@ -240,7 +265,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   else
     (* Otherwise we call back to javascript for it to query z3. *)
     let ty = ty.tm in
-    let (givens, lhs, rhs), (_vars, _count) =
+    let (givens, lhs, rhs), { denoms; _ } =
       (let open Monad.Ops (S) in
        let* lhs = get_poly ctx ty lhs.tm in
        let* rhs = get_poly ctx ty rhs.tm in
@@ -253,7 +278,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
              return (op, x, y))
            [ givens ] in
        return (givens, lhs, rhs))
-        (Emp, 0) in
+        { vars = Emp; count = 0; denoms = Emp } in
     (* We negate the goal, since Z3 checks for satisfiability.  This involves negating the operator and also swapping the order of the arguments (although in the case of (dis)equalities swapping the arguments does nothing). *)
     let neg_goal_op =
       match goal_op with
@@ -261,12 +286,22 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
       | `Neq -> `Eq
       | `Lt -> `Le
       | `Le -> `Lt in
-    let command = (neg_goal_op, rhs, lhs) :: givens in
-    let result =
-      match Hashtbl.find_opt answers command with
-      | Some result -> result
-      | None ->
-          let result = Effect.perform (Callback.Callback command) in
-          Hashtbl.add answers command result;
-          result in
-    if result then Ok () else Error (Code.Oracle_failed ("can't prove equality/inequality", PUnit))
+    (* Encoding division faithfully means the goal query below is sound whatever the denominators
+       turn out to be, since a statement about a quotient by zero is then a statement about an
+       unspecified value.  But answering such questions isn't what the student wants: writing a
+       quotient whose denominator might vanish is a mistake, so we insist the hypotheses force each
+       denominator nonzero, and say which one doesn't when they don't.  Note this asks Z3 to prove
+       a disequality, which we don't allow as a *goal*, but this is our own side condition rather
+       than something the student is being credited with proving. *)
+    let* () =
+      let open Mlist.Monadic (E) in
+      miterM
+        (fun [ (den, src) ] ->
+          if unsat ((`Eq, den, `Const Q.zero) :: givens) then Ok ()
+          else
+            Error
+              (Code.Oracle_failed
+                 ("can't prove this denominator is nonzero", Printable.PVal (ctx, src))))
+        [ Bwd.to_list denoms ] in
+    if unsat ((neg_goal_op, rhs, lhs) :: givens) then Ok ()
+    else Error (Code.Oracle_failed ("can't prove equality/inequality", PUnit))
