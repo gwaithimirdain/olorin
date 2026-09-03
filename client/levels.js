@@ -196,28 +196,22 @@ export const LEVELS = [
             rules: [ "andI", "andE", "alg" ],
             levels: [
                 {
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    variables: [ ],
                     hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1+y=y+2)" } ],
                     conclusion: { ty: "(x=1)∧(y=−2)" },
                 },
                 {
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "ℚ" }, { name: "y", ty: "ℚ" } ],
-                    hypotheses: [ { ty: "(x=3y)∧(1−x=4*y)" } ],
+                    parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(x=3*y)∧(1−x=4*y)" } ],
                     conclusion: { ty: "(x=3/7)∧(y=1/7)" },
                 },
                 {
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    variables: [ ],
                     hypotheses: [ { ty: "(x−y=3*x²)∧(y=x−x²)" } ],
                     conclusion: { ty: "(x=0)∧(y=0)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "(x+y=ω)∧(x−y=1)" } ],
-                    conclusion: { ty: "(x=(ω+1)/2)∧(y=(ω−1)/2)" },
                 },
             ]
           },
@@ -243,7 +237,7 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "P⇒P" },
                     trivial: true,
-                    hint: "bracketHint",
+                    hint: "impBracketHint",
                 },
                 // {
                 //                 parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
@@ -461,16 +455,15 @@ export const LEVELS = [
             rules: [ "orI1", "orI2", "orE", "expr", "alg", "integral" ],
             levels: [
                 {
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
                     hypotheses: [ { ty: "(x=y+1)∨(2*x=3−y)" } ],
                     conclusion: { ty: "2*x²−x*y−y²=5*x−2*y−3" },
                     trivial: true,
-                    hint: "setsHint",
                 },
                 {
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
                     hypotheses: [ { ty: "(x+y=1)∨(x−y=1)" } ],
                     conclusion: { ty: "x²+1=y²+2*x" },
                     trivial: true,

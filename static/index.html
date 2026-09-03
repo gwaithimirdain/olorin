@@ -557,10 +557,10 @@
         <img src="hints/impE.png" style="margin-left: auto; margin-right:auto; display:block">
         The symbol ⇒ means "implies", so that P⇒Q means "P implies Q" or equivalently "if P, then Q".
       </div>
-      <div id="bracketHint" class="modal hint" style="width: 600px">
+      <div id="impBracketHint" class="modal hint" style="width: 600px">
         Remember that a "prove rule" with its symbol on the right should have its <i>output port</i> connected to something using the same symbol:
         <img src="hints/impI.png" style="margin-left: auto; margin-right:auto; display:block">
-        When a box has a "bracket" like this, the output coming from the left inside the bracket is a <i>hypothetical assumption</i>, which can <i>only</i> be used to derive the corresponding <i>subgoal</i> on the right of the same bracket.
+        When a box has a "bracket" like this one, the output coming from the left inside the bracket is a <i>hypothetical assumption</i>, which can <i>only</i> be used to derive the corresponding <i>subgoal</i> on the right of the same bracket.
         <img src="hints/bracket.png" style="margin-left: auto; margin-right:auto; display:block">
         You can also stretch the bracket by clicking on either side and dragging it out, so that the entire <i>subproof</i> fits inside.
         <img src="hints/longimpI.png" style="margin-left: auto; margin-right:auto; display:block">
@@ -575,9 +575,10 @@
       <div id="casesHint" class="modal hint" style="width: 600px">
         This box needs <i>both</i> its input and output ports connected right away, but only the input port requires a specific symbol; the output port can connect to anything.
         <img src="hints/orE.png" style="margin-left: auto; margin-right:auto; display:block">
-        Now there are two brackets.
-        Each hypothetical assumption on the left can only be used to derive the subgoal at the right on the <i>same side</i>.
-        As before, you can resize the box so that the entire subproofs fit inside.
+        When a box has one or more "brackets" like this one, each output coming from the left inside a bracket is a <i>hypothetical assumption</i>, which can <i>only</i> be used to derive the corresponding <i>subgoal</i> on the right of the same bracket.
+        <img src="hints/orEbracket.png" style="margin-left: auto; margin-right:auto; display:block">
+        You can also stretch a box with brackets by clicking on either side and dragging it out, so that the entire <i>subproofs</i> fit inside.
+        <img src="hints/longorE.png" style="margin-left: auto; margin-right:auto; display:block">
       </div>
       <div id="casesGoalHint" class="modal hint" style="width: 600px">
         Remember the output port of this box must be connected right away:
@@ -680,7 +681,8 @@
         </table>
       </div>
       <div id="integralHint" class="modal hint" style="width: 600px">
-        One thing the algebra block doesn't "know" is that if the product of two numbers is zero, one or the other of them must be zero.
+        The algebra block can only prove equations or inequalities, but there are some important "algebraic" facts that are disjunctions.
+        One is that if the product of two numbers is zero, one or the other of them must be zero.
         If you need this fact, use the block labeled "?*?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
         <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block">
         <b>Warning:</b> do not connect blue "value" wires to "alg" boxes!
@@ -688,9 +690,9 @@
         I can figure out on my own which variables appear in the equations.
       </div>
       <div id="exprHint" class="modal hint">
-        If you need an input to a blue "value" port that isn't just a variable, use the "expr" block, which will prompt you for an expression.
-        To change the expression later, double-click the block.
-        You must connect the input port of that block to all the variables that occur in your expression.
+        If you need an input to a blue "value" port that isn't just a variable, use the "expr" block.
+        This will prompt you for an expression; to change the expression later, double-click the block.
+        You must connect the input port of the expression block to all the variables that occur in your expression.
         <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block">
         <b>Warning:</b> do not connect any black "statement" wires to a blue "expr" block!
       </div>
