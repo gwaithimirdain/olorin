@@ -35,18 +35,35 @@ test.describe('Expression boxes', () => {
     // An expression is arithmetic, so its dialog gets a shorter palette than the statement boxes do
     // -- no connectives or quantifiers, just the symbols an expression needs and a keyboard hasn't
     // got.  Most have a typed spelling too (- for −, * for ·, | for ∣, ^2 for ²); √ has only \sqrt.
+    //
+    // Nothing here reads on the palette's exact contents, so that adding a symbol to it can't
+    // break this: what is asserted is that the symbols an expression needs are offered, that the
+    // ones belonging to statements are not, and that whatever is offered works.
     test('the dialog offers a palette of the symbols an expression is written out of', async ({ page }) => {
         await olorin.dragRule('expr', 420, 240);
         await page.waitForSelector('#expressionBG', { state: 'visible' });
-        const buttons = () => page.evaluate(() =>
-            Array.from(document.querySelectorAll('#exprPalette .unicode-button')).map((b) => b.textContent));
-        expect(await buttons()).toEqual(['−', '·', '∣', '√', '²', '³', '⁴', 'shortcuts']);
+        const buttons = (await page.evaluate(() =>
+            Array.from(document.querySelectorAll('#exprPalette .unicode-button')).map((b) => b.textContent)))
+              .filter((b) => b !== 'shortcuts');
 
-        // The buttons type into the expression, at the cursor.
-        await page.fill('#expression', '');
-        for (const sym of ['∣', '√']) {
-            await page.click(`#exprPalette .unicode-button:has-text("${sym}")`);
+        expect(buttons).toEqual(expect.arrayContaining(['−', '·', '∣', '√', '²', '³', '⁴']));
+        // The one assertion a new palette entry could disturb, and only by offering a connective
+        // or a quantifier in a box where an expression is what's wanted.
+        for (const logical of ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈']) {
+            expect(buttons).not.toContain(logical);
         }
+
+        // Whatever is on offer types itself into the box.
+        for (const sym of buttons) {
+            await page.fill('#expression', '');
+            await page.click(`#exprPalette .unicode-button:has-text("${sym}")`);
+            expect(await page.inputValue('#expression')).toBe(sym);
+        }
+
+        // And they go in at the cursor, rather than at the end.
+        await page.fill('#expression', '');
+        await page.click('#exprPalette .unicode-button:has-text("∣")');
+        await page.click('#exprPalette .unicode-button:has-text("√")');
         await page.locator('#expression').pressSequentially('x');
         await page.click('#exprPalette .unicode-button:has-text("∣")');
         expect(await page.inputValue('#expression')).toBe('∣√x∣');
@@ -368,8 +385,10 @@ test.describe('Shortcut sequences', () => {
     });
 
     test('of more than one keystroke work in the middle of a box', async ({ page }) => {
+        expect(await typeAt(page, 'ab', 1, '><')).toEqual({ text: 'a×b', cursor: 2 });
+        // These two are the ones that have to recognize what an earlier substitution left behind:
+        // ** leaves ·· and |- leaves ∣−, each character having been converted on the way past.
         expect(await typeAt(page, 'ab', 1, '**2')).toEqual({ text: 'a²b', cursor: 2 });
-        expect(await typeAt(page, 'ab', 1, '--')).toEqual({ text: 'a∸b', cursor: 2 });
         expect(await typeAt(page, 'ab', 1, '|->')).toEqual({ text: 'a↦b', cursor: 2 });
     });
 
