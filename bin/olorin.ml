@@ -1139,67 +1139,87 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
             (Js.to_array hypotheses) [])) in
   try
     Pauser.next @@ fun () ->
-    (* We parse and process the parameters into raw terms.  *)
-    let hypcount = ref 0 in
-    let params =
-      List.map
-        (fun ({ name; ty; id = Id id; cls; _ } : Variable.t) : Parameter.t ->
-          let title =
-            match name with
-            | Some name -> Some ("type of " ^ name)
-            | None ->
-                hypcount := !hypcount + 1;
-                Some ("type of hypothesis " ^ string_of_int !hypcount) in
-          let cls =
-            match cls with
-            | `Parameter -> `Line "param"
-            | `Variable | `Hypothesis -> `Line "" in
-          {
-            wslparen = [];
-            (* We save the ID, and whether it's a parameter, of each such node as "comments" next to its parameter name. *)
-            names = [ (name, [ `Line id; cls ]) ];
-            wscolon = [];
-            ty = Parse.Term.final (Parse.Term.parse (`String { title; content = ty }));
-            wsrparen = [];
-          })
-        params in
-    (* Now process_tel can extract these comments into another (forwards) vector and guarantee that they have the correct length.  *)
-    let (Processed_tel (rawctx, varscope, idscope)) = Postprocess.process_tel Emp params in
-    let scope =
-      (* We then turn them back into a (bacwkards) vector of IDs of the same length as the varscope of names, and combine them into a scope of pairs. *)
-      Bwv.mmap
-        (fun [ x; y ] : name ->
-          {
-            name = x;
-            port =
-              (match y with
-              | [ `Line id; `Line isparam ] ->
-                  let p = ({ vertex = Id.Id id; sort = Output; label = None } : Port.t) in
-                  if isparam <> "" then parameter_ports := PortSet.add p !parameter_ports;
-                  Some p
-              | _ -> raise (Jserror "unexpected comment"));
-          })
-        [ varscope; Bwv.append (Raw.bplus_of_tel rawctx) Emp idscope ] in
-    (* We parse and process the conclusion, in the scope of variables created by parsing the parameters. *)
-    let concl_ty = Js.to_string conclusion##.ty in
-    let (Wrap obsty) =
-      Parse.Term.final
-        (Parse.Term.parse (`String { title = Some "type of conclusion"; content = concl_ty })) in
-    let rawty = Postprocess.process varscope obsty in
-    (* We check the parameters to produce a context. *)
-    let Checked_tel (cparams, ctx), _ = Check.check_tel Ctx.empty rawctx in
-    (* And then we check the conclusion type. *)
-    let ty = Check.check (Kinetic `Nolet) ctx rawty (universe D.zero) in
-    let ety = Norm.eval_term (Ctx.env ctx) ty in
-    (* We save the context, variable scope, conclusion type, and nodes.  As the user creates their graph, we will check it against these. *)
-    problem := Some (Problem (ctx, scope, ety));
-    variable_nodes := !new_vars;
-    (conclusion_node :=
-       let id = Id.Id (Js.to_string conclusion##.id) in
-       Some (id, { id; name = None; rule = Conclusion; value = Some concl_ty }));
-    const_ty := Some (Telescope.pis cparams ty);
-    (* Assuming all that succeeded, we return no errors to JavaScript to indicate success. *)
-    ok_checked ()
+    (* Everything from here runs inside the coroutine, and so has to *return* rather than raise.
+       An exception escaping unwinds the coroutine, and since Pauseable only refreshes its saved
+       continuation when a call finishes normally by yielding, every later call into Narya then
+       dies with "Continuation_already_resumed" and nothing works until the page is reloaded.
+       Narya reports a statement that doesn't parse by raising Top.Exit -- but from the handler
+       run_top installed *outside* the coroutine, so the outer `with` below catches the exception
+       and yet the coroutine is already gone.  Catching the diagnostic here instead reports it the
+       same way, displaying it to stderr for the flusher to collect into errbuf, and unwinds
+       nothing. *)
+    Reporter.try_with ~fatal:(fun d ->
+        Reporter.display ~output:stderr d;
+        err_checked ())
+    @@ fun () ->
+    try
+      (* We parse and process the parameters into raw terms.  *)
+      let hypcount = ref 0 in
+      let params =
+        List.map
+          (fun ({ name; ty; id = Id id; cls; _ } : Variable.t) : Parameter.t ->
+            let title =
+              match name with
+              | Some name -> Some ("type of " ^ name)
+              | None ->
+                  hypcount := !hypcount + 1;
+                  Some ("type of hypothesis " ^ string_of_int !hypcount) in
+            let cls =
+              match cls with
+              | `Parameter -> `Line "param"
+              | `Variable | `Hypothesis -> `Line "" in
+            {
+              wslparen = [];
+              (* We save the ID, and whether it's a parameter, of each such node as "comments" next to its parameter name. *)
+              names = [ (name, [ `Line id; cls ]) ];
+              wscolon = [];
+              ty = Parse.Term.final (Parse.Term.parse (`String { title; content = ty }));
+              wsrparen = [];
+            })
+          params in
+      (* Now process_tel can extract these comments into another (forwards) vector and guarantee that they have the correct length.  *)
+      let (Processed_tel (rawctx, varscope, idscope)) = Postprocess.process_tel Emp params in
+      let scope =
+        (* We then turn them back into a (bacwkards) vector of IDs of the same length as the varscope of names, and combine them into a scope of pairs. *)
+        Bwv.mmap
+          (fun [ x; y ] : name ->
+            {
+              name = x;
+              port =
+                (match y with
+                | [ `Line id; `Line isparam ] ->
+                    let p = ({ vertex = Id.Id id; sort = Output; label = None } : Port.t) in
+                    if isparam <> "" then parameter_ports := PortSet.add p !parameter_ports;
+                    Some p
+                | _ -> raise (Jserror "unexpected comment"));
+            })
+          [ varscope; Bwv.append (Raw.bplus_of_tel rawctx) Emp idscope ] in
+      (* We parse and process the conclusion, in the scope of variables created by parsing the parameters. *)
+      let concl_ty = Js.to_string conclusion##.ty in
+      let (Wrap obsty) =
+        Parse.Term.final
+          (Parse.Term.parse (`String { title = Some "type of conclusion"; content = concl_ty })) in
+      let rawty = Postprocess.process varscope obsty in
+      (* We check the parameters to produce a context. *)
+      let Checked_tel (cparams, ctx), _ = Check.check_tel Ctx.empty rawctx in
+      (* And then we check the conclusion type. *)
+      let ty = Check.check (Kinetic `Nolet) ctx rawty (universe D.zero) in
+      let ety = Norm.eval_term (Ctx.env ctx) ty in
+      (* We save the context, variable scope, conclusion type, and nodes.  As the user creates their graph, we will check it against these. *)
+      problem := Some (Problem (ctx, scope, ety));
+      variable_nodes := !new_vars;
+      (conclusion_node :=
+         let id = Id.Id (Js.to_string conclusion##.id) in
+         Some (id, { id; name = None; rule = Conclusion; value = Some concl_ty }));
+      const_ty := Some (Telescope.pis cparams ty);
+      (* Assuming all that succeeded, we return no errors to JavaScript to indicate success. *)
+      ok_checked ()
+    with Jserror msg ->
+      Buffer.add_string errbuf msg;
+      err_checked ()
+  (* Only reachable if something raises past the handler above, in which case the coroutine is
+     gone and the page needs a reload; we still hand JavaScript the message rather than an
+     exception. *)
   with Top.Exit -> err_checked ()
 
 (* "Parse" the current graph into one or more terms and typecheck them all. *)
@@ -1207,6 +1227,28 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     js_checked Js.t =
   let labels : (Locable.t, Label.t) Hashtbl.t = Hashtbl.create 20 in
   let diagnostics : Diagnostic.js Js.t Dynarray.t = Dynarray.create () in
+  (* Typechecking fails with this error to the console. *)
+  let failed msg : js_checked Js.t =
+    object%js
+      val mutable complete = Js.bool false
+      val mutable callback = Js.null
+      val mutable error = Js.some (Js.string msg)
+      val mutable labels = Label.to_js_array labels
+
+      (* Since the error message is what will be displayed, we don't even pass the diagnostics. *)
+      val mutable diagnostics = Js.array (Array.of_list [])
+    end in
+  (* Nothing may escape the coroutine: an exception unwinds it and leaves its saved continuation
+     spent, wedging every later call into Narya (see the note in `start` above).  So a fatal
+     diagnostic, or a Jserror, becomes the error field rather than an exception. *)
+  let guarded f =
+    Reporter.try_with ~fatal:(fun d ->
+        Buffer.clear errbuf;
+        Reporter.display ~output:stderr d;
+        Out_channel.flush stderr;
+        failed (Buffer.contents errbuf))
+    @@ fun () ->
+    try f () with Jserror msg -> failed msg in
   try
     (* Get the context and goal that were set by initialization. *)
     let (Problem (ctx, scope, conclusion_ty)) = Option.get !problem in
@@ -1232,6 +1274,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     Scopes.run ~init:[] @@ fun () ->
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
+    guarded @@ fun () ->
     let contexts = ref [] in
     (* Note: this deliberately does NOT wrap f in its own command boundary.  We typecheck
        speculatively many times here (every candidate scope for every disconnected port), and most
@@ -1333,17 +1376,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       (* And pass back the diagnostics to Javascript. *)
       val mutable diagnostics = Js.array (Dynarray.to_array diagnostics)
     end
-    (* If we caught an error, typechecking fails with that error to the console. *)
-  with Jserror msg ->
-    object%js
-      val mutable complete = Js.bool false
-      val mutable callback = Js.null
-      val mutable error = Js.some (Js.string msg)
-      val mutable labels = Label.to_js_array labels
-
-      (* Since the error message is what will be displayed, we don't even pass the diagnostics. *)
-      val mutable diagnostics = Js.array (Array.of_list [])
-    end
+  with Jserror msg -> failed msg
 
 (* We interface with JavaScript by exporting an object called 'Narya' with methods. *)
 let _ =

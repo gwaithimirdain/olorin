@@ -172,3 +172,57 @@ test.describe('Custom levels', () => {
         expect(await page.isVisible('#savedProofBG')).toBe(true);
     });
 });
+
+// A statement Narya can't parse is reported and the dialog stays open to be corrected.  The report
+// used to be the end of the session: Narya answers a bad statement by raising, out of a handler
+// installed outside its coroutine, so the coroutine was unwound on the way and its saved
+// continuation left spent -- and every later call died with "Continuation_already_resumed", the
+// dialog refusing every statement after the first bad one, good ones included.
+test.describe('A custom level that does not parse', () => {
+    // Drive the dialog directly rather than through buildCustom, which assumes the level is taken.
+    async function submit(page, conclusion) {
+        await page.evaluate(() => {
+            const bg = document.getElementById('levelChooseBG');
+            if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
+            document.getElementById('customLevel').click();
+        });
+        await page.fill('#customName', '');
+        await page.fill('#parameters', '');
+        await page.fill('#variables', 'x ∈ ℝ');
+        await page.fill('#hypotheses', '');
+        await page.fill('#conclusion', conclusion);
+        await page.click('#submitLevel');
+    }
+
+    test('is refused, and the next one is still accepted', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const alerts = [];
+        page.on('dialog', (d) => { alerts.push(d.message()); });
+        const crashes = [];
+        page.on('pageerror', (e) => crashes.push(String(e)));
+
+        // Several in a row, since the wedge showed up on the attempt after the first failure.
+        // A refused statement builds no diagram: setLevel alerts and gives up before laying one
+        // out.  (It has already relabelled the level by then, which is why the label isn't the
+        // thing to look at.)
+        for (const bad of ['x +', '∀', '((x', 'x ∈ ∈']) {
+            await submit(page, bad);
+            expect(await olorin.nodes()).toEqual([]);
+        }
+        expect(alerts).toHaveLength(4);
+        expect(alerts[0]).toContain('parse error');
+
+        // And now a good one, which has to be taken and to typecheck.
+        await submit(page, 'x·x = x²');
+        await olorin.dismissHints();
+        expect(await olorin.currentLevelName()).toBe('Custom');
+        const nodes = await olorin.nodes();
+        const alg = await olorin.dragRule('alg', 500, 200);
+        await olorin.connect({ vertex: alg, sort: 'output' },
+                             { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
+        expect(crashes).toEqual([]);
+    });
+});
