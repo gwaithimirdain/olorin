@@ -92,6 +92,19 @@ test.describe('Error explanations', () => {
         expect(await explanationFor(olorin, 'E0303')).toContain('out of the block that introduced it');
     });
 
+    // A loop is easy to draw by accident, and every wire in it is marked, so each one explains it.
+    test('wires that run in a circle say so', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await mistake(olorin, { parameters: 'P : Type', hypotheses: 'P' }, async (o, hyps, concl) => {
+            const r = await o.dragRule('alg', 300, 150);
+            await o.connect({ vertex: r, sort: 'output' }, { vertex: r, sort: 'input' });
+            await o.connect({ vertex: r, sort: 'output' }, { vertex: concl, sort: 'input' });
+        });
+        expect(await explanationFor(olorin, 'E0280')).toContain('run in a circle');
+        expect((await olorin.wireErrors()).join('')).toContain('run in a circle');
+    });
+
     test('an unfinished proof says it is unfinished', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();

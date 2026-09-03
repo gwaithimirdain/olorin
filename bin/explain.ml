@@ -140,6 +140,12 @@ let explain : Code.t -> string option = function
       Some
         "Olorin can't work out on its own what statement belongs here.  Connect a wire to this \
          input, or use an ascription block to say what it should be."
+  (* Wires that lead out of a block and back into it. *)
+  | Cyclic_term ->
+      Some
+        "These wires run in a circle: following them out of a block leads back into that same \
+         block, so one of these steps would end up justifying itself.  A proof has to build up \
+         from what is already known, so the wires can't loop."
   (* An assumption or bound variable wired out of the block that introduced it. *)
   | Ill_scoped_connection ->
       Some
