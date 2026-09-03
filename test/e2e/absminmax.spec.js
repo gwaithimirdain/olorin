@@ -153,13 +153,25 @@ test.describe('All three', () => {
         expect(await readsAs(olorin, page, 'min(∣x∣,y) = 1', R)).toBe('min(∣x∣,y)=1');
     });
 
-    test('have a way to be typed: ∣ has a palette button and a shortcut', async ({ page }) => {
+    test('have a way to be typed: the ordinary bar key becomes ∣', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         await olorin.openChooser();
         await page.click('#customLevel');
-        await page.fill('#conclusion', '');
+        const typed = async (text) => {
+            await page.fill('#conclusion', '');
+            await page.locator('#conclusion').pressSequentially(text);
+            return page.inputValue('#conclusion');
+        };
+        expect(await typed('|x|')).toBe('∣x∣');
+        expect(await typed('|a| | |b|')).toBe('∣a∣ ∣ ∣b∣');
+        expect(await typed('min(|x|,|y|)')).toBe('min(∣x∣,∣y∣)');
+        // The bar is also the first character of ↦, whose rule has to keep getting there first --
+        // and to recognize what is left after the bar and the hyphen have been converted.
+        expect(await typed('x|->y')).toBe('x↦y');
+        // The palette button and the \mid shortcut still work as well.
         await expect(page.locator('#conclPalette .unicode-button', { hasText: '∣' })).toHaveCount(1);
+        await page.fill('#conclusion', '');
         await page.click('#conclPalette .unicode-button:has-text("∣")');
         await page.locator('#conclusion').pressSequentially('x');
         await page.locator('#conclusion').pressSequentially('\\mid ');

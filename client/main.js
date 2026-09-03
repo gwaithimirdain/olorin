@@ -51,11 +51,13 @@ const KEYS = [
     { unicode: '∃', keys: [ '\\exists ', '\\ex ' ] },
     { unicode: '∀', keys: [ '\\forall ', '\\all ' ] },
     { unicode: '∈', keys: [ '\\in ' ] },
-    { unicode: '↦', keys: [ '\\mapsto ', '|->' ] }, // Has to come first, so |-> doesn't become |→
+    // Has to come first, so |-> doesn't become |→.  ∣−> is what typing |-> leaves behind, the
+    // bar having become ∣ and the hyphen − on the way past.
+    { unicode: '↦', keys: [ '\\mapsto ', '|->', '∣->', '∣−>' ] },
     { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
-    { unicode: '∣', keys: [ '\\mid ', '\\abs ', '\\divides ' ] },
+    { unicode: '∣', keys: [ '|', '\\mid ', '\\abs ', '\\divides ' ] },
     { unicode: '√', keys: [ '\\sqrt ', '\\surd ' ] },
     { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
