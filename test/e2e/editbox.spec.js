@@ -32,6 +32,31 @@ test.describe('Expression boxes', () => {
         await olorin.buildCustom(LEVEL);
     });
 
+    // An expression is arithmetic, so its dialog gets a shorter palette than the statement boxes do
+    // -- no connectives or quantifiers, just the symbols an expression needs and a keyboard hasn't
+    // got.  Most have a typed spelling too (- for −, * for ·, | for ∣, ^2 for ²); √ has only \sqrt.
+    test('the dialog offers a palette of the symbols an expression is written out of', async ({ page }) => {
+        await olorin.dragRule('expr', 420, 240);
+        await page.waitForSelector('#expressionBG', { state: 'visible' });
+        const buttons = () => page.evaluate(() =>
+            Array.from(document.querySelectorAll('#exprPalette .unicode-button')).map((b) => b.textContent));
+        expect(await buttons()).toEqual(['−', '·', '∣', '√', '²', '³', '⁴', 'shortcuts']);
+
+        // The buttons type into the expression, at the cursor.
+        await page.fill('#expression', '');
+        for (const sym of ['∣', '√']) {
+            await page.click(`#exprPalette .unicode-button:has-text("${sym}")`);
+        }
+        await page.locator('#expression').pressSequentially('x');
+        await page.click('#exprPalette .unicode-button:has-text("∣")');
+        expect(await page.inputValue('#expression')).toBe('∣√x∣');
+
+        // And the shortcuts, which the dialog had before it had a palette, still work in it.
+        await page.fill('#expression', '');
+        await page.locator('#expression').pressSequentially('|x*2|');
+        expect(await page.inputValue('#expression')).toBe('∣x·2∣');
+    });
+
     test('double-clicking one re-opens the dialog, pre-filled, and edits it in place', async ({ page }) => {
         const id = await olorin.dragRule('expr', 420, 240);
         await enterExpression(page, 'x−1');

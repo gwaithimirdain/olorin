@@ -30,6 +30,11 @@ const CLOSE_BUTTON_HOME = 0.8;
 // Unicode characters to put in the button palette below text boxes
 const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
 
+// An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
+// quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
+// hasn't got a key for.
+const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴'];
+
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
     return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -2748,11 +2753,11 @@ function addToPalette(pal, elt, str) {
     pal.appendChild(b);
 }
 
-function makePalette(palid, eltid) {
+function makePalette(palid, eltid, chars) {
     const pal = document.getElementById(palid);
     const elt = document.getElementById(eltid);
     // Create palette of buttons
-    PALETTE.forEach((chr) => addToPalette(pal, elt, chr));
+    (chars || PALETTE).forEach((chr) => addToPalette(pal, elt, chr));
     // Add TeX help button
     var t = document.createElement('div');
     t.textContent = 'or use';
@@ -2791,7 +2796,7 @@ makePalette('hypPalette', 'hypotheses');
 makePalette('conclPalette', 'conclusion');
 makePalette('ascPalette', 'ascribe');
 makePalette('wirePalette', 'wire');
-addShortcuts('expression');
+makePalette('exprPalette', 'expression', EXPR_PALETTE);
 
 var shortcuts = document.getElementById('shortcuts');
 var shortcut_thead = document.createElement('thead');
