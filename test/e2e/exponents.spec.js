@@ -1,5 +1,5 @@
 // Powers with a rational exponent, and so the roots that come with them: x^(1/2) is a square root,
-// x^(1/3) a cube root.
+// written √x as well, and x^(1/3) a cube root.
 //
 // The exponent's type is whatever the base's number system is closed under -- ℤ under naturals, ℚ
 // under integers, and only ℝ and 𝕊 under arbitrary rationals -- so writing a root of an integer
@@ -15,6 +15,10 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+
+// The types Olorin ends up giving the statements on each wire, whitespace squashed.
+const wireLabels = (page) => page.evaluate(() =>
+    Array.from(document.querySelectorAll('.connLabel')).map((e) => (e.innerText || '').replace(/\s+/g, '')));
 
 // State a level, prove it with a single algebra block fed by every hypothesis, and report whether
 // Olorin accepted it along with what it said if it didn't.
@@ -141,5 +145,69 @@ test.describe('A rational exponent on an integer base', () => {
         expect(await proves(olorin, {
             variables: 'x ∈ ℤ', hypotheses: ['0≤x'], conclusion: '(x^(1/2))^2 = x',
         })).toBe(true);
+    });
+});
+
+test.describe('The √ symbol', () => {
+    test('is the 1/2 power written another way, obligation and all', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ', hypotheses: ['0≤x'], conclusion: '√x = x^(1/2)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ', hypotheses: ['0≤x'], conclusion: '√x·√x = x',
+        })).toBe(true);
+        const without = await algebra(olorin, { variables: 'x ∈ ℝ', conclusion: '√x·√x = x' });
+        expect(without.proved).toBe(false);
+        expect(without.said).toContain('is nonnegative');
+        const negative = await algebra(olorin, {
+            variables: 'x ∈ ℝ', hypotheses: ['x<0'], conclusion: '√x = 5',
+        });
+        expect(negative.proved).toBe(false);
+        expect(negative.said).toContain('is nonnegative');
+    });
+
+    test('lands in the reals whatever number system it started in', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℤ', hypotheses: ['0≤x'], conclusion: '√x·√x = x',
+        })).toBe(true);
+        expect(await proves(olorin, { conclusion: '√4 = 2' })).toBe(true);
+        expect(await proves(olorin, { conclusion: '√2 < 3/2' })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\ny ∈ ℝ', hypotheses: ['0≤x', '0≤y'], conclusion: '√(x·y) = √x·√y',
+        })).toBe(true);
+    });
+
+    test('binds tighter than the arithmetic, but reaches over a power', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // (√x)·2, not √(x·2) -- the latter is not 2√x.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ', hypotheses: ['0≤x'], conclusion: '√x·2 = 2·√x',
+        })).toBe(true);
+        // √(x²), not (√x)²: it asks nothing of x, since x² is nonnegative by itself, and what it
+        // gives back is |x| rather than x.
+        const squared = await algebra(olorin, { variables: 'x ∈ ℝ', conclusion: '√x² = x' });
+        expect(squared.proved).toBe(false);
+        expect(squared.said).not.toContain('is nonnegative');
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ', hypotheses: ['0≤x'], conclusion: '√x² = x',
+        })).toBe(true);
+    });
+
+    test('is what gets printed back, rather than the power it stands for', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'x ∈ ℝ', hypotheses: '√(x+1) = 1', conclusion: '√(x+1) = 1',
+        });
+        const nodes = await olorin.nodes();
+        await olorin.connect({ vertex: nodes.find((n) => n.rule === 'hypothesis').id, sort: 'output' },
+                             { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await wireLabels(page)).toEqual(['√(x+1)=1']);
     });
 });

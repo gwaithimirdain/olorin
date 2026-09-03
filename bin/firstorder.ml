@@ -91,6 +91,7 @@ axiom ℝ.fourth : ℝ → ℝ
 axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (eq ℝ y 0)
 axiom ℝ.deceq (x y : ℝ) : lor (eq ℝ x y) (neq ℝ x y)
 axiom ℝ.tord (x y : ℝ) : lor (le ℝ x y) (gt ℝ x y)
+axiom ℝ.sqrt : ℝ → ℝ
 
 def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | omega. ]
 axiom 𝕊.plus : 𝕊 → 𝕊 → 𝕊
@@ -108,6 +109,7 @@ notation \"ω\" ≔ omega.
 axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x 0) (eq 𝕊 y 0)
 axiom 𝕊.deceq (x y : 𝕊) : lor (eq 𝕊 x y) (neq 𝕊 x y)
 axiom 𝕊.tord (x y : 𝕊) : lor (le 𝕊 x y) (gt 𝕊 x y)
+axiom 𝕊.sqrt : 𝕊 → 𝕊
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
@@ -157,6 +159,7 @@ let onechar_ops =
     (0x22A4, Ident [ "⊤" ]);
     (0x2212, Ident [ "−" ]);
     (0xB7, Ident [ "·" ]);
+    (0x221A, Ident [ "√" ]);
     (0x2260, Ident [ "≠" ]);
     (0xB2, Ident [ "²" ]);
     (0xB3, Ident [ "³" ]);
@@ -190,6 +193,7 @@ type (_, _, _) identity +=
   | Times : (No.nonstrict opn, No.three, No.strict opn) identity
   | Div : (No.nonstrict opn, No.three, No.strict opn) identity
   | Negate : (closed, No.three, No.nonstrict opn) identity
+  | Sqrt : (closed, No.four, No.nonstrict opn) identity
   | Pow : (No.nonstrict opn, No.four, No.strict opn) identity
   | Square : (No.strict opn, No.four, closed) identity
   | Cube : (No.strict opn, No.four, closed) identity
@@ -219,6 +223,9 @@ let times : (No.nonstrict opn, No.three, No.strict opn) notation = (Times, Infix
 let div : (No.nonstrict opn, No.three, No.strict opn) notation = (Div, Infixl No.three)
 let pow : (No.nonstrict opn, No.four, No.strict opn) notation = (Pow, Infixl No.four)
 let negate : (closed, No.three, No.nonstrict opn) notation = (Negate, Prefixr No.three)
+(* Tighter than · and −, so "√x·y" is (√x)·y, but loose enough to reach over a power or a
+   superscript, so "√x²" is √(x²) as the radical sign's bar would have it. *)
+let sqrtn : (closed, No.four, No.nonstrict opn) notation = (Sqrt, Prefixr No.four)
 let square : (No.strict opn, No.four, closed) notation = (Square, Postfix No.four)
 let cube : (No.strict opn, No.four, closed) notation = (Cube, Postfix No.four)
 let fourth : (No.strict opn, No.four, closed) notation = (Fourth, Postfix No.four)
@@ -241,6 +248,8 @@ type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -
 
 let numbers = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
 let fields = [ "ℚ"; "ℝ"; "𝕊" ]
+(* ℤ and ℚ aren't closed under square roots, so √ lands in the reals however it starts out. *)
+let reals = [ "ℝ"; "𝕊" ]
 
 let algebra =
   [
@@ -563,6 +572,35 @@ let () =
       pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "−"));
       is_case = (fun _ -> false);
     };
+  make sqrtn
+    {
+      name = "√";
+      tree = Closed_entry (eop (Ident [ "√" ]) (Done_closed sqrtn));
+      processor =
+        (fun ctx obs loc ->
+          match obs with
+          | [ Token _; Term x ] ->
+              let x = process ctx x in
+              locate_opt loc
+                (Synth
+                   (SFirst
+                      ( List.map
+                          (fun ty ->
+                            (`Any, sapp (locate_opt loc (Const (get_const [ ty; "sqrt" ]))) x, true))
+                          reals,
+                        None )))
+          | _ -> Builtins.invalid "√");
+      print_term =
+        Some
+          (function
+          | [ Token (_, (wsop, _)); Term x ] ->
+              let px, wsx = pp_term x in
+              (Token.pp (Ident [ "√" ]) ^^ pp_ws `None wsop ^^ px, wsx)
+          | _ -> Builtins.invalid "√");
+      print_case = None;
+      pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "√"));
+      is_case = (fun _ -> false);
+    };
   List.iter
     (fun (name, sym, asym, onotn, ostr) ->
       make onotn
@@ -677,6 +715,14 @@ let install_notations () =
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
       inner_symbols = `Single (Ident [ "−" ]);
+    };
+  Scope.Situation.add_with_print
+    {
+      keys = List.map (fun ty -> `Constant (get_const [ ty; "sqrt" ])) reals;
+      notn = Wrap sqrtn;
+      pat_vars = [ "x" ];
+      val_vars = [ "x" ];
+      inner_symbols = `Single (Ident [ "√" ]);
     };
   let _ =
     Scope.Situation.add_user

@@ -55,6 +55,7 @@ const KEYS = [
     { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
+    { unicode: '√', keys: [ '\\sqrt ', '\\surd ' ] },
     { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
     { unicode: '≠', keys: [ '\\neq' ] },

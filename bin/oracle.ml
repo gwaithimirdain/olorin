@@ -276,8 +276,10 @@ let get_poly ctx ty tm =
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args = Arg (Emp, x, xins); _ }
       when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) -> (
-        let* x = go (CubeOf.find_top x).tm in
+        let src = (CubeOf.find_top x).tm in
+        let* x = go src in
         match Firstorder.get_root name with
+        | "sqrt" -> power tm x (Q.of_ints 1 2) src
         | "negate" -> (
             match rational_of x with
             | Some q -> return (`Const (Q.neg q))
