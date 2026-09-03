@@ -103,7 +103,6 @@ async function algebraProves(olorin, { variables = '', hypotheses = [], conclusi
     const nodes = await olorin.nodes();
     for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
         await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: alg, sort: 'input' });
-        await olorin.waitForTypecheck();
     }
     await olorin.connect({ vertex: alg, sort: 'output' },
                          { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
@@ -159,10 +158,6 @@ test.describe('Disequalities and the algebra block', () => {
             hypotheses: 'x=0\nx=1',
             conclusion: '⊥',
         });
-        // Each wire is left to settle before the next: connecting to an algebra block again while
-        // its last typecheck is still waiting on Z3 wedges the typechecker
-        // ("Continuation_already_resumed"), and the spinner never comes down.
-        const wire = async (s, t) => { await olorin.connect(s, t); await olorin.waitForTypecheck(); };
         const zeroNeqOne = await olorin.dragRule('alg', 300, 100);
         const asc = await olorin.dragRule('asc', 500, 100);
         await page.waitForSelector('#ascribeBG', { state: 'visible' });
@@ -173,13 +168,14 @@ test.describe('Disequalities and the algebra block', () => {
         const negE = await olorin.dragRule('negE', 800, 200);
         const nodes = await olorin.nodes();
         for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
-            await wire({ vertex: n.id, sort: 'output' }, { vertex: zeroEqOne, sort: 'input' });
+            await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: zeroEqOne, sort: 'input' });
         }
-        await wire({ vertex: zeroNeqOne, sort: 'output' }, { vertex: asc, sort: 'input' });
-        await wire({ vertex: asc, sort: 'output' }, { vertex: negE, sort: 'input', label: 'negation' });
-        await wire({ vertex: zeroEqOne, sort: 'output' }, { vertex: negE, sort: 'input', label: 'statement' });
-        await wire({ vertex: negE, sort: 'output' },
-                   { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.connect({ vertex: zeroNeqOne, sort: 'output' }, { vertex: asc, sort: 'input' });
+        await olorin.connect({ vertex: asc, sort: 'output' }, { vertex: negE, sort: 'input', label: 'negation' });
+        await olorin.connect({ vertex: zeroEqOne, sort: 'output' }, { vertex: negE, sort: 'input', label: 'statement' });
+        await olorin.connect({ vertex: negE, sort: 'output' },
+                             { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.waitForTypecheck();
         expect(await olorin.isComplete()).toBe(true);
     });
 });

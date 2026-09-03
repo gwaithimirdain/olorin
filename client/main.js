@@ -120,6 +120,17 @@ var currentHint;
 // Dynamic variable to suppress re-typechecking during batch modifications of the diagram
 var suppressChecking = false;
 
+// Whether a round of typechecking is in flight, and whether the diagram has changed since it
+// started.  A round that asks Z3 something suspends inside Narya while the answer travels out
+// through a promise and back through Narya.reenter, and there is no way to start another round
+// meanwhile: the proof engine runs as a coroutine (Pauseable in narya's top.ml) whose continuation
+// is only refreshed when a round *finishes*, so a round left suspended leaves that continuation
+// spent, and the next call into Narya dies with "Continuation_already_resumed" -- with the
+// "Typechecking..." overlay still up and the proof stuck until the page is reloaded.  So a change
+// arriving mid-round is noted here and checked once the round it interrupted has landed.
+var typecheckPending = false;
+var typecheckAgain = false;
+
 // Dynamic variable set while restoring a saved proof, to suppress the wire-label prompt and typechecking that normally fire when a connection is created.
 var restoring = false;
 
@@ -3019,6 +3030,11 @@ function addConnection(params) {
 // Parse the graph into a term and typecheck it, displaying diagnostics.  If 'remove' is true, also remove the connection indicated by the parameters, as this is a detach event.  Since we need to pass the result as an onclick callback, we manually curry the definition.
 function typecheck() {
     if(suppressChecking) { return; }
+    // Wait for the round already in flight (see typecheckPending); it will come back here with the
+    // diagram as it stands then.
+    if(typecheckPending) { typecheckAgain = true; return; }
+    typecheckPending = true;
+    typecheckAgain = false;
 
     document.getElementById("typecheckingBG").style.display = 'flex';
     hideWireTooltip();
@@ -3298,12 +3314,18 @@ function continue_typechecking(nodes, edges, connections, result) {
     // If a callback string was supplied, we pass it off to Z3 and wait for a response.
     if(result.callback) {
         const solver = callback_to_z3(result.callback);
-        solver.check().then(function (result) {
-            continue_typechecking(nodes, edges, connections, Narya.reenter(result === 'unsat'));
+        solver.check().then(function (answer) {
+            continue_typechecking(nodes, edges, connections, Narya.reenter(answer === 'unsat'));
         });
         // For now, we abort this function; we'll come back to it when the response arrives.
         return;
     }
+
+    // The round has landed, so Narya can be called into again.  If the diagram moved on while we
+    // were waiting, this answer is about a proof that no longer exists: check the current one
+    // instead of drawing a stale result and saving it.
+    typecheckPending = false;
+    if(typecheckAgain) { typecheck(); return; }
 
     lastDiagnostics = result.diagnostics || [];
     const diagram = document.getElementById('diagram');
