@@ -141,6 +141,113 @@ test.describe('Overlapping labels', () => {
 
 // A wire whose ends disagree about the type is drawn red; at novice it also says what the two
 // types are, each written at its own end of the wire.
+// The X that deletes a wire sits at 0.8 along it, which on a short wire is right under the second
+// of the two types a mismatched wire shows (at 0.75) -- and any label pushed aside to clear
+// another can land on one too.  So the X is placed by the same pass as the labels, after them.
+test.describe('The X that deletes a wire', () => {
+    // A short, type-mismatched wire: P wired into an ∧-introduction dropped right beside it, at a
+    // goal about Q.  Measured without the placement pass, the X here is 65% covered by a label.
+    async function shortMismatchedWire(page) {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({ parameters: 'P : Type\nQ : Type', variables: '',
+            hypotheses: 'P', conclusion: 'Q∧Q' });
+        const nodes = await olorin.nodes();
+        const and = await olorin.dragRule('andI', 260, 330);
+        await olorin.connect({ vertex: and, sort: 'output' },
+            { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.connect({ vertex: nodes.find((n) => n.rule === 'hypothesis').id, sort: 'output' },
+            { vertex: and, sort: 'input', label: 'fst' });
+        await olorin.waitForTypecheck();
+        return olorin;
+    }
+
+    const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+                            * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+    test('no wire label covers it', async ({ page }) => {
+        const olorin = await shortMismatchedWire(page);
+        const buttons = await olorin.closeButtons();
+        const labels = await olorin.labelRects();
+        expect(buttons.length).toBeGreaterThan(0);
+        expect(labels.some((l) => l.mismatch), 'the wire should show both its types').toBe(true);
+        buttons.forEach(function (b) {
+            labels.forEach(function (l) {
+                expect(overlap(b, l), `X at ${b.location} covered by "${l.text}"`).toBe(0);
+            });
+        });
+    });
+
+    test('which means moving it off its usual spot when a label is there', async ({ page }) => {
+        const olorin = await shortMismatchedWire(page);
+        // If none had to move, the test above would be passing for the wrong reason.
+        expect((await olorin.closeButtons()).some((b) => b.location !== 0.8)).toBe(true);
+    });
+
+    // Being measurable means it is hidden with visibility rather than display, so these two check
+    // it still does appear -- on a wire, and on a rule box, which shares the same class.
+    const showing = (page) => page.evaluate(() =>
+        Array.from(document.querySelectorAll('#canvas .closebutton'))
+            .filter((e) => getComputedStyle(e).visibility === 'visible').length);
+
+    test('stays hidden until its wire is hovered, and then deletes it', async ({ page }) => {
+        const olorin = await shortMismatchedWire(page);
+        const wires = (await olorin.connections()).length;
+        expect(await showing(page)).toBe(0);
+
+        await olorin.hoverWire(0.25);
+        expect(await showing(page)).toBe(1);
+
+        await page.evaluate(() => Array.from(document.querySelectorAll('#canvas .closebutton'))
+            .find((e) => getComputedStyle(e).visibility === 'visible').click());
+        await olorin.waitForTypecheck();
+        expect((await olorin.connections()).length).toBe(wires - 1);
+    });
+
+    test('a rule box shows its own X on hover too', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({ parameters: 'P : Type', variables: '', hypotheses: 'P', conclusion: 'P' });
+        const id = await olorin.dragRule('andI', 300, 200);
+        // The typechecking overlay covers the page while it's up, and would swallow the hover.
+        await olorin.waitForTypecheck();
+        expect(await page.locator(`#${id} .closebutton`).isVisible()).toBe(false);
+        // A real pointer move, since it's CSS :hover that reveals it.
+        const box = await page.evaluate((i) => {
+            const r = document.getElementById(i).getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        }, id);
+        await page.mouse.move(box.x, box.y);
+        expect(await page.locator(`#${id} .closebutton`).isVisible()).toBe(true);
+    });
+});
+
+// A value port shows "? ∈ <set>" while it's empty.  For the ∧-elimination-style boxes the set
+// comes from the goal and is real, but the "integral" box picks its number system with an SFirst
+// over ℤ, ℚ, ℝ and 𝕊, and with these ports empty that resolves to whichever goes through first --
+// never the set the player is actually working in.  So it says the set is unknown as well.
+test.describe('A value port whose set is not yet determined', () => {
+    async function integralPorts(page, conclusion) {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'a ∈ ℝ\nb ∈ ℝ', hypotheses: 'a*b=0', conclusion,
+        });
+        const nodes = await olorin.nodes();
+        const concl = nodes.find((n) => n.rule === 'conclusion').id;
+        const box = await olorin.dragRule('integral', 300, 150);
+        await olorin.connect({ vertex: box, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        const ports = await page.evaluate(() => window.__olorin.ports());
+        return ['x', 'y'].map((l) =>
+            (ports.find((p) => p.vertex === box && p.sort === 'input' && p.label === l) || {}).type);
+    }
+
+    test('the integral box leaves the set open on its empty value inputs', async ({ page }) => {
+        expect(await integralPorts(page, '(a=0)∨(b=0)')).toEqual(['? ∈ ?', '? ∈ ?']);
+    });
+});
+
 test.describe('Type-mismatch labels', () => {
     // How many wires are drawn in the error color.
     const redWires = (page) => page.evaluate(() =>

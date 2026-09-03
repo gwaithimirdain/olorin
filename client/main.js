@@ -24,6 +24,8 @@ document.documentElement.style.setProperty('--adept-bg', COLORS[1][1].background
 document.documentElement.style.setProperty('--master-bg', COLORS[2][1].backgroundColor);
 
 const VALUECOLOR = "#0000ff";
+// Where along a wire the X that deletes it sits, before spreadWireLabels moves it off any label.
+const CLOSE_BUTTON_HOME = 0.8;
 
 // Unicode characters to put in the button palette below text boxes
 const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊'];
@@ -233,7 +235,7 @@ ready(() => {
                 type: "Custom",
                 options: {
                     id: "closeButton",
-                    location: 0.8,
+                    location: CLOSE_BUTTON_HOME,
                     create:(conn) => {
                         const closebutton = document.createElement("div");
                         closebutton.className = "closebutton";
@@ -251,9 +253,10 @@ ready(() => {
     });
 
     // Make close buttons on connections appear on hover, and stay for a second
-    instance.bind(EVENT_CONNECTION_MOUSEOVER, (conn) => {
+    instance.bind(EVENT_CONNECTION_MOUSEOVER, (conn, e) => {
+        showWireTooltip(conn, e);
         if(connectionCloseButtons[conn.id]) {
-            connectionCloseButtons[conn.id].button.style.display = 'block';
+            connectionCloseButtons[conn.id].button.style.visibility = 'visible';
             if(connectionCloseButtons[conn.id].timeout) {
                 clearTimeout(connectionCloseButtons[conn.id].timeout);
                 connectionCloseButtons[conn.id].timeout = undefined;
@@ -261,11 +264,12 @@ ready(() => {
         }
     });
     instance.bind(EVENT_CONNECTION_MOUSEOUT, (conn) => {
+        hideWireTooltip();
         if(connectionCloseButtons[conn.id]) {
             if(connectionCloseButtons[conn.id].timeout) {
                 clearTimeout(connectionCloseButtons[conn.id].timeout);
             }
-            connectionCloseButtons[conn.id].timeout = setTimeout(function () { connectionCloseButtons[conn.id].button.style.display = 'none'; }, 1000);
+            connectionCloseButtons[conn.id].timeout = setTimeout(function () { connectionCloseButtons[conn.id].button.style.visibility = 'hidden'; }, 1000);
         }
     });
 
@@ -520,13 +524,18 @@ function addEndpointsForRule(box, id, restore) {
         instance.addEndpoint(box, {
             anchor: [0, 0.1, -1, 0],
             target: true,
-            parameters: { sort: "input", label: "x", hasValue: true, side: "upper" },
+            // unknownSet: which number system x and y range over isn't settled while these ports
+            // are empty.  The User rule in olorin.ml offers ℤ.integral, ℚ.integral, ℝ.integral and
+            // 𝕊.integral as an SFirst, and with a hole here the typechecker just takes the first
+            // that goes through -- ℤ when nothing is wired up, 𝕊 once something is -- so whatever
+            // it reports for these ports is a guess, and not the set the player is working in.
+            parameters: { sort: "input", label: "x", hasValue: true, side: "upper", unknownSet: true },
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, {
             anchor: [0, 0.5, -1, 0],
             target: true,
-            parameters: { sort: "input", label: "y", hasValue: true, side: "middle" },
+            parameters: { sort: "input", label: "y", hasValue: true, side: "middle", unknownSet: true },
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, {
@@ -1271,6 +1280,24 @@ function difficultyMark(state, d) {
     return '<span class="lvmark locked" style="color:' + color + '">' + LOCK_SVG + '</span>';
 }
 
+// A level that has a hint carries an "i" in the top-right corner of its button.  While the level
+// is open the "i" is blue and clicking it shows the hint without leaving the chooser; while the
+// level is locked it is grey and inert, so it says a hint is waiting without giving it away.
+function addHintBubble(b, level, unlocked) {
+    if(!level || !level.hint) { return; }
+    const bubble = document.createElement('div');
+    bubble.className = 'hintbubble' + (unlocked ? '' : ' locked');
+    bubble.innerText = 'i';
+    bubble.title = unlocked ? "Show this level's hint" : "This level has a hint";
+    bubble.addEventListener('click', function (e) {
+        // The button underneath opens the level, which is never what a click on the badge meant --
+        // so it swallows the click whether or not it has a hint to show.
+        e.stopPropagation();
+        if(unlocked) { showHintById(level.hint); }
+    });
+    b.appendChild(bubble);
+}
+
 // Render a level's button: its number, a row of three per-difficulty marks, and a top stripe in
 // the highest completed difficulty's color (the normal black border when nothing is completed).
 // In test mode `level` is used to make the marks double-clickable (see makeMarksToggleable).
@@ -1284,6 +1311,7 @@ function renderLevelButton(b, name, states, level) {
         b.classList.add('level-locked');
         if(!TEST_MODE) {
             b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
+            addHintBubble(b, level, false);
             return;
         }
         // Still greyed as locked, but laid out like any other level (number above its marks).
@@ -1298,6 +1326,7 @@ function renderLevelButton(b, name, states, level) {
     var hc = -1;
     for(var d = 0; d < 3; d++) { if(states[d] === 'completed') { hc = d; } }
     if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
+    addHintBubble(b, level, states[0] !== 'locked');
     if(TEST_MODE && level) { makeMarksToggleable(b, level); }
 }
 
@@ -1852,6 +1881,21 @@ if (new URLSearchParams(window.location.search).has("test")) {
             const te = findEndpoint(document.getElementById(t.vertex), t.sort, t.label);
             instance.connect({ source: se, target: te });
         },
+        // The diagnostics from the last typecheck (code, text and locations of each error).
+        diagnostics: () => lastDiagnostics.map((d) => ({
+            code: d.code, isfatal: d.isfatal, text: d.text, explanation: d.explanation, locs: d.locs,
+        })),
+        // Each wire's delete-X: where it sits along its wire, and its rectangle -- it is laid out
+        // even while invisible, so the label-spreading tests can check nothing covers it.
+        closeButtons: () => instance.getConnections().map((c) => {
+            const o = c.getOverlay("closeButton");
+            if(!o || !o.canvas) { return null; }
+            const r = o.canvas.getBoundingClientRect();
+            return { location: o.location, x: r.x, y: r.y, w: r.width, h: r.height };
+        }).filter((b) => b !== null),
+        // What hovering each wire currently in error would say, in connection order.
+        wireErrors: () => instance.getConnections()
+            .map((c) => c.parameters.errorText).filter((t) => t !== undefined),
         difficulty: () => difficulty,
         varnames: () => varnames.slice(),
         savedProofKey,
@@ -2085,9 +2129,16 @@ function updateCurrentDifficulty() {
     }
 }
 
-function showHint() {
+// Show a hint by its id.  Only showing it on the level itself records that it's been seen: a hint
+// read from the chooser is browsing, and shouldn't cost the player the greeting when they get
+// there.
+function showHintById(hint) {
     document.getElementById("hintBG").style.display = 'flex';
-    document.getElementById(currentHint).style.display = 'block';
+    document.getElementById(hint).style.display = 'block';
+}
+
+function showHint() {
+    showHintById(currentHint);
     localStorage.setItem(currentHint, "true");
 }
 
@@ -2834,6 +2885,37 @@ document.addEventListener('mouseup', () => {
 });
 
 
+// A wire marked red carries the reason in its parameters; while the pointer is over it, say so.
+// Narya's own text is the fallback for the errors Explain doesn't have a student-facing version
+// of, so a red wire always explains itself somehow.
+function showWireTooltip(conn, e) {
+    const text = conn.parameters.errorText;
+    if(!text) { return; }
+    const tip = document.getElementById("wireTooltip");
+    // textContent, not innerText: the newlines are rendered by the pre-wrap on #wireTooltip, and
+    // innerText would replace them with <br> and lose the indentation.
+    tip.textContent = text;
+    tip.style.display = 'block';
+    // Follow the pointer, falling back to the middle of the wire if the event carries no position.
+    var x, y;
+    if(e && typeof e.clientX === 'number') {
+        x = e.clientX + 14;
+        y = e.clientY + 16;
+    } else {
+        const r = conn.connector.canvas.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2 + 16;
+    }
+    // Keep it on screen (it's already displayed, so it can be measured).
+    const tr = tip.getBoundingClientRect();
+    tip.style.left = Math.max(4, Math.min(x, window.innerWidth - tr.width - 4)) + 'px';
+    tip.style.top = Math.max(4, Math.min(y, window.innerHeight - tr.height - 4)) + 'px';
+}
+
+function hideWireTooltip() {
+    document.getElementById("wireTooltip").style.display = 'none';
+}
+
 // Set the color of a connection
 function setStrokeColor(conn, color) {
     const sty = conn.getPaintStyle();
@@ -2921,6 +3003,7 @@ function typecheck() {
     if(suppressChecking) { return; }
 
     document.getElementById("typecheckingBG").style.display = 'flex';
+    hideWireTooltip();
 
     console.log("typechecking with " + nodes.length + " nodes");
     var connctr = 0;
@@ -2941,6 +3024,8 @@ function typecheck() {
         if(c.parameters.userLabel) {
             c.parameters.userLabel.style.color = '';
         }
+        // Last time's error is no longer this wire's, whatever this typecheck decides.
+        c.parameters.errorText = undefined;
         instance.revalidate(c.source);
 
         // Clear the label overlays.  For some reason, if we *delete* all the overlays here and then add later the ones we want, some of them don't get displayed until the nodes are dragged around.  So instead we set the label text of all existing overlays to empty here, and later we delete only the overlays with empty label text.
@@ -3069,6 +3154,8 @@ function labelTypeMismatch(edge, d) {
 // can't move: the boxes themselves and the type labels on unconnected ports.  Positions are
 // predicted from the connector's own geometry, so this costs one repaint of the wires that
 // actually moved, not one per position tried.
+// The X that deletes a wire goes through the same pass, after all the labels, so it ends up
+// somewhere none of them covers -- the two types on a mismatched wire straddle its usual spot.
 // How far from its home position along the wire a label may be pushed, in steps of this size.
 const LABEL_STEPS = [0, -0.08, 0.08, -0.16, 0.16, -0.24, 0.24, -0.32, 0.32, -0.4, 0.4];
 // Positions to try for a label whose home is `home`, nearest first, kept clear of the wire's ends.
@@ -3100,38 +3187,55 @@ function labelObstacles() {
     return fixed;
 }
 
+// One thing to be placed along a wire: where it is now, how big it is, and the positions it may
+// move to.  `origin` is the point on the path it's currently drawn from, so any other position can
+// be predicted by adding the difference between two points on the path -- the same in page
+// coordinates as in the connector's own -- without moving it to find out.
+function placeable(c, ovl, home) {
+    const r = ovl.canvas.getBoundingClientRect();
+    if(r.width === 0 || r.height === 0) { return null; }
+    return {
+        conn: c, ovl: ovl, w: r.width, h: r.height,
+        cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+        origin: c.connector.pointOnPath(ovl.location),
+        locations: labelLocations(home),
+    };
+}
+
 function spreadWireLabels() {
     // Measure every wire label where it currently sits.  A label jsPlumb hasn't drawn yet has no
     // size; leave it for the next typecheck rather than guessing at it.
     const labels = [];
+    // The X that deletes a wire is placed after the labels, so it dodges them rather than the
+    // other way round: a label is always on show, while the X only appears under the pointer.  It
+    // hides with visibility rather than display, so it can be measured even while invisible.
+    const buttons = [];
     instance.getConnections().forEach(function (c) {
         if(!c.connector) { return; }
+        const x = c.getOverlay("closeButton");
+        if(x && x.canvas) {
+            const b = placeable(c, x, CLOSE_BUTTON_HOME);
+            if(b) { buttons.push(b); }
+        }
         // Both the type we compute for a wire and the one the player types on it (at adept and
         // master) sit in the middle of the wire, so both can collide.
         ["label", "userLabel", "gotLabel", "expectedLabel"].forEach(function (id) {
             const ovl = c.getOverlay(id);
             if(!ovl || !ovl.canvas) { return; }
             if(typeof ovl.getLabel === 'function' && ovl.getLabel() === "") { return; }
-            const r = ovl.canvas.getBoundingClientRect();
-            if(r.width === 0 || r.height === 0) { return; }
-            labels.push({
-                conn: c, ovl: ovl, w: r.width, h: r.height,
-                // Where the label sits now, and the point on the wire it's drawn from: the
-                // difference between two points on a path is the same in page coordinates as in
-                // the connector's own, so any other position can be predicted without moving it.
-                cx: r.x + r.width / 2, cy: r.y + r.height / 2,
-                origin: c.connector.pointOnPath(ovl.location),
-                // A mismatch label belongs at its own end of the wire, not in the middle.
-                locations: labelLocations(id === "gotLabel" ? 0.25 : id === "expectedLabel" ? 0.75 : 0.5),
-            });
+            // A mismatch label belongs at its own end of the wire, not in the middle.
+            const lb = placeable(c, ovl,
+                id === "gotLabel" ? 0.25 : id === "expectedLabel" ? 0.75 : 0.5);
+            if(lb) { labels.push(lb); }
         });
     });
-    if(labels.length === 0) { return; }
+    const all = labels.concat(buttons);
+    if(all.length === 0) { return; }
 
     // Seed with the immovable things, so a label prefers a spot clear of them too.
     const placed = labelObstacles();
     const moved = new Set();
-    labels.forEach(function (lb) {
+    all.forEach(function (lb) {
         var best = null;
         for(var i = 0; i < lb.locations.length; i++) {
             const loc = lb.locations[i];
@@ -3159,6 +3263,19 @@ function spreadWireLabels() {
     moved.forEach(function (el) { instance.revalidate(el); });
 }
 
+// The diagnostics from the most recent completed typecheck, for the test seam to read.
+var lastDiagnostics = [];
+
+// Narya formats a diagnostic for a terminal: a "￫ error[E0401]" header, then lines flagged with
+// ￮ or ￭.  For a tooltip we want just what it says, so drop the header and the flags.
+function plainDiagnosticText(text) {
+    return text.split(/[\r\n]+/)
+        .filter(function (l) { return !/^\s*￫/.test(l); })
+        .map(function (l) { return l.replace(/^\s*[￮￭]\s?/, ''); })
+        .join('\n')
+        .trim();
+}
+
 function continue_typechecking(nodes, edges, connections, result) {
     // If a callback string was supplied, we pass it off to Z3 and wait for a response.
     if(result.callback) {
@@ -3170,6 +3287,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         return;
     }
 
+    lastDiagnostics = result.diagnostics || [];
     const diagram = document.getElementById('diagram');
     
     // Display results
@@ -3344,7 +3462,7 @@ function continue_typechecking(nodes, edges, connections, result) {
             // The proof is no longer complete; a later re-completion counts afresh.
             proofRegisteredComplete = false;
             var somethingRed = false;
-            // result.diagnostics is an array of objects of type {isfatal:bool, locs, text:string}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
+            // result.diagnostics is an array of objects of type {isfatal:bool, code:string, text:string, explanation:string opt, locs}, where locs is an array of objects representing either an edge or a port, with type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
             result.diagnostics.forEach(function (d) {
                 // Make the edges with fatal errors red, if we're not on master difficulty
                 if(d.isfatal && difficulty <= 1) {
@@ -3352,6 +3470,11 @@ function continue_typechecking(nodes, edges, connections, result) {
                         if(loc.isEdge) {
                             const edge = connections[loc.id];
                             setStrokeColor(edge, "#ff0000");
+                            // Keep the first error reported for this wire; later ones are usually
+                            // knock-on effects of it.
+                            if(!edge.parameters.errorText) {
+                                edge.parameters.errorText = d.explanation || plainDiagnosticText(d.text);
+                            }
                             instance.revalidate(edge.source);
                             console.log(d.text);
                             somethingRed = true;
@@ -3389,7 +3512,10 @@ function continue_typechecking(nodes, edges, connections, result) {
                                                 create:(component) => {
                                                     const d = document.createElement("div");
                                                     if(endpoint.parameters.hasValue) {
-                                                        ty = "? ∈ " + ty;
+                                                        // A port whose set isn't determined until
+                                                        // something is wired in leaves that open
+                                                        // too, rather than showing a guess.
+                                                        ty = "? ∈ " + (endpoint.parameters.unknownSet ? "?" : ty);
                                                     }
                                                     const ety = escapeHtml(ty);
                                                     if(endpoint.parameters.side === "upper") {

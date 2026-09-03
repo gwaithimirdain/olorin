@@ -8,6 +8,12 @@
 // Tests should pick their levels through the selectors below (`oneWireLevel`, `conjunctionLevel`,
 // `inStage`, ...) rather than naming ids like "1-2-5": levels.js gets levels inserted and
 // reordered, which renumbers everything after them.
+//
+// The same goes for the structure around them.  Which worlds a world follows, and which stages a
+// stage requires, are declared in levels.js as `previous` lists, so neither relation is the order
+// things appear in -- a world is not gated on the world before it just for coming after it.  Go
+// through `worlds`/`prereqWorlds`/`followerWorlds` and `stagesInWorld`/`prereqStages`, and seed a
+// world's gates with `worldGateSeeds`, rather than reaching for `world + 1`.
 
 const fs = require('fs');
 const path = require('path');
@@ -74,6 +80,9 @@ function stagesInWorld(w) {
         return {
             number: i + 1,
             name: stage.name,
+            // `declared` is the list levels.js actually wrote, so a test can pick a stage that
+            // relies on the default; `previous` is that default filled in.
+            declared: stage.previous,
             previous: stage.previous || [1],
             bonus: !!stage.bonus,
             levels: inStage(w, i + 1),
@@ -86,6 +95,38 @@ function stagesInWorld(w) {
 const prereqStages = (stage, stages) =>
     stage.previous.map(function (n) { return stages[stage.number - 1 - n]; }).filter(Boolean);
 const worldCount = () => worldNames().length;
+
+// Every world, with what the three inter-world gates read of it, resolved the way the app's
+// computeUnlockData does.  `previous` is which worlds this one follows: levels.js gives how many
+// worlds back each is, defaulting to [1] (the world right before), and entries reaching past the
+// first world are dropped, so the first world follows nothing.  `counted` is the levels its
+// percentages are of -- a `bonus` stage is left out of its world's totals.  `declared` is the list
+// levels.js actually wrote, so a test can pick a world that relies on the default.
+//
+// Tests must go through this rather than assuming world w is followed by world w+1: worlds declare
+// their own lists, so the relation is not the order they appear in.
+let worldsCached = null;
+function worlds() {
+    if (worldsCached) return worldsCached;
+    const { LEVELS } = loadLevelsModule();
+    worldsCached = LEVELS.map(function (world, i) {
+        const w = i + 1;
+        return {
+            number: w,
+            name: world.name,
+            declared: world.previous,
+            previous: (world.previous || [1]).map((n) => w - n).filter((p) => p >= 1),
+            levels: inWorld(w),
+            counted: world.stages.flatMap((stage, j) => (stage.bonus ? [] : inStage(w, j + 1))),
+        };
+    });
+    return worldsCached;
+}
+
+const world = (w) => worlds()[w - 1];
+// The worlds `w` follows (rules 1 and 3), and the worlds that follow it (rule 2).
+const prereqWorlds = (w) => world(w).previous.map(world);
+const followerWorlds = (w) => worlds().filter((x) => x.previous.includes(w));
 
 // The first level matching a predicate.  `what` describes what was wanted, so a levels.js change
 // that removes the last such level fails with an explanation rather than "undefined.name".
@@ -156,29 +197,50 @@ function thresholdCount(total, frac) {
     return need;
 }
 
-// Levels whose completion unlocks `level` at `difficulty` (>= 1), as [levels, difficulty] groups:
-// the next world at half done one difficulty lower (rule 2), the previous world mostly done (rule
-// 1), this world's earlier stages (rule 4), and this stage's earlier levels (rules 5 and 6).
-// Deliberately generous -- it satisfies each gate outright rather than just clearing it.
-function prereqs(level, difficulty) {
-    const groups = [];
-    const next = inWorld(level.world + 1);
-    if (next.length > 0 && difficulty > 0) {
-        groups.push([next.slice(0, thresholdCount(next.length, 0.5)), difficulty - 1]);
-    }
-    const prev = inWorld(level.world - 1);
-    if (prev.length > 0) groups.push([prev, difficulty]);
-    groups.push([inWorld(level.world).filter((l) => l.stage < level.stage), difficulty]);
-    groups.push([inStage(level.world, level.stage).filter((l) => l.index < level.index), difficulty]);
-    return groups.filter(([ls]) => ls.length > 0);
+// Seeds that open world `w` at difficulty `K` -- rules 1-3, read as the app's worldGatesPass reads
+// them, over the declared relation rather than over world order:
+//
+//   1. every world this one follows is >= 80% complete at K
+//   2. every world that follows this one is >= 50% complete at K-1 (unless K is 0)
+//   3. every world followed by a world this one follows is >= 50% at K+1 (unless K is 2)
+//
+// A world named by more than one requirement is seeded at the highest difficulty asked of it, so a
+// weaker requirement can't undo a stronger one.
+function worldGateSeeds(w, K) {
+    const need = new Map();
+    const atLeast = (target, frac, difficulty) => {
+        if (difficulty > 2) return;
+        target.counted.slice(0, thresholdCount(target.counted.length, frac)).forEach(function (l) {
+            const key = completionKey(l);
+            if (!need.has(key) || need.get(key) < difficulty) need.set(key, difficulty);
+        });
+    };
+    prereqWorlds(w).forEach(function (p) {
+        atLeast(p, 0.8, K);
+        if (K < 2) prereqWorlds(p.number).forEach((q) => atLeast(q, 0.5, K + 1));
+    });
+    if (K > 0) followerWorlds(w).forEach((f) => atLeast(f, 0.5, K - 1));
+    return [...need].map(([key, d]) => [key, JSON.stringify({ complete: true, difficulty: d })]);
 }
 
-// The seed pairs for all of `prereqs`.
+// Levels whose completion unlocks `level` at `difficulty`: its world's own gates (rules 1-3), this
+// world's earlier stages (rule 4), and this stage's earlier levels (rules 5 and 6).  Deliberately
+// generous -- it satisfies each gate outright rather than just clearing it.
+function prereqs(level, difficulty) {
+    return [
+        [inWorld(level.world).filter((l) => l.stage < level.stage), difficulty],
+        [inStage(level.world, level.stage).filter((l) => l.index < level.index), difficulty],
+    ].filter(([ls]) => ls.length > 0);
+}
+
+// The seed pairs for all of `prereqs`, after those that open the level's world at `difficulty`.
 const prereqSeeds = (level, difficulty) =>
-    prereqs(level, difficulty).flatMap(([levels, d]) => completions(levels, d));
+    worldGateSeeds(level.world, difficulty)
+        .concat(prereqs(level, difficulty).flatMap(([levels, d]) => completions(levels, d)));
 
 module.exports = {
     allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, prereqStages, find,
+    worlds, world, prereqWorlds, followerWorlds, worldGateSeeds,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, legacyCompletionKeys, completions, thresholdCount, prereqs,
     prereqSeeds,

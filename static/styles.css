@@ -336,7 +336,9 @@ body {
     font-weight: bold;
     width: 20px;
     height: 20px;
-    display: none;
+    /* Hidden with visibility rather than display, so it is still laid out and can be measured:
+       spreadWireLabels needs its size and position to keep the wire labels off it. */
+    visibility: hidden;
 }
 
 .rule .closebutton {
@@ -346,7 +348,7 @@ body {
 }
 
 .rule:hover .closebutton {
-    display: block;
+    visibility: visible;
 }
 
 /* Modal dialogs and their backgrounds that fade the rest of the page */
@@ -507,6 +509,8 @@ body {
     justify-content: center;
     gap: 1px;
     padding: 3px;
+    /* so the hint bubble can sit in the corner */
+    position: relative;
     background-color: #ffffff;
     font-size: 16px;
     font-family: sans-serif;
@@ -566,6 +570,32 @@ body {
     flex-direction: column;
     gap: 1px;
     cursor: pointer;
+}
+
+/* A level that has a hint says so with an "i" filling its top-right corner: blue while the level
+   is open, where clicking it shows the hint, and grey while the level is locked.  The level box
+   clips its own rounded corner, so the square outer corner here comes out rounded to match. */
+
+.hintbubble {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 15px;
+    height: 15px;
+    border-bottom-left-radius: 8px;
+    background-color: #0055cc;
+    color: #ffffff;
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-weight: bold;
+    font-size: 12px;
+    line-height: 14px;
+    cursor: pointer;
+}
+
+.hintbubble.locked {
+    background-color: #aaaaaa;
+    cursor: default;
 }
 
 /* An "active" level (has an unlocked, uncompleted difficulty): bright glow so the player can
@@ -787,6 +817,14 @@ body {
     background-color: #ffffff;
     padding: 5px;
     margin: 2px;
+    /* A label sits at the middle of its wire, right where you'd aim to hover the wire itself, so
+       it lets the pointer through to the wire underneath.  The user-entered ones are clickable,
+       so they take it back. */
+    pointer-events: none;
+}
+
+.connLabel.userLabel {
+    pointer-events: auto;
 }
 
 .connLabelValue {
@@ -795,6 +833,23 @@ body {
 
 .userLabel {
     cursor: pointer;
+}
+
+/* The explanation of a wire's error, shown while the pointer is over that wire.  It never takes
+   the pointer itself, so moving along the wire doesn't make it flicker. */
+
+#wireTooltip {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    max-width: 34em;
+    padding: 8px 10px;
+    background-color: #ffffff;
+    border: 2px solid #ff0000;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    pointer-events: none;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* labels on endpoints */
