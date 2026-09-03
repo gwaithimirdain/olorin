@@ -64,7 +64,6 @@ const KEYS = [
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
     { unicode: '∣', keys: [ '|', '\\mid ', '\\abs ', '\\divides ' ] },
     { unicode: '√', keys: [ '\\sqrt ', '\\surd ' ] },
-    { unicode: '∸', keys: [ '--', '−-', '−−' ] },
     { unicode: '−', keys: [ '-' ] },
     { unicode: '≠', keys: [ '\\neq' ] },
     { unicode: '≤', keys: [ '\\le' ] },
