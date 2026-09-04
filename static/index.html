@@ -691,7 +691,23 @@
       </div>
       <div id="neqHint" class="modal hint">
         The statement "x≠y" means the same as "¬(x=y)", and is called a <i>disequality</i>.
-        I can't prove disequalities automatically; you have to use the rule blocks for ¬.
+        I can't prove most disequalities automatically; you have to use the rule blocks for ¬.
+      </div>
+      <div id="neq2Hint" class="modal hint">
+        The only kind of disequalities the algebra block can prove automatically are disequalities between different constants, without any variables involved.
+      </div>
+      <div id="ascHint" class="modal hint">
+        <p>
+          Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
+          However, sometimes I need a little help.
+          In particular, the inputs of an algebra block never determine its output, and the output of a "prove ¬" block never determines its inputs.
+          Therefore, if the both inputs of a "prove ¬" block come from the outputs of algebra blocks, I have no way to guess what labels should go on those wires.
+        </p>
+        <p>
+          The "label" block allows you to tell me what a particular wire should be labeled.
+          When you place it, it will prompt you for a statement, and then both its input and its output must be labeled with that statement.
+        </p>
+        <img src="hints/asc.png" style="margin-left: auto; margin-right:auto; display:block">
       </div>
       <div id="setsHint" class="modal hint" style="width: 600px">
         Now that we are doing algebra, our variables will denote <i>numbers</i> of one kind or another.

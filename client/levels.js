@@ -1629,19 +1629,6 @@ export const LEVELS = [
                         conclusion: { ty: "∃y∈ℝ,∀x∈ℝ,(x*y=y)" },
                     }
                 },
-                // TODO: How can we give them 1≠0?  Probably rlqe can prove it... if we allow it to prove ≠s.
-                // {
-                //     parameters: [ ],
-                //     variables: [ ],
-                //     hypotheses: [ ],
-                //     conclusion: { ty: "¬∃y∈ℝ,∀x∈ℝ,(x+y=0)" },
-                // },
-                // {
-                //     parameters: [ ],
-                //     variables: [ ],
-                //     hypotheses: [ ],
-                //     conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x·y=1)" },
-                // },
             ],
           },
           { name: "∃∀∧⇒<",
@@ -1770,8 +1757,51 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "¬∀∃⇒∨⊤",                        // ∧, ⊥ not yet used
-            rules: [ "negI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI" ],
+          { name: "=≠∧",
+            rules: [ "andE", "andI", "negE", "cnegI", "alg" ],
+            levels: [
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "y≠5"}, { ty: "x²+y=14"} ],
+                    conclusion: { ty: "x≠3" },
+                    hint: "neqHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "0≠1" },
+                    hint: "neq2Hint",
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "x²≠1"} ],
+                    conclusion: { ty: "(x≠1)∧(x≠−1)" },
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "x²≠1"} ],
+                        conclusion: { ty: "(x≠1)∧(x≠∸1)" },
+                    }
+                },
+                {
+                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "y+x=2·y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
+                    conclusion: { ty: "y≠0" },
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "y+x=2*y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
+                        conclusion: { ty: "y≠0" },
+                    }
+                },
+            ],
+          },
+          { name: "¬∀∃…",
+            rules: [ "negI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI", "expr", "alg" ],
             levels: [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
@@ -1802,6 +1832,21 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ { ty: "(∃x∈A,¬P(x))∨Q" }, { ty: "∃x∈A,⊤" } ],
                     conclusion: { ty: "∃x∈A,(P(x)⇒Q)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "¬∃y∈ℝ,∀x∈ℝ,(x+y=0)" },
+                    extrarules: [ "asc" ],
+                    hint: "ascHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x·y=1)" },
+                    extrarules: [ "asc" ],
                 },
             ]
           },
@@ -1900,42 +1945,6 @@ export const LEVELS = [
                     conclusion: { ty: "∃x∈A,(P(x)⇒∀y∈A,P(y))" },
                 },
             ]
-          },
-          { name: "=≠∧",
-            rules: [ "andE", "andI", "negE", "cnegI", "alg" ],
-            levels: [
-                {
-                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "y≠5"}, { ty: "x²+y=14"} ],
-                    conclusion: { ty: "x≠3" },
-                    hint: "neqHint",
-                },
-                {
-                    parameters: [ { name: "x", ty: "ℤ" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "x²≠1"} ],
-                    conclusion: { ty: "(x≠1)∧(x≠−1)" },
-                    saveable: {
-                        parameters: [ { name: "x", ty: "ℤ" } ],
-                        variables: [ ],
-                        hypotheses: [ { ty: "x²≠1"} ],
-                        conclusion: { ty: "(x≠1)∧(x≠∸1)" },
-                    }
-                },
-                {
-                    parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "y+x=2·y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
-                    conclusion: { ty: "y≠0" },
-                    saveable: {
-                        parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
-                        variables: [ ],
-                        hypotheses: [ { ty: "y+x=2*y−x"}, { ty: "¬((x=0)∧(y=0))" } ],
-                        conclusion: { ty: "y≠0" },
-                    }
-                },
-            ],
           },
           { name: "∀=≠",
             rules: [ "allE", "allI", "cnegI", "negE", "expr", "alg" ],
