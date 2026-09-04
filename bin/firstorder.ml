@@ -34,7 +34,7 @@ def coprod (A B : Type) : Type ≔ data [ left. (_:A) | right. (_:B) ]
 axiom negneg (P : Type) : neg (neg P) → P
 
 axiom eq (A : Type) (x y : A) : Type
-def neq (A : Type) (x y : A) : Type ≔ neg (eq A x y)
+def neq (A : Type) (x y : A) : Type ≔ sig ( negation : eq A x y → ⊥ )
 axiom Nil_eqs : Type
 axiom nil_eqs : Nil_eqs
 axiom Cons_eqs (x_eq_y : Type) (_ : x_eq_y) (rest : Type) (_ : rest) : Type

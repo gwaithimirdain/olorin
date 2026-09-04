@@ -60,6 +60,6 @@ test.describe('A relation written with the numeral first', () => {
         await oneWireProves(olorin, '0=x', '0=x');
         expect(await wireLabels(page)).toEqual(['x=0']);
         await oneWireProves(olorin, '0≠x', '0≠x');
-        expect(await wireLabels(page)).toEqual(['¬(x=0)']);
+        expect(await wireLabels(page)).toEqual(['x≠0']);
     });
 });

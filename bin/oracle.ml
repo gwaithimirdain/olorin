@@ -64,6 +64,7 @@ end)
 let rec get_equality_or_inequality ctx tm =
   let open Monad.Ops (E) in
   let eq = Scope.lookup [ "eq" ] in
+  let neq = Scope.lookup [ "neq" ] in
   let lt = Scope.lookup [ "lt" ] in
   let le = Scope.lookup [ "le" ] in
   let neg = Scope.lookup [ "neg" ] in
@@ -80,6 +81,7 @@ let rec get_equality_or_inequality ctx tm =
          && Option.is_some (is_id_ins rhsins) ->
       let* op =
         if Some name = eq then return `Eq
+        else if Some name = neq then return `Neq
         else if Some name = lt then return `Lt
         else if Some name = le then return `Le
         else Error (Code.Oracle_failed (Explain.Oracle.not_a_relation, Printable.PVal (ctx, tm)))
