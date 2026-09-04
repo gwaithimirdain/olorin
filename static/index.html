@@ -251,7 +251,7 @@
     </div>
 
     <div id="expressionBG" class="modalbg">
-      <div class="modal" style="width:600px">
+      <div class="modal" style="width:650px">
         <h3 style="text-align: center">Enter an expression</h3>
         <p>Enter an expression, possibly using available variables.</p>
         <input type="text" id="expression" style="width: 97%"/>
@@ -271,9 +271,19 @@
             <tr><td>Min/max</td><td><tt>min(x,y)</tt></td><td>(and <tt>max(x,y)</tt>)</td></tr>
           </tbody>
         </table>
-        <p>At present you can only divide by fixed positive integers, and of course only if the intended type of this expression is a number system that allows division.</p>
-        <p>A square root, and more generally a power with a fraction for its exponent, only makes sense in the real numbers or the surreals, so writing one turns the whole statement into a statement about those.  An <i>even</i> root — a square root, a fourth root — also needs its base to be nonnegative, and the algebra block will ask you to have proved that, just as it asks you to have proved a denominator nonzero.  Odd roots ask nothing: every real number has a cube root.</p>
-        <p>An absolute value, a minimum and a maximum are each a <i>case split</i>: ∣x∣ is x when x is nonnegative and −x when it is negative, and min(x,y) and max(x,y) are one or the other of x and y according to which is smaller.  The plain "alg" block makes you settle which case holds — wire in a hypothesis that decides it, or split into the two cases yourself with the "≤∨&gt;" block — so that the ∣ ∣, min or max goes away.  The "alg+" block does that reasoning itself.</p>
+        <p>
+          Only some number systems like ℚ, ℝ, and 𝕊 allow division, and of course only by a nonzero denominator.
+          Any algebra block involving division requires sufficient inputs to prove that every denominator is nonzero.
+        </p>
+        <p>
+          Only the number systems ℝ and 𝕊 allow square roots and fractional exponents.
+          Furthermore, a square root or a fractional exponent with even denominator requires the base to be nonnegative; any algebra block involving such operations requires sufficient inputs to prove such nonnegativity.
+        </p>
+        <p>
+          The ordinary algebra block also cannot prove things about case-split functions like absolute values, minima, or maxima unless it has sufficient inputs to determine which case holds, i.e. that x in ∣x∣ is ≥0 or ≤0, and that in min(x,y) and max(x,y) we have x≤y or y≤x.
+          The "≤∨&gt;" block is helpful for this.
+          (The advanced "alg+" block does that reasoning itself.)
+        </p>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitExpression" style="font-size: 16px">Submit</button>
           <button id="cancelExpression" style="font-size: 16px">Cancel</button><br/>
