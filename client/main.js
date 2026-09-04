@@ -1,4 +1,4 @@
-import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
+import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
@@ -186,41 +186,225 @@ const excludeFromAll = [ "negI" ] // Classical negation suffices
 const diagram = document.getElementById('diagram');
 // #diagram is a fixed viewport; #canvas is the scrollable surface that actually holds the nodes,
 // so nodes dragged far out stay reachable by scrolling instead of vanishing off the window edge.
+// Between them they make an unbounded canvas: the surface grows to the right and down as boxes go
+// that way, and past the top/left edge -- where the browser has no scroll room to offer -- the
+// whole diagram slides the other way instead (shiftWorld), which looks the same on screen.
 const canvas = document.getElementById('canvas');
 
-// Grow #canvas so it contains every node (plus a margin), or shrink it back to fill the viewport
-// when everything fits.  This is what makes far-out nodes reachable via the scrollbars.
-function resizeCanvas() {
+// Empty space to keep beyond the outermost box, so there's always somewhere to drop the next one.
+const CANVAS_MARGIN = 60;
+
+// Size #canvas so it covers every node (plus a margin) and whatever region is scrolled into view,
+// or shrink it back to fill the viewport when everything fits.  This is what makes far-out nodes
+// reachable via the scrollbars.  The scroll ends up at (scrollX, scrollY), by default where it
+// already was: resizing the surface can clamp the scroll, so it has to be restored afterwards.
+function resizeCanvas(scrollX, scrollY) {
+    if(scrollX === undefined) { scrollX = diagram.scrollLeft; }
+    if(scrollY === undefined) { scrollY = diagram.scrollTop; }
     let maxRight = 0, maxBottom = 0;
     nodes.forEach((x) => {
         const el = x.node;
         maxRight = Math.max(maxRight, el.offsetLeft + el.offsetWidth);
         maxBottom = Math.max(maxBottom, el.offsetTop + el.offsetHeight);
     });
-    const MARGIN = 60;
     // Clear first so diagram.clientWidth/Height report the true viewport (minus any needed scrollbar).
     canvas.style.width = '';
     canvas.style.height = '';
-    // Only grow once a node actually extends past the viewport edge (so the conclusion sitting near
-    // the right edge doesn't itself trigger a scrollbar); the margin is just breathing room beyond.
-    if(maxRight > diagram.clientWidth)   { canvas.style.width  = (maxRight + MARGIN) + 'px'; }
-    if(maxBottom > diagram.clientHeight) { canvas.style.height = (maxBottom + MARGIN) + 'px'; }
+    // Only grow once something actually extends past the viewport edge (so the conclusion sitting
+    // near the right edge doesn't itself trigger a scrollbar); the margin is just breathing room
+    // beyond.  Panning can also leave the viewport out past every box, and the surface has to keep
+    // covering it or the browser would scroll the view back.
+    const width  = Math.max(maxRight  > diagram.clientWidth  ? maxRight  + CANVAS_MARGIN : 0,
+                            scrollX + diagram.clientWidth);
+    const height = Math.max(maxBottom > diagram.clientHeight ? maxBottom + CANVAS_MARGIN : 0,
+                            scrollY + diagram.clientHeight);
+    if(width  > diagram.clientWidth)  { canvas.style.width  = width  + 'px'; }
+    if(height > diagram.clientHeight) { canvas.style.height = height + 'px'; }
+    diagram.scrollLeft = scrollX;
+    diagram.scrollTop = scrollY;
 }
 
-// Nodes can be dragged up/left past the origin, where there's no scroll room to reach them; pull any
-// such node back onto the canvas so it can't be lost.  (Growth to the right/down is handled by scroll.)
-function clampNodesToCanvas() {
+// Slide the whole diagram by (dx, dy) across the canvas, leaving out any boxes in `frozen` -- the
+// ones a drag is holding under the pointer, which have to stay where the pointer put them.  Returns
+// whether anything moved.
+function shiftWorld(dx, dy, frozen) {
+    if(!dx && !dy) { return false; }
+    var moved = false;
     nodes.forEach((x) => {
         const el = x.node;
-        let moved = false;
-        if(el.offsetLeft < 0) { el.style.left = '0px'; moved = true; }
-        if(el.offsetTop < 0)  { el.style.top = '0px';  moved = true; }
-        if(moved) { instance.revalidate(el); }
+        if(frozen && frozen.has(el)) { return; }
+        const left = el.offsetLeft + dx, top = el.offsetTop + dy;
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+        // Tell jsPlumb where the box went, so its wires follow.  (setElementPosition only updates
+        // jsPlumb's own picture of the diagram and repaints; moving the box is up to us.)
+        instance.setElementPosition(el, left, top);
+        moved = true;
     });
+    return moved;
 }
 
+// Panning (and dragging a box past an edge) can leave boxes at negative coordinates, where there's
+// no scroll room to reach them.  Slide the whole diagram back into positive territory and scroll by
+// the same amount: nothing moves on screen, but everything is now reachable with the scrollbars.
+function normalizeOrigin() {
+    let minLeft = 0, minTop = 0;
+    nodes.forEach((x) => {
+        minLeft = Math.min(minLeft, x.node.offsetLeft);
+        minTop  = Math.min(minTop,  x.node.offsetTop);
+    });
+    const dx = -minLeft, dy = -minTop;
+    if(!dx && !dy) { return false; }
+    shiftWorld(dx, dy, null);
+    // The surface has to be big enough for the scroll we're about to ask for, so size it first.
+    resizeCanvas(diagram.scrollLeft + dx, diagram.scrollTop + dy);
+    return true;
+}
+
+// Move the viewport by (dx, dy) across the diagram: a positive dx brings into view what lies off to
+// the right.  `frozen`, when given, is the set of boxes a drag is holding under the pointer: they
+// mustn't move on screen, so the pan moves the rest of the world the other way instead of
+// scrolling (jsPlumb positions a dragged box from the pointer alone, and scrolling the view under
+// it would leave it behind).  Returns whether any box moved, i.e. whether positions need saving.
+function panView(dx, dy, frozen) {
+    if(frozen) { return shiftWorld(-dx, -dy, frozen); }
+    // Scrolling right/down needs surface to scroll onto; grow it as we go.
+    if(dx > 0) { canvas.style.width  = Math.max(canvas.offsetWidth,  diagram.scrollLeft + diagram.clientWidth  + dx) + 'px'; }
+    if(dy > 0) { canvas.style.height = Math.max(canvas.offsetHeight, diagram.scrollTop  + diagram.clientHeight + dy) + 'px'; }
+    const wantX = diagram.scrollLeft + dx, wantY = diagram.scrollTop + dy;
+    diagram.scrollLeft = wantX;
+    diagram.scrollTop = wantY;
+    // Whatever the scroll couldn't do is off the top/left, where it has no room: move the world.
+    return shiftWorld(diagram.scrollLeft - wantX, diagram.scrollTop - wantY, null);
+}
+
+// How close to a viewport edge the pointer has to come before a drag starts panning, how fast that
+// pans at the very edge, and the fastest it pans however far outside the window the pointer goes.
+const PAN_BAND = 40;
+const PAN_EDGE_SPEED = 10;
+const PAN_MAX_SPEED = 24;
+
+// How fast to pan along one axis with the pointer at `p`, given a viewport spanning [lo, hi]:
+// nothing until the pointer comes within PAN_BAND of an edge, then faster the further past it goes.
+function edgeSpeed(p, lo, hi) {
+    const over = p > hi - PAN_BAND ? p - (hi - PAN_BAND) : (p < lo + PAN_BAND ? p - (lo + PAN_BAND) : 0);
+    const speed = over * PAN_EDGE_SPEED / PAN_BAND;
+    return Math.max(-PAN_MAX_SPEED, Math.min(PAN_MAX_SPEED, speed));
+}
+
+function pointerXY(e) {
+    const t = e.touches && e.touches.length ? e.touches[0] : e;
+    return { x: t.clientX, y: t.clientY };
+}
+
+// Scroll the view, as little as it takes, to show the given boxes -- for after a drag whose pointer
+// wandered off the window, carrying its box out of sight with it.  Sizes the canvas to match, so
+// this is also the resizeCanvas every settled change to the diagram needs.
+function scrollToShow(els) {
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    els.forEach((el) => {
+        left   = Math.min(left,   el.offsetLeft);
+        top    = Math.min(top,    el.offsetTop);
+        right  = Math.max(right,  el.offsetLeft + el.offsetWidth);
+        bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
+    });
+    if(left === Infinity) { resizeCanvas(); return; }
+    let x = diagram.scrollLeft, y = diagram.scrollTop;
+    // Chase the far edge first and the near edge second, so a box too big for the viewport still
+    // ends up with its top left corner showing.  PAD is so it doesn't end up flush against the edge.
+    const PAD = 8;
+    if(right  + PAD > x + diagram.clientWidth)  { x = right  + PAD - diagram.clientWidth; }
+    if(bottom + PAD > y + diagram.clientHeight) { y = bottom + PAD - diagram.clientHeight; }
+    if(left - PAD < x) { x = left - PAD; }
+    if(top  - PAD < y) { y = top  - PAD; }
+    resizeCanvas(Math.max(0, x), Math.max(0, y));
+}
+
+// Look at wherever the proof is.  A proof the player laid out by panning off the top or left of
+// where the level started is saved with the coordinates that gave it, so opening it with the view
+// back at the origin could show nothing but empty canvas.
+function scrollToContent() {
+    let minLeft = Infinity, minTop = Infinity;
+    nodes.forEach((x) => {
+        minLeft = Math.min(minLeft, x.node.offsetLeft);
+        minTop  = Math.min(minTop,  x.node.offsetTop);
+    });
+    if(minLeft === Infinity) { resizeCanvas(); return; }
+    resizeCanvas(Math.max(0, minLeft - CANVAS_MARGIN), Math.max(0, minTop - CANVAS_MARGIN));
+}
+
+// The box drag in progress, if any: which boxes the pointer is carrying (jsPlumb moves the whole
+// drag selection, and tells us which elements those are as it moves them), where the pointer was
+// last seen, and the animation frame panning the canvas while it sits against an edge.
+var dragPan = null;
+
+function dragPanFrame() {
+    // Wait for the first move: until jsPlumb has told us which boxes it is carrying, panning would
+    // slide the dragged ones out from under the pointer along with everything else.
+    if(dragPan.boxes.size > 0) {
+        const r = diagram.getBoundingClientRect();
+        panView(edgeSpeed(dragPan.pointer.x, r.left, r.right),
+                edgeSpeed(dragPan.pointer.y, r.top, r.bottom),
+                dragPan.boxes);
+    }
+    dragPan.frame = requestAnimationFrame(dragPanFrame);
+}
+
+function startDragPan(e) {
+    dragPan = { boxes: new Set(), pointer: pointerXY(e), frame: 0 };
+    dragPan.frame = requestAnimationFrame(dragPanFrame);
+}
+
+function stopDragPan() {
+    if(dragPan) { cancelAnimationFrame(dragPan.frame); }
+    dragPan = null;
+}
+
+// Ctrl/Cmd-dragging (or middle-dragging) the blank background pans the whole diagram behind the
+// viewport, for moving around a proof spread out beyond the window without using the scrollbars.
+var bgPan = null;
+
+function isPanGesture(e) { return e.button === 1 || (e.button === 0 && (e.ctrlKey || e.metaKey)); }
+
+diagram.addEventListener('mousedown', function(e) {
+    // Only from the blank background: over a box, the mouse is doing something else.
+    if(e.target !== canvas || !isPanGesture(e)) { return; }
+    e.preventDefault();
+    bgPan = { x: e.clientX, y: e.clientY, moved: false };
+    diagram.classList.add('panning');
+});
+
+document.addEventListener('mousemove', function(e) {
+    if(!bgPan) { return; }
+    // The canvas follows the hand, so the viewport goes the opposite way.
+    if(panView(bgPan.x - e.clientX, bgPan.y - e.clientY, null)) { bgPan.moved = true; }
+    bgPan.x = e.clientX;
+    bgPan.y = e.clientY;
+});
+
+document.addEventListener('mouseup', function() {
+    if(!bgPan) { return; }
+    const moved = bgPan.moved;
+    bgPan = null;
+    diagram.classList.remove('panning');
+    // Panning past the top/left leaves boxes at negative coordinates; put the origin back (which
+    // resizes the canvas itself), and otherwise trim the surface to what we ended up needing.
+    const shifted = normalizeOrigin();
+    if(!shifted) { resizeCanvas(); }
+    if(moved || shifted) { autosave(); }
+});
+
+// On a Mac, Ctrl-clicking is also the way to open a context menu; suppress it while panning.
+diagram.addEventListener('contextmenu', function(e) { if(bgPan) { e.preventDefault(); } });
+
+// Offer the "grab" cursor while the pan modifier is held, so the gesture is discoverable.
+function updatePanCursor(e) { diagram.classList.toggle('panready', e.ctrlKey || e.metaKey); }
+document.addEventListener('keydown', updatePanCursor);
+document.addEventListener('keyup', updatePanCursor);
+window.addEventListener('blur', function() { diagram.classList.remove('panready'); });
+
 // Keep the canvas filling the window as it's resized.
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', function() { resizeCanvas(); });
 
 // Initialize Z3
 const { init } = require('z3-solver');
@@ -322,11 +506,26 @@ ready(() => {
     // It seems that EVENT_CONNECTION also fires after a connection is moved, so no need to separately bind EVENT_CONNECTION_MOVED.
     // We've forbidden connections from being detached by dropping, since it appears to be kind of broken, e.g. EVENT_CONNECTION_DETACHED fires *before* it's detached.  Instead the user removes connections with the close button.
 
+    // Dragging a box against a window edge pans the canvas that way, so it can be carried off as
+    // far as the player likes.  jsPlumb moves the whole drag selection but only announces the drag
+    // once, so we collect the boxes it's carrying from the moves themselves, and take the pointer
+    // from them too: it stays put while the canvas pans out from under it.
+    instance.bind(EVENT_DRAG_START, function (p) { startDragPan(p.e); });
+    instance.bind(EVENT_DRAG_MOVE, function (p) {
+        if(dragPan) {
+            dragPan.boxes.add(p.el);
+            dragPan.pointer = pointerXY(p.e);
+        }
+    });
+
     // Dragging a node to rearrange the proof changes positions without re-typechecking, so save
     // the new positions when a drag finishes.
     instance.bind(EVENT_DRAG_STOP, function () {
-        clampNodesToCanvas();
-        resizeCanvas();
+        const dropped = dragPan ? dragPan.boxes : new Set();
+        stopDragPan();
+        // A box dragged off the top/left is sitting at negative coordinates; put the origin back.
+        normalizeOrigin();
+        scrollToShow(dropped);
         // Dragging a box moves its wires, which can push labels onto each other.
         spreadWireLabels();
         autosave();
@@ -633,7 +832,8 @@ let selectingStartX, selectingStartY, isSelecting, shiftSelecting = false;
 
 // Start selection on mousedown anywhere in the document.
 diagram.addEventListener('mousedown', function(e) {
-    if(e.target === canvas) {
+    // Ctrl/Cmd- and middle-dragging the background pan it instead of selecting.
+    if(e.target === canvas && !isPanGesture(e)) {
         isSelecting = true;
         if(e.shiftKey) {
             shiftSelecting = true;
@@ -1761,8 +1961,9 @@ function restoreProof(state, level, countAsCompletion) {
 
     // Repositioning the nodes invalidated jsPlumb's cached geometry; revalidate before reconnecting.
     nodes.forEach((entry) => instance.revalidate(entry.node));
-    // Saved nodes may sit beyond the viewport; grow the canvas so they're reachable by scrolling.
-    resizeCanvas();
+    // Saved nodes may sit beyond the viewport; grow the canvas so they're reachable by scrolling,
+    // and look at where they actually are.
+    scrollToContent();
 
     // Recreate the connections, matching endpoints by their sort and label.
     (state.connections || []).forEach((c) => {

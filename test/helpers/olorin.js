@@ -300,12 +300,41 @@ class Olorin {
     // Drag a diagram node by (dx, dy) pixels with a real mouse gesture.
     async dragNode(id, dx, dy) {
         const box = await this.page.locator('#' + id).boundingBox();
-        const cx = box.x + box.width / 2;
-        const cy = box.y + box.height / 2;
-        await this.page.mouse.move(cx, cy);
+        await this.dragNodeTo(id, box.x + box.width / 2 + dx, box.y + box.height / 2 + dy);
+    }
+
+    // Drag a diagram node to a point in the window, holding it there for `hold` milliseconds
+    // before letting go -- long enough, against a window edge, for the canvas to pan along under it.
+    async dragNodeTo(id, x, y, hold = 0) {
+        const box = await this.page.locator('#' + id).boundingBox();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         await this.page.mouse.down();
-        await this.page.mouse.move(cx + dx, cy + dy, { steps: 8 });
+        await this.page.mouse.move(x, y, { steps: 8 });
+        if(hold) { await this.page.waitForTimeout(hold); }
         await this.page.mouse.up();
+    }
+
+    // Ctrl-drag the blank background from one point in the window to another, panning the canvas.
+    async panBackground(fromX, fromY, toX, toY) {
+        await this.page.keyboard.down('Control');
+        await this.page.mouse.move(fromX, fromY);
+        await this.page.mouse.down();
+        await this.page.mouse.move(toX, toY, { steps: 10 });
+        await this.page.mouse.up();
+        await this.page.keyboard.up('Control');
+    }
+
+    // Where each node sits on the screen, by id -- what the player sees, wherever the canvas has
+    // been scrolled or panned to.
+    nodeRects() {
+        return this.page.evaluate(() => {
+            const out = {};
+            window.__olorin.nodes().forEach((n) => {
+                const r = document.getElementById(n.id).getBoundingClientRect();
+                out[n.id] = { x: r.x, y: r.y, w: r.width, h: r.height };
+            });
+            return out;
+        });
     }
 
     // Click the Angle / Curved connector-style radio.

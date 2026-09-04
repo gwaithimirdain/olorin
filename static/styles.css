@@ -93,6 +93,17 @@ body {
     min-height: 100%;
 }
 
+/* A box on the canvas is as wide as its contents: it must never re-wrap its text, which it
+   otherwise would when dragged near the right-hand edge of the canvas, where the room an
+   auto-width absolute box has to lay itself out in runs short. */
+#canvas .rule {
+    white-space: nowrap;
+}
+
+/* Ctrl/Cmd- or middle-dragging the background pans the canvas behind the viewport. */
+#diagram.panready { cursor: grab; }
+#diagram.panning, #diagram.panning * { cursor: grabbing; }
+
 /* Basic rule styling */
 
 .rule {
