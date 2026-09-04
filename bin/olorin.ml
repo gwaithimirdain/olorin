@@ -445,10 +445,33 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 locate_opt None `Explicit ) in
           let term =
             match (tm1, tm2) with
-            (* If one term is synthesizing and the other is not, we try both applying that term as the negation and implicitly using it as the unnegated.  *)
+            (* One term we can synthesize and one we can't, on whichever ports.  We want the direct
+               reading -- the synthesizing one is the negation, applied to the other -- except
+               where only the reversed one actually works, which is the player having the two the
+               other way round.  Three alternatives get all three of those right:
+
+               The direct reading first, because it has to win where both readings would do.  That
+               is what an argument still to be supplied is: a hole checks against anything, so the
+               port must be labelled with what the reading we prefer would put there -- the
+               un-negated statement, not a doubly negated one.
+
+               The reversed reading second, for when the direct one genuinely doesn't work.
+
+               And the direct reading once more, so that when neither works we fail as it does.
+               Committing (not passing through) makes its diagnostic the one reported, and running
+               it last makes its types the ones the ports are labelled with; otherwise both fall to
+               the reversed reading's complaint that the argument isn't a *doubly* negated
+               statement, which is a demand neither port ever made and no ordinary subproof can
+               meet.  It is gated on the synthesizing term really being a negation -- on having the
+               field we are about to project -- since otherwise the direct reading cannot work and
+               the reversed one's failure is the only one worth reporting. *)
             | `Synthesizing fn, `Nonsynthesizing arg | `Nonsynthesizing arg, `Synthesizing fn ->
                 Named.SFirst
-                  ( [ (`Any, make_direct fn arg, true); (`Any, make_reversed fn arg, true) ],
+                  ( [
+                      (`Any, make_direct fn arg, true);
+                      (`Any, make_reversed fn arg, true);
+                      (`Codata [ fst field ], make_direct fn arg, false);
+                    ],
                     Some fn.value )
             (* If both are synthesizing, we try all four possibilities. *)
             | `Synthesizing tm1, `Synthesizing tm2 ->
