@@ -2177,6 +2177,13 @@ if (new URLSearchParams(window.location.search).has("test")) {
             if(value === null) { delete st[option]; } else { st[option] = value; }
             updateLevelSelect(null);
         },
+        // The same for one level's own options ("extrarules"), by 1-based world, stage and level
+        // number.  A level's palette is built when it is opened, so open it after setting this.
+        setLevelOption: (world, stage, level, option, value) => {
+            const lvl = LEVELS[world - 1].stages[stage - 1].levels[level - 1];
+            if(value === null) { delete lvl[option]; } else { lvl[option] = value; }
+            updateLevelSelect(null);
+        },
         // The same for a world's own options ("previous"), by 1-based world number.
         setWorldOption: (world, option, value) => {
             const w = LEVELS[world - 1];
@@ -2613,7 +2620,9 @@ document.getElementById("doneUnlock").onclick = function () {
 };
 
 function selectCurrentLevel(level, skipSavedPrompt) {
-    if(!setLevel(level, level.stage.rules.concat(extraRules))) { return; }
+    // The palette holds this level's stage's rules, plus any the level itself asks for on top of
+    // them (`extrarules`), plus any the ?rules= query string added.
+    if(!setLevel(level, level.stage.rules.concat(level.extrarules || [], extraRules))) { return; }
     currentLevel = level;
     currentLevelButton = level.button;
     currentCustom = null;

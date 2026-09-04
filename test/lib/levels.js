@@ -45,7 +45,9 @@ function allLevels() {
                     stage: y + 1,
                     index: z + 1,
                     worldName: world.name,
-                    rules: stage.rules,
+                    // The palette this level offers: its stage's rules plus any of its own.
+                    rules: stage.rules.concat(level.extrarules || []),
+                    extrarules: level.extrarules || [],
                     saveable: saveable(level),
                     // DEPRECATED (see client/levels.js): the statements this level was stored under
                     // before it was last restated, for the levels that moved; empty otherwise.

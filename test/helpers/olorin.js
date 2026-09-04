@@ -70,6 +70,15 @@ class Olorin {
         );
     }
 
+    // Set (null clears) one of a level's own options -- 'extrarules' -- by 1-based world, stage and
+    // level number.  A level's palette is built when it is opened, so open it after setting this.
+    setLevelOption(world, stage, level, option, value) {
+        return this.page.evaluate(
+            ({ w, s, l, o, v }) => window.__olorin.setLevelOption(w, s, l, o, v),
+            { w: world, s: stage, l: level, o: option, v: value },
+        );
+    }
+
     // Set (null clears) one of a world's unlock options -- 'previous' -- by 1-based world number,
     // and re-render the chooser.
     setWorldOption(world, option, value) {
@@ -201,6 +210,13 @@ class Olorin {
     async nextUnsolved() {
         await this.page.click('#nextUnsolved');
         await this.dismissHints();
+    }
+
+    // The rules the palette is currently offering, in palette order.
+    paletteRules() {
+        return this.page.evaluate(() => Array.from(document.getElementById('palette').children)
+            .filter((el) => el.classList.contains('rule') && getComputedStyle(el).display !== 'none')
+            .map((el) => el.id));
     }
 
     // Drag a palette rule (e.g. "andI") onto the diagram at (x, y) relative to the diagram's

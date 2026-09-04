@@ -29,6 +29,14 @@
 //                       own stage still counts normally, so the stage rules (a stage needing its
 //                       predecessors, a level needing the ones before it) treat it like any other.
 //
+// A level is { parameters, variables, hypotheses, conclusion }: the statement it asks you to prove.
+// Among the optional fields it may carry:
+//
+//   extrarules: [ "id", ...]
+//                       Palette rules this level offers on top of the ones its stage lists, for a
+//                       level that needs a box the rest of its stage doesn't.  The stage's own
+//                       rules always remain available.
+//
 export const LEVELS = [
     { name: "Conjunction world",
       stages: [
