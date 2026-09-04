@@ -533,6 +533,7 @@ function addEndpointsForRule(box, id, restore) {
             maxConnections: -1,
             parameters: { sort: "output", hasValue: true },
             paintStyle: { fill: VALUECOLOR },
+            connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 },
         });
         // Double-clicking the box re-opens the dialog to edit what it says.
         box.addEventListener('dblclick', function () { editExpr(box); });
