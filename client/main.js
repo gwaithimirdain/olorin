@@ -715,7 +715,7 @@ function addEndpointsForRule(box, id, restore) {
             ascribe.focus();
         }
         typecheck_now = false;
-    } else if (id === 'alg') {
+    } else if (id === 'algebra' || id === 'algebraplus') {
         instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
     } else if (id === 'expr') {
@@ -1883,6 +1883,16 @@ document.getElementById("discardSavedProof").onclick = function() {
     }
 };
 
+// The rule a saved node names, translated if that name has since been retired.  There used to be
+// one algebra block, "alg"; it is now two, the plain "algebra" and the stronger "algebraplus",
+// which differ only over absolute values, minima and maxima.  No built-in level's statement
+// mentions any of those, so every saved "alg" is restored as the plain block, which is what the
+// palette now offers.
+const legacyRules = { alg: 'algebra' };
+function savedRule(rule) {
+    return legacyRules[rule] || rule;
+}
+
 // Find the endpoint on a node element matching a saved connection's sort and label.
 function findEndpoint(el, sort, label) {
     return instance.getEndpoints(el).find(function (ep) {
@@ -1932,8 +1942,9 @@ function restoreProof(state, level, countAsCompletion) {
 
     // Recreate the user-added nodes, in their saved order, with their saved geometry and values.
     (state.nodes || []).filter((n) => !fixedRules.includes(n.rule)).forEach((sn) => {
-        const box = addRuleNode(sn.rule);
-        addEndpointsForRule(box, sn.rule, true);
+        const rule = savedRule(sn.rule);
+        const box = addRuleNode(rule);
+        addEndpointsForRule(box, rule, true);
         if(sn.left)   { box.style.left = sn.left; }
         if(sn.top)    { box.style.top = sn.top; }
         if(sn.width)  { box.style.width = sn.width; }

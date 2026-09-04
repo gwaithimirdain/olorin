@@ -18,7 +18,7 @@ async function algebraProves(olorin, { variables = '', hypotheses = [], conclusi
         hypotheses: hypotheses.join('\n'),
         conclusion,
     });
-    const alg = await olorin.dragRule('alg', 400, 200);
+    const alg = await olorin.dragRule('algebra', 400, 200);
     const nodes = await olorin.nodes();
     for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
         await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: alg, sort: 'input' });

@@ -99,7 +99,8 @@
         <div class="basic logical rule" style="text-align: right" id="topI" data-rule="topI">⊤</div>
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc">🏷</div>
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr">expr</div>
-        <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg">alg</div>
+        <div class="basic logical rule" style="text-align: center" id="algebra" data-rule="algebra">alg</div>
+        <div class="basic logical rule" style="text-align: center" id="algebraplus" data-rule="algebraplus">alg+</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral">?·?=0</div>
         <div class="basic logical rule" style="text-align: center" id="deceq" data-rule="deceq">=∨≠</div>
         <div class="basic logical rule" style="text-align: center" id="tord" data-rule="tord">≤∨&gt;</div>
@@ -272,6 +273,7 @@
         </table>
         <p>At present you can only divide by fixed positive integers, and of course only if the intended type of this expression is a number system that allows division.</p>
         <p>A square root, and more generally a power with a fraction for its exponent, only makes sense in the real numbers or the surreals, so writing one turns the whole statement into a statement about those.  An <i>even</i> root — a square root, a fourth root — also needs its base to be nonnegative, and the algebra block will ask you to have proved that, just as it asks you to have proved a denominator nonzero.  Odd roots ask nothing: every real number has a cube root.</p>
+        <p>An absolute value, a minimum and a maximum are each a <i>case split</i>: ∣x∣ is x when x is nonnegative and −x when it is negative, and min(x,y) and max(x,y) are one or the other of x and y according to which is smaller.  The plain "alg" block makes you settle which case holds — wire in a hypothesis that decides it, or split into the two cases yourself with the "≤∨&gt;" block — so that the ∣ ∣, min or max goes away.  The "alg+" block does that reasoning itself.</p>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitExpression" style="font-size: 16px">Submit</button>
           <button id="cancelExpression" style="font-size: 16px">Cancel</button><br/>

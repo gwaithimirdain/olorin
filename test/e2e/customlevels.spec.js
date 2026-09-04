@@ -215,7 +215,7 @@ test.describe('A custom level that does not parse', () => {
         await olorin.dismissHints();
         expect(await olorin.currentLevelName()).toBe('Custom');
         const nodes = await olorin.nodes();
-        const alg = await olorin.dragRule('alg', 500, 200);
+        const alg = await olorin.dragRule('algebra', 500, 200);
         await olorin.connect({ vertex: alg, sort: 'output' },
                              { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
         await olorin.waitForTypecheck();

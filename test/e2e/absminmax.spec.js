@@ -1,8 +1,12 @@
 // Absolute value, written ∣x∣, and the smaller and larger of two numbers, written min(x,y) and
 // max(x,y).  All three make sense in every one of the number systems, since all of them are
-// ordered, and all three are definable in a real closed field by a case split, so the algebra block
-// decides them the same way it decides everything else: each is handed to Z3 as a conditional
-// between two polynomials, and needs no side condition of its own.
+// ordered, and all three are definable in a real closed field by a case split: each is handed to
+// Z3 as a conditional between two polynomials.
+//
+// Z3 decides such a conditional on its own, and the "alg+" block lets it -- so alg+ proves things
+// about ∣ ∣, min and max with no help.  The plain "alg" block does not: it first requires the
+// hypotheses wired into it to settle which way each of those comparisons goes, so that the
+// conditional simplifies away and the student has done the case split themselves.
 //
 // ∣x∣ borrows the ∣ of divisibility.  An infix notation that is an initial segment of an outfix one
 // is allowed to be ambiguous with it, and the parse resolves in favour of the infix -- the reading
@@ -16,8 +20,9 @@ const { Olorin } = require('../helpers/olorin');
 const wireLabels = (page) => page.evaluate(() =>
     Array.from(document.querySelectorAll('.connLabel')).map((e) => (e.innerText || '').replace(/\s+/g, '')));
 
-// State a level and prove it with a single algebra block fed by every hypothesis.
-async function proves(olorin, { variables = 'x ∈ ℝ\ny ∈ ℝ', hypotheses = [], conclusion }) {
+// State a level and prove it with a single algebra block -- "algebraplus" unless told otherwise --
+// fed by every hypothesis.
+async function provesWith(rule, olorin, { variables = 'x ∈ ℝ\ny ∈ ℝ', hypotheses = [], conclusion }) {
     await olorin.buildCustom({
         parameters: '',
         variables,
@@ -25,7 +30,7 @@ async function proves(olorin, { variables = 'x ∈ ℝ\ny ∈ ℝ', hypotheses =
         conclusion,
     });
     const nodes = await olorin.nodes();
-    const alg = await olorin.dragRule('alg', 600, 200);
+    const alg = await olorin.dragRule(rule, 600, 200);
     for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
         await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: alg, sort: 'input' });
     }
@@ -34,6 +39,9 @@ async function proves(olorin, { variables = 'x ∈ ℝ\ny ∈ ℝ', hypotheses =
     await olorin.waitForTypecheck();
     return olorin.isComplete();
 }
+
+const proves = (olorin, level) => provesWith('algebraplus', olorin, level);
+const plainProves = (olorin, level) => provesWith('algebra', olorin, level);
 
 // State something and wire it straight through, to read back the statement Olorin understood.
 async function readsAs(olorin, page, statement, variables = 'a ∈ ℤ\nb ∈ ℤ') {
@@ -47,7 +55,7 @@ async function readsAs(olorin, page, statement, variables = 'a ∈ ℤ\nb ∈ �
     return (await wireLabels(page))[0];
 }
 
-test.describe('Absolute value', () => {
+test.describe('Absolute value, given to the alg+ block', () => {
     test('is nonnegative and multiplicative, and obeys the triangle inequality', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
@@ -83,7 +91,7 @@ test.describe('Absolute value', () => {
     });
 });
 
-test.describe('min and max', () => {
+test.describe('min and max, given to the alg+ block', () => {
     test('are the smaller and the larger', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
@@ -111,6 +119,72 @@ test.describe('min and max', () => {
     });
 });
 
+// The plain block asks for the case split first.  The messages it gives when it doesn't get one
+// are Explain.Oracle.undecided_sign and undecided_order in bin/explain.ml.
+const complaint = async (olorin) =>
+    (await olorin.diagnostics()).map((d) => d.explanation).join(' ');
+
+test.describe('The plain alg block', () => {
+    test('refuses an absolute value whose sign nothing settles', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // Something alg+ proves outright, and with no hypotheses at all.
+        expect(await plainProves(olorin, { conclusion: '0 ≤ ∣x∣' })).toBe(false);
+        expect(await complaint(olorin)).toContain('know which way that goes');
+        // A hypothesis that says something about x, but not which way it goes, is no better.
+        expect(await plainProves(olorin, { hypotheses: ['x·x = 4'], conclusion: '0 ≤ ∣x∣' })).toBe(false);
+    });
+
+    test('takes an absolute value once a hypothesis settles the sign, either way', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await plainProves(olorin, { hypotheses: ['0≤x'], conclusion: '∣x∣ = x' })).toBe(true);
+        expect(await plainProves(olorin, { hypotheses: ['x≤0'], conclusion: '∣x∣ = −x' })).toBe(true);
+        // The two branches of the "≤∨>" block are "x ≤ 0" and "0 < x", so each of those has to be
+        // enough on its own: that block is how a student is meant to do the split.
+        expect(await plainProves(olorin, { hypotheses: ['0<x'], conclusion: '∣x∣ = x' })).toBe(true);
+        // And a hypothesis that forces the sign without saying so does just as well.
+        expect(await plainProves(olorin, { hypotheses: ['x = y·y'], conclusion: '∣x∣ = x' })).toBe(true);
+    });
+
+    test('refuses a min or max whose order nothing settles, and takes one that is settled', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await plainProves(olorin, { conclusion: 'min(x,y) ≤ x' })).toBe(false);
+        expect(await complaint(olorin)).toContain('which of those two numbers is the smaller');
+        expect(await plainProves(olorin, { hypotheses: ['x≤y'], conclusion: 'min(x,y) = x' })).toBe(true);
+        expect(await plainProves(olorin, { hypotheses: ['y<x'], conclusion: 'min(x,y) = y' })).toBe(true);
+        expect(await plainProves(olorin, { hypotheses: ['x≤y'], conclusion: 'max(x,y) = y' })).toBe(true);
+    });
+
+    test('asks separately about every case in the statement', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // Both absolute values are settled, and then min's own comparison still isn't.
+        expect(await plainProves(olorin, {
+            hypotheses: ['0≤x', '0≤y'], conclusion: 'min(∣x∣,∣y∣) ≤ x',
+        })).toBe(false);
+        expect(await complaint(olorin)).toContain('which of those two numbers is the smaller');
+        // Settling the absolute values settles the comparison between them too.
+        expect(await plainProves(olorin, {
+            hypotheses: ['0≤x', '0≤y', 'x≤y'], conclusion: 'min(∣x∣,∣y∣) = x',
+        })).toBe(true);
+        // The other way round: the order of the two is given, but not the sign of either.
+        expect(await plainProves(olorin, {
+            hypotheses: ['∣x∣≤∣y∣'], conclusion: 'min(∣x∣,∣y∣) = ∣x∣',
+        })).toBe(false);
+        expect(await complaint(olorin)).toContain('know which way that goes');
+    });
+
+    test('is otherwise the block it always was', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // A statement with no case split in it is proved exactly as before.
+        expect(await plainProves(olorin, { conclusion: '(x+y)·(x−y) = x·x−y·y' })).toBe(true);
+        expect(await plainProves(olorin, { hypotheses: ['x+y=1'], conclusion: 'x = 1−y' })).toBe(true);
+    });
+});
+
 test.describe('The ∣ of absolute value and the ∣ of divisibility', () => {
     // Divisibility is an ∃ under the hood, so a statement that reads back as one was parsed as
     // divisibility; one that reads back with bars around it was parsed as an absolute value.
@@ -132,7 +206,7 @@ test.describe('The ∣ of absolute value and the ∣ of divisibility', () => {
             parameters: '', variables: 'a ∈ ℤ\nb ∈ ℤ', hypotheses: '', conclusion: '2 ∣ 4',
         });
         const nodes = await olorin.nodes();
-        const alg = await olorin.dragRule('alg', 600, 200);
+        const alg = await olorin.dragRule('algebra', 600, 200);
         await olorin.connect({ vertex: alg, sort: 'output' },
                              { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
         await olorin.waitForTypecheck();

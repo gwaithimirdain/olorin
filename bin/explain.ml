@@ -15,6 +15,8 @@ module Oracle = struct
   let zero_denominator = "can't prove this denominator is nonzero"
   let negative_base = "can't prove this is nonnegative"
   let disequality = "proving disequalities by algebra not allowed"
+  let undecided_sign = "can't tell which way this goes"
+  let undecided_order = "can't tell which of these two is smaller"
   let not_a_relation = "not an equality or inequality"
   let mixed_types = "input is not an equation or inequality at the same type"
 end
@@ -65,6 +67,23 @@ let oracle_failed str (p : printable) =
         ^ "is nonnegative, and an even root of it -- a square root, a fourth root -- only means \
            anything if it is.  Wire in a hypothesis saying it isn't negative, or one that forces \
            that.")
+      (printed p)
+  else if str = Oracle.undecided_sign then
+    Option.map
+      (fun x ->
+        "Before the alg block will work with the absolute value of" ^ display x
+        ^ "it has to know which way that goes, so that the absolute value goes away.  Wire in a \
+           hypothesis making it nonnegative, or one making it nonpositive -- the ≤∨> block splits \
+           into exactly those two cases, and you then prove each of them.  (The alg+ block does \
+           the split for you.)")
+      (printed p)
+  else if str = Oracle.undecided_order then
+    Option.map
+      (fun x ->
+        "Before the alg block will work with" ^ display x
+        ^ "it has to know which of those two numbers is the smaller, so that the min or max goes \
+           away.  Wire in a hypothesis saying which -- the ≤∨> block splits into exactly those two \
+           cases, and you then prove each of them.  (The alg+ block does the split for you.)")
       (printed p)
   else if str = Oracle.disequality then
     Some

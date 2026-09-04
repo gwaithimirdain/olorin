@@ -134,7 +134,7 @@ export const LEVELS = [
             ]
           },
           { name: "=",
-            rules: [ "alg" ],
+            rules: [ "algebra" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" } ],
@@ -213,7 +213,7 @@ export const LEVELS = [
             ],
           },
           { name: "∧=",
-            rules: [ "andI", "andE", "alg" ],
+            rules: [ "andI", "andE", "algebra" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
@@ -484,7 +484,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "expr", "alg", "integral", "deceq", "tord" ],
+            rules: [ "orI1", "orI2", "orE", "expr", "algebra", "integral", "deceq", "tord" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -927,7 +927,7 @@ export const LEVELS = [
             ]
           },
           { name: "∣∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "algebra" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1071,7 +1071,7 @@ export const LEVELS = [
             ],
           },
           { name: "≡∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "algebra" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1212,7 +1212,7 @@ export const LEVELS = [
             ],
           },
           { name: "≡∣∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "algebra" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1367,7 +1367,7 @@ export const LEVELS = [
             ]
           },
           { name: "∀⇒<",
-            rules: [ "allI", "allE", "impE", "impI", "expr", "alg" ],
+            rules: [ "allI", "allE", "impE", "impI", "expr", "algebra" ],
             levels: [
                 {               // x pos inf => x+1 pos inf
                     parameters: [ ],
@@ -1450,7 +1450,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀⇒∧<",
-            rules: [ "allI", "allE", "impE", "impI", "andI", "andE", "expr", "alg" ],
+            rules: [ "allI", "allE", "impE", "impI", "andI", "andE", "expr", "algebra" ],
             levels: [
                 {               // x,y infinitesimal => x+y infinitesimal
                     parameters: [ ],
@@ -1585,7 +1585,7 @@ export const LEVELS = [
             ]
           },
           { name: "∃∀=",
-            rules: [ "allE", "allI", "exI", "exE", "expr", "alg" ],
+            rules: [ "allE", "allI", "exI", "exE", "expr", "algebra" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1645,7 +1645,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃∀∧⇒<",
-            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "alg" ],
+            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "algebra" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1902,7 +1902,7 @@ export const LEVELS = [
             ]
           },
           { name: "=≠∧",
-            rules: [ "andE", "andI", "negE", "cnegI", "alg" ],
+            rules: [ "andE", "andI", "negE", "cnegI", "algebra" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -1938,7 +1938,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀=≠",
-            rules: [ "allE", "allI", "cnegI", "negE", "expr", "alg" ],
+            rules: [ "allE", "allI", "cnegI", "negE", "expr", "algebra" ],
             levels: [
                 {
                     parameters: [ ],

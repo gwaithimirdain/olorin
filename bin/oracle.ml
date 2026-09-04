@@ -171,6 +171,17 @@ type step =
   | Nonzero of Symbolic.t * kinetic value
   (* Likewise the base of an even root, which they have to force to be nonnegative. *)
   | Nonneg of Symbolic.t * kinetic value
+  (* A case split the translation introduced.  An absolute value, a minimum and a maximum are each
+     a conditional on which way two things compare: for ∣x∣ on 0 against x, for min(x,y) and
+     max(x,y) on x against y.  Z3 decides such a conditional on its own, so the stronger algebra
+     block asks nothing here; the weaker one insists the hypotheses decide the comparison, so that
+     the conditional simplifies away and the student has done the case split themselves.  Either
+     direction will do, and both are asked non-strictly (a ≤ b, or b ≤ a) since either settles the
+     value: ∣x∣ is −x as soon as x ≤ 0, and the two readings agree where the two are equal.  That
+     also makes the "≤∨>" block enough to discharge this, which is the point: its branches give
+     "a ≤ b" and "b < a", and each of those is one of these two.  The tag says which message to
+     give when nothing settles it, and the value is the term to point at there. *)
+  | Cases of [ `Sign | `Order ] * Symbolic.t * Symbolic.t * kinetic value
 
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
@@ -258,8 +269,12 @@ let get_poly ctx ty tm =
         | "plus" -> return (`Plus (px, py))
         | "minus" -> return (`Minus (px, py))
         | "times" -> return (`Times (px, py))
-        | "min" -> return (`Min (px, py))
-        | "max" -> return (`Max (px, py))
+        | "min" ->
+            let* () = add_step (Cases (`Order, px, py, tm)) in
+            return (`Min (px, py))
+        | "max" ->
+            let* () = add_step (Cases (`Order, px, py, tm)) in
+            return (`Max (px, py))
         | "divide" -> (
             (* A quotient of numerals is just a rational constant, and carries no obligation.  We
                ask rational_of rather than matching on `Const, so that a minus sign in front of
@@ -284,7 +299,9 @@ let get_poly ctx ty tm =
         let* x = go src in
         match Firstorder.get_root name with
         | "sqrt" -> power tm x (Q.of_ints 1 2) src
-        | "abs" -> return (`Abs x)
+        | "abs" ->
+            let* () = add_step (Cases (`Sign, `Const Q.zero, x, src)) in
+            return (`Abs x)
         | "negate" -> (
             match rational_of x with
             | Some q -> return (`Const (Q.neg q))
@@ -323,7 +340,12 @@ let unsat (command : Relation.t list) =
 
 let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
-  let* givens, goal =
+  (* The two algebra blocks ask through constants of their own, so the question says which one is
+     asking: the "plus" block decides an absolute value, a minimum or a maximum itself, while the
+     plain one requires the hypotheses to settle each of those first (see Cases below). *)
+  let oracle = Scope.lookup [ "oracle" ] in
+  let oracle_plus = Scope.lookup [ "oracle_plus" ] in
+  let* plus, givens, goal =
     match Norm.view_term tm with
     | Neu
         {
@@ -331,11 +353,11 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
           args = Arg (Arg (Arg (Emp, givens, givins), _, _), goal, appins);
           _;
         }
-      when Some name = Scope.lookup [ "oracle" ]
+      when (Some name = oracle || Some name = oracle_plus)
            && Option.is_some (is_id_ins ins)
            && Option.is_some (is_id_ins givins)
            && Option.is_some (is_id_ins appins) ->
-        return (CubeOf.find_top givens, CubeOf.find_top goal)
+        return (Some name = oracle_plus, CubeOf.find_top givens, CubeOf.find_top goal)
     | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
   let* goal_op, ty, lhs, rhs = get_equality_or_inequality ctx goal.tm in
   let* givens = get_givens ctx ty givens.tm in
@@ -378,6 +400,10 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      things that aren't literals, which we don't allow as a *goal*; but these are our own side
      conditions rather than something the student is being credited with proving.)
 
+     An absolute value, a minimum or a maximum carries a side condition too, but only for the plain
+     algebra block, and for a different reason: Z3 decides those conditionals itself, and we want
+     the student to have decided them (see Cases above).
+
      So we walk the steps in the order the translation met them, innermost first, discharging each
      obligation against the hypotheses and the definitions before it, and gathering the definitions
      for the goal query.  An obligation never sees its own definition: "s >= 0 and s*s = x" implies
@@ -393,7 +419,19 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | Nonneg (base, src) :: rest ->
         if unsat ((`Lt, base, `Const Q.zero) :: facts) then discharge facts rest
         else
-          Error (Code.Oracle_failed (Explain.Oracle.negative_base, Printable.PVal (ctx, src))) in
+          Error (Code.Oracle_failed (Explain.Oracle.negative_base, Printable.PVal (ctx, src)))
+    (* Z3 decides a conditional on its own, so for the "plus" block there is nothing to discharge.
+       For the plain one the hypotheses have to settle the comparison -- "a ≤ b" or "b ≤ a", either
+       will do -- which is what makes the student split into cases by hand. *)
+    | Cases (which, a, b, src) :: rest ->
+        if plus || unsat ((`Lt, b, a) :: facts) || unsat ((`Lt, a, b) :: facts) then
+          discharge facts rest
+        else
+          let msg =
+            match which with
+            | `Sign -> Explain.Oracle.undecided_sign
+            | `Order -> Explain.Oracle.undecided_order in
+          Error (Code.Oracle_failed (msg, Printable.PVal (ctx, src))) in
   let* facts = discharge givens (Bwd.to_list steps) in
   if unsat ((neg_goal_op, rhs, lhs) :: facts) then Ok ()
   else Error (Code.Oracle_failed (Explain.Oracle.unprovable, PUnit))

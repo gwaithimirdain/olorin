@@ -30,7 +30,7 @@ async function algebra(olorin, { variables = '', hypotheses = [], conclusion }) 
         conclusion,
     });
     const nodes = await olorin.nodes();
-    const alg = await olorin.dragRule('alg', 600, 200);
+    const alg = await olorin.dragRule('algebra', 600, 200);
     for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
         await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: alg, sort: 'input' });
     }
@@ -223,7 +223,7 @@ test.describe('The √ symbol', () => {
         await page.click('#submitLevel');
         await olorin.dismissHints();
         const nodes = await olorin.nodes();
-        const alg = await olorin.dragRule('alg', 600, 200);
+        const alg = await olorin.dragRule('algebra', 600, 200);
         await olorin.connect({ vertex: nodes.find((n) => n.rule === 'hypothesis').id, sort: 'output' },
                              { vertex: alg, sort: 'input' });
         await olorin.connect({ vertex: alg, sort: 'output' },

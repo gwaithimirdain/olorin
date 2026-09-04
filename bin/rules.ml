@@ -30,7 +30,10 @@ type rule =
     }
   | Asc
   | Expr
-  | Algebra
+  (* The two algebra blocks: the "plus" one lets Z3 decide an absolute value, a minimum or a
+     maximum on its own, while the plain one requires the hypotheses to settle each such case
+     first.  They differ only in which oracle constant they ask through. *)
+  | Algebra of { plus : bool }
   | Var
   | Conclusion
   | User of { consts : string list list; inputs : string list }
@@ -92,7 +95,8 @@ let rules =
       ("topI", Tuple { inputs = [] });
       ("asc", Asc);
       ("expr", Expr);
-      ("alg", Algebra);
+      ("algebra", Algebra { plus = false });
+      ("algebraplus", Algebra { plus = true });
       ( "integral",
         User
           {

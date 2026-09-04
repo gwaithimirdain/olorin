@@ -648,13 +648,16 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             Named.Embed
               (Some variables, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc))) in
           ({ bindables; term = e }, variables)
-      | Algebra ->
+      | Algebra { plus } ->
           let nil_eqs = Named.Const (Parser.Scope.lookup [ "nil_eqs" ] <||> "nil_eqs not found") in
           let cons_eqs =
             locate_opt None
               (Named.Const (Parser.Scope.lookup [ "cons_eqs" ] <||> "cons_eqs not found")) in
+          (* The two algebra blocks ask through constants of their own, so that oracle.ml can tell
+             which one is asking and how hard it has to work. *)
+          let oname = if plus then "oracle_plus" else "oracle" in
           let oracle =
-            locate_opt None (Named.Const (Parser.Scope.lookup [ "oracle" ] <||> "oracle not found"))
+            locate_opt None (Named.Const (Parser.Scope.lookup [ oname ] <||> oname ^ " not found"))
           in
           (* Get all the bindables and variables from all the input wires connected to this rule. *)
           let port = { source with sort = Input; label = None } in

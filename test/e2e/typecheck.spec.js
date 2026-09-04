@@ -25,7 +25,7 @@ test.describe('Wires connected faster than Z3 answers', () => {
             hypotheses: '¬(x=1)\nx+0=1',
             conclusion: '⊥',
         });
-        const alg = await olorin.dragRule('alg', 300, 300);
+        const alg = await olorin.dragRule('algebra', 300, 300);
         const negE = await olorin.dragRule('negE', 600, 200);
         const nodes = await olorin.nodes();
         const hyps = nodes.filter((n) => n.rule === 'hypothesis');
