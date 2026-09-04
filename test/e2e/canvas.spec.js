@@ -6,13 +6,15 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { conjunctionLevel, otherLevel, wrappableStatementLevel } = require('../lib/levels');
+const { conjunctionLevel, oneWireLevel, otherLevel, wrappableStatementLevel } = require('../lib/levels');
 
 // P, Q |- P∧Q, in a stage with the ∧ rules: two hypotheses, one conclusion, and both
 // andI and andE in the palette.  Selected from levels.js so a renumbering can't break it.
 const LEVEL = conjunctionLevel();
-// Any other level, to switch away to and back from.
+// Any other level, to switch away to and back from, and one proved by a single wire, for putting a
+// saved proof on a second level cheaply.
 const ELSEWHERE = otherLevel(LEVEL);
+const ONEWIRE = oneWireLevel();
 
 // A level whose statement has somewhere to re-wrap, for pinning that a box on the canvas never does.
 const WORDY = wrappableStatementLevel();
@@ -51,6 +53,14 @@ const isVisible = (page, id) =>
         const d = document.getElementById('diagram').getBoundingClientRect();
         return r.left >= d.left && r.right <= d.right && r.top >= d.top && r.bottom <= d.bottom;
     }, id);
+
+// Where every node sits on the screen, in the order the diagram holds them -- so two snapshots can
+// be compared across a restore, which gives the recreated boxes new ids but keeps their order.
+const screenRects = (page) =>
+    page.evaluate(() => window.__olorin.nodes().map((n) => {
+        const r = document.getElementById(n.id).getBoundingClientRect();
+        return { rule: n.rule, x: Math.round(r.x), y: Math.round(r.y) };
+    }));
 
 // The ids of any nodes the player can't currently see.
 const offScreen = async (page) => {
@@ -204,27 +214,6 @@ test.describe('Panning the canvas', () => {
         expect(min.top).toBeGreaterThanOrEqual(0);
     });
 
-    test('a proof laid out by panning is in view when it is loaded again', async ({ page }) => {
-        const olorin = new Olorin(page);
-        await olorin.open();
-        await olorin.selectLevel(LEVEL.name);
-        const andId = await olorin.dragRule('andI', 400, 300);
-        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andId, sort: 'input', label: 'fst' });
-
-        // Pan a long way, which is to say: carry the proof out to coordinates the view only reaches
-        // by scrolling, and save it there.
-        await olorin.panBackground(300, 300, 1300, 700);
-        await olorin.panBackground(300, 300, 1300, 700);
-        const view = (await geom(page)).viewW;
-        expect((await nodeMinimum(page)).left).toBeGreaterThan(view);
-
-        // Coming back to the level, the restored proof is looked at rather than left off-screen.
-        await olorin.selectLevel(ELSEWHERE.name);
-        await olorin.selectLevel(LEVEL.name);
-        await olorin.loadSaved();
-        expect(await offScreen(page)).toEqual([]);
-    });
-
     test('a rule dropped on a panned canvas lands under the pointer', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
@@ -257,5 +246,88 @@ test.describe('Panning the canvas', () => {
         await olorin.panBackground(box.x - 40, box.y - 40, box.x - 240, box.y - 140);
         const after = await olorin.nodeRects();
         expect(after[id].x).toBeCloseTo(box.x - 200, 0);
+    });
+});
+
+test.describe('Resuming a saved proof', () => {
+    // Build a proof and pan it around, leaving it on screen but nowhere near where it started:
+    // pushing it down and to the right slides the boxes (there being no scrolling to be had that
+    // way), and bringing the view part of the way back over it scrolls.  So the saved proof has
+    // both a shifted layout and a scrolled view for a resume to put back.
+    async function buildPannedProof(page, olorin) {
+        await olorin.selectLevel(LEVEL.name);
+        const andId = await olorin.dragRule('andI', 400, 300);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andId, sort: 'input', label: 'fst' });
+        await olorin.panBackground(300, 300, 800, 600);
+        await olorin.panBackground(800, 600, 500, 400);
+        expect((await nodeMinimum(page)).left).toBeGreaterThan(0);
+        expect((await geom(page)).scrollX).toBeGreaterThan(0);
+        return andId;
+    }
+
+    test('looks at it just where it was left', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildPannedProof(page, olorin);
+        const before = await screenRects(page);
+
+        await olorin.selectLevel(ELSEWHERE.name);
+        await olorin.selectLevel(LEVEL.name);
+        await olorin.loadSaved();
+
+        // Every box is back on the same pixel it was on, rather than the whole proof having slid
+        // over because the view came back somewhere else.
+        expect(await screenRects(page)).toEqual(before);
+    });
+
+    test('scrolling with nothing else changing is saved too', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildPannedProof(page, olorin);
+        const before = (await olorin.savedProof()).view;
+
+        // Scrolling changes no part of the proof, but it is where the player is looking: take the
+        // view somewhere else (as far right as the canvas goes) and touch nothing else.
+        const target = await page.evaluate(() => {
+            const d = document.getElementById('diagram');
+            d.scrollLeft = d.scrollWidth;
+            return d.scrollLeft;
+        });
+        expect(target).not.toBe(before.x);
+        await expect.poll(async () => (await olorin.savedProof()).view.x).toBe(target);
+    });
+
+    test('opening a level cannot scroll its empty diagram over the saved proof', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // A level with a proof saved on it, to come back to.
+        await olorin.selectLevel(ONEWIRE.name);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        const saved = await olorin.savedProof();
+        expect(saved).not.toBeNull();
+
+        // Work somewhere else, leaving the view scrolled away from the origin...
+        await buildPannedProof(page, olorin);
+
+        // ... and come back.  Opening a level puts its view at the origin, which is a scroll like
+        // any other -- but the diagram being scrolled is the empty one set up behind the "load
+        // saved proof?" prompt, and it must not save itself over the proof being offered.
+        await olorin.selectLevel(ONEWIRE.name);
+        expect(await olorin.savedPromptVisible()).toBe(true);
+        await page.waitForTimeout(700);
+        expect(await olorin.savedProof()).toEqual(saved);
+    });
+
+    test('a proof saved with no view recorded is looked at where its boxes are', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await buildPannedProof(page, olorin);
+
+        // Proofs saved before the view was recorded (and proofs imported from a window of another
+        // size) have none, and are found by looking at the boxes themselves.
+        const state = await olorin.serialize();
+        delete state.view;
+        await olorin.restore(state);
+        expect(await offScreen(page)).toEqual([]);
     });
 });

@@ -394,6 +394,34 @@ document.addEventListener('mouseup', function() {
     if(moved || shifted) { autosave(); }
 });
 
+// Scrolling changes no part of the proof, but it does change where the player is looking, which a
+// saved proof remembers so that resuming it looks at what they left.  So save that too, once the
+// scrolling settles.
+var scrollSaveTimer = null;
+var scrollSaveKey = null;
+diagram.addEventListener('scroll', function () {
+    const key = savedProofKey();
+    // Only over a proof that is already saved: merely looking around a level shouldn't start
+    // saving one.
+    if(suppressSave || !key || !localStorage.getItem(key)) { return; }
+    clearTimeout(scrollSaveTimer);
+    scrollSaveKey = key;
+    scrollSaveTimer = setTimeout(flushScrollSave, 400);
+});
+
+// Write out the view we've scrolled to.  Called when the scrolling settles, and by anything that
+// would otherwise lose a pending one: opening another level, or leaving the page.
+function flushScrollSave() {
+    if(scrollSaveTimer === null) { return; }
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = null;
+    // Not if we've moved on since, and not from a diagram with no proof on it: opening a level
+    // scrolls the view back to the origin, and the empty level set up behind the "load saved
+    // proof?" prompt must not save itself over the very proof that prompt is offering.
+    if(savedProofKey() === scrollSaveKey && proofHasProgress(serializeProof())) { autosave(); }
+}
+window.addEventListener('pagehide', flushScrollSave);
+
 // On a Mac, Ctrl-clicking is also the way to open a context menu; suppress it while panning.
 diagram.addEventListener('contextmenu', function(e) { if(bgPan) { e.preventDefault(); } });
 
@@ -1760,6 +1788,9 @@ function serializeProof() {
         // Whether the proof is currently complete (the conclusion has turned a color).
         complete: conclusion_node !== null && conclusion_node.style.backgroundColor !== "",
         difficulty: difficulty,
+        // Where the player was looking, so resuming this proof puts the diagram back on screen
+        // exactly where they left it rather than wherever the boxes happen to be.
+        view: { x: diagram.scrollLeft, y: diagram.scrollTop },
         // Autonumber counters, so nodes added after a restore won't reuse saved IDs.
         counters: {
             counter: counter,
@@ -1973,8 +2004,9 @@ function restoreProof(state, level, countAsCompletion) {
     // Repositioning the nodes invalidated jsPlumb's cached geometry; revalidate before reconnecting.
     nodes.forEach((entry) => instance.revalidate(entry.node));
     // Saved nodes may sit beyond the viewport; grow the canvas so they're reachable by scrolling,
-    // and look at where they actually are.
-    scrollToContent();
+    // and look where the proof was left.  A proof saved or exported before the view was recorded
+    // carries none, and is found by looking at wherever its boxes actually are.
+    if(state.view) { resizeCanvas(state.view.x, state.view.y); } else { scrollToContent(); }
 
     // Recreate the connections, matching endpoints by their sort and label.
     (state.connections || []).forEach((c) => {
@@ -3944,6 +3976,8 @@ document.getElementById("submitLevel").onclick = function () {
 // and the caller must then leave the level it was on alone rather than relabel it for one that
 // never opened.
 function setLevel(level, rulesAllowed) {
+    // Save any pending scroll of the level we're leaving, while it's still the current one.
+    flushScrollSave();
     // Remember the raw definition so "Edit" can re-open the custom dialog pre-filled with it, even
     // if it turns out not to parse -- that is how the player gets back what they typed to fix it.
     currentLevelDef = level;
