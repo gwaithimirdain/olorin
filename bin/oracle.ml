@@ -118,11 +118,16 @@ let rec get_givens ctx (ty : normal) givens =
       | Ok () ->
           let* rest = get_givens ctx ty (CubeOf.find_top rest).tm in
           return ((op, x, y) :: rest)
-      | Error _ ->
-          Error
-            (Oracle_failed
-               ( Explain.Oracle.mixed_types,
-                 Printable.PNormal (ctx, CubeOf.find_top eqty) )))
+      | Error _ -> (
+        match subtype_of ctx ty.tm ty'.tm with
+          | Ok () ->
+            let* rest = get_givens ctx ty' (CubeOf.find_top rest).tm in
+            return ((op, x, y) :: rest)
+          | Error _ ->
+            Error
+              (Oracle_failed
+                 ( Explain.Oracle.mixed_types,
+                   Printable.PNormal (ctx, CubeOf.find_top eqty) ))))
   | Neu { head = Const { name; ins }; args = Emp; _ }
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
   | _ -> Error (Code.Oracle_failed ("not a Cons_eqs or Nil_eqs", Printable.PVal (ctx, givens)))
