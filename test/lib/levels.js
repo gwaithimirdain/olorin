@@ -159,6 +159,12 @@ const iffIdentityLevel = (pred = () => true) =>
     find((l) => pred(l) && l.hypotheses.length === 0 && /^(.+)⇔\1$/.test(l.conclusion),
         'a hypothesis-free "P ⇔ P" provable by a single iffI box');
 
+// A level with a hypothesis long enough, and with spaces in it, that its box would re-wrap onto a
+// second line if it were ever laid out in less room than it wants.
+const wrappableStatementLevel = () =>
+    find((l) => l.hypotheses.some((h) => h.includes(' ') && h.length >= 12),
+        'given a hypothesis with spaces in it, long enough for its box to have somewhere to wrap');
+
 // The first level that pops a hint on its first visit.
 const hintedLevel = (pred = () => true) => find((l) => l.hint && pred(l), 'given a hint');
 
@@ -241,7 +247,8 @@ const prereqSeeds = (level, difficulty) =>
 module.exports = {
     allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, prereqStages, find,
     worlds, world, prereqWorlds, followerWorlds, worldGateSeeds,
-    firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, hintedLevel, otherLevel, nextLevel,
+    firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, wrappableStatementLevel,
+    hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, legacyCompletionKeys, completions, thresholdCount, prereqs,
     prereqSeeds,
 };
