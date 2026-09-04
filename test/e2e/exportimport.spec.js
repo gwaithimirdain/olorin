@@ -173,29 +173,6 @@ test.describe('Export / Import', () => {
         expect(await olorin.customLevelNames()).toEqual([]);
     });
 
-    // The single "alg" block became two, "algebra" and "algebraplus", so a proof saved or exported
-    // before that names a rule the palette no longer has.  Every level that offered "alg" states
-    // nothing about ∣ ∣, min or max, where the two blocks differ, so an old "alg" comes back as
-    // the plain one -- which is the block those levels now offer.
-    test('a proof naming the retired \'alg\' rule comes back as the plain algebra block', async () => {
-        await olorin.buildCustom({ parameters: '', variables: '', hypotheses: '', conclusion: '2+2=4' });
-        await olorin.restore({
-            complete: true,
-            difficulty: 0,
-            nodes: [
-                { id: 'concl0', rule: 'conclusion', left: '900px', top: '200px' },
-                { id: 'rule0', rule: 'alg', left: '400px', top: '200px' },
-            ],
-            connections: [
-                { source: { vertex: 'rule0', sort: 'output' }, target: { vertex: 'concl0', sort: 'input' } },
-            ],
-        });
-        await olorin.waitForTypecheck();
-        const restored = (await olorin.nodes()).filter((n) => n.rule === 'algebra');
-        expect(restored).toHaveLength(1);
-        expect(await olorin.isComplete()).toBe(true);
-    });
-
     test('rejects invalid JSON without changing the proof', async () => {
         await olorin.selectLevel(LEVEL.name);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });

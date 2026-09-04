@@ -20,7 +20,7 @@ const { Olorin } = require('../helpers/olorin');
 const wireLabels = (page) => page.evaluate(() =>
     Array.from(document.querySelectorAll('.connLabel')).map((e) => (e.innerText || '').replace(/\s+/g, '')));
 
-// State a level and prove it with a single algebra block -- "algebraplus" unless told otherwise --
+// State a level and prove it with a single algebra block -- "algplus" unless told otherwise --
 // fed by every hypothesis.
 async function provesWith(rule, olorin, { variables = 'x ∈ ℝ\ny ∈ ℝ', hypotheses = [], conclusion }) {
     await olorin.buildCustom({
@@ -40,8 +40,8 @@ async function provesWith(rule, olorin, { variables = 'x ∈ ℝ\ny ∈ ℝ', hy
     return olorin.isComplete();
 }
 
-const proves = (olorin, level) => provesWith('algebraplus', olorin, level);
-const plainProves = (olorin, level) => provesWith('algebra', olorin, level);
+const proves = (olorin, level) => provesWith('algplus', olorin, level);
+const plainProves = (olorin, level) => provesWith('alg', olorin, level);
 
 // State something and wire it straight through, to read back the statement Olorin understood.
 async function readsAs(olorin, page, statement, variables = 'a ∈ ℤ\nb ∈ ℤ') {

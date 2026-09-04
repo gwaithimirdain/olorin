@@ -95,8 +95,8 @@ let rules =
       ("topI", Tuple { inputs = [] });
       ("asc", Asc);
       ("expr", Expr);
-      ("algebra", Algebra { plus = false });
-      ("algebraplus", Algebra { plus = true });
+      ("alg", Algebra { plus = false });
+      ("algplus", Algebra { plus = true });
       ( "integral",
         User
           {
