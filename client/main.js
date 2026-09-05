@@ -3395,9 +3395,14 @@ function addConnection(params) {
     }
     // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
     if(edge.source == edge.target) {
-        if(edge.endpoints[0].parameters.sort === 'assumption' &&
-           edge.endpoints[1].parameters.sort === 'subgoal' &&
-           edge.endpoints[0].parameters.label === edge.endpoints[1].parameters.label) {
+        // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
+        // two agree.  A block with only one subgoal leaves it unlabelled, and then every
+        // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
+        // bind the condition defining their set on a labelled port beside the unlabelled one that
+        // binds the variable.
+        const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
+        if(from.sort === 'assumption' && to.sort === 'subgoal' &&
+           (to.label === undefined || from.label === to.label)) {
             // This method isn't published in the jsPlumb community edition, but it's still there!
             edge._setConnector(StraightConnector.type);
         } else {
