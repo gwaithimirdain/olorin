@@ -16,7 +16,7 @@ open Objects
 
 let carp str = Js_of_ocaml.Console.console##log (Js.string str)
 
-(* Olorin is designed to look to the user like first-order logic.  This file sets up the definitions and notations to maintain that illusion.  Here is Narya code that defines the basic operations of first-order logic, using untruncated propositions-as-types.  This will be the startup code.  We define implication, negation, and universal quantification to be records rather than simple function-types so that we can distinguish them (e.g. so that the prove-if-then rule can't also be used to prove-forall) and given them distinct notations.  *)
+(* Olorin is designed to look to the user like first-order logic.  This file sets up the definitions and notations to maintain that illusion.  Here is Narya code that defines the basic operations of first-order logic, using untruncated propositions-as-types.  This will be the startup code.  We define implication, negation, and universal quantification to be records rather than simple function-types so that we can distinguish them (e.g. so that the prove-if-then rule can't also be used to prove-forall) and given them distinct notations.  Definitions that can't be checked here, because they depend on something that install_notations sets up (such as the subtyping relations between the number types), go in secondary_startup at the bottom of this file instead.  *)
 
 let startup =
   "def land (P Q : Type) : Type ≔ sig ( fst : P, snd : Q )
@@ -1078,3 +1078,30 @@ let install_notations () =
            val_vars = [ "a"; "b"; "n" ];
          }) in
   add_subtypes (List.map (fun x -> get_const [ x ]) numbers)
+
+(* Some definitions can't be typechecked as part of the startup code above, because they depend on
+   things that install_notations sets up: notably the subtyping relations between the number types,
+   which add_subtypes only installs at the very end.  (For instance, 𝕊.finite below bounds the
+   absolute value of a superreal by a *real* u, which typechecks only once ℝ≤𝕊 exists.)  Those
+   definitions go here instead, in secondary startup code that gets loaded after install_notations
+   by load_secondary_startup.  Like the primary startup code, this is executed with a fresh file
+   origin, whose notation situation is inherited from the toplevel rather than from the interactive
+   instant where install_notations put Olorin's notations; so it has to be written in plain Narya
+   syntax, using the constants by name. *)
+
+let secondary_startup =
+  "def 𝕊.finite (x : 𝕊) : Type ≔ existspos (u ↦ le 𝕊 (𝕊.abs x) u)
+"
+
+(* Load that code, in the same way that run_top loads its non-interactive inputs: the string sees
+   everything loaded so far, and afterwards everything it defines becomes visible in the current
+   (interactive) origin.  Scope.set_visible keeps the notation situation, so the notations that
+   install_notations added are undisturbed.  This must be run inside the Pauser, after
+   install_notations. *)
+
+let load_secondary_startup () =
+  let _ =
+    Top.Execute.load_string
+      ~init_visible:(Top.Execute.Loaded.get_scope ())
+      "secondary startup code" secondary_startup in
+  Scope.set_visible (Top.Execute.Loaded.get_scope ())

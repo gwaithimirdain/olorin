@@ -1193,6 +1193,8 @@ let init () : js_checked Js.t =
     Pauser.init ~use_ansi:false ~digit_vars:false ~onechar_ops ~install_hott:(fun () -> ())
     @@ fun () ->
     install_notations ();
+    (* Definitions that depend on the notations and subtypings just installed. *)
+    load_secondary_startup ();
     ok_checked ()
   with Top.Exit -> err_checked ()
 
