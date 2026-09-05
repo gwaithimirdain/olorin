@@ -124,6 +124,20 @@ axiom 𝕊.deceq (x y : 𝕊) : lor (eq 𝕊 x y) (neq 𝕊 x y)
 axiom 𝕊.tord (x y : 𝕊) : lor (le 𝕊 x y) (gt 𝕊 x y)
 axiom 𝕊.sqrt : 𝕊 → 𝕊
 
+{` Quantification over the positive reals.  R+ is not a type of its own -- it is a token of the
+notations for its quantifiers -- so these get constants of their own, taking only the predicate.
+Their field and constructor carry the defining condition 0<x alongside x itself, which is what the
+positive quantifier blocks put on a port of their own. `}
+def forallpos (P : ℝ → Type) : Type ≔ sig ( forallpos : (x : ℝ) → lt ℝ 0 x → P x )
+def existspos (P : ℝ → Type) : Type ≔ data [ existspos. (element : ℝ) (positive : lt ℝ 0 element) (property : P element) ]
+
+{` Likewise quantification over [n], the whole numbers below some n, which n is written out of and
+so is a parameter of these definitions as well as of their notations.  Their elements are integers
+cut down by (0<=x) and (x<n) rather than naturals, since Z is the smallest number system the
+arithmetic operations are defined on: a bound variable has to be something you can compute with. `}
+def forallbelow (n : ℤ) (P : ℤ → Type) : Type ≔ sig ( forallbelow : (x : ℤ) → land (le ℤ 0 x) (lt ℤ x n) → P x )
+def existsbelow (n : ℤ) (P : ℤ → Type) : Type ≔ data [ existsbelow. (element : ℤ) (below : land (le ℤ 0 element) (lt ℤ element n)) (property : P element) ]
+
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
 "
@@ -186,6 +200,10 @@ let onechar_ops =
 type (_, _, _) identity +=
   | Forall : (closed, No.zero, No.strict opn) identity
   | Exists : (closed, No.zero, No.strict opn) identity
+  | ForallPos : (closed, No.zero, No.strict opn) identity
+  | ExistsPos : (closed, No.zero, No.strict opn) identity
+  | ForallBelow : (closed, No.zero, No.strict opn) identity
+  | ExistsBelow : (closed, No.zero, No.strict opn) identity
   | And : (No.strict opn, No.zero, No.strict opn) identity
   | Or : (No.strict opn, No.zero, No.strict opn) identity
   | Imp : (No.strict opn, No.zero, No.strict opn) identity
@@ -226,7 +244,43 @@ let iff : (No.strict opn, No.zero, No.strict opn) notation = (Iff, Infix No.zero
 let neg : (closed, No.one, No.strict opn) notation = (Neg, Prefix No.one)
 let prod : (No.strict opn, No.one_half, No.strict opn) notation = (Prod, Infix No.one_half)
 let coprod : (No.strict opn, No.one_half, No.strict opn) notation = (Coprod, Infix No.one_half)
+let forallpos : (closed, No.zero, No.strict opn) notation = (ForallPos, Prefix No.zero)
+let existspos : (closed, No.zero, No.strict opn) notation = (ExistsPos, Prefix No.zero)
+let forallbelow : (closed, No.zero, No.strict opn) notation = (ForallBelow, Prefix No.zero)
+let existsbelow : (closed, No.zero, No.strict opn) notation = (ExistsBelow, Prefix No.zero)
 let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
+
+(* The set a quantifier ranges over is normally written out after ∈ as a term.  But some sets that
+   are worth quantifying over aren't types of their own: ℝ₊, the positive reals, and [n], the whole
+   numbers below n.  These are written as part of the notation instead, either as a bare token or
+   as a pair of tokens with a term between them, and each has a constant of its own whose field or
+   constructor carries the condition defining the set -- 0<x, or (0≤x)∧(x<n) -- alongside x itself.
+   A set with a term inside it hands that term to its constant as a first argument. *)
+type special_set =
+  | Bare of Token.t
+  | Bracketed of Token.t * Token.t
+
+let posreals = Bare (Token.Ident [ "ℝ₊" ])
+let below = Bracketed (Token.LBracket, Token.RBracket)
+
+let specialquantifiers =
+  [
+    ("∀", forallpos, "forallpos", posreals);
+    ("∃", existspos, "existspos", posreals);
+    ("∀", forallbelow, "forallbelow", below);
+    ("∃", existsbelow, "existsbelow", below);
+  ]
+
+(* The identifier-like tokens those notations reserve, which therefore can't be variable names.
+   Bracketed sets are written out of delimiters, which are never identifiers to begin with. *)
+let special_set_idents =
+  List.filter_map
+    (fun (_, _, _, set) ->
+      match set with
+      | Bare tok -> Some tok
+      | Bracketed _ -> None)
+    specialquantifiers
+
 let equals : (No.strict opn, No.zero, No.strict opn) notation = (Equals, Infix No.zero)
 let lt : (No.strict opn, No.zero, No.strict opn) notation = (Lt, Infix No.zero)
 let gt : (No.strict opn, No.zero, No.strict opn) notation = (Gt, Infix No.zero)
@@ -312,7 +366,13 @@ let rec get_abs quant (body : wrapped_parse) : string option * wrapped_parse =
       match args n with
       | [ Term { value = Ident ([ x ], _); _ }; Token (Mapsto, _); Term body ] -> (
           match body.value with
-          | Notn ((Exists, _), _) | Notn ((Forall, _), _) | Notn ((Neg, _), _) -> (Some x, Wrap body)
+          | Notn ((Exists, _), _)
+          | Notn ((Forall, _), _)
+          | Notn ((ExistsPos, _), _)
+          | Notn ((ForallPos, _), _)
+          | Notn ((ExistsBelow, _), _)
+          | Notn ((ForallBelow, _), _)
+          | Notn ((Neg, _), _) -> (Some x, Wrap body)
           | Notn _ -> (Some x, Wrap (Unparse.parenthesize body))
           | _ -> (Some x, Wrap body))
       | _ -> Builtins.invalid quant)
@@ -349,6 +409,74 @@ let pp_quant qname obs =
     ^^ Token.pp (Ident [ "∈" ])
     ^^ pp_ws `None wsin
     ^^ pp_complete_term ty `None
+    ^^ Token.pp (Op ",")
+    ^^ pp_ws `None wscomma
+    ^^ pbody,
+    wsbody )
+
+(* A quantifier over a special set prints the same way, except for how that set is written.  As for
+   pp_quant, the unparser doesn't know about binding notations and hands us "∀,(x ↦ P x)" -- the
+   bound variable still inside a lambda, and any term the set contains as an argument in front --
+   while parsing produces the notation's own tokens; we accept both shapes. *)
+let pp_specialquant qname set obs =
+  let quant, wsquant, x, wsin, pset, wscomma, Wrap body =
+    (* The set as written, from the tokens (and, for a bracketed set, the term) it is made of. *)
+    let bare wsset =
+      match set with
+      | Bare tok -> Token.pp tok ^^ pp_ws `None wsset
+      | Bracketed _ -> Builtins.invalid qname in
+    let bracketed wslb inner wsrb =
+      match set with
+      | Bracketed (lb, rb) ->
+          Token.pp lb
+          ^^ pp_ws `None wslb
+          ^^ pp_complete_term inner `None
+          ^^ Token.pp rb
+          ^^ pp_ws `None wsrb
+      | Bare _ -> Builtins.invalid qname in
+    match obs with
+    (* Unparsed: a bare set has no argument in front of the predicate, a bracketed one has its
+       inner term there. *)
+    | [ Token (quant, (wsquant, _)); Token (Op ",", (wscomma, _)); Term body ] ->
+        let x, body = get_abs qname (Wrap body) in
+        (quant, wsquant, x, [], bare [], wscomma, body)
+    | [ Token (quant, (wsquant, _)); Term inner; Token (Op ",", (wscomma, _)); Term body ] ->
+        let x, body = get_abs qname (Wrap body) in
+        (quant, wsquant, x, [], bracketed [] (Wrap inner) [], wscomma, body)
+    (* Parsed *)
+    | [
+     Token (quant, (wsquant, _));
+     Term x;
+     Token (Ident [ "∈" ], (wsin, _));
+     Token (_, (wsset, _));
+     Token (Op ",", (wscomma, _));
+     Term body;
+    ] -> (quant, wsquant, Builtins.get_var x, wsin, bare wsset, wscomma, Wrap body)
+    | [
+     Token (quant, (wsquant, _));
+     Term x;
+     Token (Ident [ "∈" ], (wsin, _));
+     Token (_, (wslb, _));
+     Term inner;
+     Token (_, (wsrb, _));
+     Token (Op ",", (wscomma, _));
+     Term body;
+    ] ->
+        ( quant,
+          wsquant,
+          Builtins.get_var x,
+          wsin,
+          bracketed wslb (Wrap inner) wsrb,
+          wscomma,
+          Wrap body )
+    | _ -> Builtins.invalid qname in
+  let pbody, wsbody = pp_term body in
+  ( Token.pp quant
+    ^^ pp_ws `None wsquant
+    ^^ pp_var x
+    ^^ Token.pp (Ident [ "∈" ])
+    ^^ pp_ws `None wsin
+    ^^ pset
     ^^ Token.pp (Op ",")
     ^^ pp_ws `None wscomma
     ^^ pbody,
@@ -424,7 +552,45 @@ let () =
           pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
-    quantifiers
+    quantifiers;
+  (* ∀x∈ℝ₊, ∃x∈ℝ₊, ∀x∈[n] and ∃x∈[n].  These merge with the ordinary quantifiers as far as ∈, where
+     the tree branches on whether the next token opens one of the special sets or starts a term. *)
+  List.iter
+    (fun (name, qnotn, qstr, set) ->
+      let setname, settree =
+        match set with
+        | Bare tok -> (Token.to_string tok, fun rest -> op tok rest)
+        | Bracketed (lb, rb) ->
+            (Token.to_string lb ^ Token.to_string rb, fun rest -> op lb (term rb rest)) in
+      (* A bracketed set hands the term inside it to the constant, in front of the predicate. *)
+      let quantify ctx loc x inner body =
+        let x = Builtins.get_var x in
+        let inner = List.map (process ctx) inner in
+        let body = process (Bwv.snoc ctx x) body in
+        apps
+          (locate_opt loc (Synth (Const (get_const [ qstr ]))))
+          (inner @ [ locate_opt loc (normal_lam (locate_opt loc x) body) ]) in
+      make qnotn
+        {
+          name = name ^ setname;
+          tree =
+            Closed_entry
+              (eop (Ident [ name ])
+                 (term (Ident [ "∈" ]) (settree (op (Op ",") (Done_closed qnotn)))));
+          processor =
+            (fun ctx obs loc ->
+              match obs with
+              | [ Token _; Term x; Token _; Token _; Token _; Term body ] ->
+                  quantify ctx loc x [] body
+              | [ Token _; Term x; Token _; Token _; Term inner; Token _; Token _; Term body ] ->
+                  quantify ctx loc x [ inner ] body
+              | _ -> Builtins.invalid qstr);
+          print_term = Some (pp_specialquant name set);
+          print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
+          is_case = (fun _ -> false);
+        })
+    specialquantifiers
 
 (* We don't need separate unicode/ascii versions of these because we detect and print relations specially in the Oracle. *)
 (* The last component is the relation to state instead when the two sides have to be swapped -- see
@@ -782,6 +948,27 @@ let install_notations () =
           inner_symbols = `Multiple (Op qname, [ None ], Op ",");
         })
     quantifiers;
+  (* pp_specialquant supplies the bound variable and the set's own tokens, so the only argument left
+     to intersperse is the term a bracketed set contains -- and a bare set hasn't even got that. *)
+  List.iter
+    (fun (qname, qnotn, qstr, set) ->
+      let vars =
+        match set with
+        | Bare _ -> [ "P" ]
+        | Bracketed _ -> [ "n"; "P" ] in
+      let inner =
+        match set with
+        | Bare _ -> []
+        | Bracketed _ -> [ None ] in
+      Scope.Situation.add_with_print
+        {
+          keys = [ `Constant (get_const [ qstr ]) ];
+          notn = Wrap qnotn;
+          pat_vars = vars;
+          val_vars = vars;
+          inner_symbols = `Multiple (Op qname, inner, Op ",");
+        })
+    specialquantifiers;
   Scope.Situation.add_with_print
     {
       keys = [ `Constant (get_const [ "neg" ]) ];
