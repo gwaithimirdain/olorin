@@ -1684,60 +1684,6 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "old ∀⇒∧<",
-            rules: [ "allI", "allE", "impE", "impI", "andI", "andE", "expr", "alg" ],
-            levels: [
-                {               // x,y infinitesimal => x+y infinitesimal
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x+y)∧(x+y<u)))" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                        hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
-                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x+y)∧(x+y<u)))" },
-                    },
-
-                },
-                {               // x,y infinitesimal => x-y infinitesimal
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x−y)∧(x−y<u)))" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                        hypotheses: [ { ty: "∀u∈ℝ,((u>0)⇒((∸u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((∸u<y)∧(y<u)))" } ],
-                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒((∸u<x−y)∧(x−y<u)))" },
-                    }
-                },
-                {               // x pos infinitesimal => 2x infinitesimal
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "x>0"}, { ty: "∀u∈ℝ,((u>0)⇒(x<u))" }, ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒(2·x<u))" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "x", ty: "𝕊" } ],
-                        hypotheses: [ { ty: "x>0"}, { ty: "∀u∈ℝ,((u>0)⇒(x<u))" }, ],
-                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒(2*x<u))" },
-                    }
-                },
-                {               // x,y pos infinitesimal => x·y infinitesimal
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "x>0" }, { ty: "y>0" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x·y)∧(x·y<u)))" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                        hypotheses: [ { ty: "x>0" }, { ty: "y>0" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<x)∧(x<u)))" }, { ty: "∀u∈ℝ,((u>0)⇒((−u<y)∧(y<u)))" } ],
-                        conclusion: { ty: "∀u∈ℝ,((u>0)⇒((−u<x*y)∧(x*y<u)))" },
-                    }
-                },
-            ],
-          },
       ]
     },
     { name: "Advanced quantifier world",
