@@ -82,14 +82,59 @@ test.describe('Error explanations', () => {
         expect(await explanationFor(olorin, 'E1200')).toContain('no cases to split on');
     });
 
+    // A wire that carries an assumption along a path to the goal is out of scope however its block
+    // is wired: the assumption exists only on the way to that block's own subgoal.
     test('an assumption used outside its own block says so', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
+        // Straight from a ⇒-introduction's hypothesis to the goal.
         await mistake(olorin, { parameters: 'P : Type' }, async (o, hyps, concl) => {
             const r = await o.dragRule('impI', 300, 150);
             await o.connect({ vertex: r, sort: 'assumption' }, { vertex: concl, sort: 'input' });
         });
-        expect(await explanationFor(olorin, 'E0303')).toContain('out of the block that introduced it');
+        const e = await explanationFor(olorin, 'E0303');
+        expect(e).toContain('out of the block that introduced it');
+
+        // And out of one case of a ∨-elimination into the other case's subgoal.
+        await mistake(olorin, { parameters: 'P : Type', hypotheses: 'P∨P' },
+            async (o, hyps, concl) => {
+                const r = await o.dragRule('orE', 300, 150);
+                await o.connect({ vertex: hyps[0], sort: 'output' }, { vertex: r, sort: 'input' });
+                await o.connect({ vertex: r, sort: 'output' }, { vertex: concl, sort: 'input' });
+                await o.connect({ vertex: r, sort: 'assumption', label: 'left' },
+                                { vertex: r, sort: 'subgoal', label: 'right' });
+            });
+        expect(await explanationFor(olorin, 'E0303')).toEqual(e);
+    });
+
+    // But a wire that goes nowhere near the goal takes the assumption nowhere.  If nothing ever
+    // elaborates the block, the assumption doesn't exist yet at all, and blaming scope would send
+    // the player looking for the wrong mistake.
+    test('an assumption from a block that leads nowhere says that instead', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // Nothing at all is wired to the ⇒-introduction's output.
+        await mistake(olorin, { parameters: 'P : Type\nQ : Type' }, async (o) => {
+            const imp = await o.dragRule('impI', 200, 400);
+            const and = await o.dragRule('andE', 600, 600);
+            await o.connect({ vertex: imp, sort: 'assumption' }, { vertex: and, sort: 'input' });
+        });
+        const e = await explanationFor(olorin, 'E0304');
+        expect(e).toContain("isn't wired into the proof");
+        expect(await olorin.wireErrors()).toContain(e);
+
+        // And one step removed: the ⇒-introduction's output is wired, but only into an
+        // ∨-introduction that leads nowhere itself, so neither block is ever elaborated.
+        await mistake(olorin, { parameters: 'P : Type\nQ : Type' }, async (o) => {
+            const imp = await o.dragRule('impI', 200, 400);
+            const or1 = await o.dragRule('orI1', 600, 200);
+            const and = await o.dragRule('andE', 600, 600);
+            await o.connect({ vertex: imp, sort: 'output' },
+                            { vertex: or1, sort: 'input', label: 'left' });
+            await o.connect({ vertex: imp, sort: 'assumption' }, { vertex: and, sort: 'input' });
+        });
+        expect(await explanationFor(olorin, 'E0304')).toEqual(e);
+        expect(await olorin.wireErrors()).toContain(e);
     });
 
     // A loop is easy to draw by accident, and every wire in it is marked, so each one explains it.

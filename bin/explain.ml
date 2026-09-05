@@ -202,6 +202,16 @@ let explain : Code.t -> string option = function
         "This wire carries an assumption, or a variable, out of the block that introduced it.  \
          Such a thing only exists inside its own block, so it can only be used on the way to that \
          block's subgoal."
+  (* An assumption wired into a fragment that leads nowhere, out of a block that nothing ever
+     elaborates: its output is dangling, or leads only somewhere that dangles.  Nothing is being
+     carried anywhere, and there is no scope to escape from yet, so the message above would point at
+     the wrong thing. *)
+  | Unattached_assumption ->
+      Some
+        "This wire carries an assumption, or a variable, out of a block whose own output isn't \
+         wired into the proof yet.  Until it is, Olorin doesn't know what that block is proving, so \
+         it doesn't know what this assumption says either: connect the block's output on the way to \
+         the goal."
   | Unbound_variable (x, _) ->
       Some
         ("There is no variable called " ^ x

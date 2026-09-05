@@ -229,6 +229,35 @@ end
 module Scopes = Resolver.Scopes
 module Resolve = Raw.Resolve (Resolver)
 
+(* Every port that some scope, anywhere, binds.  A block enters a scope only when it's elaborated as
+   part of a term that resolved -- the conclusion's, or a disconnected fragment whose head
+   synthesized -- so once every fragment has been tried, an assumption port in no scope at all
+   belongs to a block that nothing elaborated.  That's more than the wiring alone can say: a block
+   wired only into another block that is itself never elaborated (a ⇒-introduction feeding an
+   ∨-introduction whose own output is dangling, say) is just as unelaborated as one wired nowhere. *)
+let bound_ports () : PortSet.t =
+  List.fold_left
+    (fun set (Resolver.Scope (_, scope)) ->
+      List.fold_left
+        (fun set (x : name) ->
+          match x.port with
+          | Some p -> PortSet.add p set
+          | None -> set)
+        set (Bwv.to_list scope))
+    PortSet.empty (Scopes.get ())
+
+(* What to say about a wire that no scope could place.  In the conclusion's own term, every wire is
+   on a path to the goal, so an assumption reached along one really is being carried out of the
+   block that binds it -- it exists only on the way to that block's subgoal -- however that block is
+   wired up.  That's an ill-scoped connection, and the resolver reports it as one wherever it hits.
+   A wire in a fragment that leads nowhere, though, carries the assumption nowhere either.  If no
+   scope binds its port, the block that would introduce that assumption was never elaborated, so the
+   assumption doesn't exist yet at all rather than existing somewhere this wire can't reach, and
+   blaming scope would send the player looking for the wrong mistake. *)
+let scope_error_code (bound : PortSet.t) (p : Port.t) : Code.t =
+  if p.sort = Assumption && not (PortSet.mem p bound) then Unattached_assumption
+  else Ill_scoped_connection
+
 (* Wrap up the data necessary to resolve a named term and then typecheck it. *)
 type context = Context : ('b, 's) status * ('a, 'b) Ctx.t * (unit, 'a) Resolver.scope -> context
 
@@ -1101,13 +1130,18 @@ let synth_cut_ports (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
           | `No_scope _ -> Some (p, ds)
           | `Found_scope _ ->
               (* Report the wires we cut, and only those: the complaints the pruned attempt makes
-                 about the holes they left behind are our doing, not the player's. *)
+                 about the holes they left behind are our doing, not the player's.  Every pass has
+                 run by now, so the scopes we've collected are all the scopes there are, and can say
+                 which of these wires come out of a block that was never elaborated at all. *)
+              let bound = bound_ports () in
               List.iter
                 (fun (e : Edge.t) ->
                   if not (Hashtbl.mem reported e.id) then (
                     Hashtbl.replace reported e.id ();
                     Diagnostic.add diagnostics true
-                      (Reporter.diagnostic ~loc:(Loc.make [ `Edge e.id ]) Code.Ill_scoped_connection)))
+                      (Reporter.diagnostic
+                         ~loc:(Loc.make [ `Edge e.id ])
+                         (scope_error_code bound e.source))))
                 cut;
               None))
     ports
