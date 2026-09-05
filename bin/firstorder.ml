@@ -48,14 +48,20 @@ an order -- which is what an algebra block does -- would then credit a proof wit
 that nothing gives it.  Equality is different: = is genuine equality wherever it is written, so it
 stays a single relation on every type. `}
 
-{` The naturals have addition, multiplication and powers, and an ordering, but no subtraction and
-no negation: those are what makes a ring, and ℕ is only a semiring, so the operations that need
-them start at ℤ.  Everything else a natural can be asked -- its size, the smaller of two, its
-square -- it is asked as an integer, since ℕ ≤ ℤ. `}
+{` The naturals have every operation that doesn't take one outside them: what they lack is
+subtraction and negation, which are what make a ring, and division and square roots, which they
+lack for the same reasons ℤ does.  A difference of naturals is an integer and reads as one, since
+ℕ ≤ ℤ. `}
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 axiom ℕ.plus : ℕ → ℕ → ℕ
 axiom ℕ.times : ℕ → ℕ → ℕ
 axiom ℕ.pow : ℕ → ℕ → ℕ
+axiom ℕ.square : ℕ → ℕ
+axiom ℕ.cube : ℕ → ℕ
+axiom ℕ.fourth : ℕ → ℕ
+axiom ℕ.abs : ℕ → ℕ
+axiom ℕ.min : ℕ → ℕ → ℕ
+axiom ℕ.max : ℕ → ℕ → ℕ
 axiom ℕ.lt : ℕ → ℕ → Type
 def ℕ.le (x y : ℕ) : Type ≔ data [ left. (_ : ℕ.lt x y) | right. (_ : eq ℕ x y) ]
 def ℕ.gt (x y : ℕ) : Type ≔ ℕ.lt y x
@@ -354,8 +360,10 @@ let binops =
 type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -> infixl
 
 (* The number systems an operation can be asked for, smallest first, since that is the order the
-   notations try them in.  ℕ has addition, multiplication, powers and an ordering; subtraction and
-   negation -- and so everything defined with them -- start at ℤ, where there is a ring. *)
+   notations try them in.  Each list is the systems the operation doesn't take you out of:
+   subtraction and negation start at ℤ, where there is a ring; division at ℚ, where there is a
+   field; square roots at ℝ.  Everything else -- addition, multiplication, powers, sizes, the
+   smaller and larger of two, the ordering -- goes all the way down to the naturals. *)
 let numbers = [ "ℕ"; "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
 let rings = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
 let fields = [ "ℚ"; "ℝ"; "𝕊" ]
@@ -888,7 +896,7 @@ let () =
                       ( List.map
                           (fun ty ->
                             (`Any, sapp (locate_opt loc (Const (get_const [ ty; "abs" ]))) x, true))
-                          rings,
+                          numbers,
                         None )))
           | _ -> Builtins.invalid "∣∣");
       print_term =
@@ -931,7 +939,7 @@ let () =
                                        (sapp (locate_opt loc (Const (get_const [ ty; ostr ]))) x))
                                     y,
                                   true ))
-                              rings,
+                              numbers,
                             None )))
               | _ -> Builtins.invalid name);
           print_term =
@@ -982,7 +990,7 @@ let () =
                           ( List.map
                               (fun ty ->
                                 (`Any, sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x, true))
-                              rings,
+                              numbers,
                             None )))
               | _ -> Builtins.invalid name);
           print_term =
@@ -1097,7 +1105,7 @@ let install_notations () =
     (fun (_, sym, _, onotn, ostr) ->
       Scope.Situation.add_with_print
         {
-          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) rings;
+          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
           notn = Wrap onotn;
           pat_vars = [ "x" ];
           val_vars = [ "x" ];
@@ -1122,7 +1130,7 @@ let install_notations () =
     };
   Scope.Situation.add_with_print
     {
-      keys = List.map (fun ty -> `Constant (get_const [ ty; "abs" ])) rings;
+      keys = List.map (fun ty -> `Constant (get_const [ ty; "abs" ])) numbers;
       notn = Wrap absn;
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
@@ -1132,7 +1140,7 @@ let install_notations () =
     (fun (name, onotn, ostr) ->
       Scope.Situation.add_with_print
         {
-          keys = List.map (fun ty -> `Constant (get_const [ ty; ostr ])) rings;
+          keys = List.map (fun ty -> `Constant (get_const [ ty; ostr ])) numbers;
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];

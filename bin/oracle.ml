@@ -398,7 +398,7 @@ let get_poly ctx ty tm =
               match (get_funhead head, get_args args) with
               | Some hd, Some ((_ :: _) as args) ->
                   let* f = fun_for hd (List.length args) in
-                  let* args = go_args args in
+                  let* args = go_args ty args in
                   return (`App (f, args))
               | _ -> var ty tm in
             natural (Lazy.force tmty) v)
@@ -419,14 +419,16 @@ let get_poly ctx ty tm =
       return v
     else return v
   (* An argument of an uninterpreted function can be of any type at all, not just the kind of
-     number the arithmetic is about, so each is translated at its own type rather than the ambient
-     one.  On the Z3 side every sort collapses to the reals, which only gives the solver more
-     models to consider, never fewer. *)
-  and go_args = function
+     number the arithmetic is about.  One that is about the same kind of number is translated at
+     that type, like everything else, so that a term it shares with the rest of the question gets
+     the same variable; one that isn't -- an element of a parameter type, say -- at its own.  On
+     the Z3 side every sort collapses to the reals, which only gives the solver more models to
+     consider, never fewer. *)
+  and go_args ty = function
     | [] -> return []
     | (a : normal) :: rest ->
-        let* a = go a.ty a.tm in
-        let* rest = go_args rest in
+        let* a = go (if comparable ctx ty a.ty then ty else a.ty) a.tm in
+        let* rest = go_args ty rest in
         return (a :: rest)
   and go ty tm =
     match Norm.view_term tm with

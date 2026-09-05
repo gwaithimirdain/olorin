@@ -234,25 +234,62 @@ test.describe('The natural numbers', () => {
         })).toBe(true);
     });
 
-    // −, ∣ ∣, min, max and the squares aren't stated on ℕ at all, but a natural is an integer, so
-    // they still apply to one; the statement they make is then about ℤ, and mixes with ℕ's own.
-    test('reach the ring operations as integers', async ({ page }) => {
+    test('take sizes, the smaller and larger of two, and the small powers', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await algebraProves(olorin, {
             variables: 'n ∈ ℕ',
-            conclusion: 'n²=n·n',
+            conclusion: 'n²·n=n³',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            conclusion: 'n⁴=n²·n²',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            hypotheses: ['n≤m'],
+            conclusion: 'min(n,m)+max(n,m)=n+m',
         })).toBe(true);
         // ∣n∣ needs the sign of n settled, and being a natural settles it: even the plain block,
-        // which otherwise makes the student split into cases, takes this one.  So does √, whose
-        // argument has to be nonnegative before it denotes anything.
+        // which otherwise makes the student split into cases, takes this one.
         expect(await algebraProves(olorin, {
             variables: 'n ∈ ℕ',
             conclusion: '∣n∣=n',
         })).toBe(true);
+    });
+
+    // None of those takes you out of the naturals, and the results really are naturals: f accepts
+    // nothing else, so these statements can't even be made unless min and ² land back in ℕ.
+    test('and stay in ℕ when they do', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            parameters: 'f : ℕ → ℝ',
+            variables: 'n ∈ ℕ',
+            conclusion: 'f (n²) = f (n·n)',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            parameters: 'f : ℕ → ℝ',
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            hypotheses: ['n≤m'],
+            conclusion: 'f (min(n,m)) = f n',
+        })).toBe(true);
+    });
+
+    // What does take you out of them: subtraction, division and square roots, which read as the
+    // integer, rational or real ones, a natural being contained in all three.  √ needs its
+    // argument nonnegative before it denotes anything, and a natural is.
+    test('leave ℕ for the operations that have to', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
         expect(await algebraProves(olorin, {
             variables: 'n ∈ ℕ',
             conclusion: '√n·√n=n',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            hypotheses: ['n≠0'],
+            conclusion: '(m·n)/n=m',
         })).toBe(true);
     });
 
