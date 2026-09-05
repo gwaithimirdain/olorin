@@ -1,7 +1,7 @@
 // A level's "maxrules" budget: at most that many blocks, not counting the variable, hypothesis and
-// conclusion blocks the level starts with.  The budget is shown with the level's name and
-// difficulty, and a proof that is correct but over it doesn't complete the level -- a red pop-up
-// says so instead of the "Level Complete!" one.
+// conclusion blocks the level starts with.  A budgeted level shows its running block count at the
+// top until it is finished, in red once the count goes over; a proof that is correct but over
+// budget doesn't complete the level, and the completion pop-up carries the final count.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -38,25 +38,55 @@ test.describe('Block budgets', () => {
         await olorin.open();
     });
 
-    test('a level with no budget shows none, and any number of blocks completes it', async () => {
+    test('a level with no budget counts nothing, and any number of blocks completes it', async () => {
         await olorin.selectLevel(LEVEL.name);
-        expect(await olorin.maxBlocksText()).toBe(null);
+        expect(await olorin.blockBanner()).toBe(null);
 
         await olorin.dragRule('andI', 500, 450);  // a spare box, over any budget there might be
+        expect(await olorin.blockBanner()).toBe(null);
+
         await proveWithAndI(olorin);
         expect(await olorin.isComplete()).toBe(true);
         expect(await olorin.completeBannerVisible()).toBe(true);
-        expect(await olorin.tooManyBlocksVisible()).toBe(false);
+        expect(await olorin.completeBannerText()).toBe('Level Complete!');
+        expect(await olorin.blockBanner()).toBe(null);
     });
 
-    test('shows the budget, and completes a proof that keeps to it', async () => {
-        await openWithBudget(olorin, 1);
-        expect(await olorin.maxBlocksText()).toBe('Max blocks: 1');
+    test('counts up from the empty proof as blocks are added', async () => {
+        await openWithBudget(olorin, 3);
+        expect(await olorin.blockBanner()).toEqual({ text: 'Blocks used: 0/3', over: false });
 
+        await olorin.dragRule('topI', 500, 350);
+        await olorin.waitForTypecheck();
+        expect(await olorin.blockBanner()).toEqual({ text: 'Blocks used: 1/3', over: false });
+
+        const spare = await olorin.dragRule('topI', 500, 450);
+        await olorin.waitForTypecheck();
+        expect(await olorin.blockBanner()).toEqual({ text: 'Blocks used: 2/3', over: false });
+
+        await olorin.deleteNode(spare);
+        await olorin.waitForTypecheck();
+        expect(await olorin.blockBanner()).toEqual({ text: 'Blocks used: 1/3', over: false });
+    });
+
+    test('goes red once the count is over, before the proof is anywhere near correct', async () => {
+        await openWithBudget(olorin, 1);
+        await olorin.dragRule('topI', 500, 350);
+        await olorin.dragRule('topI', 500, 450);
+        await olorin.waitForTypecheck();
+
+        expect(await olorin.blockBanner()).toEqual({ text: 'Too many blocks!  Used: 2/1', over: true });
+        expect(await olorin.isComplete()).toBe(false);
+    });
+
+    test('the completion pop-up replaces the count, and carries it', async () => {
+        await openWithBudget(olorin, 2);
         await proveWithAndI(olorin);
+
         expect(await olorin.isComplete()).toBe(true);
+        expect(await olorin.blockBanner()).toBe(null);
         expect(await olorin.completeBannerVisible()).toBe(true);
-        expect(await olorin.tooManyBlocksVisible()).toBe(false);
+        expect(await olorin.completeBannerText()).toBe('Level Complete! Blocks used: 1/2');
     });
 
     test('a correct proof over the budget is refused, and completes once cut back to it', async () => {
@@ -67,8 +97,7 @@ test.describe('Block budgets', () => {
         // A second block -- correct, but one more than the budget allows.
         const spare = await olorin.dragRule('topI', 500, 450);
         await olorin.waitForTypecheck();
-        expect(await olorin.tooManyBlocksVisible()).toBe(true);
-        expect(await olorin.tooManyBlocksText()).toBe('Too many blocks!  Maximum: 1');
+        expect(await olorin.blockBanner()).toEqual({ text: 'Too many blocks!  Used: 2/1', over: true });
         // Not complete: no pop-up, and the conclusion stays uncolored.
         expect(await olorin.completeBannerVisible()).toBe(false);
         expect(await olorin.isComplete()).toBe(false);
@@ -76,8 +105,9 @@ test.describe('Block budgets', () => {
         // Deleting the spare block brings it back within budget, and it completes as usual.
         await olorin.deleteNode(spare);
         await olorin.waitForTypecheck();
-        expect(await olorin.tooManyBlocksVisible()).toBe(false);
+        expect(await olorin.blockBanner()).toBe(null);
         expect(await olorin.completeBannerVisible()).toBe(true);
+        expect(await olorin.completeBannerText()).toBe('Level Complete! Blocks used: 1/1');
         expect(await olorin.isComplete()).toBe(true);
     });
 
@@ -85,26 +115,16 @@ test.describe('Block budgets', () => {
         await openWithBudget(olorin, 1);
         await olorin.dragRule('topI', 500, 450);
         await proveWithAndI(olorin);
-        expect(await olorin.tooManyBlocksVisible()).toBe(true);
+        expect(await olorin.blockBanner()).toEqual({ text: 'Too many blocks!  Used: 2/1', over: true });
 
         expect(await olorin.levelStates(LEVEL.name)).not.toContain('completed');
     });
 
-    test('an incomplete proof over the budget shows the errors, not the budget warning', async () => {
+    test('the budget belongs to the level: leaving for one without it drops the count', async () => {
         await openWithBudget(olorin, 1);
-        // Two blocks, and nothing wired to the conclusion: over budget, but incomplete anyway.
-        await olorin.dragRule('topI', 500, 350);
-        await olorin.dragRule('topI', 500, 450);
-        await olorin.waitForTypecheck();
-        expect(await olorin.tooManyBlocksVisible()).toBe(false);
-        expect(await olorin.isComplete()).toBe(false);
-    });
-
-    test('the budget belongs to the level: leaving for one without it drops it', async () => {
-        await openWithBudget(olorin, 1);
-        expect(await olorin.maxBlocksText()).toBe('Max blocks: 1');
+        expect(await olorin.blockBanner()).toEqual({ text: 'Blocks used: 0/1', over: false });
 
         await olorin.selectLevel(oneWireLevel().name);
-        expect(await olorin.maxBlocksText()).toBe(null);
+        expect(await olorin.blockBanner()).toBe(null);
     });
 });

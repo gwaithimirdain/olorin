@@ -191,22 +191,20 @@ class Olorin {
         return this.page.isVisible('#levelCompleteBanner');
     }
 
-    // Whether the red "too many blocks" pop-up (shown for a correct proof that is over the level's
-    // "maxrules" budget) is showing.
-    tooManyBlocksVisible() {
-        return this.page.isVisible('#tooManyBlocksBanner');
-    }
-
-    tooManyBlocksText() {
-        return this.page.textContent('#tooManyBlocksBanner');
-    }
-
-    // The block budget shown with the level name and difficulty, or null when the level sets none.
-    maxBlocksText() {
+    // The running block count of a budgeted level as { text, over } -- `over` being whether it has
+    // gone red -- or null when it isn't showing.
+    blockBanner() {
         return this.page.evaluate(() => {
-            const el = document.getElementById('maxBlocks');
-            return getComputedStyle(el).display === 'none' ? null : el.innerText;
+            const el = document.getElementById('blockCountBanner');
+            if (getComputedStyle(el).display === 'none') { return null; }
+            // textContent, not innerText: the strings have double spaces that rendering collapses.
+            return { text: el.textContent, over: el.classList.contains('over') };
         });
+    }
+
+    // What the "level complete" pop-up says (it carries the block count on a budgeted level).
+    completeBannerText() {
+        return this.page.textContent('#levelCompleteText');
     }
 
     // The "world unlocked" modal that pops when a completion opens a new world/difficulty.

@@ -148,9 +148,9 @@
     <!-- What went wrong on a wire that's been marked red, shown while the pointer is over it. -->
     <div id="wireTooltip"></div>
 
-    <!-- Shown in place of the "level complete" pop-up when a proof is correct but uses more
-         blocks than the level's "maxrules" allows. -->
-    <div id="tooManyBlocksBanner"></div>
+    <!-- On a level with a "maxrules" budget, the running block count, until the level is finished
+         and the "level complete" pop-up takes its place.  Turns red once the count is over. -->
+    <div id="blockCountBanner"></div>
 
     <div id="levelCompleteBanner">
       <span id="levelCompleteText">Level Complete!</span>
@@ -163,7 +163,6 @@
     <div id="currentLevelAndDifficulty">
       <div id="currentLevel"></div>
       <div id="currentDifficulty"></div>
-      <div id="maxBlocks"></div>
       <div id="reduceDifficulty" title="Switch to an easier difficulty of this level"></div>
       <div id="showHint" title="Show a hint for this level">Show Hint</div>
       <div>

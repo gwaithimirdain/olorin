@@ -38,10 +38,10 @@
 //                       rules always remain available.
 //
 //   maxrules: N         A budget: at most N blocks may be used, not counting the variable,
-//                       hypothesis and conclusion blocks the level starts with.  The budget is
-//                       shown with the level's name and difficulty, and a proof that is correct
-//                       but over it doesn't count as complete -- the player is told so and has to
-//                       find a shorter proof.
+//                       hypothesis and conclusion blocks the level starts with.  The running count
+//                       stands at the top of the level, and turns red as soon as it goes over; a
+//                       proof that is correct but over budget doesn't count as complete, so the
+//                       player has to find a shorter one.
 //
 export const LEVELS = [
     { name: "Conjunction world",
