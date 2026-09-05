@@ -57,45 +57,37 @@ let connective_of_constr = function
 let oracle_failed str (p : printable) =
   if str = Oracle.unprovable then
     Some
-      "The algebra block couldn't prove this from the facts wired into it.  Either it doesn't \
+      "I couldn't prove this from the inputs to the algebra block.  Either it doesn't \
        follow from them by algebra alone, or a hypothesis it needs isn't connected."
   else if str = Oracle.zero_denominator then
     Option.map
       (fun den ->
-        "The algebra block can't tell that" ^ display den
-        ^ "is nonzero, and dividing by it only means anything if it is.  Wire in a hypothesis \
-           saying it isn't zero, or one that forces that.")
+        "I couldn't prove that" ^ display den
+        ^ "is nonzero, so I can't divide by it.  Wire in a hypothesis ensuring it's nonzero.")
       (printed p)
   else if str = Oracle.negative_base then
     Option.map
       (fun b ->
-        "The algebra block can't tell that" ^ display b
-        ^ "is nonnegative, and an even root of it -- a square root, a fourth root -- only means \
-           anything if it is.  Wire in a hypothesis saying it isn't negative, or one that forces \
-           that.")
+        "I couldn't prove that" ^ display b
+        ^ "is nonnegative, so I can't take an even root of it.  Wire in a hypothesis ensuring it's nonnegative.")
       (printed p)
   else if str = Oracle.undecided_sign then
     Option.map
       (fun x ->
-        "Before the alg block will work with the absolute value of" ^ display x
-        ^ "it has to know which way that goes, so that the absolute value goes away.  Wire in a \
-           hypothesis making it nonnegative, or one making it nonpositive -- the ≤∨> block splits \
-           into exactly those two cases, and you then prove each of them.  (The alg+ block does \
-           the split for you.)")
+        "Before I can prove anything about the absolute value of" ^ display x
+        ^ "I have to know which way that goes, so that the absolute value goes away.  Wire in a \
+           hypothesis making it nonnegative or nonpositive (perhaps by doing a case split).")
       (printed p)
   else if str = Oracle.undecided_order then
     Option.map
       (fun x ->
-        "Before the alg block will work with" ^ display x
-        ^ "it has to know which of those two numbers is the smaller, so that the min or max goes \
-           away.  Wire in a hypothesis saying which -- the ≤∨> block splits into exactly those two \
-           cases, and you then prove each of them.  (The alg+ block does the split for you.)")
+        "Before I can prove anything about" ^ display x
+        ^ "I have to know which of those two numbers is the smaller, so that the min or max goes \
+           away.  Wire in a hypothesis saying which is bigger (perhaps by doing a case split).")
       (printed p)
   else if str = Oracle.disequality then
     Some
-      "The algebra block won't prove a ≠ statement outright unless both sides are plain numbers: \
-       that one is for you to prove by contradiction.  Assume the two sides are equal, and derive \
-       a contradiction from that."
+      "I won't prove a ≠ statement by algebra unless both sides are plain numbers: use a proof by contradiction instead."
   else if str = Oracle.not_a_relation then
     Option.map
       (fun ty ->
@@ -113,15 +105,14 @@ let oracle_failed str (p : printable) =
   else if str = Oracle.mixed_goal then
     Option.map
       (fun ty ->
-        "The alg+ block proves each part of a conjunction against the same hypotheses, so they all \
-         have to be about the same kind of number.  The goal it's wired to is" ^ display ty
-        ^ "which mixes them.")
+         "All the conjuncts of the output of an algebra block must be equations or inequalities in sets that share a common superset.  The output "
+         ^ display ty
+         ^ "mixes incompatible sets.")
       (printed ~sort:`Type p)
   else if str = Oracle.mixed_types then
     Option.map
       (fun ty ->
-        "Everything wired into the algebra block has to be an equation or inequality about the \
-         same kind of number as the goal.  This one is about" ^ display ty ^ "which isn't.")
+        "All the inputs and the output of an algebra block must be equations or inequalities in sets that share a common superset.  The statement " ^ display ty ^ "is incompatible with others.")
       (printed ~sort:`Type p)
   else None
 
@@ -132,17 +123,16 @@ let explain : Code.t -> string option = function
       | Some got, Some expected ->
           Some
             ("This wire carries a proof of" ^ display got
-           ^ "but the block it runs into needs a proof of" ^ display expected
-           ^ "and those aren't the same statement.")
+           ^ "but the block it runs into needs a proof of" ^ display expected)
       | _, _ -> None)
   (* An introduction block wired to a goal that isn't of its shape.  Narya defines ∧, ⇒, ⇔, ∀ and ¬
      as record types, so building one at the wrong goal reads as checking a tuple. *)
   | Checking_tuple_at_nonrecord ty ->
       Option.map
         (fun ty ->
-          "This block proves a compound statement — a conjunction (A∧B), an implication (A⇒B), a \
-           biconditional (A⇔B), a universal statement (∀x∈A,…) or a negation (¬A).  But the goal \
-           it's wired to is" ^ display ty ^ "which isn't any of those, so it needs a different block.")
+          "This block proves a conjunction (A∧B), an implication (A⇒B), a \
+           biconditional (A⇔B), a universal (∀x∈A,…) or a negation (¬A).  But the goal \
+           it's wired to is" ^ display ty ^ "which isn't any of those.")
         (printed ~sort:`Type ty)
   (* An introduction block for ∨ or ∃, which are datatypes, wired to a goal of the wrong shape. *)
   | No_such_constructor (d, c) -> (
@@ -155,7 +145,7 @@ let explain : Code.t -> string option = function
       | Some shape, Some ty ->
           Some
             ("This block proves " ^ shape ^ ", but the goal it's wired to is" ^ display ty
-           ^ "which isn't of that form, so it needs a different block.")
+           ^ "which isn't of that form.")
       | _, _ -> None)
   (* An elimination block fed something that isn't of the shape it takes apart.  The payload names
      the offending term rather than its type, and that term is an internal variable, so we describe
@@ -179,8 +169,7 @@ let explain : Code.t -> string option = function
         (fun ty ->
           "This block splits a proof into cases, but what's wired into it is a proof of"
           ^ display ty
-          ^ "which has no cases to split on.  ∨-elimination needs a disjunction (A∨B), and the ⊥ \
-             block needs a proof of ⊥.")
+          ^ "which has no cases to split on.")
         (printed ~sort:`Type ty)
   | Oracle_failed (str, p) -> oracle_failed str p
   (* An unconnected input or subgoal, which Olorin elaborates to a hole. *)
@@ -188,8 +177,8 @@ let explain : Code.t -> string option = function
       Some "This part of the proof isn't finished: something that needs to be connected isn't."
   | Nonsynthesizing _ ->
       Some
-        "Olorin can't work out on its own what statement belongs here.  Connect a wire to this \
-         input, or use an ascription block to say what it should be."
+        "I can't tell what statement belongs here.  Connect a wire to this \
+         input, or use a label block to say what it should be."
   (* Wires that lead out of a block and back into it. *)
   | Cyclic_term ->
       Some
@@ -209,8 +198,8 @@ let explain : Code.t -> string option = function
   | Unattached_assumption ->
       Some
         "This wire carries an assumption, or a variable, out of a block whose own output isn't \
-         wired into the proof yet.  Until it is, Olorin doesn't know what that block is proving, so \
-         it doesn't know what this assumption says either: connect the block's output on the way to \
+         wired into the proof yet.  Until it is, I can't tell what that block is proving, so \
+         I don't know what this assumption says either: connect the block's output on the way to \
          the goal."
   | Unbound_variable (x, _) ->
       Some
