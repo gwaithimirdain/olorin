@@ -92,9 +92,9 @@ test.describe('The "≤∨>" block', () => {
 
 // State a level, prove it with a single algebra block fed by every hypothesis, and report whether
 // Olorin accepts the result.
-async function algebraProves(olorin, { variables = '', hypotheses = [], conclusion }) {
+async function algebraProves(olorin, { parameters = '', variables = '', hypotheses = [], conclusion }) {
     await olorin.buildCustom({
-        parameters: '',
+        parameters,
         variables,
         hypotheses: hypotheses.join('\n'),
         conclusion,
@@ -243,27 +243,53 @@ test.describe('The natural numbers', () => {
             variables: 'n ∈ ℕ',
             conclusion: 'n²=n·n',
         })).toBe(true);
+        // ∣n∣ needs the sign of n settled, and being a natural settles it: even the plain block,
+        // which otherwise makes the student split into cases, takes this one.  So does √, whose
+        // argument has to be nonnegative before it denotes anything.
         expect(await algebraProves(olorin, {
             variables: 'n ∈ ℕ',
-            hypotheses: ['0≤n'],
             conclusion: '∣n∣=n',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            conclusion: '√n·√n=n',
         })).toBe(true);
     });
 
-    // Being a natural is not itself a fact the block has: ℕ says nothing about 0≤n, and there is
-    // no block that says it either, so for now it has to be a hypothesis.
-    test('are not yet known to be nonnegative', async ({ page }) => {
+    // Being a natural is a fact in itself: the block is told 0≤n for every natural it meets, since
+    // to Z3 they are opaque reals and nothing else would say so.
+    test('are known to be nonnegative for being naturals', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await algebraProves(olorin, {
             variables: 'n ∈ ℕ\nm ∈ ℕ',
             conclusion: 'n≤n+m',
-        })).toBe(false);
-        expect(await algebraProves(olorin, {
-            variables: 'n ∈ ℕ\nm ∈ ℕ',
-            hypotheses: ['0≤m'],
-            conclusion: 'n≤n+m',
         })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            conclusion: '0≤n·n+n',
+        })).toBe(true);
+        // An integer that happens to be called m is not a natural, and gets no such fact.
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℤ',
+            conclusion: 'n≤n+m',
+        })).toBe(false);
+    });
+
+    // The value of a function landing in ℕ is just as opaque, and just as nonnegative.
+    test('are nonnegative wherever they turn up, not just as variables', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            parameters: 'f : ℝ → ℕ',
+            variables: 'x ∈ ℝ',
+            conclusion: '0≤f x',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            parameters: 'f : ℝ → ℤ',
+            variables: 'x ∈ ℝ',
+            conclusion: '0≤f x',
+        })).toBe(false);
     });
 
     test('mix with the larger systems, being contained in them', async ({ page }) => {

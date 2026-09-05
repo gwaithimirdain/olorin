@@ -237,7 +237,8 @@ let max_exponent = 1000
    up, so a subterm's steps come before those of the term containing it, and 'ask' below walks them
    in that order. *)
 type step =
-  (* What a fresh variable stands for: the relations defining a root. *)
+  (* Something we know about a symbol as soon as we make it, rather than from the hypotheses: the
+     relations defining a root, or that a natural is at least zero. *)
   | Define of Relation.t list
   (* A denominator, which the hypotheses have to force to be nonzero, paired with the term it came
      from so we can point at it in an error. *)
@@ -279,6 +280,14 @@ let get_args : type any. any apps -> normal list option =
     | _ -> None in
   go args []
 
+(* Whether a type is ℕ.  Its elements are nonnegative, which to Z3 -- for whom they are opaque
+   reals like any other -- is not a fact about them at all until we say so. *)
+let is_natural ty =
+  match Norm.view_term ty with
+  | Neu { head = Const { name; ins }; args = Emp; _ } ->
+      Option.is_some (is_id_ins ins) && Some name = Scope.lookup [ "ℕ" ]
+  | _ -> false
+
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
   (* Subterms we can't interpret, each standing for an opaque variable.  A root's variable is one of
@@ -293,6 +302,8 @@ type translation = {
      written with two arguments in one place and one in another is two symbols, not one. *)
   funs : (funhead * int) Bwd.t;
   funcount : int;
+  (* The symbols we've already said are nonnegative, so a natural written twice says it once. *)
+  nonnegs : Symbolic.t Bwd.t;
   (* The definitions and obligations met along the way, oldest first. *)
   steps : step Bwd.t;
 }
@@ -379,17 +390,34 @@ let get_poly ctx ty tm =
     | Some i -> return (`Const (Q.of_int i))
     | None -> (
         match Norm.view_term tm with
-        | Neu { head; args; _ } -> (
-            match (get_funhead head, get_args args) with
-            | Some hd, Some ((_ :: _) as args) ->
-                let* f = fun_for hd (List.length args) in
-                let* args = go_args args in
-                return (`App (f, args))
-            | _ -> var ty tm)
+        (* A neutral carries its own type, and that is the one that says whether it's a natural --
+           not the kind of number the arithmetic around it is about, which a natural reaches by
+           being contained in it. *)
+        | Neu { head; args; ty = tmty; _ } -> (
+            let* v =
+              match (get_funhead head, get_args args) with
+              | Some hd, Some ((_ :: _) as args) ->
+                  let* f = fun_for hd (List.length args) in
+                  let* args = go_args args in
+                  return (`App (f, args))
+              | _ -> var ty tm in
+            natural (Lazy.force tmty) v)
         | _ -> var ty tm)
   and var ty tm =
     let* v, _ = var_for ctx ty tm in
     return v
+  (* A term of type ℕ is a natural number, and that it is at least zero is a fact about the type
+     rather than anything the hypotheses say -- to Z3 it is an opaque real like any other -- so the
+     translation states it the first time it meets such a term.  Only an opaque one needs it: a
+     numeral says it for itself, and Z3 gets "n + m ≥ 0" and "n · m ≥ 0" from the parts.  An
+     uninterpreted function landing in ℕ counts as one, its value being just as opaque. *)
+  and natural tmty v =
+    let* st = S.get in
+    if is_natural tmty && not (Bwd.exists (fun x -> x = v) st.nonnegs) then
+      let* () = S.put { st with nonnegs = Snoc (st.nonnegs, v) } in
+      let* () = add_step (Define [ (`Le, `Const Q.zero, v) ]) in
+      return v
+    else return v
   (* An argument of an uninterpreted function can be of any type at all, not just the kind of
      number the arithmetic is about, so each is translated at its own type rather than the ambient
      one.  On the Z3 side every sort collapses to the reals, which only gives the solver more
@@ -550,7 +578,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      let* goals = mmapM (fun [ g ] -> poly g) [ goals ] in
      let* givens = mmapM (fun [ g ] -> poly g) [ givens ] in
      return (givens, goals))
-      { vars = Emp; count = 0; funs = Emp; funcount = 0; steps = Emp } in
+      { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
   (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
      literals, like 0≠1.  A disequality with anything else in it is one we want the student to
      prove by contradiction. *)
