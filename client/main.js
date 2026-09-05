@@ -28,7 +28,7 @@ const VALUECOLOR = "#0000ff";
 const CLOSE_BUTTON_HOME = 0.8;
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∼', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊', 'ε', 'δ'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∼', '≈', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊', 'ε', 'δ'];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
@@ -69,6 +69,7 @@ const KEYS = [
     { unicode: '≤', keys: [ '\\le' ] },
     { unicode: '≥', keys: [ '\\ge' ] },
     { unicode: '∼', keys: [ '\\sim', '~' ] },
+    { unicode: '≈', keys: [ '\\approx' ] },
     { unicode: 'ℕ', keys: [ '\\N ' ] },
     { unicode: 'ℤ', keys: [ '\\Z ' ] },
     { unicode: 'ℚ', keys: [ '\\Q ' ] },

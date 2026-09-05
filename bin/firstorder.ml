@@ -195,6 +195,8 @@ let onechar_ops =
     (0x2261, Ident [ "≡" ]);
     (0x2264, Ident [ "≤" ]);
     (0x2265, Ident [ "≥" ]);
+    (0x223C, Ident [ "∼" ]);
+    (0x2248, Ident [ "≈" ]);
   |]
 
 type (_, _, _) identity +=
@@ -1100,6 +1102,8 @@ def 𝕊.neginf (x : 𝕊) : Type ≔ forall ℝ (u ↦ lt 𝕊 x u)
 notation(0) x \"is\" \"negative\" \"infinite\" ≔ 𝕊.neginf x
 def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ lt 𝕊 (𝕊.abs x) u)
 notation(0) x \"is\" \"infinitesimal\" ≔ 𝕊.infinitesimal x
+def 𝕊.infclose (x y : 𝕊) : Type ≔ 𝕊.infinitesimal (𝕊.minus x y)
+notation(0) x \"≈\" y ≔ 𝕊.infclose x y
 "
 
 (* Load that code, in the same way that run_top loads its non-interactive inputs: the string sees
