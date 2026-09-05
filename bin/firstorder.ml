@@ -1091,6 +1091,9 @@ let install_notations () =
 
 let secondary_startup =
   "def 𝕊.finite (x : 𝕊) : Type ≔ existspos (u ↦ le 𝕊 (𝕊.abs x) u)
+notation(0) x \"is\" \"finite\" ≔ 𝕊.finite x
+def 𝕊.comparable (x y : 𝕊) : Type ≔ 𝕊.finite (𝕊.minus x y)
+notation(0) x \"∼\" y ≔ 𝕊.comparable x y
 "
 
 (* Load that code, in the same way that run_top loads its non-interactive inputs: the string sees

@@ -700,6 +700,24 @@
         For a,b,n∈ℤ, the notation "a ≡ b (mod n)" is pronounced as "a is congruent to b mod n".
         By definition, this means ∃k∈ℤ,(a−b=k·n).
       </div>
+      <div id="posrealHint" class="modal hint">
+        We write ℝ₊ to mean the set of positive real numbers.
+        For convenience, we introduce special blocks for quantifiers over ℝ₊ that require or supply both a real number and a proof of positivity.
+      </div>
+      <div id="finiteHint" class="modal hint">
+        <p>
+          The system 𝕊 of "surreal numbers" contains all the real numbers, and also "infinite" numbers like ω and "infinitesimal" numbers like 1/ω.
+          We say a surreal number is "finite" if its absolute value is less than some real number.
+        </p>
+        <p>
+          For convenience, we introduce here an enhanced algebra block "alg+" which can automatically deal with absolute values.
+          When "alg+" is available, there's no need to manually break up into cases in order to draw conclusions about absolute values.
+          But you should continue to write out all the necessary algebra steps on paper!
+        </p>
+      </div>
+      <div id="comparableHint" class="modal hint">
+        Two surreal numbers are "comparable", written "x ∼ y", if their difference is finite.
+      </div>
       <div id="negationHint" class="modal hint" style="width: 630px">
         <p>
           The symbol ¬ means "not".
