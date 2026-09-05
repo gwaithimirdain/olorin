@@ -80,7 +80,7 @@ test.describe('alg+ and conjunctions', () => {
         // A disequality is only proved outright between literals, whether or not it is conjoined.
         expect(await proves(olorin, { hypotheses: ['0<x'], conclusion: '(0<x)∧(x≠1)' })).toBe(false);
         expect(await complaints(olorin)).toEqual(
-            [expect.stringContaining("won't prove a ≠ statement outright")]);
+            [expect.stringContaining("won't prove a ≠ statement by algebra")]);
         expect(await proves(olorin, { hypotheses: ['0<x'], conclusion: '(0<x)∧(0≠1)' })).toBe(true);
     });
 

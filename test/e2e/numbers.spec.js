@@ -144,7 +144,7 @@ test.describe('Disequalities and the algebra block', () => {
             conclusion: 'x≠0',
         })).toBe(false);
         expect((await olorin.diagnostics()).map((d) => d.explanation).join(' '))
-            .toContain('prove by contradiction');
+            .toContain('proof by contradiction');
     });
 
     // What the "0≠1" fact is for: contradicting an algebraic consequence of the hypotheses.  The

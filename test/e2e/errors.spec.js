@@ -50,7 +50,9 @@ test.describe('Error explanations', () => {
         await olorin.open();
         // ∧-introduction: Narya sees the connectives-as-records, so this is "tuple at non-record".
         await mistake(olorin, { parameters: 'P : Type' }, toConclusion('andI'));
-        expect(await explanationFor(olorin, 'E0900')).toContain('compound statement');
+        const shapes = await explanationFor(olorin, 'E0900');
+        expect(shapes).toContain('a conjunction (A∧B)');
+        expect(shapes).toContain('\n    P\n');
         // ∨-introduction: ∨ is a datatype, so this one is "no such constructor" instead.
         await mistake(olorin, { parameters: 'P : Type' }, toConclusion('orI1'));
         const e = await explanationFor(olorin, 'E1000');
@@ -166,7 +168,7 @@ test.describe('Error explanations', () => {
 
         await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·(1/x)=1' }, toConclusion('alg'));
         const denom = await explanationFor(olorin, 'E3000');
-        expect(denom).toContain("can't tell that");
+        expect(denom).toContain("couldn't prove that");
         expect(denom).toContain('\n    x\n');
         expect(denom).toContain('is nonzero');
 

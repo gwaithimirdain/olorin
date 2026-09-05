@@ -8,19 +8,33 @@ open Reporter
    mistake: a block wired to a goal of the wrong shape, a wire between two blocks that disagree
    about the statement it carries, or an algebra block that can't discharge its goal. *)
 
-(* The messages the algebra oracle reports, named here so that oracle.ml and the explanations below
-   can't drift apart. *)
+(* The ways the algebra oracle can fail, extending the tag that Narya's Oracle_failed carries.  A
+   tag carries whatever the message below needs to point at, so that oracle.ml and the explanations
+   here can't drift apart.  Narya can't display any of these, so anything raised here should be
+   explained below. *)
 module Oracle = struct
-  let unprovable = "can't prove equality/inequality"
-  let zero_denominator = "can't prove this denominator is nonzero"
-  let negative_base = "can't prove this is nonnegative"
-  let disequality = "proving disequalities by algebra not allowed"
-  let undecided_sign = "can't tell which way this goes"
-  let undecided_order = "can't tell which of these two is smaller"
-  let not_a_relation = "not an equality or inequality"
-  let not_a_relation_input = "input is not an equality or inequality"
-  let mixed_types = "input is not an equation or inequality at the same type"
-  let mixed_goal = "goal is a conjunction of relations at different types"
+  type Reporter.oracle_error +=
+    (* The goal doesn't follow from the hypotheses by algebra. *)
+    | Unprovable
+    (* A denominator that isn't provably nonzero, or an even root whose base isn't provably
+       nonnegative: the term in question. *)
+    | Zero_denominator of printable
+    | Negative_base of printable
+    (* A disequality between things that aren't both literals. *)
+    | Disequality
+    (* An absolute value, min or max that the hypotheses don't decide: the term containing it. *)
+    | Undecided_sign of printable
+    | Undecided_order of printable
+    (* A goal, or an input, that isn't a relation at all: the statement in question. *)
+    | Not_a_relation of printable
+    | Not_a_relation_input of printable
+    (* A relation, or a conjunct of the goal, at a type incompatible with the others. *)
+    | Mixed_types of printable
+    | Mixed_goal of printable
+    (* Neither of these can happen unless olorin has elaborated an algebra block wrongly: the
+       hypotheses aren't a list, or the block isn't an application of an oracle constant. *)
+    | Not_a_hypothesis_list of printable
+    | Not_an_oracle_application of printable
 end
 
 (* Print a term or type, or nothing if unparsing raises (as it sometimes does). *)
@@ -53,68 +67,81 @@ let connective_of_constr = function
   | "existsbelow" -> Some "an existential statement about the whole numbers below some n (∃x∈[n],…)"
   | _ -> None
 
-(* The algebra block's own failures, told apart by the message the oracle reported. *)
-let oracle_failed str (p : printable) =
-  if str = Oracle.unprovable then
-    Some
-      "I couldn't prove this from the inputs to the algebra block.  Either it doesn't \
-       follow from them by algebra alone, or a hypothesis it needs isn't connected."
-  else if str = Oracle.zero_denominator then
-    Option.map
-      (fun den ->
-        "I couldn't prove that" ^ display den
-        ^ "is nonzero, so I can't divide by it.  Wire in a hypothesis ensuring it's nonzero.")
-      (printed p)
-  else if str = Oracle.negative_base then
-    Option.map
-      (fun b ->
-        "I couldn't prove that" ^ display b
-        ^ "is nonnegative, so I can't take an even root of it.  Wire in a hypothesis ensuring it's nonnegative.")
-      (printed p)
-  else if str = Oracle.undecided_sign then
-    Option.map
-      (fun x ->
-        "Before I can prove anything about the absolute value of" ^ display x
-        ^ "I have to know which way that goes, so that the absolute value goes away.  Wire in a \
-           hypothesis making it nonnegative or nonpositive (perhaps by doing a case split).")
-      (printed p)
-  else if str = Oracle.undecided_order then
-    Option.map
-      (fun x ->
-        "Before I can prove anything about" ^ display x
-        ^ "I have to know which of those two numbers is the smaller, so that the min or max goes \
-           away.  Wire in a hypothesis saying which is bigger (perhaps by doing a case split).")
-      (printed p)
-  else if str = Oracle.disequality then
-    Some
-      "I won't prove a ≠ statement by algebra unless both sides are plain numbers: use a proof by contradiction instead."
-  else if str = Oracle.not_a_relation then
-    Option.map
-      (fun ty ->
-        "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and the alg+ \
-         block conjunctions (∧) of those.  The goal it's wired to is" ^ display ty
-        ^ "which isn't one of them.")
-      (printed ~sort:`Type p)
-  else if str = Oracle.not_a_relation_input then
-    Option.map
-      (fun ty ->
-        "Everything wired into the algebra block has to be an equation or inequality (=, ≠, <, ≤, \
-         >, ≥), or for the alg+ block a conjunction (∧) of those.  This one is" ^ display ty
-        ^ "which isn't one of them.")
-      (printed ~sort:`Type p)
-  else if str = Oracle.mixed_goal then
-    Option.map
-      (fun ty ->
-         "All the conjuncts of the output of an algebra block must be equations or inequalities in sets that share a common superset.  The output "
-         ^ display ty
-         ^ "mixes incompatible sets.")
-      (printed ~sort:`Type p)
-  else if str = Oracle.mixed_types then
-    Option.map
-      (fun ty ->
-        "All the inputs and the output of an algebra block must be equations or inequalities in sets that share a common superset.  The statement " ^ display ty ^ "is incompatible with others.")
-      (printed ~sort:`Type p)
-  else None
+(* The algebra block's own failures, told apart by the tag the oracle reported. *)
+let oracle_failed : Reporter.oracle_error -> string option =
+  let open Oracle in
+  function
+  | Unprovable ->
+      Some
+        "I couldn't prove this from the inputs to the algebra block.  Either it doesn't \
+         follow from them by algebra alone, or a hypothesis it needs isn't connected."
+  | Zero_denominator p ->
+      Option.map
+        (fun den ->
+          "I couldn't prove that" ^ display den
+          ^ "is nonzero, so I can't divide by it.  Wire in a hypothesis ensuring it's nonzero.")
+        (printed p)
+  | Negative_base p ->
+      Option.map
+        (fun b ->
+          "I couldn't prove that" ^ display b
+          ^ "is nonnegative, so I can't take an even root of it.  Wire in a hypothesis ensuring it's nonnegative.")
+        (printed p)
+  | Undecided_sign p ->
+      Option.map
+        (fun x ->
+          "Before I can prove anything about the absolute value of" ^ display x
+          ^ "I have to know which way that goes, so that the absolute value goes away.  Wire in a \
+             hypothesis making it nonnegative or nonpositive (perhaps by doing a case split).")
+        (printed p)
+  | Undecided_order p ->
+      Option.map
+        (fun x ->
+          "Before I can prove anything about" ^ display x
+          ^ "I have to know which of those two numbers is the smaller, so that the min or max goes \
+             away.  Wire in a hypothesis saying which is bigger (perhaps by doing a case split).")
+        (printed p)
+  | Disequality ->
+      Some
+        "I won't prove a ≠ statement by algebra unless both sides are plain numbers: use a proof by contradiction instead."
+  | Not_a_relation p ->
+      Option.map
+        (fun ty ->
+          "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and the \
+           alg+ block conjunctions (∧) of those.  The goal it's wired to is" ^ display ty
+          ^ "which isn't one of them.")
+        (printed ~sort:`Type p)
+  | Not_a_relation_input p ->
+      Option.map
+        (fun ty ->
+          "Everything wired into the algebra block has to be an equation or inequality (=, ≠, <, \
+           ≤, >, ≥), or for the alg+ block a conjunction (∧) of those.  This one is" ^ display ty
+          ^ "which isn't one of them.")
+        (printed ~sort:`Type p)
+  | Mixed_goal p ->
+      Option.map
+        (fun ty ->
+           "All the conjuncts of the output of an algebra block must be equations or inequalities in sets that share a common superset.  The output "
+           ^ display ty
+           ^ "mixes incompatible sets.")
+        (printed ~sort:`Type p)
+  | Mixed_types p ->
+      Option.map
+        (fun ty ->
+          "All the inputs and the output of an algebra block must be equations or inequalities in sets that share a common superset.  The statement " ^ display ty ^ "is incompatible with others.")
+        (printed ~sort:`Type p)
+  (* Neither of these is anything the player did; Narya has nothing to say about our tags, so we
+     say what we can here rather than leaving a bare "oracle failed". *)
+  | Not_a_hypothesis_list p ->
+      Some
+        ("Something has gone wrong inside Olorin: what's wired into this algebra block isn't a \
+          list of statements, but"
+        ^ Option.fold ~none:" something unprintable." ~some:display (printed p))
+  | Not_an_oracle_application p ->
+      Some
+        ("Something has gone wrong inside Olorin: this block isn't an algebra block, but"
+        ^ Option.fold ~none:" something unprintable." ~some:display (printed p))
+  | _ -> None
 
 let explain : Code.t -> string option = function
   (* A wire whose two ends disagree about the statement it carries. *)
@@ -171,7 +198,7 @@ let explain : Code.t -> string option = function
           ^ display ty
           ^ "which has no cases to split on.")
         (printed ~sort:`Type ty)
-  | Oracle_failed (str, p) -> oracle_failed str p
+  | Oracle_failed err -> oracle_failed err
   (* An unconnected input or subgoal, which Olorin elaborates to a hole. *)
   | No_holes_allowed _ ->
       Some "This part of the proof isn't finished: something that needs to be connected isn't."

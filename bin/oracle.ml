@@ -7,6 +7,7 @@ open Subtype
 open Reporter
 open Parser
 open Objects
+open Explain.Oracle
 open Js_of_ocaml
 
 module Callback = struct
@@ -84,7 +85,7 @@ let rec get_equality_or_inequality ctx tm =
         else if Some name = neq then return `Neq
         else if Some name = lt then return `Lt
         else if Some name = le then return `Le
-        else Error (Code.Oracle_failed (Explain.Oracle.not_a_relation, Printable.PVal (ctx, tm)))
+        else Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
       in
       return (op, CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
   | Neu { head = Const { name; ins }; args = Arg (Emp, tm, tyins); _ }
@@ -95,7 +96,7 @@ let rec get_equality_or_inequality ctx tm =
       | `Neq -> return (`Eq, ty, lhs, rhs)
       | `Lt -> return (`Le, ty, rhs, lhs)
       | `Le -> return (`Lt, ty, rhs, lhs))
-  | _ -> Error (Code.Oracle_failed (Explain.Oracle.not_a_relation, Printable.PVal (ctx, tm)))
+  | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
 
 (* All the relations a statement asserts.  With 'split' -- which is what the "plus" block asks for
    -- a conjunction contributes those of both its components, so that block takes a conjunction of
@@ -119,22 +120,22 @@ let rec get_relations ~(split : bool) ctx tm =
       let* rel = get_equality_or_inequality ctx tm in
       return [ rel ]
 
-(* Keep only the relations that are about the same kind of number as the goal, reporting 'msg'
-   about 'src' if one of them isn't. *)
-let rec same_type ctx (ty : normal) msg src = function
+(* Keep only the relations that are about the same kind of number as the goal, reporting 'err'
+   if one of them isn't. *)
+let rec same_type ctx (ty : normal) err = function
   | [] -> Ok []
   | (op, (ty' : normal), x, y) :: rest -> (
       let open Monad.Ops (E) in
       match subtype_of ctx ty'.tm ty.tm with
       | Ok () ->
-          let* rest = same_type ctx ty msg src rest in
+          let* rest = same_type ctx ty err rest in
           return ((op, x, y) :: rest)
       | Error _ -> (
         match subtype_of ctx ty.tm ty'.tm with
         | Ok () ->
-          let* rest = same_type ctx ty' msg src rest in
+          let* rest = same_type ctx ty' err rest in
           return ((op, x, y) :: rest)
-        | Error _ -> Error (Code.Oracle_failed (msg, src))))
+        | Error _ -> Error (Code.Oracle_failed err)))
     
 let rec get_givens ~split ctx (ty : normal) givens =
   let open Monad.Ops (E) in
@@ -157,18 +158,15 @@ let rec get_givens ~split ctx (ty : normal) givens =
            but about a wire rather than about the goal, so it gets its own message. *)
         match get_relations ~split ctx eqty.tm with
         | Ok rels -> Ok rels
-        | Error (Code.Oracle_failed (msg, _)) when msg = Explain.Oracle.not_a_relation ->
-            Error
-              (Code.Oracle_failed
-                 (Explain.Oracle.not_a_relation_input, Printable.PNormal (ctx, eqty)))
+        | Error (Code.Oracle_failed (Not_a_relation _)) ->
+            Error (Code.Oracle_failed (Not_a_relation_input (Printable.PNormal (ctx, eqty))))
         | Error e -> Error e in
-      let* rels =
-        same_type ctx ty Explain.Oracle.mixed_types (Printable.PNormal (ctx, eqty)) rels in
+      let* rels = same_type ctx ty (Mixed_types (Printable.PNormal (ctx, eqty))) rels in
       let* rest = get_givens ~split ctx ty (CubeOf.find_top rest).tm in
       return (rels @ rest)
   | Neu { head = Const { name; ins }; args = Emp; _ }
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
-  | _ -> Error (Code.Oracle_failed ("not a Cons_eqs or Nil_eqs", Printable.PVal (ctx, givens)))
+  | _ -> Error (Code.Oracle_failed (Not_a_hypothesis_list (Printable.PVal (ctx, givens))))
 
 let rec get_posint tm =
   match Norm.view_term tm with
@@ -401,7 +399,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            && Option.is_some (is_id_ins givins)
            && Option.is_some (is_id_ins appins) ->
         return (Some name = oracle_plus, CubeOf.find_top givens, CubeOf.find_top goal)
-    | _ -> Error (Code.Oracle_failed ("not an oracle application", Printable.PVal (ctx, tm))) in
+    | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
   (* A conjunctive goal is a list of relations to prove, each against all of the hypotheses.  They
      all go through one translation, so that the same subterm gets the same variable throughout,
      and hence they have to be about the same kind of number; we take that from the first of them,
@@ -411,17 +409,14 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
        that isn't one, as the hypotheses below are reported against the whole wire. *)
     match get_relations ~split:plus ctx goal.tm with
     | Ok goals -> Ok goals
-    | Error (Code.Oracle_failed (msg, _)) when msg = Explain.Oracle.not_a_relation ->
-        Error (Code.Oracle_failed (msg, Printable.PNormal (ctx, goal)))
+    | Error (Code.Oracle_failed (Not_a_relation _)) ->
+        Error (Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal))))
     | Error e -> Error e in
   let* ty =
     match goals with
     | (_, ty, _, _) :: _ -> Ok ty
-    | [] ->
-        Error (Code.Oracle_failed (Explain.Oracle.not_a_relation, Printable.PNormal (ctx, goal)))
-  in
-  let* goals =
-    same_type ctx ty Explain.Oracle.mixed_goal (Printable.PNormal (ctx, goal)) goals in
+    | [] -> Error (Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal)))) in
+  let* goals = same_type ctx ty (Mixed_goal (Printable.PNormal (ctx, goal))) goals in
   let* givens = get_givens ~split:plus ctx ty givens.tm in
   let ty = ty.tm in
   let (givens, goals), { steps; _ } =
@@ -445,7 +440,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
       (fun acc (op, lhs, rhs) ->
         let* () = acc in
         if op = `Neq && not (is_literal lhs && is_literal rhs) then
-          Error (Code.Oracle_failed (Explain.Oracle.disequality, PUnit))
+          Error (Code.Oracle_failed Disequality)
         else Ok ())
       (Ok ()) goals in
   (* Encoding division faithfully means the goal query below is sound whatever the denominators
@@ -472,12 +467,11 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | Nonzero (den, src) :: rest ->
         if unsat ((`Eq, den, `Const Q.zero) :: facts) then discharge facts rest
         else
-          Error
-            (Code.Oracle_failed (Explain.Oracle.zero_denominator, Printable.PVal (ctx, src)))
+          Error (Code.Oracle_failed (Zero_denominator (Printable.PVal (ctx, src))))
     | Nonneg (base, src) :: rest ->
         if unsat ((`Lt, base, `Const Q.zero) :: facts) then discharge facts rest
         else
-          Error (Code.Oracle_failed (Explain.Oracle.negative_base, Printable.PVal (ctx, src)))
+          Error (Code.Oracle_failed (Negative_base (Printable.PVal (ctx, src))))
     (* Z3 decides a conditional on its own, so for the "plus" block there is nothing to discharge.
        For the plain one the hypotheses have to settle the comparison -- "a ≤ b" or "b ≤ a", either
        will do -- which is what makes the student split into cases by hand. *)
@@ -485,11 +479,11 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
         if plus || unsat ((`Lt, b, a) :: facts) || unsat ((`Lt, a, b) :: facts) then
           discharge facts rest
         else
-          let msg =
+          let err =
             match which with
-            | `Sign -> Explain.Oracle.undecided_sign
-            | `Order -> Explain.Oracle.undecided_order in
-          Error (Code.Oracle_failed (msg, Printable.PVal (ctx, src))) in
+            | `Sign -> Undecided_sign (Printable.PVal (ctx, src))
+            | `Order -> Undecided_order (Printable.PVal (ctx, src)) in
+          Error (Code.Oracle_failed err) in
   let* facts = discharge givens (Bwd.to_list steps) in
   (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
@@ -504,5 +498,5 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
         | `Lt -> `Le
         | `Le -> `Lt in
       if unsat ((neg_op, rhs, lhs) :: facts) then Ok ()
-      else Error (Code.Oracle_failed (Explain.Oracle.unprovable, PUnit)))
+      else Error (Code.Oracle_failed Unprovable))
     (Ok ()) goals
