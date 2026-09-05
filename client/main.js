@@ -686,7 +686,7 @@ function addEndpointsForRule(box, id, restore) {
             instance.addEndpoint(box, {
                 anchor: [0, 0.5, 1, 0, 22, 2],
                 source: true, maxConnections: -1,
-                parameters: {sort: "assumption", label: q.condition, side: "lower"},
+                parameters: {sort: "assumption", label: q.condition, side: "upper"},
             });
         }
         instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, dy], target: true, parameters: {sort: "subgoal", side: "upper"} });
