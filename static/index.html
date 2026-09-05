@@ -72,9 +72,9 @@
           <div class="resize-handle-left"></div>
         </div>
         <div class="basic logical elim rule" id="allE" data-rule="allE">∀</div>
-        <div class="basic logical intro rule" id="exposI" data-rule="exposI" title="Prove ∃x∈ℝ₊,P(x): give a positive real, a proof that it is positive, and a proof of P about it"> ∃₊</div>
-        <div class="basic logical elim rule" id="exposE" data-rule="exposE" title="Use ∃x∈ℝ₊,P(x): get a real, a proof that it is positive, and a proof of P about it">∃₊</div>
-        <div class="container rule" id="allposI" data-rule="allposI" title="Prove ∀x∈ℝ₊,P(x): assume a real and that it is positive, then prove P about it">
+        <div class="basic logical intro rule" id="exposI" data-rule="exposI" title="Prove ∃x∈ℝ₊,P(x): give a real number x, a proof that 0<x, and a proof of P(x)"> ∃₊</div>
+        <div class="basic logical elim rule" id="exposE" data-rule="exposE" title="Use ∃x∈ℝ₊,P(x): get a real number x, a proof that 0<x, and a proof of P(x)">∃₊</div>
+        <div class="container rule" id="allposI" data-rule="allposI" title="Prove ∀x∈ℝ₊,P(x): assume a real number x and that 0<x, then prove P(x)">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
           <div class="singleright subgoal"><div class="subgoallabel">∀₊</div></div>
@@ -85,10 +85,10 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="basic logical elim rule" id="allposE" data-rule="allposE" title="Use ∀x∈ℝ₊,P(x): give a real and a proof that it is positive, and get P about it">∀₊</div>
-        <div class="basic logical intro rule" id="exbelowI" data-rule="exbelowI" title="Prove ∃x∈[n],P(x): give a whole number, a proof of (0≤x)∧(x&lt;n), and a proof of P about it"> ∃[]</div>
-        <div class="basic logical elim rule" id="exbelowE" data-rule="exbelowE" title="Use ∃x∈[n],P(x): get a whole number, a proof of (0≤x)∧(x&lt;n), and a proof of P about it">∃[]</div>
-        <div class="container rule" id="allbelowI" data-rule="allbelowI" title="Prove ∀x∈[n],P(x): assume a whole number x and that (0≤x)∧(x&lt;n), then prove P about it">
+        <div class="basic logical elim rule" id="allposE" data-rule="allposE" title="Use ∀x∈ℝ₊,P(x): give a real number x and a proof that 0<x, and get P(x)">∀₊</div>
+        <div class="basic logical intro rule" id="exbelowI" data-rule="exbelowI" title="Prove ∃x∈[n],P(x): give an integer x, a proof of (0≤x)∧(x&lt;n), and a proof of P(x)"> ∃[]</div>
+        <div class="basic logical elim rule" id="exbelowE" data-rule="exbelowE" title="Use ∃x∈[n],P(x): get an integer x, a proof of (0≤x)∧(x&lt;n), and a proof of P(x)">∃[]</div>
+        <div class="container rule" id="allbelowI" data-rule="allbelowI" title="Prove ∀x∈[n],P(x): assume an integer x and that (0≤x)∧(x&lt;n), then prove P(x)">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
           <div class="singleright subgoal"><div class="subgoallabel">∀[]</div></div>
@@ -99,7 +99,7 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="basic logical elim rule" id="allbelowE" data-rule="allbelowE" title="Use ∀x∈[n],P(x): give a whole number x and a proof of (0≤x)∧(x&lt;n), and get P about it">∀[]</div>
+        <div class="basic logical elim rule" id="allbelowE" data-rule="allbelowE" title="Use ∀x∈[n],P(x): give an integer x and a proof of (0≤x)∧(x&lt;n), and get P(x)">∀[]</div>
         <div class="basic logical elim rule" id="negE" data-rule="negE">¬</div>
         <div class="container rule" id="negI" data-rule="negI">
           <div class="bottom bar"></div>
