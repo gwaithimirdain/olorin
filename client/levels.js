@@ -382,6 +382,21 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P⇒Q" }, { ty: "R⇒S" }, ],
                     conclusion: { ty: "(P∧R)⇒(Q∧S)" },
                 },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" }, { name: "T", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P⇒Q" }, { ty: "Q⇒R" }, { ty: "(P⇒R)⇒S" }, { ty: "(P⇒R)⇒T" } ],
+                    conclusion: { ty: "S∧T" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "V", ty: "Type" }, { name: "W", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P⇒Q" }, { ty: "Q⇒R" }, { ty: "(P⇒R)⇒V" }, { ty: "(P⇒R)⇒W" } ],
+                    conclusion: { ty: "V∧W" },
+                    extrarules: [ "asc" ],
+                    maxrules: 7,
+                    hint: "redexHint"
+                },
             ]
           },
       ]

@@ -729,6 +729,20 @@
       <div id="neq2Hint" class="modal hint">
         The only kind of disequalities the algebra block can prove automatically are disequalities between different constants, without any variables involved.
       </div>
+      <div id="redexHint" class="modal hint">
+        <p>
+          This is the same as the last level, but you have a limit of <b>seven</b> rule blocks.
+          If you look at your solution to the previous level, you'll probably see that you proved P⇒R twice.
+          We'd like to just prove it once and then <emph>use</emph> it twice, reducing us under seven blocks.
+          This basically works, but we need a bit of help.
+        </p>
+        <p>
+          Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
+          However, I can't guess the output of a "prove ⇒" block or the ⇒ input of a "use ⇒" block, so if one of those is connected directly to the other, I'm stuck.
+          To help me out, use a "label" block in between.
+          When you place a label block, it will prompt you for a statement, and then both its input and its output must be labeled with that statement.
+        </p>
+      </div>
       <div id="ascHint" class="modal hint">
         <p>
           Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
