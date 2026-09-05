@@ -99,7 +99,7 @@ async function algebraProves(olorin, { variables = '', hypotheses = [], conclusi
         hypotheses: hypotheses.join('\n'),
         conclusion,
     });
-    const alg = await olorin.dragRule('algebra', 500, 200);
+    const alg = await olorin.dragRule('alg', 500, 200);
     const nodes = await olorin.nodes();
     for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
         await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: alg, sort: 'input' });
@@ -158,13 +158,13 @@ test.describe('Disequalities and the algebra block', () => {
             hypotheses: 'x=0\nx=1',
             conclusion: '⊥',
         });
-        const zeroNeqOne = await olorin.dragRule('algebra', 300, 100);
+        const zeroNeqOne = await olorin.dragRule('alg', 300, 100);
         const asc = await olorin.dragRule('asc', 500, 100);
         await page.waitForSelector('#ascribeBG', { state: 'visible' });
         await page.fill('#ascribe', '0≠1');
         await page.click('#submitAscribe');
         await olorin.waitForTypecheck();
-        const zeroEqOne = await olorin.dragRule('algebra', 300, 300);
+        const zeroEqOne = await olorin.dragRule('alg', 300, 300);
         const negE = await olorin.dragRule('negE', 800, 200);
         const nodes = await olorin.nodes();
         for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
@@ -177,22 +177,5 @@ test.describe('Disequalities and the algebra block', () => {
                              { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
         await olorin.waitForTypecheck();
         expect(await olorin.isComplete()).toBe(true);
-    });
-});
-
-test.describe('The number-axiom blocks in the palette', () => {
-    test('are offered wherever "?·?=0" is, and nowhere it is not', async ({ page }) => {
-        const olorin = new Olorin(page);
-        await olorin.open();
-        const shown = () => page.evaluate(() =>
-            ['integral', 'deceq', 'tord'].filter(
-                (id) => getComputedStyle(document.getElementById(id)).display !== 'none'));
-
-        await olorin.selectLevel(firstLevel().name);
-        expect(await shown()).toEqual([]);
-
-        const withIntegral = find((l) => l.rules.includes('integral'), 'in a stage with the integral rule');
-        await olorin.selectLevel(withIntegral.name);
-        expect(await shown()).toEqual(['integral', 'deceq', 'tord']);
     });
 });

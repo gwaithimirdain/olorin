@@ -97,7 +97,7 @@ test.describe('Error explanations', () => {
         const olorin = new Olorin(page);
         await olorin.open();
         await mistake(olorin, { parameters: 'P : Type', hypotheses: 'P' }, async (o, hyps, concl) => {
-            const r = await o.dragRule('algebra', 300, 150);
+            const r = await o.dragRule('alg', 300, 150);
             await o.connect({ vertex: r, sort: 'output' }, { vertex: r, sort: 'input' });
             await o.connect({ vertex: r, sort: 'output' }, { vertex: concl, sort: 'input' });
         });
@@ -116,16 +116,16 @@ test.describe('Error explanations', () => {
         const olorin = new Olorin(page);
         await olorin.open();
 
-        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·x=x' }, toConclusion('algebra'));
+        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·x=x' }, toConclusion('alg'));
         expect(await explanationFor(olorin, 'E3000')).toContain("couldn't prove this");
 
-        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·(1/x)=1' }, toConclusion('algebra'));
+        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·(1/x)=1' }, toConclusion('alg'));
         const denom = await explanationFor(olorin, 'E3000');
         expect(denom).toContain("can't tell that");
         expect(denom).toContain('\n    x\n');
         expect(denom).toContain('is nonzero');
 
-        await mistake(olorin, { parameters: 'P : Type' }, toConclusion('algebra'));
+        await mistake(olorin, { parameters: 'P : Type' }, toConclusion('alg'));
         expect(await explanationFor(olorin, 'E3000')).toContain('only proves equations and inequalities');
     });
 
@@ -187,7 +187,7 @@ test.describe('The wire-error tooltip', () => {
         expect(await olorin.wireTooltip()).toContain('This wire carries a proof of');
         await olorin.unhoverWire();
         // Re-state the level so the same wiring is now an algebra failure instead.
-        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·x=x' }, toConclusion('algebra'));
+        await mistake(olorin, { variables: 'x ∈ ℝ', conclusion: 'x·x=x' }, toConclusion('alg'));
         await olorin.hoverWire(0.25);
         expect(await olorin.wireTooltip()).toContain('algebra block');
     });

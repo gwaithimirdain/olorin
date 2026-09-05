@@ -27,7 +27,7 @@ const STATE = {
         { id: 'hyp1', rule: 'hypothesis', left: '50px', top: '526px', value: '(x=3·y)∧(1−x=4·y)' },
         { id: 'concl1', rule: 'conclusion', left: '1383px', top: '449px', value: '(x=3/7) ∧ (y=1/7)' },
         { id: 'rule0', rule: 'integral', left: '515px', top: '385px' },
-        { id: 'rule1', rule: 'algebra', left: '359px', top: '590px' },
+        { id: 'rule1', rule: 'alg', left: '359px', top: '590px' },
         { id: 'rule2', rule: 'expr', left: '274px', top: '392px', value: 'x−1', width: 'fit-content' },
         { id: 'rule3', rule: 'orE', left: '689px', top: '476px', width: '276px', height: '80px' },
     ],

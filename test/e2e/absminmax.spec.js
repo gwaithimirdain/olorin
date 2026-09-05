@@ -206,7 +206,7 @@ test.describe('The ∣ of absolute value and the ∣ of divisibility', () => {
             parameters: '', variables: 'a ∈ ℤ\nb ∈ ℤ', hypotheses: '', conclusion: '2 ∣ 4',
         });
         const nodes = await olorin.nodes();
-        const alg = await olorin.dragRule('algebra', 600, 200);
+        const alg = await olorin.dragRule('alg', 600, 200);
         await olorin.connect({ vertex: alg, sort: 'output' },
                              { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
         await olorin.waitForTypecheck();

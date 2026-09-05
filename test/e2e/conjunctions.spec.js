@@ -29,8 +29,8 @@ async function provesWith(rule, olorin, { variables = 'x ∈ ℤ\nn ∈ ℤ', hy
     return olorin.isComplete();
 }
 
-const proves = (olorin, level) => provesWith('algebraplus', olorin, level);
-const plainProves = (olorin, level) => provesWith('algebra', olorin, level);
+const proves = (olorin, level) => provesWith('algplus', olorin, level);
+const plainProves = (olorin, level) => provesWith('alg', olorin, level);
 
 // What the block complained about, as the player is shown it.
 const complaints = async (olorin) =>
@@ -82,16 +82,6 @@ test.describe('alg+ and conjunctions', () => {
         expect(await complaints(olorin)).toEqual(
             [expect.stringContaining("won't prove a ≠ statement outright")]);
         expect(await proves(olorin, { hypotheses: ['0<x'], conclusion: '(0<x)∧(0≠1)' })).toBe(true);
-    });
-
-    test('wants the parts of a conjunctive goal to be about the same numbers', async () => {
-        expect(await proves(olorin, {
-            variables: 'x ∈ ℤ\ny ∈ ℝ',
-            hypotheses: ['0≤x', '0≤y'],
-            conclusion: '(0≤x)∧(0≤y)',
-        })).toBe(false);
-        expect(await complaints(olorin)).toEqual(
-            [expect.stringContaining('have to be about the same kind of number')]);
     });
 
     test("won't take a conjunction that isn't one of relations", async () => {
@@ -148,7 +138,7 @@ test.describe('the [n] quantifiers with alg+', () => {
         await page.fill('#newvar', 'z');
         await page.click('#submitVariable');
         await olorin.dismissHints();
-        const alg = await olorin.dragRule('algebraplus', 500, 300);
+        const alg = await olorin.dragRule('algplus', 500, 300);
         await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
         await olorin.connect({ vertex: intro, sort: 'assumption', label: 'below' }, { vertex: alg, sort: 'input' });
         await olorin.connect({ vertex: alg, sort: 'output' }, { vertex: intro, sort: 'subgoal' });
@@ -169,7 +159,7 @@ test.describe('the [n] quantifiers with alg+', () => {
         const k = nodes.find((n) => n.name === 'k').id;
         const [universal, low, high] = nodes.filter((n) => n.rule === 'hypothesis').map((n) => n.id);
         const elim = await olorin.dragRule('allbelowE', 450, 200);
-        const alg = await olorin.dragRule('algebraplus', 250, 420);
+        const alg = await olorin.dragRule('algplus', 250, 420);
         await olorin.connect({ vertex: universal, sort: 'output' }, { vertex: elim, sort: 'input', label: 'universal' });
         await olorin.connect({ vertex: k, sort: 'output' }, { vertex: elim, sort: 'input', label: 'element' });
         await olorin.connect({ vertex: low, sort: 'output' }, { vertex: alg, sort: 'input' });

@@ -154,7 +154,7 @@ for (const f of FAMILIES) {
             });
             const intro = await dragBinder(olorin, allI, 450, 60, 'z');
             await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-            const alg = await olorin.dragRule('algebra', 520, 300);
+            const alg = await olorin.dragRule('alg', 520, 300);
             const condition = { vertex: intro, sort: 'assumption', label: f.condition };
             if (f.arithmetic.split) {
                 const and = await olorin.dragRule('andE', 260, 300);
