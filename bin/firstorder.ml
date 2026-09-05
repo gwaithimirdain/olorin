@@ -42,10 +42,11 @@ axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs 
 axiom oracle (A : Type) (x : A) (C : Type) : C
 axiom oracle_plus (A : Type) (x : A) (C : Type) : C
 
-axiom lt (A : Type) (x y : A) : Type
-def le (A : Type) (x y : A) : Type ≔ data [ left. (_ : lt A x y) | right. (_ : eq A x y) ]
-def gt (A : Type) (x y : A) : Type ≔ lt A y x
-def ge (A : Type) (x y : A) : Type ≔ le A y x
+{` The ordering is asserted separately on each number system, rather than once for every type at
+all.  A < that made sense at any type would be an axiom with no laws of its own, and reading one as
+an order -- which is what an algebra block does -- would then credit a proof with a transitivity
+that nothing gives it.  Equality is different: = is genuine equality wherever it is written, so it
+stays a single relation on every type. `}
 
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
 
@@ -63,8 +64,12 @@ axiom ℤ.integral (x y : ℤ) : eq ℤ (ℤ.times x y) 0 → lor (eq ℤ x 0) (
 axiom ℤ.abs : ℤ → ℤ
 axiom ℤ.min : ℤ → ℤ → ℤ
 axiom ℤ.max : ℤ → ℤ → ℤ
+axiom ℤ.lt : ℤ → ℤ → Type
+def ℤ.le (x y : ℤ) : Type ≔ data [ left. (_ : ℤ.lt x y) | right. (_ : eq ℤ x y) ]
+def ℤ.gt (x y : ℤ) : Type ≔ ℤ.lt y x
+def ℤ.ge (x y : ℤ) : Type ≔ ℤ.le y x
 axiom ℤ.deceq (x y : ℤ) : lor (eq ℤ x y) (neq ℤ x y)
-axiom ℤ.tord (x y : ℤ) : lor (le ℤ x y) (gt ℤ x y)
+axiom ℤ.tord (x y : ℤ) : lor (ℤ.le x y) (ℤ.gt x y)
 
 def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) ]
 axiom ℚ.plus : ℚ → ℚ → ℚ
@@ -81,8 +86,12 @@ axiom ℚ.integral (x y : ℚ) : eq ℚ (ℚ.times x y) 0 → lor (eq ℚ x 0) (
 axiom ℚ.abs : ℚ → ℚ
 axiom ℚ.min : ℚ → ℚ → ℚ
 axiom ℚ.max : ℚ → ℚ → ℚ
+axiom ℚ.lt : ℚ → ℚ → Type
+def ℚ.le (x y : ℚ) : Type ≔ data [ left. (_ : ℚ.lt x y) | right. (_ : eq ℚ x y) ]
+def ℚ.gt (x y : ℚ) : Type ≔ ℚ.lt y x
+def ℚ.ge (x y : ℚ) : Type ≔ ℚ.le y x
 axiom ℚ.deceq (x y : ℚ) : lor (eq ℚ x y) (neq ℚ x y)
-axiom ℚ.tord (x y : ℚ) : lor (le ℚ x y) (gt ℚ x y)
+axiom ℚ.tord (x y : ℚ) : lor (ℚ.le x y) (ℚ.gt x y)
 
 def ℝ : Type ≔ data [ zero. | suc. (_:ℝ) ]
 axiom ℝ.plus : ℝ → ℝ → ℝ
@@ -99,8 +108,12 @@ axiom ℝ.integral (x y : ℝ) : eq ℝ (ℝ.times x y) 0 → lor (eq ℝ x 0) (
 axiom ℝ.abs : ℝ → ℝ
 axiom ℝ.min : ℝ → ℝ → ℝ
 axiom ℝ.max : ℝ → ℝ → ℝ
+axiom ℝ.lt : ℝ → ℝ → Type
+def ℝ.le (x y : ℝ) : Type ≔ data [ left. (_ : ℝ.lt x y) | right. (_ : eq ℝ x y) ]
+def ℝ.gt (x y : ℝ) : Type ≔ ℝ.lt y x
+def ℝ.ge (x y : ℝ) : Type ≔ ℝ.le y x
 axiom ℝ.deceq (x y : ℝ) : lor (eq ℝ x y) (neq ℝ x y)
-axiom ℝ.tord (x y : ℝ) : lor (le ℝ x y) (gt ℝ x y)
+axiom ℝ.tord (x y : ℝ) : lor (ℝ.le x y) (ℝ.gt x y)
 axiom ℝ.sqrt : ℝ → ℝ
 
 def 𝕊 : Type ≔ data [ zero. | suc. (_:𝕊) | omega. ]
@@ -120,23 +133,27 @@ axiom 𝕊.integral (x y : 𝕊) : eq 𝕊 (𝕊.times x y) 0 → lor (eq 𝕊 x
 axiom 𝕊.abs : 𝕊 → 𝕊
 axiom 𝕊.min : 𝕊 → 𝕊 → 𝕊
 axiom 𝕊.max : 𝕊 → 𝕊 → 𝕊
+axiom 𝕊.lt : 𝕊 → 𝕊 → Type
+def 𝕊.le (x y : 𝕊) : Type ≔ data [ left. (_ : 𝕊.lt x y) | right. (_ : eq 𝕊 x y) ]
+def 𝕊.gt (x y : 𝕊) : Type ≔ 𝕊.lt y x
+def 𝕊.ge (x y : 𝕊) : Type ≔ 𝕊.le y x
 axiom 𝕊.deceq (x y : 𝕊) : lor (eq 𝕊 x y) (neq 𝕊 x y)
-axiom 𝕊.tord (x y : 𝕊) : lor (le 𝕊 x y) (gt 𝕊 x y)
+axiom 𝕊.tord (x y : 𝕊) : lor (𝕊.le x y) (𝕊.gt x y)
 axiom 𝕊.sqrt : 𝕊 → 𝕊
 
 {` Quantification over the positive reals.  R+ is not a type of its own -- it is a token of the
 notations for its quantifiers -- so these get constants of their own, taking only the predicate.
 Their field and constructor carry the defining condition 0<x alongside x itself, which is what the
 positive quantifier blocks put on a port of their own. `}
-def forallpos (P : ℝ → Type) : Type ≔ sig ( forallpos : (x : ℝ) → lt ℝ 0 x → P x )
-def existspos (P : ℝ → Type) : Type ≔ data [ existspos. (element : ℝ) (positive : lt ℝ 0 element) (property : P element) ]
+def forallpos (P : ℝ → Type) : Type ≔ sig ( forallpos : (x : ℝ) → ℝ.lt 0 x → P x )
+def existspos (P : ℝ → Type) : Type ≔ data [ existspos. (element : ℝ) (positive : ℝ.lt 0 element) (property : P element) ]
 
 {` Likewise quantification over [n], the whole numbers below some n, which n is written out of and
 so is a parameter of these definitions as well as of their notations.  Their elements are integers
 cut down by (0<=x) and (x<n) rather than naturals, since Z is the smallest number system the
 arithmetic operations are defined on: a bound variable has to be something you can compute with. `}
-def forallbelow (n : ℤ) (P : ℤ → Type) : Type ≔ sig ( forallbelow : (x : ℤ) → land (le ℤ 0 x) (lt ℤ x n) → P x )
-def existsbelow (n : ℤ) (P : ℤ → Type) : Type ≔ data [ existsbelow. (element : ℤ) (below : land (le ℤ 0 element) (lt ℤ element n)) (property : P element) ]
+def forallbelow (n : ℤ) (P : ℤ → Type) : Type ≔ sig ( forallbelow : (x : ℤ) → land (ℤ.le 0 x) (ℤ.lt x n) → P x )
+def existsbelow (n : ℤ) (P : ℤ → Type) : Type ≔ data [ existsbelow. (element : ℤ) (below : land (ℤ.le 0 element) (ℤ.lt element n)) (property : P element) ]
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
@@ -595,17 +612,23 @@ let () =
     specialquantifiers
 
 (* We don't need separate unicode/ascii versions of these because we detect and print relations specially in the Oracle. *)
-(* The last component is the relation to state instead when the two sides have to be swapped -- see
-   yterm below, where only the right-hand side synthesizes and so has to come first.  That is the
-   relation *reversed*, not negated: "x < y" is "y > x", and "x = y" is "y = x". *)
-let relations =
+(* Equality holds of any two things of any one type, so its constant takes that type as an implicit
+   argument, read off whichever side of the relation synthesizes one.  The last component is the
+   relation to state instead when the two sides have to be swapped -- see yterm below, where only
+   the right-hand side synthesizes and so has to come first.  That is the relation *reversed*, not
+   negated: "x = y" is "y = x". *)
+let equalities = [ ("=", Token.Op "=", equals, "eq", "eq"); ("≠", Ident [ "≠" ], neq, "neq", "neq") ]
+
+(* The orderings, on the other hand, are relations on the number systems and nowhere else, so each
+   number system has its own and there is no type argument to infer.  We pick between them the way
+   the arithmetic operations do: try the smallest system first and take the first that typechecks
+   for both sides. *)
+let orderings =
   [
-    ("=", Token.Op "=", equals, "eq", "eq");
-    ("≠", Ident [ "≠" ], neq, "neq", "neq");
-    ("<", Op "<", lt, "lt", "gt");
-    (">", Op ">", gt, "gt", "lt");
-    ("≤", Ident [ "≤" ], le, "le", "ge");
-    ("≥", Ident [ "≥" ], ge, "ge", "le");
+    ("<", Token.Op "<", lt, "lt");
+    (">", Op ">", gt, "gt");
+    ("≤", Ident [ "≤" ], le, "le");
+    ("≥", Ident [ "≥" ], ge, "ge");
   ]
 
 let () =
@@ -686,7 +709,50 @@ let () =
           pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
           is_case = (fun _ -> false);
         })
-    relations
+    equalities;
+  (* An ordering names its number system in the constant itself, so both sides are simply checked
+     against it and neither has to synthesize anything. *)
+  List.iter
+    (fun (name, tok, notn, str) ->
+      make notn
+        {
+          name;
+          tree = Open_entry (eop tok (done_open notn));
+          processor =
+            (fun ctx obs loc ->
+              match obs with
+              | Term x :: Token _ :: Term y :: _ ->
+                  let x, y = (process ctx x, process ctx y) in
+                  locate_opt loc
+                    (Synth
+                       (SFirst
+                          ( List.map
+                              (fun ty ->
+                                ( `Any,
+                                  sapp
+                                    (locate_opt None
+                                       (sapp
+                                          (locate_opt loc (Const (get_const [ ty; str ])))
+                                          x))
+                                    y,
+                                  true ))
+                              numbers,
+                            None )))
+              | _ -> Builtins.invalid name);
+          print_term =
+            Some
+              (fun obs ->
+                match obs with
+                | Term x :: Token (_, (wsop, _)) :: Term y :: _ ->
+                    let px, wsx = pp_term x in
+                    let py, wsy = pp_term y in
+                    (px ^^ pp_ws `None wsx ^^ Token.pp tok ^^ pp_ws `None wsop ^^ py, wsy)
+                | _ -> Builtins.invalid name);
+          print_case = None;
+          pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern name));
+          is_case = (fun _ -> false);
+        })
+    orderings
 
 let () =
   List.iter
@@ -989,7 +1055,18 @@ let install_notations () =
           val_vars = [ "A"; "x"; "y" ];
           inner_symbols = `Multiple (tok, [ None ], Op ":>");
         })
-    relations;
+    equalities;
+  List.iter
+    (fun (_, tok, notn, str) ->
+      Scope.Situation.add_with_print
+        {
+          keys = List.map (fun ty -> `Constant (get_const [ ty; str ])) numbers;
+          notn = Wrap notn;
+          pat_vars = [ "x"; "y" ];
+          val_vars = [ "x"; "y" ];
+          inner_symbols = `Single tok;
+        })
+    orderings;
   List.iter
     (fun (_, _, usym, asym, Wrap_infixl onotn, ostr, tys) ->
       Scope.Situation.add_with_print
@@ -1092,15 +1169,15 @@ let install_notations () =
    syntax, using the constants by name. *)
 
 let secondary_startup =
-  "def 𝕊.finite (x : 𝕊) : Type ≔ existspos (u ↦ le 𝕊 (𝕊.abs x) u)
+  "def 𝕊.finite (x : 𝕊) : Type ≔ existspos (u ↦ 𝕊.le (𝕊.abs x) u)
 notation(0) x \"is\" \"finite\" ≔ 𝕊.finite x
 def 𝕊.comparable (x y : 𝕊) : Type ≔ 𝕊.finite (𝕊.minus x y)
 notation(0) x \"∼\" y ≔ 𝕊.comparable x y
-def 𝕊.posinf (x : 𝕊) : Type ≔ forall ℝ (u ↦ lt 𝕊 u x)
+def 𝕊.posinf (x : 𝕊) : Type ≔ forall ℝ (u ↦ 𝕊.lt u x)
 notation(0) x \"is\" \"positive\" \"infinite\" ≔ 𝕊.posinf x
-def 𝕊.neginf (x : 𝕊) : Type ≔ forall ℝ (u ↦ lt 𝕊 x u)
+def 𝕊.neginf (x : 𝕊) : Type ≔ forall ℝ (u ↦ 𝕊.lt x u)
 notation(0) x \"is\" \"negative\" \"infinite\" ≔ 𝕊.neginf x
-def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ lt 𝕊 (𝕊.abs x) u)
+def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ 𝕊.lt (𝕊.abs x) u)
 notation(0) x \"is\" \"infinitesimal\" ≔ 𝕊.infinitesimal x
 def 𝕊.infclose (x y : 𝕊) : Type ≔ 𝕊.infinitesimal (𝕊.minus x y)
 notation(0) x \"≈\" y ≔ 𝕊.infclose x y

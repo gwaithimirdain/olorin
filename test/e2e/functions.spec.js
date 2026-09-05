@@ -5,18 +5,15 @@
 // and nothing else about f comes with it -- in particular it is not assumed injective, monotone,
 // or anything of the sort.
 //
-// The equations wired into a block don't have to be about the same kind of number as its goal, or
+// The statements wired into a block don't have to be about the same kind of number as its goal, or
 // about numbers at all: an equation between elements of a parameter type is carried into the
-// arguments of an uninterpreted function just the same.  An *inequality* is still held to the
-// goal's kind of number, since "<" outside the number systems is an axiom with no laws -- reading
-// one as an order on the reals would hand the student a transitivity nothing gives them.
+// arguments of an uninterpreted function just the same.  There's no need to hold the orderings to
+// the goal's number system either, because each number system has an ordering of its own and
+// nothing else has one -- <, ≤, > and ≥ can't be written about anything but numbers.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-
-// What the block complained about, as the player is shown it.
-const complaints = async (olorin) =>
-    (await olorin.diagnostics()).map((d) => (d.explanation || d.text).replace(/\s+/g, ' '));
+const { firstLevel } = require('../lib/levels');
 
 // State a level and prove it with a single algebra block fed by every hypothesis.
 async function algebraProves(olorin, { parameters = 'f : ℝ → ℝ', variables = 'x ∈ ℝ\ny ∈ ℝ',
@@ -151,17 +148,30 @@ test.describe('Equations about things that are not numbers', () => {
         })).toBe(true);
     });
 
-    test('but an inequality still has to be about the goal\'s kind of number', async ({ page }) => {
+    test('and so does an inequality about a number system the goal has nothing to do with',
+         async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await algebraProves(olorin, {
-            parameters: 'A : Type\nf : A → ℝ',
-            variables: 'a ∈ A\nb ∈ A\nc ∈ A',
-            hypotheses: ['a < b', 'b < c'],
-            conclusion: 'f a = f c',
-        })).toBe(false);
-        expect(await complaints(olorin)).toEqual([expect.stringContaining(
-            'An inequality (<, ≤, >, ≥) wired into an algebra block has to be about the same kind '
-            + 'of number as its output')]);
+            parameters: 'A : Type\ng : ℝ → A',
+            variables: 'x ∈ ℝ\ny ∈ ℝ',
+            hypotheses: ['x ≤ y', 'y ≤ x'],
+            conclusion: 'g x = g y',
+        })).toBe(true);
+    });
+
+    test('while an ordering between them cannot be stated at all', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.selectLevel(firstLevel().name);
+        // <, ≤, > and ≥ are relations on the number systems and nowhere else, so there is no
+        // reading of "a < b" for a and b in a parameter type, and Olorin won't take the level.
+        await olorin.buildCustom({
+            parameters: 'A : Type',
+            variables: 'a ∈ A\nb ∈ A',
+            hypotheses: 'a < b',
+            conclusion: 'a = b',
+        });
+        expect(await olorin.currentLevelName()).toBe(firstLevel().name);
     });
 });

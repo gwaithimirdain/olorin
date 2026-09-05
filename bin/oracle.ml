@@ -62,14 +62,25 @@ module E = Monad.Error (struct
   type t = Code.t
 end)
 
+(* An ordering belongs to one number system -- there is a ℝ.lt and a ℤ.lt and no < that holds of
+   anything else -- so the constant itself says which relation this is, and its arguments carry the
+   number system, being annotated with the domain of the constant's type. *)
+let order_relations () =
+  List.concat_map
+    (fun ty ->
+      List.filter_map
+        (fun (str, op) -> Option.map (fun c -> (c, op)) (Scope.lookup [ ty; str ]))
+        [ ("lt", `Lt); ("le", `Le) ])
+    Firstorder.numbers
+
 let rec get_equality_or_inequality ctx tm =
   let open Monad.Ops (E) in
   let eq = Scope.lookup [ "eq" ] in
   let neq = Scope.lookup [ "neq" ] in
-  let lt = Scope.lookup [ "lt" ] in
-  let le = Scope.lookup [ "le" ] in
   let neg = Scope.lookup [ "neg" ] in
+  let orders = order_relations () in
   match Norm.view_term tm with
+  (* Equality holds of two things of any one type, which it takes as its first argument. *)
   | Neu
       {
         head = Const { name; ins };
@@ -83,11 +94,17 @@ let rec get_equality_or_inequality ctx tm =
       let* op =
         if Some name = eq then return `Eq
         else if Some name = neq then return `Neq
-        else if Some name = lt then return `Lt
-        else if Some name = le then return `Le
         else Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
       in
-      return (op, CubeOf.find_top ty, CubeOf.find_top lhs, CubeOf.find_top rhs)
+      return (op, (CubeOf.find_top ty).tm, CubeOf.find_top lhs, CubeOf.find_top rhs)
+  (* An ordering takes only the two sides. *)
+  | Neu { head = Const { name; ins }; args = Arg (Arg (Emp, lhs, lhsins), rhs, rhsins); _ }
+    when Option.is_some (is_id_ins ins)
+         && Option.is_some (is_id_ins lhsins)
+         && Option.is_some (is_id_ins rhsins)
+         && List.mem_assoc name orders ->
+      let lhs = CubeOf.find_top lhs in
+      return (List.assoc name orders, lhs.ty, lhs, CubeOf.find_top rhs)
   | Neu { head = Const { name; ins }; args = Arg (Emp, tm, tyins); _ }
     when Some name = neg && Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins tyins) -> (
       let* op, ty, lhs, rhs = get_equality_or_inequality ctx (CubeOf.find_top tm).tm in
@@ -124,48 +141,27 @@ let rec get_relations ~(split : bool) ctx tm =
    one type is a subtype of the other, so both embed in the ordered ring the translation is really
    working in.  (subtype_of falls back to equality of types, so a type is comparable with itself.)
    *)
-let comparable ctx (ty : normal) (ty' : normal) =
-  Result.is_ok (subtype_of ctx ty'.tm ty.tm) || Result.is_ok (subtype_of ctx ty.tm ty'.tm)
+let comparable ctx ty ty' =
+  Result.is_ok (subtype_of ctx ty' ty) || Result.is_ok (subtype_of ctx ty ty')
 
-(* Keep only the relations that are about the same kind of number as the goal, reporting 'err'
-   if one of them isn't.  Each comes back paired with the type to translate it at, which for these
-   is the goal's own: a subterm it shares with the goal then gets the same variable. *)
-let rec same_type ctx (ty : normal) err = function
-  | [] -> Ok []
-  | (op, (ty' : normal), x, y) :: rest ->
-      let open Monad.Ops (E) in
-      if comparable ctx ty ty' then
-        let* rest = same_type ctx ty err rest in
-        return ((op, ty, x, y) :: rest)
-      else Error (Code.Oracle_failed err)
+(* Pair each relation with the type to translate it at.  A relation about the same kind of number
+   as the goal is translated at the goal's type, so that a subterm they share gets the same
+   variable; anything else is translated at its own type.
 
-(* The hypotheses are held to that too, with one exception: an *equation* may be about anything at
-   all, whatever the goal is about -- two elements of a parameter type, say.  Nothing of the
-   arithmetic applies to such a statement, and it is translated at its own type, as an equation
-   between opaque terms; what it is good for is telling Z3 that two arguments of an uninterpreted
-   function agree, so that congruence carries the equation over to the values.
+   Nothing has to be refused here.  A statement about something the arithmetic knows nothing about
+   -- two elements of a parameter type, say -- can only be an equation, since the orderings are
+   relations on the number systems and nowhere else, and an equation between opaque terms is all
+   Z3 needs to carry the two into the arguments of an uninterpreted function and let congruence do
+   the rest.  Terms of two different types never share a variable, so a query can mix them freely.
 
-   An *inequality* about something the arithmetic doesn't know is refused, and this is the
-   difference between the two.  Outside the number systems, "<" is an axiom with no laws of its
-   own -- nothing says it is transitive, or irreflexive, or anything else -- so reading one as an
-   order on the reals would credit the student with a transitivity they haven't got.  Equality
-   carries no such risk: "=" is equality wherever it is written, and Z3's is too.
-
-   What this does still rest on, as the translation always has, is that a type whose operations the
+   What this does rest on, as the translation always has, is that a type whose operations the
    translation interprets -- anything whose plus, times and the rest it reads as arithmetic -- is
    an ordered ring that embeds in the reals.  That is what makes the numbers' own statements
-   faithful; statements at any other type only ever become equations between opaque terms, and
-   terms of two different types never share a variable, so a query can mix them freely. *)
-let rec given_types ctx (ty : normal) err = function
-  | [] -> Ok []
-  | (op, (ty' : normal), x, y) :: rest ->
-      let open Monad.Ops (E) in
-      let* rest = given_types ctx ty err rest in
-      if comparable ctx ty ty' then return ((op, ty, x, y) :: rest)
-      else if op = `Eq || op = `Neq then return ((op, ty', x, y) :: rest)
-      else Error (Code.Oracle_failed err)
+   faithful. *)
+let relation_types ctx ty =
+  List.map (fun (op, ty', x, y) -> (op, (if comparable ctx ty ty' then ty else ty'), x, y))
 
-let rec get_givens ~split ctx (ty : normal) givens =
+let rec get_givens ~split ctx (ty : kinetic value) givens =
   let open Monad.Ops (E) in
   let cons_eqs = Scope.lookup [ "Cons_eqs" ] in
   let nil_eqs = Scope.lookup [ "Nil_eqs" ] in
@@ -189,7 +185,7 @@ let rec get_givens ~split ctx (ty : normal) givens =
         | Error (Code.Oracle_failed (Not_a_relation _)) ->
             Error (Code.Oracle_failed (Not_a_relation_input (Printable.PNormal (ctx, eqty))))
         | Error e -> Error e in
-      let* rels = given_types ctx ty (Mixed_types (Printable.PNormal (ctx, eqty))) rels in
+      let rels = relation_types ctx ty rels in
       let* rest = get_givens ~split ctx ty (CubeOf.find_top rest).tm in
       return (rels @ rest)
   | Neu { head = Const { name; ins }; args = Emp; _ }
@@ -512,9 +508,10 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
         return (Some name = oracle_plus, CubeOf.find_top givens, CubeOf.find_top goal)
     | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
   (* A conjunctive goal is a list of relations to prove, each against all of the hypotheses.  They
-     all go through one translation, so that the same subterm gets the same variable throughout,
-     and hence they have to be about the same kind of number; we take that from the first of them,
-     as a single relation's type was taken from the goal itself. *)
+     all go through one translation, so that the same subterm gets the same variable throughout.
+     The kind of number the block is *about* -- which decides what shares variables with what, and
+     nothing else -- we take from the first of them, as a single relation's type was taken from the
+     goal itself. *)
   let* goals =
     (* Report a goal that isn't a relation against the whole goal rather than against the conjunct
        that isn't one, as the hypotheses below are reported against the whole wire. *)
@@ -527,13 +524,13 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     match goals with
     | (_, ty, _, _) :: _ -> Ok ty
     | [] -> Error (Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal)))) in
-  let* goals = same_type ctx ty (Mixed_goal (Printable.PNormal (ctx, goal))) goals in
+  let goals = relation_types ctx ty goals in
   let* givens = get_givens ~split:plus ctx ty givens.tm in
   let (givens, goals), { steps; _ } =
     (let open Monad.Ops (S) in
-     let poly (op, (ty : normal), (x : normal), (y : normal)) =
-       let* x = get_poly ctx ty.tm x.tm in
-       let* y = get_poly ctx ty.tm y.tm in
+     let poly (op, ty, (x : normal), (y : normal)) =
+       let* x = get_poly ctx ty x.tm in
+       let* y = get_poly ctx ty y.tm in
        return (op, x, y) in
      let open Mlist.Monadic (S) in
      (* The goal before the hypotheses, so that the side conditions come out in the order they did

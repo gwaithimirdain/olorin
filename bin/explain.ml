@@ -28,10 +28,6 @@ module Oracle = struct
     (* A goal, or an input, that isn't a relation at all: the statement in question. *)
     | Not_a_relation of printable
     | Not_a_relation_input of printable
-    (* An inequality wired in about a kind of number the goal isn't about, or a conjunct of the
-       goal at a type incompatible with the others. *)
-    | Mixed_types of printable
-    | Mixed_goal of printable
     (* Neither of these can happen unless olorin has elaborated an algebra block wrongly: the
        hypotheses aren't a list, or the block isn't an application of an oracle constant. *)
     | Not_a_hypothesis_list of printable
@@ -118,21 +114,6 @@ let oracle_failed : Reporter.oracle_error -> string option =
           "Everything wired into the algebra block has to be an equation or inequality (=, ≠, <, \
            ≤, >, ≥), or for the alg+ block a conjunction (∧) of those.  This one is" ^ display ty
           ^ "which isn't one of them.")
-        (printed ~sort:`Type p)
-  | Mixed_goal p ->
-      Option.map
-        (fun ty ->
-           "All the conjuncts of the output of an algebra block must be equations or inequalities in sets that share a common superset.  The output "
-           ^ display ty
-           ^ "mixes incompatible sets.")
-        (printed ~sort:`Type p)
-  | Mixed_types p ->
-      Option.map
-        (fun ty ->
-          "An inequality (<, ≤, >, ≥) wired into an algebra block has to be about the same kind of \
-           number as its output: the two sets must share a common superset.  The statement"
-          ^ display ty
-          ^ "isn't.  (An equation (=, ≠) may be about anything at all, numbers or not.)")
         (printed ~sort:`Type p)
   (* Neither of these is anything the player did; Narya has nothing to say about our tags, so we
      say what we can here rather than leaving a bare "oracle failed". *)
