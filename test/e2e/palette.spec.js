@@ -1,5 +1,6 @@
 // Which rules a level's palette offers: its stage's `rules`, plus any the level itself lists in
-// `extrarules` -- for a level that needs a box the rest of its stage doesn't.
+// `extrarules` -- for a level that needs a box the rest of its stage doesn't.  And that every
+// block in it says what it does, on hovering.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -61,5 +62,20 @@ test.describe("A level's extra rules", () => {
 
         const id = await olorin.dragRule('andI', 400, 300);
         expect((await olorin.nodes()).find((n) => n.id === id).rule).toBe('andI');
+    });
+});
+
+test.describe('Every block in the palette', () => {
+    test('says what it is for, so a player can find out by hovering it', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // A custom level offers the whole palette, so this sees every block there is.
+        await olorin.buildCustom({ parameters: 'P : Type', hypotheses: 'P', conclusion: 'P' });
+        const untitled = await page.evaluate(() =>
+            Array.from(document.getElementById('palette').children)
+                .filter((e) => e.classList.contains('rule'))
+                .filter((e) => !(e.title || '').trim())
+                .map((e) => e.id));
+        expect(untitled).toEqual([]);
     });
 });
