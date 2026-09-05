@@ -848,6 +848,16 @@ export const LEVELS = [
                     hint: "botHint",
                 },
                 {
+                    parameters: [ { name: "x", ty: "ℝ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "x<x" } ],
+                    conclusion: { ty: "0=1" },
+                    trivial: true,
+                    autoComplete: true,
+                    hint: "algebraBotHint",
+                    extrarules: [ "alg" ],
+                },
+                {
                     parameters: [ { name: "P", ty: "Type" } ],
                     variables: [ ],
                     hypotheses: [ ],
@@ -1646,6 +1656,13 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ ],
                     conclusion: { ty: "0 is infinitesimal" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "x is infinitesimal" } ],
+                    conclusion: { ty: "x=0" },
+                    hint: "infinitesimalZeroHint",
                 },
                 {
                     parameters: [ ],

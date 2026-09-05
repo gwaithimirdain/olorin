@@ -662,6 +662,10 @@
       <div id="botHint" class="modal hint">
         The symbol ⊥ means "false" or "a contradiction".
         Mnemonic: it's the dual of ⊤.
+        Since it's impossible for this to be true, if we ever have it as an assumption, we can immediately "close out" that part of the proof by formally deriving anything.
+      </div>
+      <div id="algebraBotHint" class="modal hint">
+        Impossible algebraic assumptions also allow us to "close out" a proof, by formally deriving any (algebraic) conclusion using the algebra block.
       </div>
       <div id="faHint" class="modal hint" style="width: 600px">
         <p>
@@ -738,6 +742,7 @@
       </div>
       <div id="infinitesimalZeroHint" class="modal hint">
         Zero is the only <i>real</i> number that is infinitesimal.
+        Remember that the algebra block can derive <i>any</i> algebraic conclusion if given impossible algebraic assumptions.
       </div>
       <div id="negationHint" class="modal hint" style="width: 630px">
         <p>
@@ -745,7 +750,8 @@
           Mnemonic: it's like − for negating a number, but instead it negates a statement.
         </p>
         <p>
-          When using a negation, either input port can be the negated statement, and either one can be connected first:
+          To use a negation, if we know both a statement and its negation, then this part of the proof is impossible, so we can "close it out" by formally deriving anything.
+          For this block, either input port can be the negated statement, and either one can be connected first:
           <div style="margin-left: auto; margin-right:auto; display:block">
             <img src="hints/neg1.png">
             <img src="hints/neg2.png">
