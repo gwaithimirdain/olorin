@@ -2412,6 +2412,7 @@ document.getElementById('expression').onkeypress = function(event) {
 }
 
 document.getElementById("submitWire").onclick = submitWireLabel;
+document.getElementById("cancelWire").onclick = cancelWireLabel;
 document.getElementById('wire').onkeypress = function(event) {
     if(event.key == 'Enter') {
         submitWireLabel();
@@ -3069,7 +3070,7 @@ function setUserWireLabel(edge, ty) {
             const d = document.createElement("div");
             d.className = "connLabel userLabel";
             d.innerText = ty;
-            d.onclick = function () { getUserLabel(edge); }
+            d.onclick = function () { getUserLabel(edge, true); }
             edge.parameters.userLabel = d;
             return d;
         },
@@ -3079,6 +3080,29 @@ function setUserWireLabel(edge, ty) {
 }
 
 // And the modal box that prompts for a wire label
+
+// The connection(s) the wire-label dialog is currently open for, found from the ports it recorded
+// when it opened (rather than a held reference, since a connection object can be replaced).
+function wireLabelConnections() {
+    const wire = document.getElementById('wire');
+    const source = document.getElementById(wire.dataset.source);
+    const target = document.getElementById(wire.dataset.target);
+    return instance.getConnections({ source: source, target: target }).filter(function (edge) {
+        return (edge.endpoints[0].parameters.sort === wire.dataset.sourceSort &&
+                edge.endpoints[0].parameters.label === wire.dataset.sourceLabel &&
+                edge.endpoints[1].parameters.sort === wire.dataset.targetSort &&
+                edge.endpoints[1].parameters.label === wire.dataset.targetLabel);
+    });
+}
+
+// Empty the dialog and put it away.
+function closeWireLabel() {
+    const wire = document.getElementById('wire');
+    wire.value = '';
+    wire.dataset.editing = "";
+    document.getElementById("wireBG").style.display = "none";
+}
+
 function submitWireLabel() {
     const wire = document.getElementById('wire');
     const ty = wire.value;
@@ -3086,21 +3110,23 @@ function submitWireLabel() {
         alert("Invalid label");
         return;
     }
-    const source = document.getElementById(wire.dataset.source);
-    const target = document.getElementById(wire.dataset.target);
-    instance.getConnections({ source: source, target: target }).forEach(function (edge) {
-        if(edge.endpoints[0].parameters.sort === wire.dataset.sourceSort &&
-           edge.endpoints[0].parameters.label === wire.dataset.sourceLabel &&
-           edge.endpoints[1].parameters.sort === wire.dataset.targetSort &&
-           edge.endpoints[1].parameters.label === wire.dataset.targetLabel) {
-            setUserWireLabel(edge, ty);
-        }
-    });
-    // And empty and hide the modal dialog
-    wire.value = '';
-    document.getElementById("wireBG").style.display = "none";
+    wireLabelConnections().forEach(function (edge) { setUserWireLabel(edge, ty); });
+    closeWireLabel();
     // And finally typecheck!
     typecheck();
+}
+
+function cancelWireLabel() {
+    // Cancelling the prompt for a wire just drawn means it was never made, so it goes away;
+    // cancelling an edit of a label already on a wire leaves the wire exactly as it was.
+    const editing = (document.getElementById('wire').dataset.editing === "true");
+    if(!editing) {
+        wireLabelConnections().forEach(function (edge) { instance.deleteConnection(edge); });
+    }
+    closeWireLabel();
+    if(!editing) {
+        typecheck();
+    }
 }
 
 // The custom level-select dialog, and the type ascription and wire label dialog boxes, have a palette of unicode characters below each text box, and a link to the help dialog listing the shortcut keys.
@@ -3352,10 +3378,13 @@ function setStrokeColor(conn, color) {
     conn.setHoverPaintStyle(sty);
 }
 
-function getUserLabel(edge) {
+// Prompt for a wire's label.  `editing` says the wire already has one and is being corrected in
+// place, which is what Cancel needs to know: see cancelWireLabel.
+function getUserLabel(edge, editing) {
     const wireBG = document.getElementById("wireBG");
     const wire = document.getElementById("wire");
     wireBG.style.display = 'flex';
+    wire.dataset.editing = editing ? "true" : "";
     wire.dataset.source = edge.source.id;
     wire.dataset.sourceSort = edge.endpoints[0].parameters.sort;
     if(edge.endpoints[0].parameters.label) {
@@ -3391,7 +3420,7 @@ function addConnection(params) {
             typecheck();
         } else {
             // Otherwise, we first prompt the user for a label for the new wire.
-            getUserLabel(edge);
+            getUserLabel(edge, false);
         }
     }
     // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
