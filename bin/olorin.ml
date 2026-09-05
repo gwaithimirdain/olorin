@@ -359,10 +359,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
       match source_vertex.rule with
       | Var -> (without_bindables (Synth (Var (`Port source, None))), PortSet.singleton source)
       | Conclusion -> raise (Jserror "conclusion cannot be a source")
-      | Tuple { inputs } ->
-          let bindables, variables, fields =
+      | Tuple { inputs; unordered } ->
+          (* We compute each input once, keeping the field it normally goes to alongside it, so
+             that an unordered tuple can pair them up the other way round without checking
+             anything twice. *)
+          let bindables, variables, entries =
             List.fold_left
-              (fun (bindables, variables, fields) (assumption, label, fld) ->
+              (fun (bindables, variables, entries) (assumption, label, fld) ->
                 match assumption with
                 | None ->
                     let tm, newvars =
@@ -370,7 +373,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                         { source with sort = Input; label = Some label } in
                     ( Bindables.union bindables tm.value.bindables,
                       PortSet.union variables newvars,
-                      Snoc (fields, (Some fld, (locate_opt None `Normal, locate_opt tm.loc tm.value.term)))
+                      (fld, (locate_opt None `Normal, locate_opt tm.loc tm.value.term)) :: entries
                     )
                 | Some albl ->
                     let subgoal = { source with sort = Subgoal; label = Some label } in
@@ -381,10 +384,32 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                         subgoal in
                     ( Bindables.union bindables newbinds,
                       PortSet.union variables newvars,
-                      Snoc (fields, (Some fld, (locate_opt None `Normal, locate_opt None tm))) ))
-              (Bindables.empty, PortSet.empty, Bwd.Emp)
+                      (fld, (locate_opt None `Normal, locate_opt None tm)) :: entries ))
+              (Bindables.empty, PortSet.empty, [])
               inputs in
-          ({ bindables; term = Named.Struct (Eta, fields) }, variables)
+          let entries = List.rev entries in
+          let strct entries =
+            Named.Struct
+              (Eta, Bwd.of_list (List.map (fun (fld, tm) -> (Some fld, tm)) entries)) in
+          let term =
+            match (unordered, entries) with
+            | false, _ -> strct entries
+            (* Both readings of an unordered tuple are tried, the natural one first so that it wins
+               wherever both would do -- notably when a port is still empty, since a hole checks
+               against anything and the port must be labeled with the field it normally carries.
+               If neither works we run the natural reading once more, committing this time, so that
+               it is *its* complaint that gets reported and its types that label the ports, rather
+               than the swapped reading's demand that each port carry the other's statement. *)
+            | true, [ (f1, tm1); (f2, tm2) ] ->
+                let direct = strct [ (f1, tm1); (f2, tm2) ] in
+                Named.First
+                  [
+                    (`Any, direct, true);
+                    (`Any, strct [ (f1, tm2); (f2, tm1) ], true);
+                    (`Any, direct, false);
+                  ]
+            | true, _ -> raise (Jserror "unordered tuple without exactly two inputs") in
+          ({ bindables; term }, variables)
       | Fields { outputs } ->
           let label = source.label <||> "missing label" in
           let fld, _ =

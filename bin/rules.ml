@@ -14,7 +14,14 @@ type match_branch =
 
 (* This is the type of abstract rules.  The string arguments are the labels of the corresponding ports.  When there is only one input port, or only one output port, it doesn't have a label. *)
 type rule =
-  | Tuple of { inputs : (string option * string * (string * string list)) list }
+  (* A tuple assembles its inputs into the fields of a record.  If it is 'unordered', its two
+     inputs can be wired up in either order: we try the natural reading first and the swapped one
+     second, so a player who puts the proofs the other way round still gets a proof.  Only a tuple
+     with exactly two inputs can be unordered. *)
+  | Tuple of {
+      inputs : (string option * string * (string * string list)) list;
+      unordered : bool;
+    }
   | Fields of { outputs : ((string * int list) * string) list }
   | Constr of { inputs : string list; constr : Constr.t }
   | Match of { branches : match_branch list; asc_pre : string option }
@@ -51,7 +58,14 @@ let rules =
       ("hypothesis", Var);
       ("conclusion", Conclusion);
       ("andE", Fields { outputs = [ (("fst", []), "fst"); (("snd", []), "snd") ] });
-      ("andI", Tuple { inputs = [ (None, "fst", ("fst", [])); (None, "snd", ("snd", [])) ] });
+      ( "andI",
+        Tuple
+          {
+            inputs = [ (None, "fst", ("fst", [])); (None, "snd", ("snd", [])) ];
+            (* A conjunction's two halves are proved the same way round or the other; either is a
+               proof, so the block takes them in either order. *)
+            unordered = true;
+          } );
       ( "orE",
         Match
           {
@@ -78,8 +92,10 @@ let rules =
       ("iffE2", App { field = Some ("rtol", []); inputs = ("implication", [ "antecedent" ]) });
       ( "iffI",
         Tuple
-          { inputs = [ (Some "ltor", "ltor", ("ltor", [])); (Some "rtol", "rtol", ("rtol", [])) ] }
-      );
+          {
+            inputs = [ (Some "ltor", "ltor", ("ltor", [])); (Some "rtol", "rtol", ("rtol", [])) ];
+            unordered = false;
+          } );
       ( "exE",
         Coconstr
           { constr = Constr.intern "exists"; outputs = [ (true, "element"); (false, "property") ] }
@@ -155,7 +171,7 @@ let rules =
             implicit_post = Some ("negation", "negneg");
           } );
       ("botE", Match { branches = []; asc_pre = Some "⊥" });
-      ("topI", Tuple { inputs = [] });
+      ("topI", Tuple { inputs = []; unordered = false });
       ("asc", Asc);
       ("expr", Expr);
       ("alg", Algebra { plus = false });

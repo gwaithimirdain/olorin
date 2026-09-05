@@ -153,7 +153,7 @@ let assumptions_of_vertex (v : Vertex.t) =
   | Abs { extras; _ } ->
       { vertex; sort; label = None }
       :: List.map (fun label : Port.t -> { vertex; sort; label = Some label }) extras
-  | Tuple { inputs } ->
+  | Tuple { inputs; _ } ->
       List.filter_map
         (fun (a, _, _) -> Option.map (fun label : Port.t -> { vertex; sort; label = Some label }) a)
         inputs
