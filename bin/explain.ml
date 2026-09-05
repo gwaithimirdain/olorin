@@ -18,7 +18,9 @@ module Oracle = struct
   let undecided_sign = "can't tell which way this goes"
   let undecided_order = "can't tell which of these two is smaller"
   let not_a_relation = "not an equality or inequality"
+  let not_a_relation_input = "input is not an equality or inequality"
   let mixed_types = "input is not an equation or inequality at the same type"
+  let mixed_goal = "goal is a conjunction of relations at different types"
 end
 
 (* Print a term or type, or nothing if unparsing raises (as it sometimes does). *)
@@ -97,8 +99,23 @@ let oracle_failed str (p : printable) =
   else if str = Oracle.not_a_relation then
     Option.map
       (fun ty ->
-        "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥).  The goal \
-         it's wired to is" ^ display ty ^ "which isn't one of those.")
+        "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and the alg+ \
+         block conjunctions (∧) of those.  The goal it's wired to is" ^ display ty
+        ^ "which isn't one of them.")
+      (printed ~sort:`Type p)
+  else if str = Oracle.not_a_relation_input then
+    Option.map
+      (fun ty ->
+        "Everything wired into the algebra block has to be an equation or inequality (=, ≠, <, ≤, \
+         >, ≥), or for the alg+ block a conjunction (∧) of those.  This one is" ^ display ty
+        ^ "which isn't one of them.")
+      (printed ~sort:`Type p)
+  else if str = Oracle.mixed_goal then
+    Option.map
+      (fun ty ->
+        "The alg+ block proves each part of a conjunction against the same hypotheses, so they all \
+         have to be about the same kind of number.  The goal it's wired to is" ^ display ty
+        ^ "which mixes them.")
       (printed ~sort:`Type p)
   else if str = Oracle.mixed_types then
     Option.map
