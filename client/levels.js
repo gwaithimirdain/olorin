@@ -292,7 +292,7 @@ export const LEVELS = [
                     trivial: true,
                     hint: "impBracketHint",
                 },
-                // {
+                // { // This one is too easy/redundant
                 //                 parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
                 //                 variables: [ ],
                 //                 hypotheses: [ { ty: "Q" } ],
@@ -1029,6 +1029,7 @@ export const LEVELS = [
                     variables: [ { name: "n", ty: "ℤ" } ],
                     hypotheses: [ { ty: "2 ∣ n" } ],
                     conclusion: { ty: "2 ∣ n²" },
+                    hint: "dividesHint",
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "n", ty: "ℤ" } ],
@@ -1036,13 +1037,12 @@ export const LEVELS = [
                         conclusion: { ty: "∃k∈ℤ,(n²=2*k)" },
                     }
                 },
-                // 0 is not synthesizing )-:
-                // {
-                //     parameters: [ ],
-                //     variables: [ { name: "a", ty: "ℤ" } ],
-                //     hypotheses: [ ],
-                //     conclusion: { ty: "a ∣ 0" },
-                // },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "a ∣ 0" },
+                },
                 {
                     parameters: [ ],
                     variables: [ { name: "b", ty: "ℤ" } ],
@@ -1173,6 +1173,7 @@ export const LEVELS = [
                     variables: [ { name: "a", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
                     hypotheses: [  ],
                     conclusion: { ty: "a ≡ a (mod n)" },
+                    hint: "modHint",
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "a", ty: "ℤ" }, { name: "n", ty: "ℤ" } ],
@@ -1341,13 +1342,6 @@ export const LEVELS = [
                         },
                     ]
                 },
-                // Just for testing number systems and subtypes
-                // {
-                //     parameters: [ ],
-                //     variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "𝕊" } ],
-                //     hypotheses: [ ],
-                //     conclusion: { ty: "∃a∈ℝ,∃b∈𝕊,((a+a=a)∧(b+b=b))" },
-                // },
             ],
           },
       ]
