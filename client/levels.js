@@ -133,7 +133,7 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "=",
+          { name: "=<",
             rules: [ "alg" ],
             levels: [
                 {
@@ -194,6 +194,15 @@ export const LEVELS = [
                     }
                 },
                 {
+                    parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "x≠0" }, { ty: "x·y=0" } ],
+                    conclusion: { ty: "y=0" },
+                    trivial: true,
+                    autoComplete: true,
+                    hint: "divisionHint",
+                },
+                {
                     parameters: [ { name: "x", ty: "ℝ" } ],
                     variables: [ ],
                     hypotheses: [ ],
@@ -205,14 +214,14 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "x<y+1" } ],
-                    conclusion: { ty: "x−1<y" },
+                    hypotheses: [ { ty: "x≤y+1" } ],
+                    conclusion: { ty: "x−1≤y" },
                     trivial: true,
                     autoComplete: true,
                 },
             ],
           },
-          { name: "∧=",
+          { name: "∧=<",
             rules: [ "andI", "andE", "alg" ],
             levels: [
                 {
@@ -244,6 +253,12 @@ export const LEVELS = [
                         hypotheses: [ { ty: "(x−y=3*x²)∧(y=x−x²)" } ],
                         conclusion: { ty: "(x=0)∧(y=0)" },
                     }
+                },
+                {
+                    parameters: [ { name: "a", ty: "ℝ" }, { name: "b", ty: "ℝ" }, { name: "c", ty: "ℝ" }, { name: "d", ty: "ℝ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "((a<b)∧(b<c))∧(c<d)" } ],
+                    conclusion: { ty: "(a<c)∧(b<d)" },
                 },
             ]
           },
@@ -484,7 +499,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "expr", "alg", "integral", "deceq", "tord" ],
+            rules: [ "orI1", "orI2", "orE", "alg" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -505,6 +520,7 @@ export const LEVELS = [
                     hypotheses: [ { ty: "(x+y=1)∨(x−y=1)" } ],
                     conclusion: { ty: "x²+1=y²+2·x" },
                     trivial: true,
+                    hint: "paperAlgebraHint",
                     saveable: {
                         parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                         variables: [ ],
@@ -518,6 +534,8 @@ export const LEVELS = [
                     hypotheses: [ { ty: "x·y=0" } ],
                     conclusion: { ty: "(x=0)∨(y=0)" },
                     trivial: true,
+                    autoComplete: true,
+                    extrarules: [ "integral" ],
                     hint: "integralHint",
                     saveable: {
                         parameters: [ ],
@@ -531,19 +549,30 @@ export const LEVELS = [
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x²=0" } ],
                     conclusion: { ty: "x=0" },
+                    extrarules: [ "integral" ],
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x²=x" } ],
                     conclusion: { ty: "(x=0)∨(x=1)" },
+                    extrarules: [ "integral", "expr" ],
                     hint: "exprHint",
+                },
+                { // We use different variable names for this one so that Olorin can tell it's different from the previous one.
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "a·b=0" } ],
+                    conclusion: { ty: "(a=0)∨(b=0)" },
+                    extrarules: [ "deceq", "expr" ],
+                    hint: "deceqHint",
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x²−x−2=0)∨(x²−1=0)" } ],
                     conclusion: { ty: "(x=2)∨((x=1)∨(x=−1))" },
+                    extrarules: [ "integral", "deceq", "expr" ],
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "x", ty: "ℤ" } ],
@@ -556,6 +585,7 @@ export const LEVELS = [
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x²−2·x−3=0)∨(x²+3·x+2=0)" } ],
                     conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
+                    extrarules: [ "integral", "deceq", "expr" ],
                     saveable: [
                         {
                             parameters: [ ],
@@ -1270,7 +1300,7 @@ export const LEVELS = [
                     conclusion: { ty: "P(a)" },
                     trivial: true,
                     autoComplete: true,
-                    hint: "valueHint",
+                    hint: "faHint",
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" } ],

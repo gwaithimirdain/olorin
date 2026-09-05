@@ -630,16 +630,9 @@
         The symbol ⊥ means "false" or "a contradiction".
         Mnemonic: it's the dual of ⊤.
       </div>
-      <div id="valueHint" class="modal hint" style="width: 600px">
-        <p>
-          Blue ports and wires carry <i>values</i>, and are labeled by the name of the value along with the set it belongs to:
-          <img src="hints/value.png" style="margin-left: auto; margin-right:auto; display:block">
-          means the value <i>a</i> belongs to the set <i>A</i>.
-        </p>
-        <p>
-          The symbol ∀ means "for all" or "for every".
-          Menomnic: it's an upside-down "A" for "for all".
-        </p>
+      <div id="faHint" class="modal hint" style="width: 600px">
+        The symbol ∀ means "for all" or "for every".
+        Menomnic: it's an upside-down "A" for "for all".
       </div>
       <div id="variableHint" class="modal hint">
         When you add a box that introduces a new hypothetical value, you need to name that value with a new variable, which can't be the same as any other variable name.
@@ -680,18 +673,25 @@
       </div>
       <div id="algebra3Hint" class="modal hint">
         You can attach as many assumptions as you need to the input port of the algebra block.
+        Although it has only one input port, you can attach as many wires as you want to that port.
       </div>
       <div id="algebra4Hint" class="modal hint">
         My method of checking algebraic equations is very general and powerful, but it doesn't produce a human-readable proof.
         When writing a proof for human readers, you should show the algebraic calculations.
-        Therefore, I recommend that whenever you use an algebra block, you also do the algebra yourself on paper.
+        Therefore, I <i>strongly</i> recommend that whenever you use an algebra block, you also do the algebra yourself on paper.
+      </div>
+      <div id="paperAlgebraHint" class="modal hint">
+        Remember that whenever you use an algebra block, you should also do the algebra yourself on paper!
+      </div>
+      <div id="divisionHint" class="modal hint">
+        Division by zero is never allowed, so if an algebra block needs to do division, be sure you connect it to enough inputs that guarantee anything it needs to divide by is nonzero.
       </div>
       <div id="inequalityHint" class="modal hint">
         The algebra block can also prove inequalities.
       </div>
       <div id="neqHint" class="modal hint">
         The statement "x≠y" means the same as "¬(x=y)", and is called a <i>disequality</i>.
-        I can't prove most disequalities automatically; you have to use the rule blocks for ¬.
+        I can't prove disequalities involving variables automatically; you have to use the rule blocks for ¬.
       </div>
       <div id="neq2Hint" class="modal hint">
         The only kind of disequalities the algebra block can prove automatically are disequalities between different constants, without any variables involved.
@@ -725,20 +725,40 @@
         </table>
       </div>
       <div id="integralHint" class="modal hint" style="width: 600px">
-        The algebra block can only prove equations or inequalities, but there are some important "algebraic" facts that are disjunctions.
-        One is that if the product of two numbers is zero, one or the other of them must be zero.
-        If you need this fact, use the block labeled "?·?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
-        <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block">
-        <b>Warning:</b> do not connect blue "value" wires to "alg" boxes!
-        All the inputs to an "alg" box must be <i>equations</i> (or inequalities), as those are the only things I can do algebra with.
-        I can figure out on my own which variables appear in the equations.
+        <p>
+          The algebra block can only prove equations or inequalities, but there are some important "algebraic" facts that are disjunctions.
+          One is that if the product of two numbers is zero, one or the other of them must be zero.
+          If you need this fact, use the block labeled "?·?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
+        </p>
+        <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block"/>
+        <p>
+          Blue ports, such as the first two inputs to this box, must be connected to blue wires, which carry <i>values</i> rather than statements.
+          Blue wires are labeled by the value along with the set it belongs to: <span style="text-color: #0000ff">x ∈ ℤ</span> means the value <i>x</i> belongs to the set <i>ℤ</i>.
+          Here are the sets of numbers we'll be using:
+          <table style="margin-left: auto; margin-right: auto; border-spacing: 20px 5px">
+            <tbody>
+              <tr><td>ℕ</td><td>The natural numbers: 0,1,2,3,…</td></tr>
+              <tr><td>ℤ</td><td>The integers: …,−3,−2,−1,0,1,2,3,…</td></tr>
+              <tr><td>ℚ</td><td>The rational numbers: fractions p/q where p,q∈ℤ, q≠0</td></tr>
+              <tr><td>ℝ</td><td>The real numbers: finite or infinite decimals, e.g. π, √2</td></tr>
+              <tr><td>ℂ</td><td>The complex numbers: a+bi where a,b∈ℝ and i²=−1</td></tr>
+              <tr><td>𝕊</td><td>The surreal numbers: the real numbers plus "infinite" numbers like ω and "infinitesimal" numbers like 1/ω</td></tr>
+            </tbody>
+          </table>
+        </p>
+      </div>
+      <div id="deceqHint" class="modal hint" style="width: 600px">
+        In fact, the property "?·?=0" can be proven from the simpler property that everything is either equal to zero or not equal to zero, together with the fact that algebra can divide by anything nonzero.
+        More generally, the block "=∨≠" proves that any two numbers are either equal or unequal; the "expr" block can be used to supply constants such as "0".
       </div>
       <div id="exprHint" class="modal hint">
         If you need an input to a blue "value" port that isn't just a variable, use the "expr" block.
         This will prompt you for an expression; to change the expression later, double-click the block.
         You must connect the input port of the expression block to all the variables that occur in your expression.
-        <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block">
+        <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block"/>
         <b>Warning:</b> do not connect any black "statement" wires to a blue "expr" block!
+        And do not connect any blue "value" wires to a black "alg" box!
+        All the inputs to an "alg" box must be <i>equations</i> (or inequalities), as those are the only things I can do algebra with; I can figure out on my own which variables appear in the equations.
       </div>
     </div>
 
