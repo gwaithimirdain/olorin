@@ -2,10 +2,6 @@
 // relations: a hypothesis that is a conjunction contributes both of its parts, and a goal that is
 // one is decided part by part against all the hypotheses.  The plain "alg" block still insists on
 // a bare equation or inequality at both ends.
-//
-// The motivating case is the ∀x∈[n] and ∃x∈[n] blocks, whose condition port carries the single
-// statement (0≤x)∧(x<n): alg+ consumes and produces it directly, with no ∧-elimination or
-// ∧-introduction in between.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -125,48 +121,3 @@ test.describe('the plain alg block', () => {
     });
 });
 
-test.describe('the [n] quantifiers with alg+', () => {
-    // Their condition port carries (0≤x)∧(x<n), which alg+ now handles at both ends.
-    test('consumes the condition ∀x∈[n] binds', async ({ page }) => {
-        const olorin = new Olorin(page);
-        await olorin.open();
-        await olorin.buildCustom({
-            parameters: '', variables: 'n ∈ ℤ', hypotheses: '', conclusion: '∀x∈[n],(0<n)',
-        });
-        const intro = await olorin.dragRule('allbelowI', 450, 60);
-        await page.waitForSelector('#variableBG', { state: 'visible' });
-        await page.fill('#newvar', 'z');
-        await page.click('#submitVariable');
-        await olorin.dismissHints();
-        const alg = await olorin.dragRule('algplus', 500, 300);
-        await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        await olorin.connect({ vertex: intro, sort: 'assumption', label: 'below' }, { vertex: alg, sort: 'input' });
-        await olorin.connect({ vertex: alg, sort: 'output' }, { vertex: intro, sort: 'subgoal' });
-        await olorin.waitForTypecheck();
-        expect(await olorin.isComplete()).toBe(true);
-    });
-
-    test('and produces the condition ∀x∈[n]-elimination asks for', async ({ page }) => {
-        const olorin = new Olorin(page);
-        await olorin.open();
-        await olorin.buildCustom({
-            parameters: 'P : ℤ → Type',
-            variables: 'n ∈ ℤ\nk ∈ ℤ',
-            hypotheses: '∀x∈[n],P x\n0≤k\nk<n',
-            conclusion: 'P k',
-        });
-        const nodes = await olorin.nodes();
-        const k = nodes.find((n) => n.name === 'k').id;
-        const [universal, low, high] = nodes.filter((n) => n.rule === 'hypothesis').map((n) => n.id);
-        const elim = await olorin.dragRule('allbelowE', 450, 200);
-        const alg = await olorin.dragRule('algplus', 250, 420);
-        await olorin.connect({ vertex: universal, sort: 'output' }, { vertex: elim, sort: 'input', label: 'universal' });
-        await olorin.connect({ vertex: k, sort: 'output' }, { vertex: elim, sort: 'input', label: 'element' });
-        await olorin.connect({ vertex: low, sort: 'output' }, { vertex: alg, sort: 'input' });
-        await olorin.connect({ vertex: high, sort: 'output' }, { vertex: alg, sort: 'input' });
-        await olorin.connect({ vertex: alg, sort: 'output' }, { vertex: elim, sort: 'input', label: 'below' });
-        await olorin.connect({ vertex: elim, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
-        await olorin.waitForTypecheck();
-        expect(await olorin.isComplete()).toBe(true);
-    });
-});

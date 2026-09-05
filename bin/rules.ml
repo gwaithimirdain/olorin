@@ -105,7 +105,7 @@ let rules =
       ( "allI",
         Abs { field = Some ("forall", []); has_value = true; extras = []; implicit_post = None } );
       (* The quantifiers over the special sets ℝ₊ and [n].  Each carries the condition defining its
-         set -- 0<x, or (0≤x)∧(x<n) -- on a port of its own alongside the value port for x: the
+         set -- 0<x, or x<n -- on a port of its own alongside the value port for x: the
          field of "forallpos" and "forallbelow" takes it as a second argument, and the constructor
          of "existspos" and "existsbelow" as a second component. *)
       ( "exposE",

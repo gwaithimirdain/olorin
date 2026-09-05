@@ -166,11 +166,11 @@ def forallpos (P : ℝ → Type) : Type ≔ sig ( forallpos : (x : ℝ) → ℝ.
 def existspos (P : ℝ → Type) : Type ≔ data [ existspos. (element : ℝ) (positive : ℝ.lt 0 element) (property : P element) ]
 
 {` Likewise quantification over [n], the whole numbers below some n, which n is written out of and
-so is a parameter of these definitions as well as of their notations.  Their elements are integers
-cut down by (0<=x) and (x<n) rather than naturals, since Z is the smallest number system the
-arithmetic operations are defined on: a bound variable has to be something you can compute with. `}
-def forallbelow (n : ℤ) (P : ℤ → Type) : Type ≔ sig ( forallbelow : (x : ℤ) → land (ℤ.le 0 x) (ℤ.lt x n) → P x )
-def existsbelow (n : ℤ) (P : ℤ → Type) : Type ≔ data [ existsbelow. (element : ℤ) (below : land (ℤ.le 0 element) (ℤ.lt element n)) (property : P element) ]
+so is a parameter of these definitions as well as of their notations.  Their elements are naturals,
+cut down by (x<n) alone: being a natural is already being at least 0, and says so to an algebra
+block without being carried around as half of the condition. `}
+def forallbelow (n : ℕ) (P : ℕ → Type) : Type ≔ sig ( forallbelow : (x : ℕ) → ℕ.lt x n → P x )
+def existsbelow (n : ℕ) (P : ℕ → Type) : Type ≔ data [ existsbelow. (element : ℕ) (below : ℕ.lt element n) (property : P element) ]
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
@@ -290,7 +290,7 @@ let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
    are worth quantifying over aren't types of their own: ℝ₊, the positive reals, and [n], the whole
    numbers below n.  These are written as part of the notation instead, either as a bare token or
    as a pair of tokens with a term between them, and each has a constant of its own whose field or
-   constructor carries the condition defining the set -- 0<x, or (0≤x)∧(x<n) -- alongside x itself.
+   constructor carries the condition defining the set -- 0<x, or x<n -- alongside x itself.
    A set with a term inside it hands that term to its constant as a first argument. *)
 type special_set =
   | Bare of Token.t

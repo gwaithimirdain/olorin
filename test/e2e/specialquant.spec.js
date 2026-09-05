@@ -1,6 +1,7 @@
 // The quantifiers over a set that isn't a type of its own: ∀x∈ℝ₊ / ∃x∈ℝ₊ over the positive reals,
 // and ∀x∈[n] / ∃x∈[n] over the whole numbers below n.  Their blocks carry the condition defining
-// the set -- 0<x, or (0≤x)∧(x<n) -- on a port of its own alongside the value port for x.  No
+// the set -- 0<x, or x<n -- on a port of its own alongside the value port for x.  [n]'s elements
+// are naturals, so being at least 0 comes with the element rather than with the condition.  No
 // built-in level offers them yet, so these drive them on custom levels, whose palette holds every
 // rule.
 
@@ -19,7 +20,10 @@ const FAMILIES = [
         // A goal the algebra block can reach from the condition alone, to pin that the bound
         // variable is a number you can compute with.  `split` says the condition is a conjunction,
         // so it needs ∧-elimination before the algebra block, which takes only relations.
-        arithmetic: { conclusion: '∀x∈ℝ₊,(0<x·2)', split: false },
+        arithmetic: { conclusion: '∀x∈ℝ₊,(0<x·2)' },
+        // Supplying that condition to an elimination from a hypothesis, rather than from a binder.
+        elimVariables: 'k ∈ ℝ',
+        elimCondition: '0<k',
         // A statement that nests both quantifiers of the family, with the bodies parenthesized as
         // ∀ and the relations have no relative precedence (as for the ordinary quantifiers).
         nested: '∀ε∈ℝ₊,∃δ∈ℝ₊,∀x∈ℝ,((∣x∣<δ)⇒(∣f x∣<ε))',
@@ -29,17 +33,20 @@ const FAMILIES = [
     },
     {
         set: '[n]',
-        parameters: 'P : ℤ → Type',
-        variables: 'n ∈ ℤ',
-        elementSet: 'ℤ',
+        parameters: 'P : ℕ → Type',
+        variables: 'n ∈ ℕ',
+        elementSet: 'ℕ',
         condition: 'below',
-        conditionOn: (v) => `(0≤${v})∧(${v}<n)`,
+        conditionOn: (v) => `${v}<n`,
         rules: { allI: 'allbelowI', allE: 'allbelowE', exI: 'exbelowI', exE: 'exbelowE' },
-        // 0 ≤ x < n forces 0 < n, using both halves of the condition.
-        arithmetic: { conclusion: '∀x∈[n],(0<n)', split: true },
+        // x < n forces 0 < n, using the condition and the 0 ≤ x that comes of x being a natural --
+        // which the block is told, and which used to have to be half of the condition.
+        arithmetic: { conclusion: '∀x∈[n],(0<n)' },
+        elimVariables: 'n ∈ ℕ\nk ∈ ℕ',
+        elimCondition: 'k<n',
         nested: '∀i∈[n],∃j∈[n],(i<j)',
         nestedParameters: '',
-        nestedVariables: 'n ∈ ℤ',
+        nestedVariables: 'n ∈ ℕ',
         nestedPrinted: '∀i∈[n],∃j∈[n],(i<j)',
     },
 ];
@@ -155,18 +162,33 @@ for (const f of FAMILIES) {
             const intro = await dragBinder(olorin, allI, 450, 60, 'z');
             await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
             const alg = await olorin.dragRule('alg', 520, 300);
-            const condition = { vertex: intro, sort: 'assumption', label: f.condition };
-            if (f.arithmetic.split) {
-                const and = await olorin.dragRule('andE', 260, 300);
-                await olorin.connect(condition, { vertex: and, sort: 'input' });
-                for (const half of ['fst', 'snd']) {
-                    await olorin.connect({ vertex: and, sort: 'output', label: half }, { vertex: alg, sort: 'input' });
-                }
-            } else {
-                await olorin.connect(condition, { vertex: alg, sort: 'input' });
-            }
+            await olorin.connect({ vertex: intro, sort: 'assumption', label: f.condition },
+                                 { vertex: alg, sort: 'input' });
             await olorin.connect({ vertex: alg, sort: 'output' }, { vertex: intro, sort: 'subgoal' });
             // Anything the algebra block asks Z3 comes back asynchronously.
+            await olorin.waitForTypecheck();
+            expect(await olorin.isComplete()).toBe(true);
+        });
+
+        test('and can be handed the condition an elimination asks for', async ({ page }) => {
+            const olorin = new Olorin(page);
+            await olorin.open();
+            await olorin.buildCustom({
+                parameters: f.parameters,
+                variables: f.elimVariables,
+                hypotheses: `∀x∈${f.set},P x\n${f.elimCondition}`,
+                conclusion: 'P k',
+            });
+            const nodes = await olorin.nodes();
+            const k = nodes.find((n) => n.name === 'k').id;
+            const [universal, condition] = nodes.filter((n) => n.rule === 'hypothesis').map((n) => n.id);
+            const elim = await olorin.dragRule(allE, 450, 200);
+            const alg = await olorin.dragRule('alg', 250, 420);
+            await olorin.connect({ vertex: universal, sort: 'output' }, { vertex: elim, sort: 'input', label: 'universal' });
+            await olorin.connect({ vertex: k, sort: 'output' }, { vertex: elim, sort: 'input', label: 'element' });
+            await olorin.connect({ vertex: condition, sort: 'output' }, { vertex: alg, sort: 'input' });
+            await olorin.connect({ vertex: alg, sort: 'output' }, { vertex: elim, sort: 'input', label: f.condition });
+            await olorin.connect({ vertex: elim, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
             await olorin.waitForTypecheck();
             expect(await olorin.isComplete()).toBe(true);
         });
