@@ -5,12 +5,18 @@
 // and nothing else about f comes with it -- in particular it is not assumed injective, monotone,
 // or anything of the sort.
 //
-// Congruence only reaches arguments the block can talk about in the first place, since the
-// hypotheses it takes have to be relations between numbers: "f(x) = f(y)" from "x = y" needs x and
-// y to be numbers, not elements of some parameter type.
+// The equations wired into a block don't have to be about the same kind of number as its goal, or
+// about numbers at all: an equation between elements of a parameter type is carried into the
+// arguments of an uninterpreted function just the same.  An *inequality* is still held to the
+// goal's kind of number, since "<" outside the number systems is an axiom with no laws -- reading
+// one as an order on the reals would hand the student a transitivity nothing gives them.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+
+// What the block complained about, as the player is shown it.
+const complaints = async (olorin) =>
+    (await olorin.diagnostics()).map((d) => (d.explanation || d.text).replace(/\s+/g, ' '));
 
 // State a level and prove it with a single algebra block fed by every hypothesis.
 async function algebraProves(olorin, { parameters = 'f : ℝ → ℝ', variables = 'x ∈ ℝ\ny ∈ ℝ',
@@ -100,5 +106,62 @@ test.describe('Uninterpreted functions in the algebra block', () => {
             parameters: 'g : ℝ → ℝ → ℝ',
             conclusion: 'g x y = g y x',
         })).toBe(false);
+    });
+});
+
+test.describe('Equations about things that are not numbers', () => {
+    // The point of allowing these: the equation is useless to the arithmetic itself, but it tells
+    // Z3 that two arguments of an uninterpreted function agree, and congruence does the rest.
+    test('carry into the arguments of a function that lands in the numbers', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            parameters: 'A : Type\nf : A → ℝ',
+            variables: 'a ∈ A\nb ∈ A',
+            hypotheses: ['a = b'],
+            conclusion: 'f a = f b',
+        })).toBe(true);
+        // And they are still only equations: nothing about f comes with them.
+        expect(await algebraProves(olorin, {
+            parameters: 'A : Type\nf : A → ℝ',
+            variables: 'a ∈ A\nb ∈ A',
+            conclusion: 'f a = f b',
+        })).toBe(false);
+    });
+
+    test('and can be the goal as well as a hypothesis', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            parameters: 'A : Type\ng : ℝ → A',
+            variables: 'x ∈ ℝ\ny ∈ ℝ',
+            hypotheses: ['x + 1 = y'],
+            conclusion: 'g (x + 1) = g y',
+        })).toBe(true);
+    });
+
+    test('mix with equations about numbers in one block', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            parameters: 'A : Type\nf : A → ℝ',
+            variables: 'a ∈ A\nb ∈ A\nx ∈ ℝ',
+            hypotheses: ['a = b', 'f a = 2 · x'],
+            conclusion: 'f b = x + x',
+        })).toBe(true);
+    });
+
+    test('but an inequality still has to be about the goal\'s kind of number', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            parameters: 'A : Type\nf : A → ℝ',
+            variables: 'a ∈ A\nb ∈ A\nc ∈ A',
+            hypotheses: ['a < b', 'b < c'],
+            conclusion: 'f a = f c',
+        })).toBe(false);
+        expect(await complaints(olorin)).toEqual([expect.stringContaining(
+            'An inequality (<, ≤, >, ≥) wired into an algebra block has to be about the same kind '
+            + 'of number as its output')]);
     });
 });
