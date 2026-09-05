@@ -38,6 +38,8 @@ let connective_of_field = function
   | "implies" -> Some "an implication (A⇒B)"
   | "ltor" | "rtol" -> Some "a biconditional (A⇔B)"
   | "forall" -> Some "a universal statement (∀x∈A,…)"
+  | "forallpos" -> Some "a universal statement about positive reals (∀x∈ℝ₊,…)"
+  | "forallbelow" -> Some "a universal statement about the whole numbers below some n (∀x∈[n],…)"
   | "negation" -> Some "a negation (¬A)"
   | _ -> None
 
@@ -45,6 +47,8 @@ let connective_of_field = function
 let connective_of_constr = function
   | "left" | "right" -> Some "a disjunction (A∨B)"
   | "exists" -> Some "an existential statement (∃x∈A,…)"
+  | "existspos" -> Some "an existential statement about positive reals (∃x∈ℝ₊,…)"
+  | "existsbelow" -> Some "an existential statement about the whole numbers below some n (∃x∈[n],…)"
   | _ -> None
 
 (* The algebra block's own failures, told apart by the message the oracle reported. *)

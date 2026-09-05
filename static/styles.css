@@ -911,6 +911,13 @@ body {
     white-space: nowrap;
 }
 
+.middleOutputLabel {
+    position: absolute;
+    left: 10px;
+    bottom: -10px;
+    white-space: nowrap;
+}
+
 /* About text */
 
 #aboutModal {

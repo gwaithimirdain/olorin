@@ -149,7 +149,10 @@ let assumptions_of_vertex (v : Vertex.t) =
                    (fun label : Port.t -> { vertex; sort; label = Some label })
                    assumptions)
            branches)
-  | Abs _ -> [ { vertex; sort; label = None } ]
+  (* The main assumption of an abstraction is unlabeled; any extras it binds alongside are not. *)
+  | Abs { extras; _ } ->
+      { vertex; sort; label = None }
+      :: List.map (fun label : Port.t -> { vertex; sort; label = Some label }) extras
   | Tuple { inputs } ->
       List.filter_map
         (fun (a, _, _) -> Option.map (fun label : Port.t -> { vertex; sort; label = Some label }) a)

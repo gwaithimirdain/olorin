@@ -347,7 +347,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     let subgoal = { source with sort = Subgoal; label = Some label } in
                     let assumption = { source with sort = Assumption; label = Some albl } in
                     let newbinds, tm, newvars =
-                      lam_of_output_port ~seen vertices graph assumption subgoal source_vertex in
+                      lam_of_output_port ~seen vertices graph
+                        [ (assumption, source_vertex.name) ]
+                        subgoal in
                     ( Bindables.union bindables newbinds,
                       PortSet.union variables newvars,
                       Snoc (fields, (Some fld, (locate_opt None `Normal, locate_opt None tm))) ))
@@ -380,30 +382,34 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               inputs
               (Bindables.empty, PortSet.empty, []) in
           ({ bindables; term = Named.Constr (locate_opt None constr, args) }, variables)
-      | App { inputs = fn, arg; field } ->
+      | App { inputs = fn, args; field } ->
           let fn, fn_variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = Some fn }
           in
           let fn, fn_bindables = ensure_synth fn "function" in
-          let ( ({ value = { bindables = arg_bindables; term = argtm }; loc = argloc } :
-                  term_with_bindables located),
-                arg_variables ) =
-            check_of_input_port ~seen vertices graph { source with sort = Input; label = Some arg }
-          in
-          let arg = locate_opt argloc argtm in
-          let term =
-            Named.Synth
-              (match field with
-              | Some fld ->
-                  (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
-                  Named.App
-                    ( locate_opt (Loc.non_annotating fn.loc)
-                        (Named.Synth (Named.Field (fn, `Name fld))),
-                      named_arg arg,
-                      locate_opt None `Explicit )
-              | None -> App (named_synth fn, named_arg arg, locate_opt None `Explicit)) in
-          ( { bindables = Bindables.union fn_bindables arg_bindables; term },
-            PortSet.union fn_variables arg_variables )
+          let head =
+            match field with
+            (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
+            | Some fld -> locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld))
+            | None -> fn in
+          (* Apply it to each argument port in turn. *)
+          let bindables, variables, tm =
+            List.fold_left
+              (fun (bindables, variables, (tm : unit Named.synth located)) label ->
+                let ( ({ value = { bindables = arg_bindables; term = argtm }; loc = argloc } :
+                        term_with_bindables located),
+                      arg_variables ) =
+                  check_of_input_port ~seen vertices graph
+                    { source with sort = Input; label = Some label } in
+                ( Bindables.union bindables arg_bindables,
+                  PortSet.union variables arg_variables,
+                  locate_opt None
+                    (Named.App
+                       ( named_synth tm,
+                         named_arg (locate_opt argloc argtm),
+                         locate_opt None `Explicit )) ))
+              (fn_bindables, fn_variables, head) args in
+          ({ bindables; term = Named.Synth tm.value }, variables)
       | Neg { inputs = fn, arg; field; implicit_pre } ->
           (* Get the two inputs, which we will allow to appear in either order *)
           let get_tm lbl =
@@ -501,12 +507,16 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                  })
           in
           ({ bindables; term }, variables)
-      | Abs { field; has_value = _; implicit_post } ->
-          (* In an abstraction, we bind all the bindables in the body that involve the assumption variable, and pass the rest on as bindables for the abstraction. *)
-          let assumption = { source with sort = Assumption; label = None } in
+      | Abs { field; has_value = _; extras; implicit_post } ->
+          (* In an abstraction, we bind all the bindables in the body that involve the assumption variables, and pass the rest on as bindables for the abstraction. *)
+          let assumptions =
+            ({ source with sort = Assumption; label = None }, source_vertex.name)
+            :: List.map
+                 (fun label -> ({ source with sort = Assumption; label = Some label }, None))
+                 extras in
           let subgoal = { source with sort = Subgoal; label = None } in
           let bindables, lam, variables =
-            lam_of_output_port ~seen vertices graph assumption subgoal source_vertex in
+            lam_of_output_port ~seen vertices graph assumptions subgoal in
           let term =
             match field with
             (* We don't locate the lambda, because we don't want strings to be labeled by *its* type (which would be, say, P→Q instead of P⇒Q). *)
@@ -717,22 +727,31 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           ({ bindables; term = Synth (SFirst (terms, None)) }, variables) in
     (locate !loc tm, variables)
 
-(* Subroutine for abstractions and tuples with binding arguments *)
-and lam_of_output_port ~seen vertices graph assumption subgoal source_vertex =
+(* Subroutine for abstractions and tuples with binding arguments.  The assumptions, given with the
+   names they carry (if any), are bound outermost-first as nested lambdas.  Bindables in the body
+   that involve any of them are all bound innermost, where every one of them is in scope. *)
+and lam_of_output_port ~seen vertices graph assumptions subgoal =
   let body, variables = check_of_input_port ~seen vertices graph subgoal in
-  let body, bindables = bind_some (PortSet.singleton assumption) body in
+  let ports =
+    List.fold_left (fun ps (assumption, _) -> PortSet.add assumption ps) PortSet.empty assumptions
+  in
+  let body, bindables = bind_some ports body in
   let lam =
-    Named.Lam
-      {
-        name = locate_opt body.loc ({ name = source_vertex.name; port = Some assumption } : name);
-        cube = locate_opt None `Normal;
-        implicit = `Explicit;
-        dom = None;
-        body;
-      } in
-  (* We remove the local assumption from the variable dependence *)
-  let variables = PortSet.remove assumption variables in
-  (bindables, lam, variables)
+    List.fold_right
+      (fun (assumption, name) (body : unit Named.check located) ->
+        locate_opt body.loc
+          (Named.Lam
+             {
+               name = locate_opt body.loc ({ name; port = Some assumption } : name);
+               cube = locate_opt None `Normal;
+               implicit = `Explicit;
+               dom = None;
+               body;
+             }))
+      assumptions body in
+  (* We remove the local assumptions from the variable dependence *)
+  let variables = PortSet.diff variables ports in
+  (bindables, lam.value, variables)
 
 and vars_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : bwd_graph)
     (port : Port.t) : Bindables.t * PortSet.t =
@@ -1439,6 +1458,9 @@ let _ =
          let ok = ok && not ('0' <= str.[0] && str.[0] <= '9') in
          (* We have to return *)
          let ok = ok && not (Array.exists (fun (_, x) -> x = Token.Ident [ str ]) onechar_ops) in
+         (* Nor one of the multi-character tokens that a notation reserves, like the ℝ₊ that says
+            which set a quantifier ranges over. *)
+         let ok = ok && not (List.mem (Token.Ident [ str ]) special_set_idents) in
          (* And since the Pauser always returns the same type, we have to return a js_checked, so we just put the validity test in the 'complete' field. *)
          object%js
            val mutable complete = Js.bool ok

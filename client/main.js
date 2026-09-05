@@ -28,7 +28,7 @@ const VALUECOLOR = "#0000ff";
 const CLOSE_BUTTON_HOME = 0.8;
 
 // Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℂ', '𝕊', 'ε', 'δ'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊', 'ε', 'δ'];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
@@ -71,6 +71,8 @@ const KEYS = [
     { unicode: 'ℕ', keys: [ '\\N ' ] },
     { unicode: 'ℤ', keys: [ '\\Z ' ] },
     { unicode: 'ℚ', keys: [ '\\Q ' ] },
+    // ℝ₊ has to come first, so \R+ isn't read as \R followed by a stray +.
+    { unicode: 'ℝ₊', keys: [ '\\R+ ', '\\Rpos ' ] },
     { unicode: 'ℝ', keys: [ '\\R ' ] },
     { unicode: 'ℂ', keys: [ '\\C ' ] },
     { unicode: '𝕊', keys: [ '\\S ' ] },
@@ -594,6 +596,22 @@ ready(() => {
     }
 });
 
+// The quantifiers over a set that isn't a type of its own: ℝ₊, the positive reals, and [n], the
+// whole numbers below n.  Each of their four blocks carries the condition defining that set --
+// 0<x, or (0≤x)∧(x<n) -- on a port of its own alongside the value port for x, so the blocks of one
+// such quantifier differ from those of another only in that port's label and in how the set is
+// written in the placeholder types their ports show while empty.
+const SPECIALQUANT = {
+    allposI:   { condition: "positive", set: "ℝ₊" },
+    allposE:   { condition: "positive", set: "ℝ₊" },
+    exposI:    { condition: "positive", set: "ℝ₊" },
+    exposE:    { condition: "positive", set: "ℝ₊" },
+    allbelowI: { condition: "below", set: "[?]" },
+    allbelowE: { condition: "below", set: "[?]" },
+    exbelowI:  { condition: "below", set: "[?]" },
+    exbelowE:  { condition: "below", set: "[?]" },
+};
+
 // Clone the palette rule `id` into a new diagram node: position it, register it in the
 // nodes list, and give it a close button.  Endpoints are added separately by
 // addEndpointsForRule.  Returns the new box element.
@@ -642,10 +660,16 @@ function addEndpointsForRule(box, id, restore) {
     } else if (id === 'orI2') {
         instance.addEndpoint(box, { anchor: "Left", target: true, parameters: { sort: "input", label: "right" } });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∨?" } });
-    } else if (id === 'impI' || id === 'allI' || id === 'negI' || id === 'cnegI' ) {
-        if(id === 'allI') {
+    } else if (id === 'impI' || id === 'allI' || id === 'allposI' || id === 'allbelowI' || id === 'negI' || id === 'cnegI' ) {
+        // Every ∀ block binds a variable, so its assumption port carries a value.  The ones that
+        // quantify over a special set bind the condition defining it too, on a second port below
+        // that one, so their variable port sits higher up a taller box to leave room.
+        const q = SPECIALQUANT[id];
+        const binds = (id === 'allI' || !!q);
+        const dy = (q ? -22 : -12);
+        if(binds) {
             instance.addEndpoint(box, {
-                anchor: [0, 0.5, 1, 0, 22, -12],
+                anchor: [0, 0.5, 1, 0, 22, dy],
                 source: true, maxConnections: -1,
                 parameters: { sort: "assumption", hasValue: true, side: "upper" },
                 paintStyle: { fill: VALUECOLOR },
@@ -653,18 +677,25 @@ function addEndpointsForRule(box, id, restore) {
             });
         } else {
             instance.addEndpoint(box, {
-                anchor: [0, 0.5, 1, 0, 22, -12],
+                anchor: [0, 0.5, 1, 0, 22, dy],
                 source: true, maxConnections: -1,
                 parameters: {sort: "assumption", side: "upper"},
             });
         }
-        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -12], target: true, parameters: {sort: "subgoal", side: "upper"} });
-        const primary = (id === 'impI' ? "?⇒?" : (id === 'allI' ? "∀?∈?,?" : (id === 'cnegI' ? "?" : "¬?")));
+        if(q) {
+            instance.addEndpoint(box, {
+                anchor: [0, 0.5, 1, 0, 22, 2],
+                source: true, maxConnections: -1,
+                parameters: {sort: "assumption", label: q.condition, side: "lower"},
+            });
+        }
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, dy], target: true, parameters: {sort: "subgoal", side: "upper"} });
+        const primary = (id === 'impI' ? "?⇒?" : (id === 'allI' ? "∀?∈?,?" : (q ? "∀?∈" + q.set + ",?" : (id === 'cnegI' ? "?" : "¬?"))));
         instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: primary} });
         box.style.width = '200px';
-        box.style.height = '50px';
+        box.style.height = (q ? '70px' : '50px');
         makeResizable(box);
-        if(id === 'allI') {
+        if(binds) {
             // Double-clicking the box re-opens the dialog to rename the variable it binds.
             box.addEventListener('dblclick', function () { editVariable(box); });
             if(!restore) { getVariable(box.id); }
@@ -720,6 +751,44 @@ function addEndpointsForRule(box, id, restore) {
             parameters: {sort: "input", label: "element", hasValue: true, side: "lower"},
             paintStyle: { fill: VALUECOLOR },
         });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    } else if (id === 'exposE' || id === 'exbelowE') {
+        const q = SPECIALQUANT[id];
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "∃?∈" + q.set + ",?"} });
+        instance.addEndpoint(box, {
+            anchor: [1, 0.1, 1, 0],
+            source: true, maxConnections: -1,
+            parameters: { sort: "output", label: "element", hasValue: true, side: "upper"},
+            paintStyle: { fill: VALUECOLOR },
+            connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
+        });
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: q.condition, side: "middle"} });
+        instance.addEndpoint(box, { anchor: [1, 0.9, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        // Double-clicking the box re-opens the dialog to rename the variable it binds.
+        box.addEventListener('dblclick', function () { editVariable(box); });
+        if(!restore) { getVariable(box.id); }
+        typecheck_now = false;
+    } else if (id === 'exposI' || id === 'exbelowI') {
+        const q = SPECIALQUANT[id];
+        instance.addEndpoint(box, {
+            anchor: [0, 0.1, -1, 0],
+            target: true,
+            parameters: {sort: "input", label: "element", hasValue: true, side: "upper"},
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, { anchor: [0, 0.5, -1, 0], target: true, parameters: {sort: "input", label: q.condition, side: "middle"} });
+        instance.addEndpoint(box, { anchor: [0, 0.9, -1, 0], target: true, parameters: {sort: "input", label: "property", side: "lower"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "∃?∈" + q.set + ",?"} });
+    } else if (id === 'allposE' || id === 'allbelowE') {
+        const q = SPECIALQUANT[id];
+        instance.addEndpoint(box, { anchor: [0, 0.1, -1, 0], target: true, parameters: {sort: "input", label: "universal", side: "upper", primary: "∀?∈" + q.set + ",?"} });
+        instance.addEndpoint(box, {
+            anchor: [0, 0.5, -1, 0],
+            target: true,
+            parameters: {sort: "input", label: "element", hasValue: true, side: "middle"},
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, { anchor: [0, 0.9, -1, 0], target: true, parameters: {sort: "input", label: q.condition, side: "lower"} });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
     } else if (id === 'negE') {
         instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "negation", side: "upper", primary: "¬?"} });
@@ -3707,6 +3776,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                                         if(endpoint.parameters.side === "upper") {
                                             // Lower is the default
                                             cssClass = "upperOutputLabel";
+                                        } else if(endpoint.parameters.side === "middle") {
+                                            cssClass = "middleOutputLabel";
                                         }
                                         if(endpoint.parameters.hasValue) {
                                             cssClass = cssClass + " connLabelValue";

@@ -20,11 +20,16 @@ type rule =
   | Match of { branches : match_branch list; asc_pre : string option }
   | Coconstr of { constr : Constr.t; outputs : (bool * string) list }
   (* Application and abstraction include an optional field because ⇒, ∀, and ¬ are actually records, so for Narya's internals we need to tuple and project in addition to applying and abstracting. *)
-  | App of { field : (string * int list) option; inputs : string * string }
+  (* The inputs of an application are the port carrying the function and then one port per argument
+     it is applied to, in order: ∀x∈ℝ₊ takes the positivity of x as a second argument alongside x. *)
+  | App of { field : (string * int list) option; inputs : string * string list }
   | Neg of { field : string * int list; inputs : string * string; implicit_pre : string }
   | Abs of {
       field : (string * string list) option;
       has_value : bool;
+      (* Assumptions bound after the main (unlabeled) one, as further nested lambdas: ∀x∈ℝ₊ binds
+         the positivity of x alongside x itself, on a labeled port of its own. *)
+      extras : string list;
       (* Allow testing for the presence of a field in the goal type, and if it isn't there, insert a specified function (with implicit first argument).  The intended example is so that a single rule can be both proof-of-negation and proof-by-contradiction. *)
       implicit_post : (string * string) option;
     }
@@ -60,10 +65,17 @@ let rules =
           } );
       ("orI1", Constr { inputs = [ "left" ]; constr = Constr.intern "left" });
       ("orI2", Constr { inputs = [ "right" ]; constr = Constr.intern "right" });
-      ("impE", App { field = Some ("implies", []); inputs = ("implication", "antecedent") });
-      ("impI", Abs { field = Some ("implies", []); has_value = false; implicit_post = None });
-      ("iffE1", App { field = Some ("ltor", []); inputs = ("implication", "antecedent") });
-      ("iffE2", App { field = Some ("rtol", []); inputs = ("implication", "antecedent") });
+      ("impE", App { field = Some ("implies", []); inputs = ("implication", [ "antecedent" ]) });
+      ( "impI",
+        Abs
+          {
+            field = Some ("implies", []);
+            has_value = false;
+            extras = [];
+            implicit_post = None;
+          } );
+      ("iffE1", App { field = Some ("ltor", []); inputs = ("implication", [ "antecedent" ]) });
+      ("iffE2", App { field = Some ("rtol", []); inputs = ("implication", [ "antecedent" ]) });
       ( "iffI",
         Tuple
           { inputs = [ (Some "ltor", "ltor", ("ltor", [])); (Some "rtol", "rtol", ("rtol", [])) ] }
@@ -73,8 +85,51 @@ let rules =
           { constr = Constr.intern "exists"; outputs = [ (true, "element"); (false, "property") ] }
       );
       ("exI", Constr { inputs = [ "element"; "property" ]; constr = Constr.intern "exists" });
-      ("allE", App { field = Some ("forall", []); inputs = ("universal", "element") });
-      ("allI", Abs { field = Some ("forall", []); has_value = true; implicit_post = None });
+      ("allE", App { field = Some ("forall", []); inputs = ("universal", [ "element" ]) });
+      ( "allI",
+        Abs { field = Some ("forall", []); has_value = true; extras = []; implicit_post = None } );
+      (* The quantifiers over the special sets ℝ₊ and [n].  Each carries the condition defining its
+         set -- 0<x, or (0≤x)∧(x<n) -- on a port of its own alongside the value port for x: the
+         field of "forallpos" and "forallbelow" takes it as a second argument, and the constructor
+         of "existspos" and "existsbelow" as a second component. *)
+      ( "exposE",
+        Coconstr
+          {
+            constr = Constr.intern "existspos";
+            outputs = [ (true, "element"); (false, "positive"); (false, "property") ];
+          } );
+      ( "exposI",
+        Constr
+          { inputs = [ "element"; "positive"; "property" ]; constr = Constr.intern "existspos" } );
+      ( "allposE",
+        App { field = Some ("forallpos", []); inputs = ("universal", [ "element"; "positive" ]) } );
+      ( "allposI",
+        Abs
+          {
+            field = Some ("forallpos", []);
+            has_value = true;
+            extras = [ "positive" ];
+            implicit_post = None;
+          } );
+      ( "exbelowE",
+        Coconstr
+          {
+            constr = Constr.intern "existsbelow";
+            outputs = [ (true, "element"); (false, "below"); (false, "property") ];
+          } );
+      ( "exbelowI",
+        Constr
+          { inputs = [ "element"; "below"; "property" ]; constr = Constr.intern "existsbelow" } );
+      ( "allbelowE",
+        App { field = Some ("forallbelow", []); inputs = ("universal", [ "element"; "below" ]) } );
+      ( "allbelowI",
+        Abs
+          {
+            field = Some ("forallbelow", []);
+            has_value = true;
+            extras = [ "below" ];
+            implicit_post = None;
+          } );
       ( "negE",
         Neg
           {
@@ -82,13 +137,21 @@ let rules =
             inputs = ("negation", "statement");
             implicit_pre = "contradict";
           } );
-      ("negI", Abs { field = Some ("negation", []); has_value = false; implicit_post = None });
+      ( "negI",
+        Abs
+          {
+            field = Some ("negation", []);
+            has_value = false;
+            extras = [];
+            implicit_post = None;
+          } );
       ( "cnegI",
         (* Classical proof-by-contradiction *)
         Abs
           {
             field = Some ("negation", []);
             has_value = false;
+            extras = [];
             implicit_post = Some ("negation", "negneg");
           } );
       ("botE", Match { branches = []; asc_pre = Some "⊥" });
