@@ -663,17 +663,34 @@
         Mnemonic: it's the dual of ⊤.
       </div>
       <div id="faHint" class="modal hint" style="width: 600px">
-        The symbol ∀ means "for all" or "for every".
-        Menomnic: it's an upside-down "A" for "for all".
+        <p>
+          The symbol ∀ means "for all" or "for every".
+          Menomnic: it's an upside-down "A" for "for all".
+        </p>
+        <p>
+          To use ∀x∈A,P(x) we give a value for x and can deduce P of that value.
+          Here A denotes an arbitrary unknown set.
+        </p>
       </div>
       <div id="variableHint" class="modal hint">
-        When you add a box that introduces a new hypothetical value, you need to name that value with a new variable, which can't be the same as any other variable name.
-        To rename it later, double-click the box.
+        To prove ∀x∈A,P(x) we suppose an arbitrary value for x and prove P of that value.
+        When you add a box that introduces a new hypothetical value of this sort, you need to name that value with a new variable, which can't be the same as any other variable name.
+        You can change the name later by double-clicking on the box.
       </div>
       <div id="exHint" class="modal hint">
-        The symbol ∃ means "there exists".
-        Mnemonic: it's a backwards "E" for "there Exists".
-        To prove ∃x∈A,P(x) we have to specify a value of x that satisfies P(x), and when we use it we get such a value.
+        <p>
+          The symbol ∃ means "there exists".
+          Mnemonic: it's a backwards "E" for "there Exists".
+        </p>
+        <p>
+          To prove ∃x∈A,P(x) we specify a value of x that satisfies P(x).
+          Here A denotes an arbitrary unknown set.
+        </p>
+      </div>
+      <div id="exElimHint" class="modal hint">
+        When using ∃x∈A,P(x) we get such value of x that satisfies P(x) (and about which nothing else is known).
+        When adding this block, you have to name that value with a new variable, which can't be the same as any other variable name.
+        You can change the name later by double-clicking on the box.
       </div>
       <div id="dividesHint" class="modal hint">
         For a,b∈ℤ, the notation "a ∣ b" means "a divides b" or "b is divisible by a".

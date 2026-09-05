@@ -935,6 +935,7 @@ export const LEVELS = [
                     conclusion: { ty: "P" },
                     trivial: true,
                     autoComplete: true,
+                    hint: "exElimHint",
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "B", ty: "Type" }, { name: "P", ty: "A×B→Type" } ],
