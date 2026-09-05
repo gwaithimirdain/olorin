@@ -191,6 +191,24 @@ class Olorin {
         return this.page.isVisible('#levelCompleteBanner');
     }
 
+    // Whether the red "too many blocks" pop-up (shown for a correct proof that is over the level's
+    // "maxrules" budget) is showing.
+    tooManyBlocksVisible() {
+        return this.page.isVisible('#tooManyBlocksBanner');
+    }
+
+    tooManyBlocksText() {
+        return this.page.textContent('#tooManyBlocksBanner');
+    }
+
+    // The block budget shown with the level name and difficulty, or null when the level sets none.
+    maxBlocksText() {
+        return this.page.evaluate(() => {
+            const el = document.getElementById('maxBlocks');
+            return getComputedStyle(el).display === 'none' ? null : el.innerText;
+        });
+    }
+
     // The "world unlocked" modal that pops when a completion opens a new world/difficulty.
     unlockModalVisible() {
         return this.page.isVisible('#unlockBG');
@@ -247,6 +265,13 @@ class Olorin {
     // as { vertex, sort, label }, matching the app's own endpoint parameters.
     async connect(source, target) {
         await this.page.evaluate(({ s, t }) => window.__olorin.connect(s, t), { s: source, t: target });
+        await this.dismissHints();
+    }
+
+    // Remove a rule box by clicking its red X (the fixed context nodes don't have one).  The X only
+    // appears while the pointer is over its box, so click it directly rather than through the mouse.
+    async deleteNode(id) {
+        await this.page.evaluate((i) => document.querySelector(`#${i} .closebutton`).click(), id);
         await this.dismissHints();
     }
 

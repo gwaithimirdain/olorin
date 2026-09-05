@@ -159,6 +159,10 @@ var currentLevelButton;
 // The definition (parameters/variables/hypotheses/conclusion) of whatever level is currently
 // loaded, built-in or custom, so the "Edit" button can re-open the custom dialog pre-filled.
 var currentLevelDef = null;
+// The block budget ("maxrules") of the level currently loaded, or null for a level that sets none.
+// Set by setLevel once it knows the new level is good, so a statement Narya rejects leaves the
+// level we stay on -- and its budget -- alone.
+var currentMaxRules = null;
 // The saved custom level currently open (an entry of the localStorage "customLevels" list), or null
 // when on a built-in level or an unsaved custom one.  Used so custom levels track completion and
 // save proofs like built-in ones.
@@ -184,6 +188,10 @@ var unlockData = [];
 
 // Exclude these rules from "all"
 const excludeFromAll = [ "negI" ] // Classical negation suffices
+
+// The rules of the blocks a level starts with, laid out by setLevel rather than added by the
+// player: everything else in `nodes` is a block the player put there.
+const FIXED_RULES = [ 'variable', 'hypothesis', 'conclusion' ];
 
 const diagram = document.getElementById('diagram');
 // #diagram is a fixed viewport; #canvas is the scrollable surface that actually holds the nodes,
@@ -1925,10 +1933,9 @@ function savedProofKey(d) {
 // Whether a serialized proof represents actual progress worth restoring: at least one
 // connection, or one user-added node beyond the level's fixed nodes.
 function proofHasProgress(state) {
-    const fixedRules = ['variable', 'hypothesis', 'conclusion'];
     return !!state && (
         (Array.isArray(state.connections) && state.connections.length > 0) ||
-        (Array.isArray(state.nodes) && state.nodes.some((n) => !fixedRules.includes(n.rule)))
+        (Array.isArray(state.nodes) && state.nodes.some((n) => !FIXED_RULES.includes(n.rule)))
     );
 }
 
@@ -2017,11 +2024,10 @@ function restoreProof(state, level, countAsCompletion) {
 
     // Map each saved node id to the actual node element now in the diagram.
     const idMap = {};
-    const fixedRules = ['variable', 'hypothesis', 'conclusion'];
 
     // The fixed nodes were just recreated by selectCurrentLevel, in the same order they
     // were saved; pair them up by that order and restore their positions.
-    const savedFixed = (state.nodes || []).filter((n) => fixedRules.includes(n.rule));
+    const savedFixed = (state.nodes || []).filter((n) => FIXED_RULES.includes(n.rule));
     nodes.forEach((entry, i) => {
         const sn = savedFixed[i];
         if(!sn) { return; }
@@ -2031,7 +2037,7 @@ function restoreProof(state, level, countAsCompletion) {
     });
 
     // Recreate the user-added nodes, in their saved order, with their saved geometry and values.
-    (state.nodes || []).filter((n) => !fixedRules.includes(n.rule)).forEach((sn) => {
+    (state.nodes || []).filter((n) => !FIXED_RULES.includes(n.rule)).forEach((sn) => {
         const rule = sn.rule;
         const box = addRuleNode(rule);
         addEndpointsForRule(box, rule, true);
@@ -2479,6 +2485,42 @@ function updateCurrentDifficulty() {
     } else {
         reduceDifficulty.style.display = 'none';
     }
+}
+
+// === Block budgets ("maxrules") ===
+
+// How many blocks the player has added: everything in the diagram except the variable, hypothesis
+// and conclusion blocks the level was laid out with.
+function blocksUsed() {
+    return nodes.filter(function (x) { return !FIXED_RULES.includes(x.rule); }).length;
+}
+
+// Whether the proof is over the current level's block budget.  A level with no budget never is.
+function overBlockBudget() {
+    return currentMaxRules !== null && currentMaxRules !== undefined && blocksUsed() > currentMaxRules;
+}
+
+// Show the current level's block budget with its name and difficulty (nothing, for a level that
+// sets none).
+function updateMaxBlocks() {
+    const el = document.getElementById("maxBlocks");
+    if(currentMaxRules === null || currentMaxRules === undefined) {
+        el.style.display = 'none';
+    } else {
+        el.innerText = "Max blocks: " + currentMaxRules;
+        el.style.display = 'block';
+    }
+}
+
+// The red pop-up shown in place of the completion one when a proof is correct but over budget.
+function showTooManyBlocks() {
+    const banner = document.getElementById("tooManyBlocksBanner");
+    banner.innerText = "Too many blocks!  Maximum: " + currentMaxRules;
+    banner.classList.add("shown");
+}
+
+function hideTooManyBlocks() {
+    document.getElementById("tooManyBlocksBanner").classList.remove("shown");
 }
 
 // Show a hint by its id.  Only showing it on the level itself records that it's been seen: a hint
@@ -3688,6 +3730,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         diagram.style.backgroundColor = "";
         conclusion_node.style.backgroundColor = "";
         document.getElementById("levelCompleteBanner").classList.remove("shown");
+        hideTooManyBlocks();
     } else {
         // result.labels is an array of objects of type {loc, ty:string, tm:string opt}, where loc represents either an edge or a port and has type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
         // To this we add the ports that have default labels from being "primary" (synthesizing inputs or checking outputs).  But we add them last, so they don't override any labels produced by Narya.
@@ -3791,8 +3834,19 @@ function continue_typechecking(nodes, edges, connections, result) {
                 }
             }
         });
-        // If the level is complete, color the goal and level green.
-        if(result.complete) {
+        // A proof that is correct but uses more blocks than the level allows doesn't count: the
+        // goal stays uncolored and nothing is registered, and a red pop-up says so in place of the
+        // completion one.
+        if(result.complete && overBlockBudget()) {
+            diagram.style.backgroundColor = "";
+            conclusion_node.style.backgroundColor = "";
+            document.getElementById("levelCompleteBanner").classList.remove("shown");
+            // Cutting back to a proof within budget counts as a fresh completion.
+            proofRegisteredComplete = false;
+            showTooManyBlocks();
+        } else if(result.complete) {
+            // The level is complete: color the goal and level green.
+            hideTooManyBlocks();
             diagram.style.backgroundColor = COLORS[difficulty][0].backgroundColor;
             conclusion_node.style.color = COLORS[difficulty][1].color;
             conclusion_node.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
@@ -3848,6 +3902,7 @@ function continue_typechecking(nodes, edges, connections, result) {
             banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
             banner.classList.add("shown");
         } else {
+            hideTooManyBlocks();
             // If there are fatal errors, remove any green color on the goal and indicate the errors somehow.
             diagram.style.backgroundColor = "";
             conclusion_node.style.backgroundColor = "";
@@ -4111,6 +4166,7 @@ function setLevel(level, rulesAllowed) {
     clearLevelSelect();
     // A freshly set-up level isn't complete yet, so the completion pop-up starts hidden.
     document.getElementById("levelCompleteBanner").classList.remove("shown");
+    hideTooManyBlocks();
 
     // Turn on the "cancel" buttons and "proof will be erased" warnings for future level-selections.
     // (setLevelWarning is optional -- it was removed from the custom dialog.)
@@ -4218,8 +4274,13 @@ function setLevel(level, rulesAllowed) {
     nodes.push({id: concl.id, rule: 'conclusion', node: concl, value: conclusion.ty});
     instance.addEndpoint(concl, { anchor: "Left", target: true, parameters: {sort: "input"} });
 
-    // Set the visible difficulty
+    // Set the visible difficulty, and this level's block budget if it sets one.  The budget is
+    // recorded here rather than off currentLevel: the typecheck below is the new level's first, and
+    // it already has to know the budget, but currentLevel doesn't name the new level until setLevel
+    // returns -- and a custom level, which has no budget, never sets it at all.
     updateCurrentDifficulty();
+    currentMaxRules = (level.maxrules === undefined) ? null : level.maxrules;
+    updateMaxBlocks();
 
     // Finally, we typecheck.  It will fail since the user hasn't added any connections yet, but it adds labels to ports.
     suppressChecking = false;

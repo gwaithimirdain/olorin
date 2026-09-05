@@ -37,6 +37,12 @@
 //                       level that needs a box the rest of its stage doesn't.  The stage's own
 //                       rules always remain available.
 //
+//   maxrules: N         A budget: at most N blocks may be used, not counting the variable,
+//                       hypothesis and conclusion blocks the level starts with.  The budget is
+//                       shown with the level's name and difficulty, and a proof that is correct
+//                       but over it doesn't count as complete -- the player is told so and has to
+//                       find a shorter proof.
+//
 export const LEVELS = [
     { name: "Conjunction world",
       stages: [
