@@ -138,15 +138,24 @@ let rec get_relations ~(split : bool) ctx tm =
       return [ rel ]
 
 (* Whether the block's arithmetic can treat two statements as being about the same kind of number:
-   one type is a subtype of the other, so both embed in the ordered ring the translation is really
+   one type is a subtype of the other, so both embed in the ordered field the translation is really
    working in.  (subtype_of falls back to equality of types, so a type is comparable with itself.)
    *)
 let comparable ctx ty ty' =
   Result.is_ok (subtype_of ctx ty' ty) || Result.is_ok (subtype_of ctx ty ty')
 
-(* Pair each relation with the type to translate it at.  A relation about the same kind of number
-   as the goal is translated at the goal's type, so that a subterm they share gets the same
-   variable; anything else is translated at its own type.
+(* The kind of number a block is about: the largest of the types of the statements in play that
+   are about numbers at all.  We start from the goal's, which is what a lone relation's type has
+   always been, and widen past any statement about a larger system; the number systems are a chain,
+   so there is a largest.  A statement about anything else is comparable with nothing and leaves
+   this alone. *)
+let widest ctx =
+  List.fold_left (fun ty (_, ty', _, _) ->
+      if Result.is_ok (subtype_of ctx ty ty') then ty' else ty)
+
+(* Pair each relation with the type to translate it at: that one, when the relation is about the
+   same kind of number, so that a subterm two of them share gets the same variable; otherwise its
+   own.
 
    Nothing has to be refused here.  A statement about something the arithmetic knows nothing about
    -- two elements of a parameter type, say -- can only be an equation, since the orderings are
@@ -156,12 +165,12 @@ let comparable ctx ty ty' =
 
    What this does rest on, as the translation always has, is that a type whose operations the
    translation interprets -- anything whose plus, times and the rest it reads as arithmetic -- is
-   an ordered ring that embeds in the reals.  That is what makes the numbers' own statements
+   an ordered semiring that embeds in the reals.  That is what makes the numbers' own statements
    faithful. *)
 let relation_types ctx ty =
   List.map (fun (op, ty', x, y) -> (op, (if comparable ctx ty ty' then ty else ty'), x, y))
 
-let rec get_givens ~split ctx (ty : kinetic value) givens =
+let rec get_givens ~split ctx givens =
   let open Monad.Ops (E) in
   let cons_eqs = Scope.lookup [ "Cons_eqs" ] in
   let nil_eqs = Scope.lookup [ "Nil_eqs" ] in
@@ -185,8 +194,7 @@ let rec get_givens ~split ctx (ty : kinetic value) givens =
         | Error (Code.Oracle_failed (Not_a_relation _)) ->
             Error (Code.Oracle_failed (Not_a_relation_input (Printable.PNormal (ctx, eqty))))
         | Error e -> Error e in
-      let rels = relation_types ctx ty rels in
-      let* rest = get_givens ~split ctx ty (CubeOf.find_top rest).tm in
+      let* rest = get_givens ~split ctx (CubeOf.find_top rest).tm in
       return (rels @ rest)
   | Neu { head = Const { name; ins }; args = Emp; _ }
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
@@ -524,8 +532,12 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     match goals with
     | (_, ty, _, _) :: _ -> Ok ty
     | [] -> Error (Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal)))) in
+  let* givens = get_givens ~split:plus ctx givens.tm in
+  (* Both ends are tagged together, so that a hypothesis about a larger number system than the goal
+     pulls the goal up to it rather than being translated down. *)
+  let ty = widest ctx ty (goals @ givens) in
   let goals = relation_types ctx ty goals in
-  let* givens = get_givens ~split:plus ctx ty givens.tm in
+  let givens = relation_types ctx ty givens in
   let (givens, goals), { steps; _ } =
     (let open Monad.Ops (S) in
      let poly (op, ty, (x : normal), (y : normal)) =

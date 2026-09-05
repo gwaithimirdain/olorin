@@ -48,7 +48,18 @@ an order -- which is what an algebra block does -- would then credit a proof wit
 that nothing gives it.  Equality is different: = is genuine equality wherever it is written, so it
 stays a single relation on every type. `}
 
+{` The naturals have addition, multiplication and powers, and an ordering, but no subtraction and
+no negation: those are what makes a ring, and ℕ is only a semiring, so the operations that need
+them start at ℤ.  Everything else a natural can be asked -- its size, the smaller of two, its
+square -- it is asked as an integer, since ℕ ≤ ℤ. `}
 def ℕ : Type ≔ data [ zero. | suc. (_:ℕ) ]
+axiom ℕ.plus : ℕ → ℕ → ℕ
+axiom ℕ.times : ℕ → ℕ → ℕ
+axiom ℕ.pow : ℕ → ℕ → ℕ
+axiom ℕ.lt : ℕ → ℕ → Type
+def ℕ.le (x y : ℕ) : Type ≔ data [ left. (_ : ℕ.lt x y) | right. (_ : eq ℕ x y) ]
+def ℕ.gt (x y : ℕ) : Type ≔ ℕ.lt y x
+def ℕ.ge (x y : ℕ) : Type ≔ ℕ.le y x
 
 def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) ]
 axiom ℤ.plus : ℤ → ℤ → ℤ
@@ -342,7 +353,11 @@ let binops =
 
 type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -> infixl
 
-let numbers = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
+(* The number systems an operation can be asked for, smallest first, since that is the order the
+   notations try them in.  ℕ has addition, multiplication, powers and an ordering; subtraction and
+   negation -- and so everything defined with them -- start at ℤ, where there is a ring. *)
+let numbers = [ "ℕ"; "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
+let rings = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
 let fields = [ "ℚ"; "ℝ"; "𝕊" ]
 (* ℤ and ℚ aren't closed under square roots, so √ lands in the reals however it starts out. *)
 let reals = [ "ℝ"; "𝕊" ]
@@ -356,7 +371,7 @@ let algebra =
       Op "-",
       Wrap_infixl minus,
       [ "minus" ],
-      numbers );
+      rings );
     ( "·",
       [ Ident [ "·" ]; Op "*" ],
       Ident [ "·" ],
@@ -812,7 +827,7 @@ let () =
                       ( List.map
                           (fun ty ->
                             (`Any, sapp (locate_opt loc (Const (get_const [ ty; "negate" ]))) x, true))
-                          numbers,
+                          rings,
                         None )))
           | _ -> Builtins.invalid "negate");
       print_term =
@@ -873,7 +888,7 @@ let () =
                       ( List.map
                           (fun ty ->
                             (`Any, sapp (locate_opt loc (Const (get_const [ ty; "abs" ]))) x, true))
-                          numbers,
+                          rings,
                         None )))
           | _ -> Builtins.invalid "∣∣");
       print_term =
@@ -916,7 +931,7 @@ let () =
                                        (sapp (locate_opt loc (Const (get_const [ ty; ostr ]))) x))
                                     y,
                                   true ))
-                              numbers,
+                              rings,
                             None )))
               | _ -> Builtins.invalid name);
           print_term =
@@ -967,7 +982,7 @@ let () =
                           ( List.map
                               (fun ty ->
                                 (`Any, sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x, true))
-                              numbers,
+                              rings,
                             None )))
               | _ -> Builtins.invalid name);
           print_term =
@@ -1082,7 +1097,7 @@ let install_notations () =
     (fun (_, sym, _, onotn, ostr) ->
       Scope.Situation.add_with_print
         {
-          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) numbers;
+          keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) rings;
           notn = Wrap onotn;
           pat_vars = [ "x" ];
           val_vars = [ "x" ];
@@ -1091,7 +1106,7 @@ let install_notations () =
     powers;
   Scope.Situation.add_with_print
     {
-      keys = List.map (fun ty -> `Constant (get_const [ ty; "negate" ])) numbers;
+      keys = List.map (fun ty -> `Constant (get_const [ ty; "negate" ])) rings;
       notn = Wrap negate;
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
@@ -1107,7 +1122,7 @@ let install_notations () =
     };
   Scope.Situation.add_with_print
     {
-      keys = List.map (fun ty -> `Constant (get_const [ ty; "abs" ])) numbers;
+      keys = List.map (fun ty -> `Constant (get_const [ ty; "abs" ])) rings;
       notn = Wrap absn;
       pat_vars = [ "x" ];
       val_vars = [ "x" ];
@@ -1117,7 +1132,7 @@ let install_notations () =
     (fun (name, onotn, ostr) ->
       Scope.Situation.add_with_print
         {
-          keys = List.map (fun ty -> `Constant (get_const [ ty; ostr ])) numbers;
+          keys = List.map (fun ty -> `Constant (get_const [ ty; ostr ])) rings;
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];

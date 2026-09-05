@@ -179,3 +179,100 @@ test.describe('Disequalities and the algebra block', () => {
         expect(await olorin.isComplete()).toBe(true);
     });
 });
+
+// ℕ is a number system of the game's like any other, except that it isn't a ring: it has addition,
+// multiplication, powers and an ordering, and no subtraction or negation.  Everything defined with
+// those -- −, ∣ ∣, min, max, the squares, √ -- starts at ℤ instead, which naturals still reach,
+// since ℕ ≤ ℤ.  The algebra block reads all of it as arithmetic over the reals, which ℕ embeds in,
+// so its facts are the ones true of the naturals as a sub-semiring of ℝ, induction excepted.
+test.describe('The natural numbers', () => {
+    test('add, multiply and take powers', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            conclusion: 'n+m=m+n',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ\nk ∈ ℕ',
+            conclusion: 'n·(m+k)=n·m+n·k',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            conclusion: 'n^2=n·n',
+        })).toBe(true);
+    });
+
+    test('are ordered', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ\nk ∈ ℕ',
+            hypotheses: ['n<m', 'm<k'],
+            conclusion: 'n<k',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            hypotheses: ['n≤m'],
+            conclusion: 'n+1≤m+1',
+        })).toBe(true);
+    });
+
+    // Subtraction is the whole reason ℕ isn't on the ring list: a difference of naturals is an
+    // integer, and reads as one, so nothing here is the truncated subtraction of the naturals.
+    test('subtract as integers, not by truncation', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            conclusion: 'n−m=−(m−n)',
+        })).toBe(true);
+        // 0−1 would be 0 if it were truncated, and the block would then refuse this.
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            conclusion: '(n−(n+1))+1=0',
+        })).toBe(true);
+    });
+
+    // −, ∣ ∣, min, max and the squares aren't stated on ℕ at all, but a natural is an integer, so
+    // they still apply to one; the statement they make is then about ℤ, and mixes with ℕ's own.
+    test('reach the ring operations as integers', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            conclusion: 'n²=n·n',
+        })).toBe(true);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ',
+            hypotheses: ['0≤n'],
+            conclusion: '∣n∣=n',
+        })).toBe(true);
+    });
+
+    // Being a natural is not itself a fact the block has: ℕ says nothing about 0≤n, and there is
+    // no block that says it either, so for now it has to be a hypothesis.
+    test('are not yet known to be nonnegative', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            conclusion: 'n≤n+m',
+        })).toBe(false);
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nm ∈ ℕ',
+            hypotheses: ['0≤m'],
+            conclusion: 'n≤n+m',
+        })).toBe(true);
+    });
+
+    test('mix with the larger systems, being contained in them', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await algebraProves(olorin, {
+            variables: 'n ∈ ℕ\nx ∈ ℝ',
+            hypotheses: ['n<3', 'x=n'],
+            conclusion: 'x<3',
+        })).toBe(true);
+    });
+});
