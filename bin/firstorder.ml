@@ -1094,6 +1094,12 @@ let secondary_startup =
 notation(0) x \"is\" \"finite\" ≔ 𝕊.finite x
 def 𝕊.comparable (x y : 𝕊) : Type ≔ 𝕊.finite (𝕊.minus x y)
 notation(0) x \"∼\" y ≔ 𝕊.comparable x y
+def 𝕊.posinf (x : 𝕊) : Type ≔ forall ℝ (u ↦ lt 𝕊 u x)
+notation(0) x \"is\" \"positive\" \"infinite\" ≔ 𝕊.posinf x
+def 𝕊.neginf (x : 𝕊) : Type ≔ forall ℝ (u ↦ lt 𝕊 x u)
+notation(0) x \"is\" \"negative\" \"infinite\" ≔ 𝕊.neginf x
+def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ lt 𝕊 (𝕊.abs x) u)
+notation(0) x \"is\" \"infinitesimal\" ≔ 𝕊.infinitesimal x
 "
 
 (* Load that code, in the same way that run_top loads its non-interactive inputs: the string sees

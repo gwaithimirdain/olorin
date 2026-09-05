@@ -1518,90 +1518,156 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "∀⇒<",
-            rules: [ "allI", "allE", "impE", "impI", "expr", "alg" ],
+          { name: "∀<",
+            rules: [ "allI", "allE", "expr", "alg" ],
             levels: [
-                {               // x pos inf => x+1 pos inf
+                {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(u<x+1)" },
+                    hypotheses: [ { ty: "x is positive infinite" } ],
+                    conclusion: { ty: "x+1 is positive infinite" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
+                        conclusion: { ty: "∀u∈ℝ,(u<x+1)" },
+                    },
+                    hint: "infiniteHint",
                 },
-                {               // x pos inf => x-1 pos inf
+                {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(u<x−1)" },
+                    hypotheses: [ { ty: "x is positive infinite" } ],
+                    conclusion: { ty: "x−1 is positive infinite" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" } ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
+                        conclusion: { ty: "∀u∈ℝ,(u<x−1)" },
+                    },
                 },
-                {               // x pos inf => x+q pos inf
+                {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(u<x+q)" },
+                    hypotheses: [ { ty: "x is positive infinite" } ],
+                    conclusion: { ty: "x+q is positive infinite" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
+                        conclusion: { ty: "∀u∈ℝ,(u<x+q)" },
+                    },
                 },
-                // {
-                //     parameters: [ { name: "x", ty: "𝕊" } ],
-                //     variables: [ ],
-                //     hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
-                //     conclusion: { ty: "∀u∈ℝ,(u<2·x)" },
-                // },
-                {               // x neg inf => x+q neg inf
+                {
+                    parameters: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "x is positive infinite" }, { ty: "q>0" } ],
+                    conclusion: { ty: "x·q is positive infinite" },
+                },
+                {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
+                    hypotheses: [ { ty: "x is negative infinite" } ],
+                    conclusion: { ty: "x+q is negative infinite" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
+                        hypotheses: [ { ty: "∀u∈ℝ,(x<u)" } ],
+                        conclusion: { ty: "∀u∈ℝ,(x+q<u)" },
+                    },
                 },
-                {               // x,y pos inf => x+y pos inf
+                {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(u<x+y)" },
-                },
-                {               // x,y pos inf => x·y pos inf
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
-                    conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x·y))" },
+                    hypotheses: [ { ty: "x is positive infinite" }, { ty: "y is positive infinite" } ],
+                    conclusion: { ty: "x+y is positive infinite" },
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
                         hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(u<y)" } ],
-                        conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
-                    }
+                        conclusion: { ty: "∀u∈ℝ,(u<x+y)" },
+                    },
                 },
-                {               // x,y neg inf => x+y neg inf
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" }, ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,(x+y<u)" },
-                },
-                {               // x,y neg inf => x·y pos inf
+                {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x·y))" },
+                    hypotheses: [ { ty: "x is negative infinite" }, { ty: "y is negative infinite" } ],
+                    conclusion: { ty: "x+y is negative infinite" },
                     saveable: {
                         parameters: [ ],
-                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" }, ],
                         hypotheses: [ { ty: "∀u∈ℝ,(x<u)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                        conclusion: { ty: "∀u∈ℝ,((0<u)⇒(u<x*y))" },
-                    }
-                },
-                {               // x pos inf, y neg inf => x·y neg inf
-                    parameters: [ ],
-                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                    hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                    conclusion: { ty: "∀u∈ℝ,((u<0)⇒(x·y<u))" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
-                        hypotheses: [ { ty: "∀u∈ℝ,(u<x)" }, { ty: "∀u∈ℝ,(y<u)" } ],
-                        conclusion: { ty: "∀u∈ℝ,((u<0)⇒(x*y<u))" },
-                    }
+                        conclusion: { ty: "∀u∈ℝ,(x+y<u)" },
+                    },
                 },
             ],
           },
-          { name: "∀⇒∧<",
+          { name: "∀∨<",
+            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "tord" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is positive infinite" }, { ty: "y is positive infinite" } ],
+                    conclusion: { ty: "x·y is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is negative infinite" }, { ty: "y is negative infinite" } ],
+                    conclusion: { ty: "x·y is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is positive infinite" }, { ty: "y is negative infinite" } ],
+                    conclusion: { ty: "x·y is negative infinite" },
+                },
+            ],
+          },
+          { name: "∀₊∨<",
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is infinitesimal" }, { ty: "y is infinitesimal" } ],
+                    conclusion: { ty: "x+y is infinitesimal" },
+                    hint: "infinitesimalHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is infinitesimal" }, { ty: "y is infinitesimal" } ],
+                    conclusion: { ty: "x−y is infinitesimal" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "0 is infinitesimal" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x>0"}, { ty: "x is infinitesimal" }, ],
+                    conclusion: { ty: "2·x is infinitesimal" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" }, ],
+                    hypotheses: [ { ty: "x is infinitesimal" }, ],
+                    conclusion: { ty: "q·x is infinitesimal" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is infinitesimal" }, { ty: "y is infinitesimal" } ],
+                    conclusion: { ty: "x·y is infinitesimal" },
+                },
+            ],
+          },
+          { name: "old ∀⇒∧<",
             rules: [ "allI", "allE", "impE", "impI", "andI", "andE", "expr", "alg" ],
             levels: [
                 {               // x,y infinitesimal => x+y infinitesimal
