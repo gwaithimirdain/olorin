@@ -565,7 +565,7 @@ export const LEVELS = [
                         conclusion: { ty: "(x=0)∨(y=0)" },
                     }
                 },
-                {
+                { // This level can actually be proven by "algebra" alone without "integral", but let's not tell anyone.
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x²=0" } ],
@@ -621,6 +621,50 @@ export const LEVELS = [
                             conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
                         },
                     ]
+                },
+            ],
+          },
+          { name: "∨<",
+            rules: [ "orI1", "orI2", "orE", "expr", "alg", "tord" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(x≤y)∨(x>y)" },
+                    hint: "totalOrderHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(x<y)∨((x=y)∨(x>y))" },
+                    hint: "leHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∣3·x−2∣>x−1" },
+                    hint: "absHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∣x∣·∣y∣=∣x·y∣" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∣x+y∣≤∣x∣+∣y∣" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "y", ty: "𝕊" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "∣x−y∣≥∣x∣−∣y∣" },
                 },
             ],
           },

@@ -784,6 +784,20 @@
         In fact, the property "?·?=0" can be proven from the simpler property that everything is either equal to zero or not equal to zero, together with the fact that algebra can divide by anything nonzero.
         More generally, the block "=∨≠" proves that any two numbers are either equal or unequal; the "expr" block can be used to supply constants such as "0".
       </div>
+      <div id="totalOrderHint" class="modal hint" style="width: 600px">
+        Another important disjunctive fact is that numbers are "totally ordered": given any two numbers, one is less than or equal to the other.
+        The block ≤∨&gt; proves this, in the form (x≤y)∨(x>y), about any two input expressions.
+      </div>
+      <div id="leHint" class="modal hint" style="width: 600px">
+        In addition, x≤y is, essentially by definition, the same as (x&lt;y)∨(x=y).
+        Thus, you can treat it like an ∨ statement, using the same blocks to prove and use it.
+      </div>
+      <div id="absHint" class="modal hint" style="width: 600px">
+        One common situation in which we use this property is when reasoning about absolute value, since ∣x∣=x if x≥0 and ∣x∣=−x if x≤0.
+        (This is basically the definition of absolute value, and applies in any of our ordered number systems ℤ, ℚ, ℝ, 𝕊.)
+        The algebra block can't deal with absolute values on its own, but if we give it a hypothesis ensuring that one of these conditions holds, then the absolute value simplifies away and the algebra block takes over.
+        (Remember to also write out all the algebraic proofs on paper yourself, though!)
+      </div>
       <div id="exprHint" class="modal hint">
         If you need an input to a blue "value" port that isn't just a variable, use the "expr" block.
         This will prompt you for an expression; to change the expression later, double-click the block.
