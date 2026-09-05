@@ -224,13 +224,43 @@ type step =
      give when nothing settles it, and the value is the term to point at there. *)
   | Cases of [ `Sign | `Order ] * Symbolic.t * Symbolic.t * kinetic value
 
+(* The head of an application we can hand to Z3 as a function symbol.  A constant or a variable,
+   and only a bare one: a degeneracy or a nonidentity insertion on it makes a different term, so
+   rather than deciding when two of those agree we leave such a term opaque. *)
+type funhead = [ `Const of Constant.t | `Var of level ]
+
+let get_funhead : head -> funhead option = function
+  | Const { name; ins } when Option.is_some (is_id_ins ins) -> Some (`Const name)
+  | Var { level; deg } when Option.is_some (is_id_deg deg) -> Some (`Var level)
+  | _ -> None
+
+(* The arguments of an application spine, oldest first, if it is a plain sequence of applications.
+   A field projection or an instantiation isn't something we take apart. *)
+let get_args : type any. any apps -> normal list option =
+ fun args ->
+  let rec go : type any. any apps -> normal list -> normal list option =
+   fun args acc ->
+    match args with
+    | Emp -> Some acc
+    | Arg (rest, arg, ins) when Option.is_some (is_id_ins ins) ->
+        go rest (CubeOf.find_top arg :: acc)
+    | _ -> None in
+  go args []
+
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
   (* Subterms we can't interpret, each standing for an opaque variable.  A root's variable is one of
      these, keyed by the power it came from, so that writing the same root twice gets the same
-     variable and states its definition once. *)
-  vars : kinetic value Bwd.t;
+     variable and states its definition once.  We record the type each was met at as well as the
+     term, since an argument of an uninterpreted function can be of any type at all, and asking
+     whether two terms agree only makes sense once we know they're of the same type. *)
+  vars : normal Bwd.t;
   count : int;
+  (* Likewise the heads we've turned into uninterpreted function symbols, each paired with the
+     number of arguments it was applied to.  Z3's functions have no partial application, so a head
+     written with two arguments in one place and one in another is two symbols, not one. *)
+  funs : (funhead * int) Bwd.t;
+  funcount : int;
   (* The definitions and obligations met along the way, oldest first. *)
   steps : step Bwd.t;
 }
@@ -241,23 +271,32 @@ end)
 
 (* The variable standing for a subterm we can't express directly, and whether we have just met that
    subterm for the first time -- so that a root states its definition once however often it is
-   written. *)
+   written.  Two subterms share a variable only when they are really the same term, at the same
+   type: giving one variable to two different terms would be asserting an equation that doesn't
+   hold, and could prove anything. *)
 let var_for ctx ty tm : (Symbolic.t * bool) S.t =
   let open Monad.Ops (S) in
   let* ({ vars; count; _ } as st) = S.get in
-  match Bwd.find_index (fun x -> Result.is_ok (Equal.equal_at ctx tm x ty)) vars with
+  let same (x : normal) =
+    Result.is_ok (Equal.equal_val ctx ty x.ty) && Result.is_ok (Equal.equal_at ctx tm x.tm ty) in
+  match Bwd.find_index same vars with
   | None ->
-      let* () = S.put { st with vars = Snoc (vars, tm); count = count + 1 } in
+      let* () = S.put { st with vars = Snoc (vars, { tm; ty }); count = count + 1 } in
       return (`Var count, true)
   | Some i -> return (`Var (count - i - 1), false)
 
-let var_or_const ctx ty tm : Symbolic.t S.t =
+(* Likewise the function symbol standing for a head we can't interpret, applied to that many
+   arguments.  Heads are compared as they are written rather than up to conversion, so a constant
+   and a variable it's defined to equal get two symbols; that costs us provable goals, never
+   soundness. *)
+let fun_for (hd : funhead) (arity : int) : int S.t =
   let open Monad.Ops (S) in
-  match get_posint tm with
-  | Some i -> return (`Const (Q.of_int i))
+  let* ({ funs; funcount; _ } as st) = S.get in
+  match Bwd.find_index (fun x -> x = (hd, arity)) funs with
   | None ->
-      let* v, _ = var_for ctx ty tm in
-      return v
+      let* () = S.put { st with funs = Snoc (funs, (hd, arity)); funcount = funcount + 1 } in
+      return funcount
+  | Some i -> return (funcount - i - 1)
 
 let get_poly ctx ty tm =
   let open Monad.Ops (S) in
@@ -271,10 +310,10 @@ let get_poly ctx ty tm =
      one -- and then the base itself has to be nonnegative, or "s >= 0 and s^q = base^p" has no
      solution at all and would prove anything.  Odd roots are total on the reals and need neither.
      'src' is the term to point at if an obligation can't be discharged. *)
-  let power tm base e src =
+  let rec power ty tm base e src =
     let n, d = (Q.num e, Q.den e) in
     if not (Z.fits_int n && Z.fits_int d && Z.leq (Z.abs n) (Z.of_int max_exponent)
-            && Z.leq d (Z.of_int max_exponent)) then var_or_const ctx ty tm
+            && Z.leq d (Z.of_int max_exponent)) then opaque ty tm
     else
       let n, d = (Z.to_int n, Z.to_int d) in
       (* base^n, with a negative n written as a reciprocal so the denominator obligation applies. *)
@@ -296,63 +335,107 @@ let get_poly ctx ty tm =
               (Define
                  ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
           else return () in
-        return s in
-  let rec go tm =
+        return s
+  (* A term the arithmetic doesn't interpret.  A numeral is the constant it names.  An application
+     of a bare constant or variable becomes an uninterpreted function symbol applied to the
+     translations of its arguments: Z3 knows nothing about such a function beyond congruence, which
+     is exactly what we want, as it gives us "f x = f y" from "x = y" and nothing else.  Anything
+     else -- a projection, a constructor, a variable on its own -- is a variable of its own, as
+     before.  *)
+  and opaque ty tm : Symbolic.t S.t =
+    match get_posint tm with
+    | Some i -> return (`Const (Q.of_int i))
+    | None -> (
+        match Norm.view_term tm with
+        | Neu { head; args; _ } -> (
+            match (get_funhead head, get_args args) with
+            | Some hd, Some ((_ :: _) as args) ->
+                let* f = fun_for hd (List.length args) in
+                let* args = go_args args in
+                return (`App (f, args))
+            | _ -> var ty tm)
+        | _ -> var ty tm)
+  and var ty tm =
+    let* v, _ = var_for ctx ty tm in
+    return v
+  (* An argument of an uninterpreted function can be of any type at all, not just the kind of
+     number the arithmetic is about, so each is translated at its own type rather than the ambient
+     one.  On the Z3 side every sort collapses to the reals, which only gives the solver more
+     models to consider, never fewer. *)
+  and go_args = function
+    | [] -> return []
+    | (a : normal) :: rest ->
+        let* a = go a.ty a.tm in
+        let* rest = go_args rest in
+        return (a :: rest)
+  and go ty tm =
     match Norm.view_term tm with
-    (* Binary operation *)
+    (* Binary operation.  The arguments are translated inside each branch rather than before the
+       match, so that a head that isn't one of these doesn't translate them twice -- once here and
+       again as the arguments of its function symbol. *)
     | Neu { head = Const { name; ins }; args = Arg (Arg (Emp, x, xins), y, yins); _ }
       when Option.is_some (is_id_ins ins)
            && Option.is_some (is_id_ins xins)
            && Option.is_some (is_id_ins yins) -> (
-        let* px = go (CubeOf.find_top x).tm in
-        let* py = go (CubeOf.find_top y).tm in
+        let binary k =
+          let* px = go ty (CubeOf.find_top x).tm in
+          let* py = go ty (CubeOf.find_top y).tm in
+          k px py in
         match Firstorder.get_root name with
-        | "plus" -> return (`Plus (px, py))
-        | "minus" -> return (`Minus (px, py))
-        | "times" -> return (`Times (px, py))
+        | "plus" -> binary (fun px py -> return (`Plus (px, py)))
+        | "minus" -> binary (fun px py -> return (`Minus (px, py)))
+        | "times" -> binary (fun px py -> return (`Times (px, py)))
         | "min" ->
-            let* () = add_step (Cases (`Order, px, py, tm)) in
-            return (`Min (px, py))
+            binary (fun px py ->
+                let* () = add_step (Cases (`Order, px, py, tm)) in
+                return (`Min (px, py)))
         | "max" ->
-            let* () = add_step (Cases (`Order, px, py, tm)) in
-            return (`Max (px, py))
-        | "divide" -> (
-            (* A quotient of numerals is just a rational constant, and carries no obligation.  We
-               ask rational_of rather than matching on `Const, so that a minus sign in front of
-               either of them doesn't stop the fold: "−1/2" parses as (−1)/2. *)
-            match (rational_of px, rational_of py) with
-            | Some a, Some b when not (Q.equal b Q.zero) -> return (`Const (Q.div a b))
-            (* Otherwise we hand the division to Z3 as a division.  Z3's real division is total,
-               with the value at a zero denominator left uninterpreted, so this is sound however
-               the denominator turns out; but we also require it to be provably nonzero. *)
-            | _ ->
-                let* () = add_step (Nonzero (py, (CubeOf.find_top y).tm)) in
-                return (`Div (px, py)))
-        | "pow" -> (
-            match rational_of py with
-            | Some e -> power tm px e (CubeOf.find_top x).tm
-            | None -> var_or_const ctx ty tm)
-        | _ -> var_or_const ctx ty tm)
+            binary (fun px py ->
+                let* () = add_step (Cases (`Order, px, py, tm)) in
+                return (`Max (px, py)))
+        | "divide" ->
+            binary (fun px py ->
+                (* A quotient of numerals is just a rational constant, and carries no obligation.
+                   We ask rational_of rather than matching on `Const, so that a minus sign in front
+                   of either of them doesn't stop the fold: "−1/2" parses as (−1)/2. *)
+                match (rational_of px, rational_of py) with
+                | Some a, Some b when not (Q.equal b Q.zero) -> return (`Const (Q.div a b))
+                (* Otherwise we hand the division to Z3 as a division.  Z3's real division is total,
+                   with the value at a zero denominator left uninterpreted, so this is sound however
+                   the denominator turns out; but we also require it to be provably nonzero. *)
+                | _ ->
+                    let* () = add_step (Nonzero (py, (CubeOf.find_top y).tm)) in
+                    return (`Div (px, py)))
+        | "pow" ->
+            binary (fun px py ->
+                match rational_of py with
+                | Some e -> power ty tm px e (CubeOf.find_top x).tm
+                | None -> opaque ty tm)
+        | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args = Arg (Emp, x, xins); _ }
       when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) -> (
         let src = (CubeOf.find_top x).tm in
-        let* x = go src in
+        let unary k =
+          let* x = go ty src in
+          k x in
         match Firstorder.get_root name with
-        | "sqrt" -> power tm x (Q.of_ints 1 2) src
+        | "sqrt" -> unary (fun x -> power ty tm x (Q.of_ints 1 2) src)
         | "abs" ->
-            let* () = add_step (Cases (`Sign, `Const Q.zero, x, src)) in
-            return (`Abs x)
-        | "negate" -> (
-            match rational_of x with
-            | Some q -> return (`Const (Q.neg q))
-            | None -> return (`Neg x))
-        | "square" -> return (`Times (x, x))
-        | "cube" -> return (`Times (`Times (x, x), x))
-        | "fourth" -> return (`Times (`Times (x, x), `Times (x, x)))
-        | _ -> var_or_const ctx ty tm)
-    | _ -> var_or_const ctx ty tm in
-  go tm
+            unary (fun x ->
+                let* () = add_step (Cases (`Sign, `Const Q.zero, x, src)) in
+                return (`Abs x))
+        | "negate" ->
+            unary (fun x ->
+                match rational_of x with
+                | Some q -> return (`Const (Q.neg q))
+                | None -> return (`Neg x))
+        | "square" -> unary (fun x -> return (`Times (x, x)))
+        | "cube" -> unary (fun x -> return (`Times (`Times (x, x), x)))
+        | "fourth" -> unary (fun x -> return (`Times (`Times (x, x), `Times (x, x))))
+        | _ -> opaque ty tm)
+    | _ -> opaque ty tm in
+  go ty tm
 
 let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
   | Permute { ctx; _ } ->
@@ -431,7 +514,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      let* goals = mmapM (fun [ g ] -> poly g) [ goals ] in
      let* givens = mmapM (fun [ g ] -> poly g) [ givens ] in
      return (givens, goals))
-      { vars = Emp; count = 0; steps = Emp } in
+      { vars = Emp; count = 0; funs = Emp; funcount = 0; steps = Emp } in
   (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
      literals, like 0≠1.  A disequality with anything else in it is one we want the student to
      prove by contradiction. *)

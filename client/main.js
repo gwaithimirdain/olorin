@@ -451,11 +451,13 @@ const { init } = require('z3-solver');
 var Solver;
 var Real;
 var If;
+var Func;
 init().then((z3) => {
     const ctx = new z3.Context('main');
     Solver = ctx.Solver;
     Real = ctx.Real;
     If = ctx.If;
+    Func = ctx.Function;
 });
 
 ready(() => {
@@ -3543,34 +3545,53 @@ function typecheck() {
     continue_typechecking(nodes, edges, connections, Narya.check(nodes, edges));
 }
 
-function symbolic_to_z3(sym) {
+// 'decls' holds the uninterpreted function symbols met so far, so that the two occurrences of f in
+// "f(x) = f(y)" are the same function to Z3 and congruence applies.  It belongs to one question,
+// like the variables do.
+function symbolic_to_z3(sym, decls) {
     if(sym.head === "add") {
-        return symbolic_to_z3(sym.args[0]).add(symbolic_to_z3(sym.args[1]));
+        return symbolic_to_z3(sym.args[0], decls).add(symbolic_to_z3(sym.args[1], decls));
     } else if(sym.head === "sub") {
-        return symbolic_to_z3(sym.args[0]).sub(symbolic_to_z3(sym.args[1]));
+        return symbolic_to_z3(sym.args[0], decls).sub(symbolic_to_z3(sym.args[1], decls));
     } else if(sym.head === "mul") {
-        return symbolic_to_z3(sym.args[0]).mul(symbolic_to_z3(sym.args[1]));
+        return symbolic_to_z3(sym.args[0], decls).mul(symbolic_to_z3(sym.args[1], decls));
     } else if(sym.head === "div") {
-        return symbolic_to_z3(sym.args[0]).div(symbolic_to_z3(sym.args[1]));
+        return symbolic_to_z3(sym.args[0], decls).div(symbolic_to_z3(sym.args[1], decls));
     } else if(sym.head === "neg") {
-        return symbolic_to_z3(sym.args[0]).neg();
+        return symbolic_to_z3(sym.args[0], decls).neg();
     // Z3 has no |x|, min or max over the reals, but each is a conditional, and a conditional
     // between two polynomials is still something the nonlinear solver decides.
     } else if(sym.head === "abs") {
-        const x = symbolic_to_z3(sym.args[0]);
+        const x = symbolic_to_z3(sym.args[0], decls);
         return If(x.ge(0), x, x.neg());
     } else if(sym.head === "min") {
-        const x = symbolic_to_z3(sym.args[0]);
-        const y = symbolic_to_z3(sym.args[1]);
+        const x = symbolic_to_z3(sym.args[0], decls);
+        const y = symbolic_to_z3(sym.args[1], decls);
         return If(x.le(y), x, y);
     } else if(sym.head === "max") {
-        const x = symbolic_to_z3(sym.args[0]);
-        const y = symbolic_to_z3(sym.args[1]);
+        const x = symbolic_to_z3(sym.args[0], decls);
+        const y = symbolic_to_z3(sym.args[1], decls);
         return If(x.le(y), y, x);
     } else if(sym.head === "val") {
         return Real.val(sym.args[0].head);
     } else if(sym.head === "const") {
         return Real.const(sym.args[0].head);
+    // A function the translation couldn't interpret, applied to its arguments.  Z3 assumes nothing
+    // about such a function beyond congruence -- equal arguments give equal results -- which is
+    // exactly what makes "x = y" prove "f(x) = f(y)" and nothing else about f come with it.
+    // Everything is a real here, whatever the argument's type in Narya: that only leaves the
+    // solver more models to consider, never fewer.  Narya numbers a symbol by its head *and* its
+    // arity, since Z3 has no partial application, so one name always means one signature.
+    } else if(sym.head === "app") {
+        const name = sym.args[0].head;
+        const args = sym.args.slice(1).map(function (a) { return symbolic_to_z3(a, decls); });
+        var f = decls.get(name);
+        if(f === undefined) {
+            const sort = Real.sort();
+            f = Func.declare(name, ...args.map(function () { return sort; }), sort);
+            decls.set(name, f);
+        }
+        return f.call(...args);
     } else {
         console.log("Error: invalid symbolic");
     }
@@ -3578,9 +3599,10 @@ function symbolic_to_z3(sym) {
 
 function callback_to_z3(callback) {
     const solver = new Solver();
+    const decls = new Map();
     callback.forEach(function (rel) {
-        const lhs = symbolic_to_z3(rel.lhs);
-        const rhs = symbolic_to_z3(rel.rhs);
+        const lhs = symbolic_to_z3(rel.lhs, decls);
+        const rhs = symbolic_to_z3(rel.rhs, decls);
         if(rel.op === "eq") {
             solver.add(lhs.eq(rhs));
         } else if(rel.op === "neq") {

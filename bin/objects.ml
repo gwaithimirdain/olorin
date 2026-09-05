@@ -445,6 +445,10 @@ module Symbolic = struct
     | `Min of t * t
     | `Max of t * t
     | `Var of int
+    | (* An application of an uninterpreted function symbol, identified by its index, to the
+         translations of its arguments.  Declaring these to Z3 as functions rather than folding
+         each application into a variable of its own is what makes "x = y" imply "f x = f y". *)
+      `App of int * t list
     | `Const of Q.t ]
 
   let to_js_head (head : string) (args : js Js.t list) : js Js.t =
@@ -464,6 +468,8 @@ module Symbolic = struct
     | `Max (x, y) -> to_js_head "max" [ to_js x; to_js y ]
     | `Const n -> to_js_head "val" [ to_js_head (Q.to_string n) [] ]
     | `Var x -> to_js_head "const" [ to_js_head ("H" ^ string_of_int x) [] ]
+    | `App (f, args) ->
+        to_js_head "app" (to_js_head ("F" ^ string_of_int f) [] :: List.map to_js args)
 
   let rec to_string = function
     | `Plus (p, q) -> "Plus(" ^ to_string p ^ ", " ^ to_string q ^ ")"
@@ -475,6 +481,9 @@ module Symbolic = struct
     | `Min (p, q) -> "Min(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Max (p, q) -> "Max(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Var i -> "Var(" ^ string_of_int i ^ ")"
+    | `App (f, args) ->
+        "App(" ^ string_of_int f ^ String.concat "" (List.map (fun x -> ", " ^ to_string x) args)
+        ^ ")"
     | `Const n -> "Const(" ^ Q.to_string n ^ ")"
 end
 
