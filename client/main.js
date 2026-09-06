@@ -470,7 +470,7 @@ ready(() => {
             },
         },
         connector: FlowchartConnector.type,
-        paintStyle: { stroke: "#000000", strokeWidth: 2 },
+        paintStyle: { stroke: "#000000", strokeWidth: 2, outlineWidth: 6, outlineStroke: "transparent" },
         endpointStyle: { fill: "#000000" },
         reattachConnections: true,
         connectionOverlays: [
