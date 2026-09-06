@@ -59,7 +59,7 @@ const KEYS = [
     // Has to come first, so |-> doesn't become |→.  ∣−> is what typing |-> leaves behind, the
     // bar having become ∣ and the hyphen − on the way past.
     { unicode: '↦', keys: [ '\\mapsto ', '|->', '∣->', '∣−>' ] },
-    { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->' ] },
+    { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->', '−>' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
     { unicode: '∣', keys: [ '|', '\\mid ', '\\abs ', '\\divides ' ] },
