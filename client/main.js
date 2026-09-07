@@ -1,4 +1,4 @@
-import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
+import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
@@ -124,6 +124,18 @@ var naryaInited = false;
 
 // connections to close buttons
 var connectionCloseButtons = {};
+
+// The wire, if any, whose tooltip/close-button is currently shown, and the wire, if any,
+// that's pinned open by a tap (for touchscreens, which have no hover state to reveal these
+// via mouseover; see pinConnection/unpinConnection below).
+var activeConnectionId = null;
+var pinnedConnectionId = null;
+
+// A touch device fires a tap's connection-tap event twice -- once from the raw touch, once more
+// from the compatibility mouse events the browser synthesizes right after -- so the second one
+// must be ignored rather than read as the user tapping again to toggle the pin back off.
+var lastTapConnectionId = null;
+var lastTapTime = 0;
 
 // difficulty setting
 var difficulty = 0;
@@ -492,6 +504,7 @@ ready(() => {
                         closebutton.className = "closebutton";
                         closebutton.innerText = "X";
                         closebutton.addEventListener('click', function () {
+                            if(pinnedConnectionId === conn.id) { unpinConnection(); }
                             instance.deleteConnection(conn);
                             typecheck();
                         });
@@ -505,6 +518,7 @@ ready(() => {
 
     // Make close buttons on connections appear on hover, and stay for a second
     instance.bind(EVENT_CONNECTION_MOUSEOVER, (conn, e) => {
+        activeConnectionId = conn.id;
         showWireTooltip(conn, e);
         if(connectionCloseButtons[conn.id]) {
             connectionCloseButtons[conn.id].button.style.visibility = 'visible';
@@ -515,12 +529,48 @@ ready(() => {
         }
     });
     instance.bind(EVENT_CONNECTION_MOUSEOUT, (conn) => {
-        hideWireTooltip();
+        // A tap-pinned wire (see below) stays open till it's explicitly unpinned: touchscreens
+        // fire a compatibility mouseout with no real hover to back it, and it shouldn't undo the pin.
+        if(pinnedConnectionId === conn.id) { return; }
+        if(activeConnectionId === conn.id) {
+            hideWireTooltip();
+            activeConnectionId = null;
+        }
         if(connectionCloseButtons[conn.id]) {
             if(connectionCloseButtons[conn.id].timeout) {
                 clearTimeout(connectionCloseButtons[conn.id].timeout);
             }
             connectionCloseButtons[conn.id].timeout = setTimeout(function () { connectionCloseButtons[conn.id].button.style.visibility = 'hidden'; }, 1000);
+        }
+    });
+
+    // Touchscreens have no hover state, so tapping a wire pins its close button and error
+    // tooltip open (tap it again, tap elsewhere, or delete it to close); this fires for mouse
+    // clicks too, which is a harmless bonus there since hover already does the job.
+    instance.bind(EVENT_CONNECTION_TAP, (conn, e) => {
+        // Ignore the touch/mouse duplicate of the tap that just fired (see lastTapConnectionId above).
+        const now = Date.now();
+        if(conn.id === lastTapConnectionId && now - lastTapTime < 300) { return; }
+        lastTapConnectionId = conn.id;
+        lastTapTime = now;
+        if(pinnedConnectionId === conn.id) {
+            unpinConnection();
+        } else {
+            unpinConnection();
+            pinnedConnectionId = conn.id;
+            activeConnectionId = conn.id;
+            showWireTooltip(conn, e);
+            if(connectionCloseButtons[conn.id]) {
+                clearTimeout(connectionCloseButtons[conn.id].timeout);
+                connectionCloseButtons[conn.id].timeout = undefined;
+                connectionCloseButtons[conn.id].button.style.visibility = 'visible';
+            }
+        }
+    });
+    // Tapping/clicking anywhere that isn't a wire, its close button, or the tooltip unpins.
+    document.addEventListener('click', (e) => {
+        if(pinnedConnectionId != null && !e.target.closest('.jtk-connector, .closebutton, #wireTooltip')) {
+            unpinConnection();
         }
     });
 
@@ -3369,6 +3419,20 @@ function showWireTooltip(conn, e) {
 
 function hideWireTooltip() {
     document.getElementById("wireTooltip").style.display = 'none';
+}
+
+// Close whichever wire a tap has pinned open (see EVENT_CONNECTION_TAP above).
+function unpinConnection() {
+    if(pinnedConnectionId == null) { return; }
+    const id = pinnedConnectionId;
+    pinnedConnectionId = null;
+    if(activeConnectionId === id) {
+        hideWireTooltip();
+        activeConnectionId = null;
+    }
+    if(connectionCloseButtons[id]) {
+        connectionCloseButtons[id].button.style.visibility = 'hidden';
+    }
 }
 
 // Set the color of a connection
