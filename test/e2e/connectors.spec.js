@@ -1,7 +1,9 @@
 // A saved proof should remember each wire's connector style (angled vs curved), not just apply
 // the current global default on restore.  A wire that runs from a block's own assumption to its
 // own subgoal is drawn straight instead, whatever that default is, since the flowchart connector
-// takes such a wire out around the block.
+// takes such a wire out around the block.  A wire from a block back to itself is forced angled
+// only when it runs backwards -- to a port left of the one it started at -- since that is the
+// shape a curved connector can't draw without looping over the block.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -43,7 +45,7 @@ test.describe('Connector styles', () => {
 // single wire, so each block below carries just the one being asked about.
 const connectors = (state) => state.connections.map((c) => c.connector);
 
-test.describe('A wire from an assumption to its own block\'s subgoal', () => {
+test.describe('A wire from a block back to itself', () => {
     let olorin;
 
     test.beforeEach(async ({ page }) => {
@@ -85,15 +87,52 @@ test.describe('A wire from an assumption to its own block\'s subgoal', () => {
 
     test('but not when it reaches the subgoal of another branch', async () => {
         // ∨-elimination has a subgoal per branch, each labelled, and an assumption only belongs to
-        // its own; a wire across to the other one is ill-typed and stays a flowchart wire.
+        // its own; a wire across to the other one is ill-typed, so it isn't straightened.  It still
+        // runs forwards across the block, though, so it is drawn in whichever style is selected.
         const orE = await olorin.dragRule('orE', 300, 100);
         await olorin.connect({ vertex: orE, sort: 'assumption', label: 'left' }, { vertex: orE, sort: 'subgoal', label: 'right' });
         expect(connectors(await olorin.serialize())).toEqual(['Flowchart']);
+
+        await olorin.setConnectorStyle('curved');
+        const orE2 = await olorin.dragRule('orE', 300, 400);
+        await olorin.connect({ vertex: orE2, sort: 'assumption', label: 'left' }, { vertex: orE2, sort: 'subgoal', label: 'right' });
+        expect(connectors(await olorin.serialize())).toEqual(['Flowchart', 'Bezier']);
+    });
+
+    // Left to itself, jsPlumb draws a curved wire that begins and ends on the same block as a
+    // circle sitting on its source port: the loopback case reads only where the wire starts, so
+    // the wire lands nowhere near the port it actually joins.  The connector is configured out of
+    // that, and the wire's own type doesn't record it, so check the shape it is really drawn in.
+    test('and the curved one is drawn between its two ports, not as a loopback circle', async ({ page }) => {
+        await olorin.setConnectorStyle('curved');
+        const orE = await olorin.dragRule('orE', 300, 100);
+        await olorin.connect({ vertex: orE, sort: 'assumption', label: 'left' }, { vertex: orE, sort: 'subgoal', label: 'right' });
+        expect(connectors(await olorin.serialize())).toEqual(['Bezier']);
+
+        const drawn = await page.evaluate(() => {
+            const svg = Array.from(document.querySelectorAll('.jtk-connector')).find((s) => s.jtk && s.jtk.connector);
+            const conn = svg.jtk.connector.connection;
+            const x = (i) => conn.instance.router.getEndpointLocation(conn.endpoints[i]).curX;
+            return { drawnWidth: svg.getBoundingClientRect().width, portGap: Math.abs(x(1) - x(0)) };
+        });
+        // The loopback circle is a fixed 50px across wherever the ports are; a wire drawn between
+        // them covers the distance from one to the other.
+        expect(drawn.portGap).toBeGreaterThan(100);
+        expect(drawn.drawnWidth).toBeGreaterThan(drawn.portGap * 0.8);
     });
 
     test('and its own branch\'s subgoal still is', async () => {
         const orE = await olorin.dragRule('orE', 300, 100);
         await olorin.connect({ vertex: orE, sort: 'assumption', label: 'left' }, { vertex: orE, sort: 'subgoal', label: 'left' });
         expect(connectors(await olorin.serialize())).toEqual(['Straight']);
+    });
+
+    test('while one that runs backwards stays angled even when curved wires are selected', async () => {
+        // ∧-elimination takes its input on the left and gives its outputs on the right, so wiring
+        // one of those outputs back into its own input doubles the wire back over the block.
+        await olorin.setConnectorStyle('curved');
+        const andE = await olorin.dragRule('andE', 300, 100);
+        await olorin.connect({ vertex: andE, sort: 'output', label: 'fst' }, { vertex: andE, sort: 'input' });
+        expect(connectors(await olorin.serialize())).toEqual(['Flowchart']);
     });
 });

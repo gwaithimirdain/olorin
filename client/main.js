@@ -35,6 +35,13 @@ const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '
 // hasn't got a key for.
 const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴', 'ε', 'δ'];
 
+// Left to itself, jsPlumb draws every curved wire that starts and ends on the same block as a
+// circle sitting on its source port: the loopback case reads only where the wire starts, and never
+// looks at where it ends.  Turning that off draws such a wire as the ordinary curve between its two
+// ports instead.  It makes no difference to a wire between two different blocks, which never takes
+// that path.
+const CURVED_CONNECTOR = { type: BezierConnector.type, options: { showLoopback: false } };
+
 // A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
 // mathematician does reach for is a Greek letter, so its box offers the lowercase alphabet (see
 // KEYS below for why omicron isn't in it).
@@ -681,7 +688,7 @@ ready(() => {
         document.getElementById("angleConnectors").checked = true;
         document.getElementById("curvedConnectors").checked = false;
     } else if (connectors === 'curved') {
-        instance.importDefaults({ connector: BezierConnector.type });
+        instance.importDefaults({ connector: CURVED_CONNECTOR });
         document.getElementById("angleConnectors").checked = false;
         document.getElementById("curvedConnectors").checked = true;
     }
@@ -986,7 +993,7 @@ document.getElementById("angleConnectors").onclick = function() {
     localStorage.setItem("connectors", "angle");
 };
 document.getElementById("curvedConnectors").onclick = function() {
-    instance.importDefaults({ connector: BezierConnector.type });
+    instance.importDefaults({ connector: CURVED_CONNECTOR });
     localStorage.setItem("connectors", "curved");
 };
 
@@ -3506,6 +3513,13 @@ function getUserLabel(edge, editing) {
     wire.focus();
 }
 
+// Where a port sits along the diagram's x axis.  jsPlumb caches this as each endpoint is painted
+// and recomputes it on demand, so it is available even for a wire being restored into a diagram
+// that hasn't been drawn yet.  (getEndpointLocation isn't published in the community edition.)
+function portX(endpoint) {
+    return instance.router.getEndpointLocation(endpoint).curX;
+}
+
 function addConnection(params) {
     const edge = params.connection;
     // While restoring a saved proof, we set the wire labels ourselves and typecheck once at the end, so we skip the prompt/typecheck here (but still apply the connector styling below).
@@ -3524,29 +3538,29 @@ function addConnection(params) {
             getUserLabel(edge, false);
         }
     }
-    // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
-    if(edge.source == edge.target) {
-        // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
-        // two agree.  A block with only one subgoal leaves it unlabelled, and then every
-        // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
-        // bind the condition defining their set on a labelled port beside the unlabelled one that
-        // binds the variable.
-        const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
-        if(from.sort === 'assumption' && to.sort === 'subgoal' &&
-           (to.label === undefined || from.label === to.label)) {
-            // This method isn't published in the jsPlumb community edition, but it's still there!
-            edge._setConnector(StraightConnector.type);
-        } else {
-            // Other cyclic connections are ill-typed, but should at least be displayed looking okay, and Bezier connectors can't handle it.
-            edge._setConnector(FlowchartConnector.type);
-        }
-    } else {
+    // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
+    // two agree.  A block with only one subgoal leaves it unlabelled, and then every
+    // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
+    // bind the condition defining their set on a labelled port beside the unlabelled one that
+    // binds the variable.
+    const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
+    const selfLoop = edge.source == edge.target;
+    if(selfLoop && from.sort === 'assumption' && to.sort === 'subgoal' &&
+       (to.label === undefined || from.label === to.label)) {
+        // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
+        // This method isn't published in the jsPlumb community edition, but it's still there!
+        edge._setConnector(StraightConnector.type);
+    } else if(selfLoop && portX(edge.endpoints[1]) < portX(edge.endpoints[0])) {
+        // A wire that runs back to a port left of where it started has to double back on itself,
+        // which a Bezier connector can't draw without looping over the block.  A self-connection
+        // that still runs forwards -- one branch's assumption into another branch's subgoal, say --
+        // is drawn like any other wire, so it follows the selected style below.
+        edge._setConnector(FlowchartConnector.type);
+    } else if(document.getElementById("angleConnectors").checked) {
         // If the target of a connection is moved to be non-cyclic, reset it to the selected style.
-        if(document.getElementById("angleConnectors").checked) {
-            edge._setConnector(FlowchartConnector.type);
-        } else if(document.getElementById("curvedConnectors").checked) {
-            edge._setConnector(BezierConnector.type);
-        }
+        edge._setConnector(FlowchartConnector.type);
+    } else if(document.getElementById("curvedConnectors").checked) {
+        edge._setConnector(CURVED_CONNECTOR);
     }
     // For some reason setting the connector type blows away the Arrow overlay, although it doesn't affect the Custom close-button overlay.
     edge.addOverlay({
