@@ -1528,6 +1528,35 @@ export const LEVELS = [
                 },
             ]
           },
+          { name: "∀=⊥",
+            rules: [ "allI", "allE", "expr", "alg", "botE" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x=0)" } ],
+                    conclusion: { ty: "a=0" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "a", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∀x∈ℤ,(a*x=0)" } ],
+                        conclusion: { ty: "a=0" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²" } ],
+                    conclusion: { ty: "a=1/2" },
+                },
+                { // TODO: Make this ⊥ when alg can prove that
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+6·x=a)" } ],
+                    conclusion: { ty: "0=1" },
+                },
+            ],
+          },
           { name: "∀<",
             rules: [ "allI", "allE", "expr", "alg" ],
             levels: [
@@ -1939,6 +1968,7 @@ export const LEVELS = [
       ]
     },
     { name: "Negation world",
+      previous: [4],
       stages: [
           { name: "¬⇒⊥",
             rules: [ "impI", "impE", "negI", "negE", "botE" ],
@@ -2070,58 +2100,8 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "¬∀∃…",
-            rules: [ "negI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI", "expr", "alg" ],
-            levels: [
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "¬∃x∈A,P(x)" } ],
-                    conclusion: { ty: "∀x∈A,¬P(x)" },
-                },
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "∀x∈A,¬P(x)" } ],
-                    conclusion: { ty: "¬∃x∈A,P(x)" },
-                },
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "∃x∈A,¬P(x)" } ],
-                    conclusion: { ty: "¬∀x∈A,P(x)" },
-                },
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" }, { name: "Q", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "(∃x∈A,¬P(x))∨Q" } ],
-                    conclusion: { ty: "(∀x∈A,P(x))⇒Q" },
-                },
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" }, { name: "Q", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "(∃x∈A,¬P(x))∨Q" }, { ty: "∃x∈A,⊤" } ],
-                    conclusion: { ty: "∃x∈A,(P(x)⇒Q)" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "¬∃y∈ℝ,∀x∈ℝ,(x+y=0)" },
-                    extrarules: [ "asc" ],
-                    hint: "ascHint",
-                },
-                {
-                    parameters: [ ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x·y=1)" },
-                    extrarules: [ "asc" ],
-                },
-            ]
-          },
           { name: "¬¬₁",
-            rules: [ "impI", "impE", "cnegI", "negE", "andI", "andE", "orI1", "orI2", "orE", "allI", "allE", "exI", "exE" ],
+            rules: [ "impI", "impE", "cnegI", "negE", "andI", "andE", "orI1", "orI2", "orE" ],
             levels: [
                 {
                     parameters: [ { name: "P", ty: "Type" } ],
@@ -2149,12 +2129,6 @@ export const LEVELS = [
                     conclusion: { ty: "¬P∨¬Q" },
                 },
                 {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "¬∀x∈A,P(x)" } ],
-                    conclusion: { ty: "∃x∈A,¬P(x)" },
-                },
-                {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
                     variables: [ ],
                     hypotheses: [ { ty: "P⇒Q" } ],
@@ -2170,7 +2144,7 @@ export const LEVELS = [
           },
           { name: "¬¬₂",
             bonus: true,
-            rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE", "allI", "allE", "exI", "exE" ],
+            rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE" ],
             levels: [
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
@@ -2208,6 +2182,52 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "(P⇒Q)∨(Q⇒R)" },
                 },
+            ]
+          },
+      ],
+    },
+    { name: "Negated quantifier world",
+      previous: [1,2],
+      stages: [
+          { name: "¬∀∃∨⊤⇒",
+            rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI" ],
+            levels: [
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "¬∃x∈A,P(x)" } ],
+                    conclusion: { ty: "∀x∈A,¬P(x)" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∀x∈A,¬P(x)" } ],
+                    conclusion: { ty: "¬∃x∈A,P(x)" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃x∈A,¬P(x)" } ],
+                    conclusion: { ty: "¬∀x∈A,P(x)" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "¬∀x∈A,P(x)" } ],
+                    conclusion: { ty: "∃x∈A,¬P(x)" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(∃x∈A,¬P(x))∨Q" } ],
+                    conclusion: { ty: "(∀x∈A,P(x))⇒Q" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(∃x∈A,¬P(x))∨Q" }, { ty: "∃x∈A,⊤" } ],
+                    conclusion: { ty: "∃x∈A,(P(x)⇒Q)" },
+                },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
                     variables: [ ],
@@ -2216,40 +2236,21 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "∀=≠",
-            rules: [ "allE", "allI", "cnegI", "negE", "expr", "alg" ],
+          { name: "¬∀∃=",
+            rules: [ "allE", "allI", "exE", "exI", "cnegI", "negE", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a·x=0)" } ],
-                    conclusion: { ty: "a=0" },
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "a", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∀x∈ℤ,(a*x=0)" } ],
-                        conclusion: { ty: "a=0" },
-                    }
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "¬∃y∈ℝ,∀x∈ℝ,(x+y=0)" },
+                    hint: "ascHint",
                 },
                 {
                     parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+6·x=a)" } ],
-                    conclusion: { ty: "a=−4" },
-                    saveable: [
-                        {
-                            parameters: [ ],
-                            variables: [ { name: "a", ty: "ℤ" } ],
-                            hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
-                            conclusion: { ty: "a=∸4" },
-                        },
-                        {
-                            parameters: [ ],
-                            variables: [ { name: "a", ty: "ℤ" } ],
-                            hypotheses: [ { ty: "∀x∈ℤ,(a*x²+6*x=a)" } ],
-                            conclusion: { ty: "a=−4" },
-                        },
-                    ]
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "¬∀x∈ℝ,∃y∈ℝ,(x·y=1)" },
                 },
                 {
                     parameters: [ ],

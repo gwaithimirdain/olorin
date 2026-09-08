@@ -1218,6 +1218,7 @@ function login(email, course) {
 const SHORT_WORLD_NAMES = {
     "Advanced proposition world": "Adv. Prop.",
     "Advanced quantifier world": "Adv. Quant.",
+    "Negated quantifier world": "Neg. Quant.",
 };
 function shortWorldName(name) {
     if(SHORT_WORLD_NAMES[name]) { return SHORT_WORLD_NAMES[name]; }
