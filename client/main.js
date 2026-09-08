@@ -38,11 +38,13 @@ const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '
 const NUMBER_PALETTE = ['ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊'];
 
 // Omicron is left out: it is identical to a Latin o, so offering it could only produce two names
-// nobody can tell apart.  This is also the palette the variable-name box gets, on its own.
+// nobody can tell apart.
 const GREEK_PALETTE = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
 
-const PALETTE_GROUPS = [{ label: 'numbers', chars: NUMBER_PALETTE },
-                        { label: 'Greek', chars: GREEK_PALETTE }];
+// The variable-name box offers this one on its own, so it is named apart from the pair.
+const GREEK_GROUP = { label: 'Greek', chars: GREEK_PALETTE };
+
+const PALETTE_GROUPS = [{ label: 'numbers', chars: NUMBER_PALETTE }, GREEK_GROUP];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
@@ -3339,8 +3341,8 @@ makePalette('ascPalette', 'ascribe', PALETTE, PALETTE_GROUPS);
 makePalette('wirePalette', 'wire', PALETTE, PALETTE_GROUPS);
 makePalette('exprPalette', 'expression', EXPR_PALETTE, []);
 // A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
-// mathematician does reach for is a Greek letter, and there is room for the alphabet as buttons.
-makePalette('varnamePalette', 'newvar', GREEK_PALETTE, []);
+// mathematician does reach for is a Greek letter, so that dropdown is the whole of this palette.
+makePalette('varnamePalette', 'newvar', [], [GREEK_GROUP]);
 
 var shortcuts = document.getElementById('shortcuts');
 var shortcut_thead = document.createElement('thead');

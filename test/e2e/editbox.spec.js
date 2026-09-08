@@ -304,28 +304,30 @@ test.describe('Boxes that bind a variable', () => {
         expect(await olorin.varnames()).toEqual(expect.arrayContaining(['x', 'y']));
     });
 
-    // Almost nothing in the usual palette can go in a name, so this box offers the lowercase Greek
-    // alphabet instead.  As with the expression palette, nothing here reads on its exact contents:
+    // Almost nothing in the usual palette can go in a name, so this box offers the same Greek
+    // dropdown a statement box has, and nothing else.  Nothing here reads on its exact contents:
     // what is asserted is that ε and δ are offered, that the symbols belonging to statements are
-    // not, and that whatever is offered both types itself in and names a variable the checker will
+    // not, and that every letter offered both types itself in and names a variable the checker will
     // actually take -- offering a name it would refuse would be a trap.
-    test('the dialog offers a palette of Greek letters, and shortcuts reach it', async ({ page }) => {
+    test('the dialog offers the Greek dropdown, and shortcuts reach it', async ({ page }) => {
         await olorin.dragRule('allI', 420, 240);
         await page.waitForSelector('#variableBG', { state: 'visible' });
-        const buttons = (await page.evaluate(() =>
-            Array.from(document.querySelectorAll('#varnamePalette .unicode-button')).map((b) => b.textContent)))
-              .filter((b) => b !== 'shortcuts');
+        const menus = await page.evaluate(() => Array.from(document.querySelectorAll('#varnamePalette select'))
+            .map((s) => Array.from(s.options).map((o) => o.textContent)));
+        expect(menus).toHaveLength(1);
+        const [label, ...letters] = menus[0];
 
-        expect(buttons).toEqual(expect.arrayContaining(['ε', 'δ']));
+        expect(label).toBe('Greek');
+        expect(letters).toEqual(expect.arrayContaining(['ε', 'δ']));
         for (const logical of ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈']) {
-            expect(buttons).not.toContain(logical);
+            expect(letters).not.toContain(logical);
         }
 
-        for (const sym of buttons) {
+        for (const letter of letters) {
             await page.fill('#newvar', '');
-            await page.click(`#varnamePalette .unicode-button:has-text("${sym}")`);
-            expect(await page.inputValue('#newvar')).toBe(sym);
-            expect(await page.evaluate((s) => window.Narya.checkVariable(s).complete, sym), sym).toBe(true);
+            await page.selectOption('#varnamePalette select', letter);
+            expect(await page.inputValue('#newvar')).toBe(letter);
+            expect(await page.evaluate((s) => window.Narya.checkVariable(s).complete, letter), letter).toBe(true);
         }
 
         // The backslash shortcuts reach this box too, and the name they spell is accepted.

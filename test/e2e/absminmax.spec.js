@@ -243,10 +243,11 @@ test.describe('All three', () => {
         // The bar is also the first character of ↦, whose rule has to keep getting there first --
         // and to recognize what is left after the bar and the hyphen have been converted.
         expect(await typed('x|->y')).toBe('x↦y');
-        // The palette button and the \mid shortcut still work as well.
-        await expect(page.locator('#conclPalette .unicode-button', { hasText: '∣' })).toHaveCount(1);
+        // ∣ has no palette button, on the grounds that the bar key above types it without the
+        // player needing to know a shortcut was involved.  The \mid spelling still works too.
+        await expect(page.locator('#conclPalette .unicode-button', { hasText: '∣' })).toHaveCount(0);
         await page.fill('#conclusion', '');
-        await page.click('#conclPalette .unicode-button:has-text("∣")');
+        await page.locator('#conclusion').pressSequentially('\\mid ');
         await page.locator('#conclusion').pressSequentially('x');
         await page.locator('#conclusion').pressSequentially('\\mid ');
         expect(await page.inputValue('#conclusion')).toBe('∣x∣');
