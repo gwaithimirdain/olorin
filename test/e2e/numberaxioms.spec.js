@@ -6,8 +6,10 @@
 // between them.  Arch, ℤ→ℕ and frac conclude an ∃, which their block takes apart itself: instead
 // of a single output carrying ∃n∈ℕ,…, each hands out the number on a value port and the statement
 // about it on another, exactly as ∃-elimination does.  frac's axiom concludes two nested ∃s and
-// its block takes apart both, so it binds two variables rather than one -- the only block that
-// does.  ℝ<ω concludes a relation, so it has the ordinary single output.
+// then a ∧ of three statements, and its block takes all of that apart: it binds two variables
+// rather than one -- the only block that does -- and hands out each half of the ∧ on a port of its
+// own, so nothing after it has to take anything apart.  ℝ<ω concludes a relation, so it has the
+// ordinary single output.
 //
 // Unlike "=∨≠" and "≤∨>", none of them follows its input into a number system: each axiom is about
 // one.  A rational or integer input to Arch is coerced into ℝ and the block still applies, but
@@ -183,8 +185,8 @@ async function dragMultiBinder(olorin, rule, x, y, names) {
 const LOWEST_TERMS = (a, b) => `((${b}≥1)∧((x=${a}/${b})∧(∀c∈ℕ,(((c∣${a})∧(c∣${b}))⇒(c=1)))))`;
 
 // State ∃a∈ℤ,∃b∈ℤ,(that), over a variable x of the given set, and prove it by feeding x to a frac
-// block and passing its three outputs to two ∃-introductions.  The block hands out both sides of
-// the fraction, so the player only has to put them back together.
+// block and putting what comes out of it back together: the three statements into two ∧s, and the
+// two numbers into two ∃s.  Nothing takes anything apart here -- the block did all of that.
 async function fracProves(olorin, set) {
     await olorin.buildCustom({
         parameters: '',
@@ -192,16 +194,27 @@ async function fracProves(olorin, set) {
         hypotheses: '',
         conclusion: `∃a∈ℤ,∃b∈ℤ,${LOWEST_TERMS('a', 'b')}`,
     });
-    const frac = await dragMultiBinder(olorin, 'frac', 400, 150, ['p', 'q']);
-    const inner = await olorin.dragRule('exI', 650, 350);
-    const outer = await olorin.dragRule('exI', 850, 450);
+    const frac = await dragMultiBinder(olorin, 'frac', 300, 100, ['p', 'q']);
+    const andInner = await olorin.dragRule('andI', 500, 250);
+    const andOuter = await olorin.dragRule('andI', 650, 350);
+    const inner = await olorin.dragRule('exI', 800, 450);
+    const outer = await olorin.dragRule('exI', 950, 550);
     const nodes = await olorin.nodes();
     const varx = nodes.find((v) => v.rule === 'variable' && v.name === 'x').id;
     await olorin.connect({ vertex: varx, sort: 'output' }, { vertex: frac, sort: 'input', label: 'x' });
+    // (x=a/b) ∧ (∀c∈ℕ,…), and then (b≥1) ∧ that.
+    await olorin.connect({ vertex: frac, sort: 'output', label: 'fraction' },
+                         { vertex: andInner, sort: 'input', label: 'fst' });
+    await olorin.connect({ vertex: frac, sort: 'output', label: 'lowest' },
+                         { vertex: andInner, sort: 'input', label: 'snd' });
+    await olorin.connect({ vertex: frac, sort: 'output', label: 'atleastone' },
+                         { vertex: andOuter, sort: 'input', label: 'fst' });
+    await olorin.connect({ vertex: andInner, sort: 'output' },
+                         { vertex: andOuter, sort: 'input', label: 'snd' });
     // The inner ∃ is over the denominator, the outer one over the numerator.
     await olorin.connect({ vertex: frac, sort: 'output', label: 'denominator' },
                          { vertex: inner, sort: 'input', label: 'element' });
-    await olorin.connect({ vertex: frac, sort: 'output', label: 'property' },
+    await olorin.connect({ vertex: andOuter, sort: 'output' },
                          { vertex: inner, sort: 'input', label: 'property' });
     await olorin.connect({ vertex: frac, sort: 'output', label: 'numerator' },
                          { vertex: outer, sort: 'input', label: 'element' });
@@ -322,7 +335,7 @@ test.describe('The "frac" block', () => {
         expect(await olorin.varnames()).toEqual(expect.arrayContaining(['p', 'q']));
     });
 
-    test('labels its outputs with both numbers and what holds of them', async ({ page }) => {
+    test('labels its outputs with both numbers and each statement about them', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         await olorin.buildCustom({
@@ -334,9 +347,35 @@ test.describe('The "frac" block', () => {
                              { vertex: frac, sort: 'input', label: 'x' });
         await olorin.waitForTypecheck();
         const labels = await portLabels(olorin);
-        expect(labels).toEqual(expect.arrayContaining(['p ∈ ℤ', 'q ∈ ℤ']));
-        // The statement about them, read back with divisibility spelled out as the ∃ it is.
-        expect(labels.join(' ')).toContain('(1≤q)∧((x=p/q)∧');
+        // Five ports: the two numbers, and each half of the ∧ separately -- no conjunction is left
+        // on any of them.  Coprimality reads back with divisibility spelled out as the ∃ it is.
+        expect(labels).toEqual(expect.arrayContaining(['p ∈ ℤ', 'q ∈ ℤ', '1≤q', 'x=p/q']));
+        expect(labels.join(' ')).toContain('∀c∈ℕ,');
+        expect(labels.join(' ')).not.toContain('∧((x=p/q)');
+    });
+
+    // Each of the three statements comes out on a wire of its own, so a proof that needs just one
+    // of them takes it straight from the block -- where before that took an ∧-elimination too.
+    test('hands out one half of its ∧ without the others', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '∃b∈ℤ,(b≥1)',
+        });
+        const frac = await dragMultiBinder(olorin, 'frac', 400, 150, ['p', 'q']);
+        const intro = await olorin.dragRule('exI', 700, 300);
+        const nodes = await olorin.nodes();
+        const varx = nodes.find((v) => v.rule === 'variable' && v.name === 'x').id;
+        await olorin.connect({ vertex: varx, sort: 'output' },
+                             { vertex: frac, sort: 'input', label: 'x' });
+        await olorin.connect({ vertex: frac, sort: 'output', label: 'denominator' },
+                             { vertex: intro, sort: 'input', label: 'element' });
+        await olorin.connect({ vertex: frac, sort: 'output', label: 'atleastone' },
+                             { vertex: intro, sort: 'input', label: 'property' });
+        await olorin.connect({ vertex: intro, sort: 'output' },
+                             { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
     });
 });
 

@@ -377,35 +377,57 @@ let destruct_step (source : Port.t) (names : string list) (constr : Constr.t)
       ports variables in
   (leftover, ports, bindables, variables)
 
-(* Destruct a synthesizing term, and then the last component of that, and so on for as many steps
-   as the rule asks for: that is how a nest of ∃s is opened, one bound variable at a time.  The
-   Coconstr rule takes one step, on the term on its input wire; a User rule whose axiom concludes
-   one or more existential statements takes one per ∃, on the term it builds by applying the axiom.
-   All the steps depend on the same term, so they are all wrapped around a body together, outermost
-   step first -- which is the order they are added in, since bindables are bound from the last
-   added inward.  The term this returns is for whichever port was asked for; every port of the
-   vertex is bound by one of the matches. *)
-let destruct_constr (source : Port.t) (names : string list)
-    (steps : (Constr.t * (bool * string) list) list) (tm : unit Named.synth located)
-    (bindables : Bindables.t) (variables : PortSet.t) : term_with_bindables * PortSet.t =
+(* Take a synthesizing term apart, and then the last component of that, and so on for as many steps
+   as the rule asks for: that is how a nest of ∃s and ∧s comes apart, one piece at a time.  The
+   Coconstr rule takes a single step, on the term on its input wire; a User rule whose axiom
+   concludes such a statement takes one step per ∃ and per ∧, on the term it builds by applying the
+   axiom.
+
+   An ∃ is matched, which binds its components as variables: all such steps depend on the same
+   term, so they are all wrapped around a body together, outermost step first -- which is the order
+   they are added in, since bindables are bound from the last added inward.  A ∧ is a record, so it
+   is projected instead, which binds nothing: those ports carry the projection itself, and we
+   collect them as we go so that whichever one was asked for can be handed back.  Everything else
+   is a variable one of the matches bound, named by its port. *)
+let destruct_constr (source : Port.t) (names : string list) (steps : destructure list)
+    (tm : unit Named.synth located) (bindables : Bindables.t) (variables : PortSet.t) :
+    term_with_bindables * PortSet.t =
   let used = variables in
-  let rec go names steps tm bindables variables =
+  (* The next step takes apart the last component of this one, so that component is a port of the
+     block's own rather than one the player sees (see visible_outputs). *)
+  let last what = function
+    | [] -> raise (Jserror ("destructuring step with nothing to " ^ what))
+    | xs -> List.nth xs (List.length xs - 1) in
+  let rec go names steps tm bindables variables projected =
     match steps with
-    | [] -> (bindables, variables)
-    | (constr, outputs) :: rest ->
+    | [] -> (bindables, variables, projected)
+    | Open (constr, outputs) :: rest ->
         let names, ports, bindables, variables =
           destruct_step source names constr outputs tm ~used bindables variables in
-        if rest = [] then (bindables, variables)
+        if rest = [] then (bindables, variables, projected)
         else
-          (* The next step takes apart the last component of this one, so that component is a port
-             of the block's own rather than one the player sees (see visible_outputs). *)
           let inner =
-            match List.rev ports with
-            | { port = Some p; _ } :: _ -> p
-            | _ -> raise (Jserror "destructuring step with nothing to take apart") in
-          go names rest (locate_opt tm.loc (Named.Var (`Port inner, None))) bindables variables in
-  let bindables, variables = go names steps tm bindables variables in
-  ({ bindables; term = Synth (Var (`Port source, None)) }, variables)
+            match last "match" ports with
+            | { port = Some p; _ } -> p
+            | _ -> raise (Jserror "destructuring step with an unnamed component") in
+          go names rest
+            (locate_opt tm.loc (Named.Var (`Port inner, None)))
+            bindables variables projected
+    | Project fields :: rest ->
+        let terms =
+          List.map (fun (fld, label) -> (label, Named.Field (tm, `Name fld))) fields in
+        let projected = terms @ projected in
+        if rest = [] then (bindables, variables, projected)
+        else
+          go names rest
+            (locate_opt tm.loc (snd (last "project" terms)))
+            bindables variables projected in
+  let bindables, variables, projected = go names steps tm bindables variables [] in
+  let term =
+    match Option.bind source.label (fun l -> List.assoc_opt l projected) with
+    | Some projection -> Named.Synth projection
+    | None -> Synth (Var (`Port source, None)) in
+  ({ bindables; term }, variables)
 
 (* From graphs to raw terms with named variables *)
 
@@ -724,9 +746,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let tm, bindables = ensure_synth tm "coconstr input" in
-          destruct_constr source source_vertex.names
-            [ (constr, outputs) ]
-            tm bindables variables
+          destruct_constr source source_vertex.names [ Open (constr, outputs) ] tm bindables
+            variables
       | Asc ->
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }

@@ -51,26 +51,38 @@ type rule =
   | User of {
       consts : string list list;
       inputs : string list;
-      (* Some user axioms conclude an existential statement.  Rather than making the player follow
-         such a block with a separate ∃-elimination, the block takes its own conclusion apart,
-         handing out one output port per component of the constructor, exactly as a Coconstr does.
-         Each further step takes apart the *last* component of the step before it, which is how a
-         nest of ∃s is opened one variable at a time; that last component is then a port of the
-         block's own machinery rather than one the player sees.  The components flagged 'true' are
-         the ones carrying a value, and they take the block's bound variable names in order.  An
-         empty list is a block with the usual single unlabeled output carrying the conclusion
-         itself. *)
-      outputs : (Constr.t * (bool * string) list) list;
+      (* Some user axioms conclude a statement built up out of ∃ and ∧.  Rather than making the
+         player follow such a block with the ∃- and ∧-eliminations that take that statement apart
+         again, the block takes its own conclusion apart, handing out one output port per piece.
+         Each step takes apart the *last* component of the step before it, which is how a nest of
+         ∃s and ∧s comes apart one piece at a time; those in-between components are ports of the
+         block's own machinery rather than ones the player sees.  An empty list is a block with the
+         usual single unlabeled output carrying the conclusion itself. *)
+      outputs : destructure list;
     }
+
+(* One step of that.  A datatype with a single constructor -- an ∃ -- comes apart by matching it,
+   which binds a variable for each of its components; the flag says which of them carry a value the
+   player names, and those take the block's bound variable names in order.  A record -- a ∧ -- comes
+   apart by projecting out its fields, which binds nothing: each such port simply carries that
+   projection of what the steps before it left. *)
+and destructure =
+  | Open of Constr.t * (bool * string) list
+  | Project of ((string * int list) * string) list
+
+let labels_of = function
+  | Open (_, outs) -> List.map snd outs
+  | Project flds -> List.map snd flds
 
 (* The output ports such a block shows the player: every component of every step, except the last
    component of each step that the step after it takes apart. *)
-let rec visible_outputs : (Constr.t * (bool * string) list) list -> string list = function
+let rec visible_outputs : destructure list -> string list = function
   | [] -> []
-  | [ (_, outs) ] -> List.map snd outs
-  | (_, outs) :: rest ->
-      let n = List.length outs in
-      List.filteri (fun i _ -> i < n - 1) (List.map snd outs) @ visible_outputs rest
+  | [ step ] -> labels_of step
+  | step :: rest ->
+      let labels = labels_of step in
+      let n = List.length labels in
+      List.filteri (fun i _ -> i < n - 1) labels @ visible_outputs rest
 
 (* Here are the specific rules currently used in graphs.  The port labels used here have to match those used in the JavaScript.  It would be better if the JavaScript could get them from here. *)
 let rules =
@@ -229,7 +241,7 @@ let rules =
           {
             consts = [ [ "ℝ"; "archimedean" ] ];
             inputs = [ "x" ];
-            outputs = [ (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
+            outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* An integer that is at least zero is a natural number.  The proof that it is nonnegative is
          an input of its own, alongside the integer; what comes out is that natural number and the
@@ -239,14 +251,15 @@ let rules =
           {
             consts = [ [ "ℤ"; "tonat" ] ];
             inputs = [ "x"; "nonneg" ];
-            outputs = [ (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
+            outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* Every rational is a fraction in lowest terms.  Its axiom concludes two nested ∃s, one for
-         each side of the fraction, so the block takes two steps: the first hands out the numerator
-         and the second, taking apart what the first leaves, the denominator.  That inner ∃ is the
-         "rest" port, which belongs to the block rather than to the player -- what they see is the
-         numerator, the denominator, and the statement about the two of them.  Two value ports mean
-         two bound variables, which the block's variable dialog asks for in this order. *)
+         each side of the fraction, and then a ∧ of the three things that hold of the two of them,
+         so the block comes apart in four steps: the ∃s hand out the numerator and the denominator,
+         and the projections hand out each half of the ∧ in turn.  The components in between --
+         "rest", "conjunction" and "others" -- are the block's own, so the player sees five ports:
+         the two numbers, and the three statements about them.  Two value ports mean two bound
+         variables, which the block's variable dialog asks for in this order. *)
       ( "frac",
         User
           {
@@ -254,8 +267,10 @@ let rules =
             inputs = [ "x" ];
             outputs =
               [
-                (Constr.intern "exists", [ (true, "numerator"); (false, "rest") ]);
-                (Constr.intern "exists", [ (true, "denominator"); (false, "property") ]);
+                Open (Constr.intern "exists", [ (true, "numerator"); (false, "rest") ]);
+                Open (Constr.intern "exists", [ (true, "denominator"); (false, "conjunction") ]);
+                Project [ (("fst", []), "atleastone"); (("snd", []), "others") ];
+                Project [ (("fst", []), "fraction"); (("snd", []), "lowest") ];
               ];
           } );
       (* Every real number is smaller than ω.  This one concludes a relation rather than an ∃, so it

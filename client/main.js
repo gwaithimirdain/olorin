@@ -1053,28 +1053,39 @@ function addEndpointsForRule(box, id, restore) {
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
     } else if (id === 'frac') {
-        // A rational in, and both sides of its lowest-terms fraction out: the axiom concludes two
-        // nested ∃s and the block takes them both apart, so it binds two variables rather than one
-        // (BOUND_VARIABLES above, and the User rule's two steps in bin/rules.ml).  The port between
-        // the two -- the inner ∃ that the second step opens -- belongs to the block, not to the
-        // player, so it has no endpoint here; what is left is the numerator, the denominator, and
-        // the statement about the two of them.
+        // A rational in, and its whole lowest-terms fraction out, piece by piece.  The axiom
+        // concludes two nested ∃s and then a ∧ of three statements, and the block takes all of
+        // that apart (the User rule's four steps in bin/rules.ml): out come both sides of the
+        // fraction, on value ports, and each of the three statements on a port of its own, so the
+        // player needs neither an ∃-elimination nor an ∧-elimination after it.  Two value ports
+        // mean two bound variables (BOUND_VARIABLES above).  The components in between belong to
+        // the block rather than to the player, and get no endpoint here.  Five ports is a lot for
+        // one box, so this one is taller than a basic block usually is.
+        box.style.height = '60px';
         instance.addEndpoint(box, {
             anchor: "Left",
             target: true,
             parameters: { sort: "input", label: "x", hasValue: true },
             paintStyle: { fill: VALUECOLOR },
         });
-        [["numerator", 0.1, "upper"], ["denominator", 0.5, "middle"]].forEach(function (p) {
+        [["numerator", 0.1], ["denominator", 0.3]].forEach(function (p) {
             instance.addEndpoint(box, {
                 anchor: [1, p[1], 1, 0],
                 source: true, maxConnections: -1,
-                parameters: { sort: "output", label: p[0], hasValue: true, side: p[2] },
+                parameters: { sort: "output", label: p[0], hasValue: true, side: "upper" },
                 paintStyle: { fill: VALUECOLOR },
                 connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
             });
         });
-        instance.addEndpoint(box, { anchor: [1, 0.9, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        // b≥1, then x=a/b, then that a and b have no common factor but 1.
+        [["atleastone", 0.5, "middle"], ["fraction", 0.7, "lower"], ["lowest", 0.9, "lower"]]
+            .forEach(function (p) {
+                instance.addEndpoint(box, {
+                    anchor: [1, p[1], 1, 0],
+                    source: true, maxConnections: -1,
+                    parameters: { sort: "output", label: p[0], side: p[2] },
+                });
+            });
         // Double-clicking the box re-opens the dialog, which walks through both names again.
         box.addEventListener('dblclick', function () { editVariable(box); });
         if(!restore) { getVariable(box.id); }
