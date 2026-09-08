@@ -25,7 +25,9 @@ module Oracle = struct
     (* An absolute value, min or max that the hypotheses don't decide: the term containing it. *)
     | Undecided_sign of printable
     | Undecided_order of printable
-    (* A goal, or an input, that isn't a relation at all: the statement in question. *)
+    (* A goal, or an input, that isn't a relation at all: the statement in question.  A goal like
+       that is only reported once the hypotheses have turned out to be consistent, since a
+       contradiction among them proves it (see oracle.ml); an input like that is refused outright. *)
     | Not_a_relation of printable
     | Not_a_relation_input of printable
     (* Neither of these can happen unless olorin has elaborated an algebra block wrongly: the
@@ -106,7 +108,9 @@ let oracle_failed : Reporter.oracle_error -> string option =
         (fun ty ->
           "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and the \
            alg+ block conjunctions (∧) of those.  The goal it's wired to is" ^ display ty
-          ^ "which isn't one of them.")
+          ^ "which isn't one of them.  I can still prove a goal like that when the inputs to the \
+             block contradict each other, since anything at all follows from a contradiction, but \
+             here I couldn't prove that they do.")
         (printed ~sort:`Type p)
   | Not_a_relation_input p ->
       Option.map

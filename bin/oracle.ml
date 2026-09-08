@@ -547,22 +547,28 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
     | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
   (* A conjunctive goal is a list of relations to prove, each against all of the hypotheses.  They
      all go through one translation, so that the same subterm gets the same variable throughout.
-     The kind of number the block is *about* -- which decides what shares variables with what, and
-     nothing else -- we take from the first of them, as a single relation's type was taken from the
-     goal itself. *)
+
+     A goal that isn't a relation at all isn't refused out of hand: anything whatsoever follows from
+     hypotheses that contradict each other, so such a goal leaves the list of relations to prove
+     empty, and what we ask below is whether the hypotheses are inconsistent on their own.  (The
+     goal is still reported as a whole, rather than by the conjunct that isn't a relation, as the
+     hypotheses are reported by the whole wire.) *)
+  let nonalgebraic_goal = Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal))) in
   let* goals =
-    (* Report a goal that isn't a relation against the whole goal rather than against the conjunct
-       that isn't one, as the hypotheses below are reported against the whole wire. *)
     match get_relations ~split:plus ctx goal.tm with
     | Ok goals -> Ok goals
-    | Error (Code.Oracle_failed (Not_a_relation _)) ->
-        Error (Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal))))
+    | Error (Code.Oracle_failed (Not_a_relation _)) -> Ok []
     | Error e -> Error e in
-  let* ty =
-    match goals with
-    | (_, ty, _, _) :: _ -> Ok ty
-    | [] -> Error (Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal)))) in
   let* givens = get_givens ~split:plus ctx givens.tm in
+  (* The kind of number the block is *about* -- which decides what shares variables with what, and
+     nothing else -- comes from the first of the goal's relations, as a single relation's type was
+     taken from the goal itself; with no goal relation to read it off, the first hypothesis serves
+     instead.  If there is neither, there is nothing that could be inconsistent, so a non-algebraic
+     goal fails here rather than at a query with no facts in it. *)
+  let* ty =
+    match goals @ givens with
+    | (_, ty, _, _) :: _ -> Ok ty
+    | [] -> Error nonalgebraic_goal in
   (* Both ends are tagged together, so that a hypothesis about a larger number system than the goal
      pulls the goal up to it rather than being translated down. *)
   let ty = widest ctx ty (goals @ givens) in
@@ -637,15 +643,21 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
      swapping the order of the arguments (although for a (dis)equality swapping does nothing). *)
-  List.fold_left
-    (fun acc (op, lhs, rhs) ->
-      let* () = acc in
-      let neg_op =
-        match op with
-        | `Eq -> `Neq
-        | `Neq -> `Eq
-        | `Lt -> `Le
-        | `Le -> `Lt in
-      if unsat ((neg_op, rhs, lhs) :: facts) then Ok ()
-      else Error (Code.Oracle_failed Unprovable))
-    (Ok ()) goals
+  match goals with
+  (* A goal that isn't algebraic at all, which we prove only by the hypotheses being contradictory:
+     from a contradiction anything follows, that statement included.  Where they aren't, the
+     complaint is that the goal isn't a relation, not that it doesn't follow by algebra. *)
+  | [] -> if unsat facts then Ok () else Error nonalgebraic_goal
+  | _ ->
+      List.fold_left
+        (fun acc (op, lhs, rhs) ->
+          let* () = acc in
+          let neg_op =
+            match op with
+            | `Eq -> `Neq
+            | `Neq -> `Eq
+            | `Lt -> `Le
+            | `Le -> `Lt in
+          if unsat ((neg_op, rhs, lhs) :: facts) then Ok ()
+          else Error (Code.Oracle_failed Unprovable))
+        (Ok ()) goals
