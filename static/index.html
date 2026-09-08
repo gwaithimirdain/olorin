@@ -134,7 +134,7 @@
         <div class="basic logical rule" style="text-align: center" id="tord" data-rule="tord" title="Split into cases on two numbers x and y: get that either x≤y or y&lt;x">≤∨&gt;</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="arch" data-rule="arch" title="Use the Archimedean property: give a real number x, and get a natural number n together with a proof that x&lt;n">Arch</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="zton" data-rule="zton" title="Use that a nonnegative integer is a natural number: give an integer x and a proof that x≥0, and get a natural number n together with a proof that x=n">ℤ→ℕ</div>
-        <div class="basic logical rule" style="text-align: center; font-size: 12px" id="frac" data-rule="frac" title="Use that a rational number is a fraction in lowest terms: give a rational x, and get an integer a and a proof that there is an integer b≥1 with x=a/b and no common factor of a and b except 1">frac</div>
+        <div class="basic logical rule" style="text-align: center; font-size: 12px" id="frac" data-rule="frac" title="Use that a rational number is a fraction in lowest terms: give a rational x, and get integers a and b with a proof that b≥1, that x=a/b, and that a and b have no common factor except 1">frac</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="omega" data-rule="omega" title="Use that ω is bigger than every real number: give a real number x, and get a proof that x&lt;ω">ℝ&lt;ω</div>
       </div>
       <div style="display: block; align-items: end" id="buttons">
@@ -260,7 +260,7 @@
 
     <div id="variableBG" class="modalbg">
       <div class="modal">
-        <h3 style="text-align: center">Choose a new variable name</h3>
+        <h3 style="text-align: center" id="variableHeading">Choose a new variable name</h3>
         <p>Variables currently in use:</p>
         <div id="variableList"></div>
         <p>New variable:</p>

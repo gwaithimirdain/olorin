@@ -1,11 +1,13 @@
-// The blocks that assert how one number system sits inside another: "Arch", "ℤ→ℕ" and "ℝ<ω".
+// The blocks that assert how one number system sits inside another: "Arch", "ℤ→ℕ", "frac" and
+// "ℝ<ω".
 //
 // Each is a "User" rule (bin/rules.ml) applying one axiom, and all of those axioms live in the
 // secondary startup code, since each one relates two number systems and so needs the subtyping
-// between them.  Arch and ℤ→ℕ conclude an ∃, which their block destructs itself: instead of a
-// single output carrying ∃n∈ℕ,…, each hands out the natural number on a value port and the
-// statement about it on another, exactly as ∃-elimination does.  ℝ<ω concludes a relation, so it
-// has the ordinary single output.
+// between them.  Arch, ℤ→ℕ and frac conclude an ∃, which their block takes apart itself: instead
+// of a single output carrying ∃n∈ℕ,…, each hands out the number on a value port and the statement
+// about it on another, exactly as ∃-elimination does.  frac's axiom concludes two nested ∃s and
+// its block takes apart both, so it binds two variables rather than one -- the only block that
+// does.  ℝ<ω concludes a relation, so it has the ordinary single output.
 //
 // Unlike "=∨≠" and "≤∨>", none of them follows its input into a number system: each axiom is about
 // one.  A rational or integer input to Arch is coerced into ℝ and the block still applies, but
@@ -163,31 +165,49 @@ test.describe('The "ℤ→ℕ" block', () => {
         });
 });
 
-// What frac says about the numerator it hands out: there is a denominator b of at least 1 making x
-// the fraction a/b, with no common factor of the two but 1.  Divisibility is an ∃ under the hood
-// and prints as one, so this is written the way a player would write it and read back the long way.
-const LOWEST_TERMS = (a) => `∃b∈ℤ,((b≥1)∧((x=${a}/b)∧(∀c∈ℕ,(((c∣${a})∧(c∣b))⇒(c=1)))))`;
+// Drop a block that binds several variables, naming them in the dialogs it pops one after another.
+async function dragMultiBinder(olorin, rule, x, y, names) {
+    const id = await olorin.dragRule(rule, x, y);
+    for (const name of names) {
+        await olorin.page.waitForSelector('#variableBG', { state: 'visible' });
+        await olorin.page.fill('#newvar', name);
+        await olorin.page.click('#submitVariable');
+    }
+    await olorin.dismissHints();
+    return id;
+}
 
-// State ∃a∈ℤ,(that), over a variable x of the given set, and prove it by feeding x to a frac block
-// and passing its two outputs straight to ∃-introduction.  The block gives out the numerator and
-// the ∃ over the denominator, so this is the whole proof: the player only has to name a.
+// What frac says about the two numbers it hands out: the denominator is at least 1, it makes x the
+// fraction a/b, and the two have no common factor but 1.  Divisibility is an ∃ under the hood and
+// prints as one, so this is written the way a player would write it and read back the long way.
+const LOWEST_TERMS = (a, b) => `((${b}≥1)∧((x=${a}/${b})∧(∀c∈ℕ,(((c∣${a})∧(c∣${b}))⇒(c=1)))))`;
+
+// State ∃a∈ℤ,∃b∈ℤ,(that), over a variable x of the given set, and prove it by feeding x to a frac
+// block and passing its three outputs to two ∃-introductions.  The block hands out both sides of
+// the fraction, so the player only has to put them back together.
 async function fracProves(olorin, set) {
     await olorin.buildCustom({
         parameters: '',
         variables: `x ∈ ${set}`,
         hypotheses: '',
-        conclusion: `∃a∈ℤ,${LOWEST_TERMS('a')}`,
+        conclusion: `∃a∈ℤ,∃b∈ℤ,${LOWEST_TERMS('a', 'b')}`,
     });
-    const frac = await dragBinder(olorin, 'frac', 400, 150, 'p');
-    const intro = await olorin.dragRule('exI', 650, 350);
+    const frac = await dragMultiBinder(olorin, 'frac', 400, 150, ['p', 'q']);
+    const inner = await olorin.dragRule('exI', 650, 350);
+    const outer = await olorin.dragRule('exI', 850, 450);
     const nodes = await olorin.nodes();
     const varx = nodes.find((v) => v.rule === 'variable' && v.name === 'x').id;
     await olorin.connect({ vertex: varx, sort: 'output' }, { vertex: frac, sort: 'input', label: 'x' });
-    for (const port of ['element', 'property']) {
-        await olorin.connect({ vertex: frac, sort: 'output', label: port },
-                             { vertex: intro, sort: 'input', label: port });
-    }
-    await olorin.connect({ vertex: intro, sort: 'output' },
+    // The inner ∃ is over the denominator, the outer one over the numerator.
+    await olorin.connect({ vertex: frac, sort: 'output', label: 'denominator' },
+                         { vertex: inner, sort: 'input', label: 'element' });
+    await olorin.connect({ vertex: frac, sort: 'output', label: 'property' },
+                         { vertex: inner, sort: 'input', label: 'property' });
+    await olorin.connect({ vertex: frac, sort: 'output', label: 'numerator' },
+                         { vertex: outer, sort: 'input', label: 'element' });
+    await olorin.connect({ vertex: inner, sort: 'output' },
+                         { vertex: outer, sort: 'input', label: 'property' });
+    await olorin.connect({ vertex: outer, sort: 'output' },
                          { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
     await olorin.waitForTypecheck();
     return olorin.isComplete();
@@ -207,50 +227,116 @@ test.describe('The "frac" block', () => {
         expect(await fracProves(olorin, 'ℝ')).toBe(false);
     });
 
-    // The block binds one variable, the numerator; the denominator is inside the ∃ it hands out,
-    // and the player names it with an ∃-elimination of their own.  Here that yields b≥1.
-    test('leaves the denominator to an ∃-elimination, which names it', async ({ page }) => {
-        const olorin = new Olorin(page);
-        await olorin.open();
-        await olorin.buildCustom({
-            parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '∃b∈ℤ,(b≥1)',
-        });
-        const frac = await dragBinder(olorin, 'frac', 300, 100, 'p');
-        const elim = await dragBinder(olorin, 'exE', 500, 200, 'q');
-        const and = await olorin.dragRule('andE', 700, 300);
-        const intro = await olorin.dragRule('exI', 900, 400);
-        const nodes = await olorin.nodes();
-        const varx = nodes.find((v) => v.rule === 'variable' && v.name === 'x').id;
-        await olorin.connect({ vertex: varx, sort: 'output' }, { vertex: frac, sort: 'input', label: 'x' });
-        await olorin.connect({ vertex: frac, sort: 'output', label: 'property' },
-                             { vertex: elim, sort: 'input' });
-        await olorin.connect({ vertex: elim, sort: 'output', label: 'property' },
-                             { vertex: and, sort: 'input' });
-        await olorin.connect({ vertex: elim, sort: 'output', label: 'element' },
-                             { vertex: intro, sort: 'input', label: 'element' });
-        await olorin.connect({ vertex: and, sort: 'output', label: 'fst' },
-                             { vertex: intro, sort: 'input', label: 'property' });
-        await olorin.connect({ vertex: intro, sort: 'output' },
-                             { vertex: nodes.find((n) => n.rule === 'conclusion').id, sort: 'input' });
-        await olorin.waitForTypecheck();
-        expect(await olorin.isComplete()).toBe(true);
-    });
-
-    test('labels its outputs with the numerator and what holds of it', async ({ page }) => {
+    test('asks for both names in turn, and binds them both', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         await olorin.buildCustom({
             parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '⊤',
         });
-        const frac = await dragBinder(olorin, 'frac', 400, 150, 'p');
+        const id = await olorin.dragRule('frac', 400, 150);
+        // The first dialog asks for the numerator, and stays open for the denominator.
+        await expect(page.locator('#variableBG')).toBeVisible();
+        expect(await page.textContent('#variableHeading')).toContain('numerator');
+        await page.fill('#newvar', 'p');
+        await page.click('#submitVariable');
+        await expect(page.locator('#variableBG')).toBeVisible();
+        expect(await page.textContent('#variableHeading')).toContain('denominator');
+        // The name just given is taken, so the second one can't repeat it.
+        expect(await page.textContent('#variableList')).toContain('p');
+        await page.fill('#newvar', 'q');
+        await page.click('#submitVariable');
+
+        expect(await page.isVisible('#variableBG')).toBe(false);
+        expect((await olorin.nodes()).find((n) => n.id === id).names).toEqual(['p', 'q']);
+        expect(await olorin.varnames()).toEqual(expect.arrayContaining(['p', 'q']));
+
+        // And deleting the block gives both names back.
+        await olorin.deleteNode(id);
+        const left = await olorin.varnames();
+        expect(left).not.toContain('p');
+        expect(left).not.toContain('q');
+    });
+
+    test('renames both, one dialog after the other', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '⊤',
+        });
+        const id = await dragMultiBinder(olorin, 'frac', 400, 150, ['p', 'q']);
+        await page.dblclick('#' + id);
+        // Each is pre-filled with the name it binds now, which is therefore not taken.
+        await expect(page.locator('#variableBG')).toBeVisible();
+        expect(await page.inputValue('#newvar')).toBe('p');
+        expect(await page.textContent('#variableList')).not.toContain('p');
+        await page.fill('#newvar', 'u');
+        await page.click('#submitVariable');
+        expect(await page.inputValue('#newvar')).toBe('q');
+        await page.fill('#newvar', 'v');
+        await page.click('#submitVariable');
+
+        expect((await olorin.nodes()).find((n) => n.id === id).names).toEqual(['u', 'v']);
+        const names = await olorin.varnames();
+        expect(names).toEqual(expect.arrayContaining(['u', 'v']));
+        expect(names).not.toContain('p');
+        expect(names).not.toContain('q');
+    });
+
+    // Cancelling any of the dialogs a new block pops takes the block away, as cancelling the one
+    // dialog always has -- and the name already given goes back into circulation with it.
+    test('is taken away, names and all, by cancelling the second dialog', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '⊤',
+        });
+        await olorin.dragRule('frac', 400, 150);
+        await page.fill('#newvar', 'p');
+        await page.click('#submitVariable');
+        await expect(page.locator('#variableBG')).toBeVisible();
+        await page.click('#cancelVariable');
+
+        expect((await olorin.nodes()).some((n) => n.rule === 'frac')).toBe(false);
+        expect(await olorin.varnames()).not.toContain('p');
+    });
+
+    // Both names have to survive a save: a block that binds two writes them as a list, where one
+    // that binds a single variable has always written it on its own.
+    test('keeps both names through an export and import', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '⊤',
+        });
+        const frac = await dragMultiBinder(olorin, 'frac', 400, 150, ['p', 'q']);
+        const varx = (await olorin.nodes()).find((v) => v.rule === 'variable' && v.name === 'x').id;
+        await olorin.connect({ vertex: varx, sort: 'output' },
+                             { vertex: frac, sort: 'input', label: 'x' });
+        const before = await olorin.structuralState();
+        const json = await olorin.exportText();
+        expect(JSON.parse(json).nodes.find((n) => n.rule === 'frac').names).toEqual(['p', 'q']);
+
+        await olorin.clear();
+        await olorin.importText(json);
+        expect(await olorin.structuralState()).toEqual(before);
+        expect(await olorin.varnames()).toEqual(expect.arrayContaining(['p', 'q']));
+    });
+
+    test('labels its outputs with both numbers and what holds of them', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'x ∈ ℚ', hypotheses: '', conclusion: '⊤',
+        });
+        const frac = await dragMultiBinder(olorin, 'frac', 400, 150, ['p', 'q']);
         const varx = (await olorin.nodes()).find((v) => v.rule === 'variable' && v.name === 'x').id;
         await olorin.connect({ vertex: varx, sort: 'output' },
                              { vertex: frac, sort: 'input', label: 'x' });
         await olorin.waitForTypecheck();
         const labels = await portLabels(olorin);
-        expect(labels).toEqual(expect.arrayContaining(['p ∈ ℤ']));
-        // The statement about it, read back with divisibility spelled out as the ∃ it is.
-        expect(labels.join(' ')).toContain('∃b∈ℤ,((1≤b)∧((x=p/b)∧');
+        expect(labels).toEqual(expect.arrayContaining(['p ∈ ℤ', 'q ∈ ℤ']));
+        // The statement about them, read back with divisibility spelled out as the ∃ it is.
+        expect(labels.join(' ')).toContain('(1≤q)∧((x=p/q)∧');
     });
 });
 

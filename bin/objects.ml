@@ -40,11 +40,13 @@ module IdSet = Set.Make (Id)
 (* Vertices of the graph *)
 
 module Vertex = struct
-  type t = { id : Id.t; name : string option; rule : rule; value : string option }
+  (* 'names' are the variables a block binds, in the order its value ports hand them out.  Most
+     blocks bind one or none; frac binds both sides of the fraction it produces. *)
+  type t = { id : Id.t; names : string list; rule : rule; value : string option }
 
   class type js = object
     method id : Js.js_string Js.t Js.prop
-    method name : Js.js_string Js.t Js.optdef Js.prop
+    method names : Js.js_string Js.t Js.js_array Js.t Js.optdef Js.prop
     method rule : Js.js_string Js.t Js.prop
     method value : Js.js_string Js.t Js.optdef Js.prop
   end
@@ -53,7 +55,10 @@ module Vertex = struct
     let id = Js.to_string v##.id in
     {
       id = Id id;
-      name = option_of_string_optdef v##.name;
+      names =
+        Js.Optdef.case v##.names
+          (fun () -> [])
+          (fun a -> List.map Js.to_string (Array.to_list (Js.to_array a)));
       rule =
         (match RuleMap.find_opt (Js.to_string v##.rule) rules with
         | Some x -> x
@@ -128,8 +133,12 @@ let outputs_of_vertex (v : Vertex.t) : Port.t list =
      vertex that have multiple output ports. *)
   | Fields { outputs } ->
       List.map (fun (_, label) : Port.t -> { vertex; sort; label = Some label }) outputs
-  | Coconstr { outputs; constr = _ } | User { outputs = Some (_, outputs); _ } ->
+  | Coconstr { outputs; constr = _ } ->
       List.map (fun (_, label) : Port.t -> { vertex; sort; label = Some label }) outputs
+  (* A block that takes its own conclusion apart shows one port per component, except for the
+     components its later steps take apart in turn, which are machinery of its own. *)
+  | User { outputs = _ :: _ as steps; _ } ->
+      List.map (fun label : Port.t -> { vertex; sort; label = Some label }) (visible_outputs steps)
   (* While the conclusion has zero. *)
   | Conclusion -> []
   (* All others have one. *)
@@ -206,7 +215,8 @@ module Variable = struct
   let of_js cls vars v =
     let id, name, ty =
       (Id.Id (Js.to_string v##.id), option_of_string_optdef v##.name, Js.to_string v##.ty) in
-    vars := !vars |> IdMap.add id ({ id; name; rule = Var; value = Some ty } : Vertex.t);
+    vars :=
+      !vars |> IdMap.add id ({ id; names = Option.to_list name; rule = Var; value = Some ty } : Vertex.t);
     { id; name; ty; cls }
 end
 

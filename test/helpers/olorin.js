@@ -521,7 +521,7 @@ class Olorin {
         const port = (p) => `${tag(p.vertex)}|${p.sort}|${p.label || ''}`;
         return {
             nodes: nodes
-                .map((n) => ({ rule: n.rule, name: n.name, value: n.value, left: n.left, top: n.top, width: n.width, height: n.height }))
+                .map((n) => ({ rule: n.rule, name: n.name, names: n.names, value: n.value, left: n.left, top: n.top, width: n.width, height: n.height }))
                 .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
             connections: conns
                 .map((c) => ({ source: port(c.source), target: port(c.target), ty: c.ty }))

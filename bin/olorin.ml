@@ -326,31 +326,33 @@ let ensure_synth (tm : term_with_bindables located) (err : string) :
   | { value = { bindables; term = _ }; loc } ->
       (locate_opt loc (Named.Fail (Nonsynthesizing err)), bindables)
 
-(* Destruct a synthesizing term belonging to a one-constructor type, handing out one output port of
-   the vertex for each component of that constructor: the term is matched against the constructor,
-   and each output port becomes one of the variables the branch binds, with the match itself
-   deferred as a bindable to be wrapped around whatever body eventually uses those variables.  The
-   Coconstr rule does this to the term on its input wire; a User rule whose axiom concludes an
-   existential statement does it to the term it builds by applying that axiom.  The 'named' flag on
-   an output says that it carries a value the player names, so it gets the vertex's variable name.
-   'name' is that name, and 'loc' locates the variables the branch binds. *)
-let destruct_constr (source : Port.t) (name : string option) (constr : Constr.t)
-    (outputs : (bool * string) list) (tm : unit Named.synth located) (bindables : Bindables.t)
-    (variables : PortSet.t) : term_with_bindables * PortSet.t =
-  let names =
-    List.map
-      (fun (named, label) : name ->
-        {
-          name = (if named then name else None);
-          port = Some { source with sort = Output; label = Some label };
-        })
-      outputs in
-  let (Wrap vars) = Vec.of_list names in
+(* One step of destructing: match a synthesizing term against a one-constructor type, handing out
+   one output port of the vertex for each component of that constructor.  Each output port becomes
+   one of the variables the branch binds, and the match itself is deferred as a bindable, to be
+   wrapped around whatever body eventually uses those variables.  The 'named' flag on a component
+   says that it carries a value the player names, so it takes the next of the vertex's bound names;
+   the names left over are returned for the step after this one.  'used' is what the term being
+   matched depends on, which is what decides when the match has to be wrapped around a body. *)
+let destruct_step (source : Port.t) (names : string list) (constr : Constr.t)
+    (outputs : (bool * string) list) (tm : unit Named.synth located) ~(used : PortSet.t)
+    (bindables : Bindables.t) (variables : PortSet.t) :
+    string list * name list * Bindables.t * PortSet.t =
+  let leftover, ports =
+    List.fold_left_map
+      (fun names (named, label) : (string list * name) ->
+        let name, names =
+          match (named, names) with
+          | true, n :: ns -> (Some n, ns)
+          | true, [] -> (None, [])
+          | false, _ -> (None, names) in
+        (names, { name; port = Some { source with sort = Output; label = Some label } }))
+      names outputs in
+  let (Wrap vars) = Vec.of_list ports in
   let vars = namevec_of_vec vars in
   let bindables =
-    Bindables.add bindables names
+    Bindables.add bindables ports
       {
-        used = variables;
+        used;
         bind =
           (fun body ->
             let branch = Named.Branch (locate_opt tm.loc vars, `Normal None, body) in
@@ -372,7 +374,37 @@ let destruct_constr (source : Port.t) (name : string option) (constr : Constr.t)
         match x.port with
         | Some p -> PortSet.add p vars
         | None -> vars)
-      names variables in
+      ports variables in
+  (leftover, ports, bindables, variables)
+
+(* Destruct a synthesizing term, and then the last component of that, and so on for as many steps
+   as the rule asks for: that is how a nest of ∃s is opened, one bound variable at a time.  The
+   Coconstr rule takes one step, on the term on its input wire; a User rule whose axiom concludes
+   one or more existential statements takes one per ∃, on the term it builds by applying the axiom.
+   All the steps depend on the same term, so they are all wrapped around a body together, outermost
+   step first -- which is the order they are added in, since bindables are bound from the last
+   added inward.  The term this returns is for whichever port was asked for; every port of the
+   vertex is bound by one of the matches. *)
+let destruct_constr (source : Port.t) (names : string list)
+    (steps : (Constr.t * (bool * string) list) list) (tm : unit Named.synth located)
+    (bindables : Bindables.t) (variables : PortSet.t) : term_with_bindables * PortSet.t =
+  let used = variables in
+  let rec go names steps tm bindables variables =
+    match steps with
+    | [] -> (bindables, variables)
+    | (constr, outputs) :: rest ->
+        let names, ports, bindables, variables =
+          destruct_step source names constr outputs tm ~used bindables variables in
+        if rest = [] then (bindables, variables)
+        else
+          (* The next step takes apart the last component of this one, so that component is a port
+             of the block's own rather than one the player sees (see visible_outputs). *)
+          let inner =
+            match List.rev ports with
+            | { port = Some p; _ } :: _ -> p
+            | _ -> raise (Jserror "destructuring step with nothing to take apart") in
+          go names rest (locate_opt tm.loc (Named.Var (`Port inner, None))) bindables variables in
+  let bindables, variables = go names steps tm bindables variables in
   ({ bindables; term = Synth (Var (`Port source, None)) }, variables)
 
 (* From graphs to raw terms with named variables *)
@@ -429,7 +461,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     let assumption = { source with sort = Assumption; label = Some albl } in
                     let newbinds, tm, newvars =
                       lam_of_output_port ~seen vertices graph
-                        [ (assumption, source_vertex.name) ]
+                        [ (assumption, List.nth_opt source_vertex.names 0) ]
                         subgoal in
                     ( Bindables.union bindables newbinds,
                       PortSet.union variables newvars,
@@ -613,7 +645,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
       | Abs { field; has_value = _; extras; implicit_post } ->
           (* In an abstraction, we bind all the bindables in the body that involve the assumption variables, and pass the rest on as bindables for the abstraction. *)
           let assumptions =
-            ({ source with sort = Assumption; label = None }, source_vertex.name)
+            ({ source with sort = Assumption; label = None }, List.nth_opt source_vertex.names 0)
             :: List.map
                  (fun label -> ({ source with sort = Assumption; label = Some label }, None))
                  extras in
@@ -692,7 +724,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let tm, bindables = ensure_synth tm "coconstr input" in
-          destruct_constr source source_vertex.name constr outputs tm bindables variables
+          destruct_constr source source_vertex.names
+            [ (constr, outputs) ]
+            tm bindables variables
       | Asc ->
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
@@ -795,10 +829,10 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           (* A block that destructs its own conclusion hands out its components on output ports, as
              a Coconstr does; otherwise the application itself is what its single output carries. *)
           (match outputs with
-          | None -> ({ bindables; term = Synth tm }, variables)
-          | Some (constr, outputs) ->
-              destruct_constr source source_vertex.name constr outputs (locate !loc tm) bindables
-                variables) in
+          | [] -> ({ bindables; term = Synth tm }, variables)
+          | steps ->
+              destruct_constr source source_vertex.names steps (locate !loc tm) bindables variables)
+          in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments.  The assumptions, given with the
@@ -1336,7 +1370,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
       variable_nodes := !new_vars;
       (conclusion_node :=
          let id = Id.Id (Js.to_string conclusion##.id) in
-         Some (id, { id; name = None; rule = Conclusion; value = Some concl_ty }));
+         Some (id, { id; names = []; rule = Conclusion; value = Some concl_ty }));
       const_ty := Some (Telescope.pis cparams ty);
       (* Assuming all that succeeded, we return no errors to JavaScript to indicate success. *)
       ok_checked ()

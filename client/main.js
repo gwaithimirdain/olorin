@@ -722,6 +722,20 @@ const SPECIALQUANT = {
     exbelowE:  { condition: "below", set: "[?]" },
 };
 
+// The variables a block binds, in the order its value ports hand them out -- which is the order
+// the variable dialog asks for them, and the order Olorin's OCaml side hands the names to the
+// ports (see the User rule's outputs in bin/rules.ml).  A block that binds a single variable needs
+// no further description, and its entry is the empty label; frac binds both sides of the fraction
+// it produces, so its dialog says which of the two it is asking for.
+const BOUND_VARIABLES = { frac: ["numerator", "denominator"] };
+function boundVariables(rule) { return BOUND_VARIABLES[rule] || [""]; }
+
+// The names a block currently binds, however many that is.
+function boundNames(id) {
+    const entry = nodes.find(function (x) { return x.id === id; });
+    return (entry && entry.names) || [];
+}
+
 // Clone the palette rule `id` into a new diagram node: position it, register it in the
 // nodes list, and give it a close button.  Endpoints are added separately by
 // addEndpointsForRule.  Returns the new box element.
@@ -1006,17 +1020,14 @@ function addEndpointsForRule(box, id, restore) {
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-    } else if (id === 'arch' || id === 'zton' || id === 'frac') {
-        // The blocks whose axiom produces a number: the Archimedean property, which takes a real
-        // and gives a natural above it; ℤ→ℕ, which takes a nonnegative integer and gives the
-        // natural number it is equal to; and frac, which takes a rational and gives the numerator
-        // of its lowest-terms fraction.  Each destructs the ∃ its axiom concludes, so like
+    } else if (id === 'arch' || id === 'zton') {
+        // Two blocks whose axiom produces a natural number: the Archimedean property, which takes a
+        // real and gives one above it, and ℤ→ℕ, which takes a nonnegative integer and gives the
+        // natural number it is equal to.  Each takes apart the ∃ its axiom concludes, so like
         // ∃-elimination it binds a variable and hands it out on a value port, with the statement
-        // about it on a second port -- for frac that statement is the inner ∃ naming the
-        // denominator, which the player opens with an ∃-elimination of their own.  The number
-        // system is fixed by the axiom in each case, so there is no unknownSet on the inputs.
-        // ℤ→ℕ takes the proof that x is nonnegative on an input of its own, below the value port
-        // for x; the other two take only the number.
+        // about it on a second port.  The number system is fixed by the axiom in both cases, so
+        // there is no unknownSet on the inputs.  ℤ→ℕ takes the proof that x is nonnegative on an
+        // input of its own, below the value port for x.
         const two = (id === 'zton');
         instance.addEndpoint(box, {
             anchor: (two ? [0, 0.2, -1, 0] : "Left"),
@@ -1038,6 +1049,33 @@ function addEndpointsForRule(box, id, restore) {
         });
         instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
         // Double-clicking the box re-opens the dialog to rename the variable it binds.
+        box.addEventListener('dblclick', function () { editVariable(box); });
+        if(!restore) { getVariable(box.id); }
+        typecheck_now = false;
+    } else if (id === 'frac') {
+        // A rational in, and both sides of its lowest-terms fraction out: the axiom concludes two
+        // nested ∃s and the block takes them both apart, so it binds two variables rather than one
+        // (BOUND_VARIABLES above, and the User rule's two steps in bin/rules.ml).  The port between
+        // the two -- the inner ∃ that the second step opens -- belongs to the block, not to the
+        // player, so it has no endpoint here; what is left is the numerator, the denominator, and
+        // the statement about the two of them.
+        instance.addEndpoint(box, {
+            anchor: "Left",
+            target: true,
+            parameters: { sort: "input", label: "x", hasValue: true },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        [["numerator", 0.1, "upper"], ["denominator", 0.5, "middle"]].forEach(function (p) {
+            instance.addEndpoint(box, {
+                anchor: [1, p[1], 1, 0],
+                source: true, maxConnections: -1,
+                parameters: { sort: "output", label: p[0], hasValue: true, side: p[2] },
+                paintStyle: { fill: VALUECOLOR },
+                connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
+            });
+        });
+        instance.addEndpoint(box, { anchor: [1, 0.9, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        // Double-clicking the box re-opens the dialog, which walks through both names again.
         box.addEventListener('dblclick', function () { editVariable(box); });
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
@@ -1986,10 +2024,12 @@ function serializeProof() {
             top: node.style.top,
         };
         if(x.name !== undefined) { data.name = x.name; }
+        // The variables a block binds.  A proof saved before blocks could bind more than one wrote
+        // a single "name" (repeated as "variable"), which restoreProof still reads.
+        if(x.names !== undefined) { data.names = x.names; }
         if(x.value !== undefined) { data.value = x.value; }
         if(node.style.width) { data.width = node.style.width; }
         if(node.style.height) { data.height = node.style.height; }
-        if(node.dataset.variable) { data.variable = node.dataset.variable; }
         return data;
     });
 
@@ -2204,11 +2244,13 @@ function restoreProof(state, level, countAsCompletion) {
         if(sn.width)  { box.style.width = sn.width; }
         if(sn.height) { box.style.height = sn.height; }
         const entry = nodes.find((x) => x.id === box.id);
-        // Restore a bound-variable name (∀/∃ rules) into the global list and the node.
-        if(sn.name !== undefined && entry) { entry.name = sn.name; }
-        if(sn.variable) {
-            if(!varnames.includes(sn.variable)) { varnames.push(sn.variable); }
-            box.dataset.variable = sn.variable;
+        // Restore the bound-variable names (∀/∃ and the number blocks) into the global list and the
+        // node.  A proof saved before a block could bind more than one has a single "name" (and a
+        // "variable" beside it saying the same thing), which reads back as a list of one.
+        const bound = sn.names || (sn.name !== undefined ? [sn.name] : []);
+        if(bound.length > 0) {
+            if(entry) { entry.names = bound.slice(); }
+            bound.forEach(function (v) { if(!varnames.includes(v)) { varnames.push(v); } });
         }
         // Restore an ascription/expression value and re-render the box accordingly.
         if(sn.value !== undefined) {
@@ -2374,7 +2416,7 @@ if (new URLSearchParams(window.location.search).has("test")) {
     window.__olorin = {
         // Snapshot of the diagram nodes (id, rule, name/value, geometry).
         nodes: () => nodes.map((n) => ({
-            id: n.id, rule: n.rule, name: n.name, value: n.value,
+            id: n.id, rule: n.rule, name: n.name, names: n.names, value: n.value,
             left: n.node.style.left, top: n.node.style.top,
             width: n.node.style.width, height: n.node.style.height,
         })),
@@ -2970,8 +3012,11 @@ function addBoxCloseButton(box) {
 
 function deleteRule(box) {
     suppressChecking = true;
-    if(box.dataset.variable) {
-        varnames = varnames.filter(function(x) { return x !== box.dataset.variable })
+    // Every variable this block bound is free again -- both of frac's, and any it had got as far
+    // as naming when a half-finished dialog is what deleted it.
+    const gone = boundNames(box.id);
+    if(gone.length > 0) {
+        varnames = varnames.filter(function(x) { return !gone.includes(x) })
     }
     nodes = nodes.filter(function (x) { return x.node !== box });
     instance.deleteConnectionsForElement(box);
@@ -3001,10 +3046,21 @@ function renameWarningText() {
         ".  If any of them mention the old name, you'll need to change them yourself.";
 }
 
-function openVariableDialog(id, current, editing) {
+// Ask for the `index`th of the variables the block `id` binds.  A block that binds more than one
+// asks for them in turn: submitting one re-opens this on the next, so the player names the
+// numerator and then the denominator without the dialog appearing to go away in between.
+function openVariableDialog(id, editing, index) {
     const variableBG = document.getElementById("variableBG");
     const variableList = document.getElementById("variableList");
     const newvar = document.getElementById('newvar');
+    const entry = nodes.find(function (x) { return x.id === id; });
+    const roles = boundVariables(entry ? entry.rule : null);
+    // What this box binds there now: the name being replaced when renaming, and nothing when the
+    // block has just been dropped.
+    const current = boundNames(id)[index] || '';
+    // Say which variable is being asked for, when the block binds more than one.
+    document.getElementById("variableHeading").innerText =
+        roles[index] ? "Choose a name for the " + roles[index] : "Choose a new variable name";
 
     variableBG.style.display = "flex";
     // A rename can leave hand-written names behind; a brand-new variable has no old name to leave.
@@ -3016,6 +3072,7 @@ function openVariableDialog(id, current, editing) {
     const taken = varnames.filter(function (v) { return v !== current; });
     variableList.innerText = taken.length > 0 ? taken.join(" ") : "<none>";
     newvar.dataset.name = id;
+    newvar.dataset.index = index;
     // Cancelling an edit leaves the box alone; cancelling a brand-new one removes it.
     newvar.dataset.editing = editing ? "true" : "";
     newvar.value = current;
@@ -3023,23 +3080,29 @@ function openVariableDialog(id, current, editing) {
     newvar.select();
 }
 
-// Prompt for the variable a newly added ∀-introduction or ∃-elimination binds.
+// Prompt for the variables a newly added ∀-introduction, ∃-elimination or number block binds,
+// starting with the first.
 function getVariable(id) {
-    openVariableDialog(id, '', false);
+    openVariableDialog(id, false, 0);
 }
 
-// Re-open that dialog on a box that already binds one, to rename it.  Double-clicking does this.
+// Re-open that dialog on a box that already binds them, to rename them.  Double-clicking does
+// this; a block that binds more than one walks through them all again, each pre-filled.
 function editVariable(box) {
-    openVariableDialog(box.id, box.dataset.variable || '', true);
+    openVariableDialog(box.id, true, 0);
 }
 
-// When that modal dialog is submitted, we save the variable name and hide it.
+// When that modal dialog is submitted, we save the variable name and hide it -- or, when the block
+// binds another variable after this one, ask for that one instead of hiding.
 function submitNewVariable() {
     const variableBG = document.getElementById("variableBG");
     const newvar = document.getElementById('newvar');
     const box = document.getElementById(newvar.dataset.name);
-    // When renaming, the name this box binds now is the one being replaced, so it isn't taken.
-    const previous = newvar.dataset.editing === "true" ? box.dataset.variable : undefined;
+    const editing = newvar.dataset.editing === "true";
+    const index = Number(newvar.dataset.index || 0);
+    // When renaming, the name this box binds at this position is the one being replaced, so it
+    // isn't taken.
+    const previous = editing ? boundNames(newvar.dataset.name)[index] : undefined;
     // Narya reads a name the same however it's padded, so " z" and "z" are one variable, not two:
     // compare and store the trimmed name, or the checks below would let a padded copy of a name
     // already in use slip past them.
@@ -3058,14 +3121,19 @@ function submitNewVariable() {
             varnames = varnames.filter(function (v) { return v !== previous; });
         }
         varnames.push(name);
-        // Attach it to the node that prompted for it.  NOTE: This doesn't allow a single node to contain more than one variable name.
-        for (var i in nodes) {
-            if (nodes[i].id === newvar.dataset.name) {
-                nodes[i].name = name;
-            }
+        // Attach it to the node that prompted for it, at the position it was asked for.  The names
+        // a block binds live on its node entry, which is what deleteRule reads to give them back
+        // when the block goes away, and what the OCaml side reads to name its value ports.
+        const entry = nodes.find(function (x) { return x.id === newvar.dataset.name; });
+        if(entry) {
+            entry.names = entry.names || [];
+            entry.names[index] = name;
         }
-        // Save the variable associated to the rule box.  This allows us to remove it from the global list of used variables when that rule is deleted.
-        box.dataset.variable = name;
+        // A block that binds another variable after this one asks for that one now.
+        if(entry && index + 1 < boundVariables(entry.rule).length) {
+            openVariableDialog(entry.id, editing, index + 1);
+            return;
+        }
         // And empty and hide the modal dialog
         newvar.value = '';
         newvar.dataset.editing = "";

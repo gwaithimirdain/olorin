@@ -236,7 +236,9 @@ test.describe('Boxes that bind a variable', () => {
         await page.click('#submitVariable');
     }
 
-    const boundName = (page, id) => page.evaluate((i) => document.getElementById(i).dataset.variable, id);
+    // The names a block binds live on its node entry, in the order its value ports hand them out.
+    const boundName = async (page, id) =>
+          (await page.evaluate((i) => (window.__olorin.nodes().find((n) => n.id === i) || {}).names, id) || [])[0];
 
     test('double-clicking one re-opens the dialog, pre-filled, and renames the variable', async ({ page }) => {
         const id = await olorin.dragRule('allI', 420, 240);
@@ -255,7 +257,7 @@ test.describe('Boxes that bind a variable', () => {
 
         expect(await page.isVisible('#variableBG')).toBe(false);
         expect(await boundName(page, id)).toBe('w');
-        expect((await olorin.nodes()).find((n) => n.id === id).name).toBe('w');
+        expect((await olorin.nodes()).find((n) => n.id === id).names).toEqual(['w']);
         // The old name is no longer in use, and the new one is.
         const names = await olorin.varnames();
         expect(names).toContain('w');
@@ -345,7 +347,7 @@ test.describe('Boxes that bind a variable', () => {
 
         expect(await page.isVisible('#variableBG')).toBe(false);
         expect(await boundName(page, id)).toBe('w');
-        expect((await olorin.nodes()).find((n) => n.id === id).name).toBe('w');
+        expect((await olorin.nodes()).find((n) => n.id === id).names).toEqual(['w']);
         expect(await olorin.varnames()).toContain('w');
     });
 

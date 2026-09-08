@@ -52,11 +52,25 @@ type rule =
       consts : string list list;
       inputs : string list;
       (* Some user axioms conclude an existential statement.  Rather than making the player follow
-         such a block with a separate ∃-elimination, it destructs its own conclusion, handing out
-         one output port per component of the constructor, exactly as a Coconstr does.  When this
-         is None the block has the usual single unlabeled output carrying the conclusion itself. *)
-      outputs : (Constr.t * (bool * string) list) option;
+         such a block with a separate ∃-elimination, the block takes its own conclusion apart,
+         handing out one output port per component of the constructor, exactly as a Coconstr does.
+         Each further step takes apart the *last* component of the step before it, which is how a
+         nest of ∃s is opened one variable at a time; that last component is then a port of the
+         block's own machinery rather than one the player sees.  The components flagged 'true' are
+         the ones carrying a value, and they take the block's bound variable names in order.  An
+         empty list is a block with the usual single unlabeled output carrying the conclusion
+         itself. *)
+      outputs : (Constr.t * (bool * string) list) list;
     }
+
+(* The output ports such a block shows the player: every component of every step, except the last
+   component of each step that the step after it takes apart. *)
+let rec visible_outputs : (Constr.t * (bool * string) list) list -> string list = function
+  | [] -> []
+  | [ (_, outs) ] -> List.map snd outs
+  | (_, outs) :: rest ->
+      let n = List.length outs in
+      List.filteri (fun i _ -> i < n - 1) (List.map snd outs) @ visible_outputs rest
 
 (* Here are the specific rules currently used in graphs.  The port labels used here have to match those used in the JavaScript.  It would be better if the JavaScript could get them from here. *)
 let rules =
@@ -190,21 +204,21 @@ let rules =
             consts =
               [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
             inputs = [ "x"; "y"; "xy0" ];
-            outputs = None;
+            outputs = [];
           } );
       ( "deceq",
         User
           {
             consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
             inputs = [ "x"; "y" ];
-            outputs = None;
+            outputs = [];
           } );
       ( "tord",
         User
           {
             consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
             inputs = [ "x"; "y" ];
-            outputs = None;
+            outputs = [];
           } );
       (* The Archimedean property: every real is below some natural number.  The axiom concludes an
          ∃, so the block destructs it, giving out the natural number n it produces on a value port
@@ -215,8 +229,7 @@ let rules =
           {
             consts = [ [ "ℝ"; "archimedean" ] ];
             inputs = [ "x" ];
-            outputs =
-              Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
+            outputs = [ (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* An integer that is at least zero is a natural number.  The proof that it is nonnegative is
          an input of its own, alongside the integer; what comes out is that natural number and the
@@ -226,22 +239,26 @@ let rules =
           {
             consts = [ [ "ℤ"; "tonat" ] ];
             inputs = [ "x"; "nonneg" ];
-            outputs =
-              Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
+            outputs = [ (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* Every rational is a fraction in lowest terms.  Its axiom concludes two nested ∃s, one for
-         the numerator and one for the denominator, and a block binds one variable, so this one
-         destructs only the outer: out come the numerator and the statement ∃b∈ℤ,… about it, which
-         the player opens with an ordinary ∃-elimination to name the denominator. *)
+         each side of the fraction, so the block takes two steps: the first hands out the numerator
+         and the second, taking apart what the first leaves, the denominator.  That inner ∃ is the
+         "rest" port, which belongs to the block rather than to the player -- what they see is the
+         numerator, the denominator, and the statement about the two of them.  Two value ports mean
+         two bound variables, which the block's variable dialog asks for in this order. *)
       ( "frac",
         User
           {
             consts = [ [ "ℚ"; "frac" ] ];
             inputs = [ "x" ];
             outputs =
-              Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
+              [
+                (Constr.intern "exists", [ (true, "numerator"); (false, "rest") ]);
+                (Constr.intern "exists", [ (true, "denominator"); (false, "property") ]);
+              ];
           } );
       (* Every real number is smaller than ω.  This one concludes a relation rather than an ∃, so it
          has the ordinary single output, carrying x<ω. *)
-      ("omega", User { consts = [ [ "ℝ"; "ltomega" ] ]; inputs = [ "x" ]; outputs = None });
+      ("omega", User { consts = [ [ "ℝ"; "ltomega" ] ]; inputs = [ "x" ]; outputs = [] });
     ]
