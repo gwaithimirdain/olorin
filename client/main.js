@@ -44,7 +44,7 @@ const GREEK_PALETTE = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ
 // The variable-name box offers this one on its own, so it is named apart from the pair.
 const GREEK_GROUP = { label: 'Greek', chars: GREEK_PALETTE };
 
-const PALETTE_GROUPS = [{ label: 'numbers', chars: NUMBER_PALETTE }, GREEK_GROUP];
+const PALETTE_GROUPS = [{ label: 'sets', chars: NUMBER_PALETTE }, GREEK_GROUP];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
