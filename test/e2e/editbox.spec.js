@@ -304,6 +304,39 @@ test.describe('Boxes that bind a variable', () => {
         expect(await olorin.varnames()).toEqual(expect.arrayContaining(['x', 'y']));
     });
 
+    // Almost nothing in the usual palette can go in a name, so this box offers the lowercase Greek
+    // alphabet instead.  As with the expression palette, nothing here reads on its exact contents:
+    // what is asserted is that ε and δ are offered, that the symbols belonging to statements are
+    // not, and that whatever is offered both types itself in and names a variable the checker will
+    // actually take -- offering a name it would refuse would be a trap.
+    test('the dialog offers a palette of Greek letters, and shortcuts reach it', async ({ page }) => {
+        await olorin.dragRule('allI', 420, 240);
+        await page.waitForSelector('#variableBG', { state: 'visible' });
+        const buttons = (await page.evaluate(() =>
+            Array.from(document.querySelectorAll('#varnamePalette .unicode-button')).map((b) => b.textContent)))
+              .filter((b) => b !== 'shortcuts');
+
+        expect(buttons).toEqual(expect.arrayContaining(['ε', 'δ']));
+        for (const logical of ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈']) {
+            expect(buttons).not.toContain(logical);
+        }
+
+        for (const sym of buttons) {
+            await page.fill('#newvar', '');
+            await page.click(`#varnamePalette .unicode-button:has-text("${sym}")`);
+            expect(await page.inputValue('#newvar')).toBe(sym);
+            expect(await page.evaluate((s) => window.Narya.checkVariable(s).complete, sym), sym).toBe(true);
+        }
+
+        // The backslash shortcuts reach this box too, and the name they spell is accepted.
+        await page.fill('#newvar', '');
+        await page.locator('#newvar').pressSequentially('\\lambda ');
+        expect(await page.inputValue('#newvar')).toBe('λ');
+        await page.click('#submitVariable');
+        expect(await page.isVisible('#variableBG')).toBe(false);
+        expect(await olorin.varnames()).toContain('λ');
+    });
+
     test('a padded name that is free is accepted, and kept without the padding', async ({ page }) => {
         const id = await olorin.dragRule('allI', 420, 240);
         await enterVariable(page, '  w  ');
@@ -422,6 +455,29 @@ test.describe('Shortcut sequences', () => {
     test('still work at either end', async ({ page }) => {
         expect(await typeAt(page, 'xy', 2, '*')).toEqual({ text: 'xy·', cursor: 3 });
         expect(await typeAt(page, 'xy', 0, '*')).toEqual({ text: '·xy', cursor: 1 });
+    });
+
+    // The substitutions are plain string replacements applied in order, so a sequence that spelled
+    // another one as a substring -- in either direction -- would quietly swallow it.  The Greek
+    // letters come close to several of the older sequences (\alpha to \all, \lambda to \land and
+    // \le, \gamma to \ge, \sigma to \sim, \tau to \to, \nu to \neg, \mu to \mid, \xi to \x, \iota
+    // to \in), so check that each of those still spells only what it should.
+    test('of Greek letters do not swallow, or get swallowed by, the older ones', async ({ page }) => {
+        const sequences = [
+            ['\\alpha ', 'α'], ['\\beta ', 'β'], ['\\gamma ', 'γ'], ['\\delta ', 'δ'],
+            ['\\eps ', 'ε'], ['\\epsilon ', 'ε'], ['\\zeta ', 'ζ'], ['\\eta ', 'η'],
+            ['\\theta ', 'θ'], ['\\iota ', 'ι'], ['\\kappa ', 'κ'], ['\\lambda ', 'λ'],
+            ['\\mu ', 'μ'], ['\\nu ', 'ν'], ['\\xi ', 'ξ'], ['\\pi ', 'π'], ['\\rho ', 'ρ'],
+            ['\\sigma ', 'σ'], ['\\tau ', 'τ'], ['\\upsilon ', 'υ'], ['\\phi ', 'φ'],
+            ['\\chi ', 'χ'], ['\\psi ', 'ψ'], ['\\omega ', 'ω'],
+            // And the older sequences those come closest to.
+            ['\\all ', '∀'], ['\\land ', '∧'], ['\\le', '≤'], ['\\ge', '≥'], ['\\sim', '∼'],
+            ['\\to ', '→'], ['\\top ', '⊤'], ['\\neg ', '¬'], ['\\neq', '≠'], ['\\mid ', '∣'],
+            ['\\x ', '×'], ['\\in ', '∈'], ['\\ex ', '∃'], ['\\sqrt ', '√'], ['\\R ', 'ℝ'],
+        ];
+        for (const [keys, symbol] of sequences) {
+            expect(await typeAt(page, '', 0, keys), keys).toEqual({ text: symbol, cursor: 1 });
+        }
     });
 });
 
