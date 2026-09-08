@@ -27,8 +27,22 @@ const VALUECOLOR = "#0000ff";
 // Where along a wire the X that deletes it sits, before spreadWireLabels moves it off any label.
 const CLOSE_BUTTON_HOME = 0.8;
 
-// Unicode characters to put in the button palette below text boxes
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '∼', '≈', '∣', '√', 'ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊', 'ε', 'δ'];
+// Unicode characters to put in the button palette below text boxes.  ∼ and ∣ are left out: their
+// shortcuts are the ~ and | already on the keyboard, which look enough like them that they can be
+// typed without knowing there was a shortcut involved.
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '≈', '√'];
+
+// The number systems, and the Greek alphabet, go in dropdowns at the end of that row rather than
+// getting a button each: there are a lot of them, they group naturally, and they come up far less
+// often than the connectives do.  Buttons for them all would take the row onto a second line.
+const NUMBER_PALETTE = ['ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊'];
+
+// Omicron is left out: it is identical to a Latin o, so offering it could only produce two names
+// nobody can tell apart.  This is also the palette the variable-name box gets, on its own.
+const GREEK_PALETTE = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
+
+const PALETTE_GROUPS = [{ label: 'numbers', chars: NUMBER_PALETTE },
+                        { label: 'Greek', chars: GREEK_PALETTE }];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
@@ -42,10 +56,6 @@ const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴', 'ε', 'δ'];
 // that path.
 const CURVED_CONNECTOR = { type: BezierConnector.type, options: { showLoopback: false } };
 
-// A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
-// mathematician does reach for is a Greek letter, so its box offers the lowercase alphabet (see
-// KEYS below for why omicron isn't in it).
-const VARNAME_PALETTE = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
 
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
@@ -3225,7 +3235,9 @@ function cancelWireLabel() {
 // The custom level-select dialog, and the type ascription and wire label dialog boxes, have a palette of unicode characters below each text box, and a link to the help dialog listing the shortcut keys.
 
 function insert(elt, str) {
-    const i = elt.selectionStart + 1;
+    // Past what was inserted: ℝ₊ is two characters, and 𝕊 is one that takes two units to write, so
+    // the cursor can't just go one along.
+    const i = elt.selectionStart + str.length;
     elt.setRangeText(str);
     elt.focus();
     elt.setSelectionRange(i,i);
@@ -3245,11 +3257,35 @@ function addToPalette(pal, elt, str) {
     pal.appendChild(b);
 }
 
-function makePalette(palid, eltid, chars) {
+// A group of symbols that would take up too much of the row to have a button each.  The label sits
+// in the closed dropdown, and picking a symbol out of it types that symbol, as a button would.
+function addDropdownToPalette(pal, elt, label, chars) {
+    const sel = document.createElement('select');
+    sel.className = "unicode-dropdown";
+    const head = document.createElement('option');
+    head.textContent = label;
+    sel.appendChild(head);
+    chars.forEach(function (chr) {
+        const opt = document.createElement('option');
+        opt.textContent = chr;
+        sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function() {
+        if(sel.selectedIndex === 0) { return; }
+        insert(elt, sel.value);
+        // Back to showing the label, so that picking the same symbol twice running still counts as
+        // a change and types it again.
+        sel.selectedIndex = 0;
+    });
+    pal.appendChild(sel);
+}
+
+function makePalette(palid, eltid, chars, groups) {
     const pal = document.getElementById(palid);
     const elt = document.getElementById(eltid);
-    // Create palette of buttons
-    (chars || PALETTE).forEach((chr) => addToPalette(pal, elt, chr));
+    // Create palette of buttons, and of dropdowns for the groups that get one
+    chars.forEach((chr) => addToPalette(pal, elt, chr));
+    groups.forEach((g) => addDropdownToPalette(pal, elt, g.label, g.chars));
     // Add TeX help button
     var t = document.createElement('div');
     t.textContent = 'or use';
@@ -3295,14 +3331,16 @@ function addShortcuts(eltid) {
     });
 }
 
-makePalette('paramPalette', 'parameters');
-makePalette('varPalette', 'variables');
-makePalette('hypPalette', 'hypotheses');
-makePalette('conclPalette', 'conclusion');
-makePalette('ascPalette', 'ascribe');
-makePalette('wirePalette', 'wire');
-makePalette('exprPalette', 'expression', EXPR_PALETTE);
-makePalette('varnamePalette', 'newvar', VARNAME_PALETTE);
+makePalette('paramPalette', 'parameters', PALETTE, PALETTE_GROUPS);
+makePalette('varPalette', 'variables', PALETTE, PALETTE_GROUPS);
+makePalette('hypPalette', 'hypotheses', PALETTE, PALETTE_GROUPS);
+makePalette('conclPalette', 'conclusion', PALETTE, PALETTE_GROUPS);
+makePalette('ascPalette', 'ascribe', PALETTE, PALETTE_GROUPS);
+makePalette('wirePalette', 'wire', PALETTE, PALETTE_GROUPS);
+makePalette('exprPalette', 'expression', EXPR_PALETTE, []);
+// A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
+// mathematician does reach for is a Greek letter, and there is room for the alphabet as buttons.
+makePalette('varnamePalette', 'newvar', GREEK_PALETTE, []);
 
 var shortcuts = document.getElementById('shortcuts');
 var shortcut_thead = document.createElement('thead');

@@ -481,3 +481,78 @@ test.describe('Shortcut sequences', () => {
     });
 });
 
+
+// The palette below a statement box holds a button per symbol, and the row has to stay one line
+// long: the number systems and the Greek alphabet are folded into dropdowns rather than taking a
+// button each, and ∼ and ∣ have none at all, since ~ and | already type them.
+test.describe('The symbol palette', () => {
+    test.beforeEach(async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.openChooser();
+        await page.click('#customLevel');
+    });
+
+    // What the row is for: it wrapped onto a second line before the dropdowns took the bulk of it.
+    test('fits on a single line', async ({ page }) => {
+        const row = await page.evaluate(() => {
+            const pal = document.getElementById('conclPalette');
+            return {
+                height: pal.getBoundingClientRect().height,
+                tallest: Math.max(...Array.from(pal.children).map((k) => k.getBoundingClientRect().height)),
+            };
+        });
+        // A second line would take the row to twice the height of the tallest thing on it.
+        expect(row.height).toBeLessThan(row.tallest * 2);
+    });
+
+    test('offers the number systems and the Greek alphabet in dropdowns', async ({ page }) => {
+        const menus = await page.evaluate(() => Array.from(document.querySelectorAll('#conclPalette select'))
+            .map((s) => Array.from(s.options).map((o) => o.textContent)));
+        const [numbers, greek] = menus;
+
+        expect(numbers[0]).toBe('numbers');
+        expect(numbers).toEqual(expect.arrayContaining(['ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊']));
+        expect(greek[0]).toBe('Greek');
+        expect(greek).toEqual(expect.arrayContaining(['α', 'δ', 'ε', 'λ', 'π', 'ω']));
+        // Whatever they hold is no longer a button, and the connectives are still buttons.
+        const buttons = await page.evaluate(() => Array.from(
+            document.querySelectorAll('#conclPalette .unicode-button')).map((b) => b.textContent));
+        expect(buttons).toEqual(expect.arrayContaining(['∧', '∨', '⇒', '⇔', '¬', '∀', '∃', '∈']));
+        for (const grouped of ['ℕ', 'ℝ₊', '𝕊', 'ε', 'δ']) {
+            expect(buttons).not.toContain(grouped);
+        }
+    });
+
+    test('types what is picked out of a dropdown at the cursor', async ({ page }) => {
+        await page.fill('#conclusion', 'xy');
+        await page.evaluate(() => document.getElementById('conclusion').setSelectionRange(1, 1));
+
+        // ℝ₊ is two characters and 𝕊 one that takes two units to write, so both put the cursor
+        // somewhere a plain "one along" would miss.
+        await page.selectOption('#conclPalette select >> nth=0', 'ℝ₊');
+        expect(await page.inputValue('#conclusion')).toBe('xℝ₊y');
+        expect(await page.evaluate(() => document.getElementById('conclusion').selectionStart)).toBe(3);
+
+        await page.selectOption('#conclPalette select >> nth=1', 'λ');
+        expect(await page.inputValue('#conclusion')).toBe('xℝ₊λy');
+        // Picking the same symbol again still types it, rather than counting as no change.
+        await page.selectOption('#conclPalette select >> nth=1', 'λ');
+        expect(await page.inputValue('#conclusion')).toBe('xℝ₊λλy');
+
+        await page.fill('#conclusion', '');
+        await page.selectOption('#conclPalette select >> nth=0', '𝕊');
+        expect(await page.evaluate(() => document.getElementById('conclusion').selectionStart)).toBe(2);
+    });
+
+    test('leaves ∼ and ∣ to the keyboard keys that look like them', async ({ page }) => {
+        const buttons = await page.evaluate(() => Array.from(
+            document.querySelectorAll('#conclPalette .unicode-button')).map((b) => b.textContent));
+        expect(buttons).not.toContain('∼');
+        expect(buttons).not.toContain('∣');
+        // Which is only reasonable because typing the plain keys still produces them.
+        await page.fill('#conclusion', '');
+        await page.locator('#conclusion').pressSequentially('x~y|z');
+        expect(await page.inputValue('#conclusion')).toBe('x∼y∣z');
+    });
+});
