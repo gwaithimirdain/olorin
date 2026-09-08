@@ -513,7 +513,7 @@ test.describe('The symbol palette', () => {
             .map((s) => Array.from(s.options).map((o) => o.textContent)));
         const [numbers, greek] = menus;
 
-        expect(numbers[0]).toBe('numbers');
+        expect(numbers[0]).toBe('sets');
         expect(numbers).toEqual(expect.arrayContaining(['ℕ', 'ℤ', 'ℚ', 'ℝ', 'ℝ₊', 'ℂ', '𝕊']));
         expect(greek[0]).toBe('Greek');
         expect(greek).toEqual(expect.arrayContaining(['α', 'δ', 'ε', 'λ', 'π', 'ω']));
