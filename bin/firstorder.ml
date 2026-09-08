@@ -1186,7 +1186,8 @@ let install_notations () =
 (* Some definitions can't be typechecked as part of the startup code above, because they depend on
    things that install_notations sets up: notably the subtyping relations between the number types,
    which add_subtypes only installs at the very end.  (For instance, 𝕊.finite below bounds the
-   absolute value of a superreal by a *real* u, which typechecks only once ℝ≤𝕊 exists.)  Those
+   absolute value of a superreal by a *real* u, which typechecks only once ℝ≤𝕊 exists, and
+   ℝ.archimedean compares a real to a *natural* number n, which needs ℕ≤ℝ.)  Those
    definitions go here instead, in secondary startup code that gets loaded after install_notations
    by load_secondary_startup.  Like the primary startup code, this is executed with a fresh file
    origin, whose notation situation is inherited from the toplevel rather than from the interactive
@@ -1206,6 +1207,7 @@ def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ 𝕊.lt (𝕊.abs 
 notation(0) x \"is\" \"infinitesimal\" ≔ 𝕊.infinitesimal x
 def 𝕊.infclose (x y : 𝕊) : Type ≔ 𝕊.infinitesimal (𝕊.minus x y)
 notation(0) x \"≈\" y ≔ 𝕊.infclose x y
+axiom ℝ.archimedean (x : ℝ) : exists ℕ (n ↦ ℝ.lt x n)
 "
 
 (* Load that code, in the same way that run_top loads its non-interactive inputs: the string sees

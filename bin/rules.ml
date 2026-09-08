@@ -48,7 +48,15 @@ type rule =
   | Algebra of { plus : bool }
   | Var
   | Conclusion
-  | User of { consts : string list list; inputs : string list }
+  | User of {
+      consts : string list list;
+      inputs : string list;
+      (* Some user axioms conclude an existential statement.  Rather than making the player follow
+         such a block with a separate ∃-elimination, it destructs its own conclusion, handing out
+         one output port per component of the constructor, exactly as a Coconstr does.  When this
+         is None the block has the usual single unlabeled output carrying the conclusion itself. *)
+      outputs : (Constr.t * (bool * string) list) option;
+    }
 
 (* Here are the specific rules currently used in graphs.  The port labels used here have to match those used in the JavaScript.  It would be better if the JavaScript could get them from here. *)
 let rules =
@@ -182,17 +190,32 @@ let rules =
             consts =
               [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
             inputs = [ "x"; "y"; "xy0" ];
+            outputs = None;
           } );
       ( "deceq",
         User
           {
             consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
             inputs = [ "x"; "y" ];
+            outputs = None;
           } );
       ( "tord",
         User
           {
             consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
             inputs = [ "x"; "y" ];
+            outputs = None;
+          } );
+      (* The Archimedean property: every real is below some natural number.  The axiom concludes an
+         ∃, so the block destructs it, giving out the natural number n it produces on a value port
+         and the proof that x<n on another.  There is no 𝕊 version: the superreals are exactly the
+         number system where this fails. *)
+      ( "arch",
+        User
+          {
+            consts = [ [ "ℝ"; "archimedean" ] ];
+            inputs = [ "x" ];
+            outputs =
+              Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
           } );
     ]

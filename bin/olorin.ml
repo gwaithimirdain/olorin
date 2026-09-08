@@ -326,6 +326,55 @@ let ensure_synth (tm : term_with_bindables located) (err : string) :
   | { value = { bindables; term = _ }; loc } ->
       (locate_opt loc (Named.Fail (Nonsynthesizing err)), bindables)
 
+(* Destruct a synthesizing term belonging to a one-constructor type, handing out one output port of
+   the vertex for each component of that constructor: the term is matched against the constructor,
+   and each output port becomes one of the variables the branch binds, with the match itself
+   deferred as a bindable to be wrapped around whatever body eventually uses those variables.  The
+   Coconstr rule does this to the term on its input wire; a User rule whose axiom concludes an
+   existential statement does it to the term it builds by applying that axiom.  The 'named' flag on
+   an output says that it carries a value the player names, so it gets the vertex's variable name.
+   'name' is that name, and 'loc' locates the variables the branch binds. *)
+let destruct_constr (source : Port.t) (name : string option) (constr : Constr.t)
+    (outputs : (bool * string) list) (tm : unit Named.synth located) (bindables : Bindables.t)
+    (variables : PortSet.t) : term_with_bindables * PortSet.t =
+  let names =
+    List.map
+      (fun (named, label) : name ->
+        {
+          name = (if named then name else None);
+          port = Some { source with sort = Output; label = Some label };
+        })
+      outputs in
+  let (Wrap vars) = Vec.of_list names in
+  let vars = namevec_of_vec vars in
+  let bindables =
+    Bindables.add bindables names
+      {
+        used = variables;
+        bind =
+          (fun body ->
+            let branch = Named.Branch (locate_opt tm.loc vars, `Normal None, body) in
+            let branches = Snoc (Emp, (constr, branch)) in
+            Synth
+              (Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] }));
+        sbind =
+          (fun body ->
+            let branch =
+              Named.Branch
+                (locate_opt tm.loc vars, `Normal None, locate_opt body.loc (Named.Synth body.value))
+            in
+            let branches = Snoc (Emp, (constr, branch)) in
+            Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] });
+      } in
+  let variables =
+    List.fold_right
+      (fun (x : name) vars ->
+        match x.port with
+        | Some p -> PortSet.add p vars
+        | None -> vars)
+      names variables in
+  ({ bindables; term = Synth (Var (`Port source, None)) }, variables)
+
 (* From graphs to raw terms with named variables *)
 
 (* The fundamental operation takes an output port and produces a raw term with named variables, where as above the "names" might be user-visible strings or hypothesis/assumption ports.  We thread through a set 'seen' that tracks which vertices have been seen, to detect cycles.  We attach Asai "locations" to parts of this term that correspond to *edges* in the graph.  We report as an additional result the set of variable ports on which this term depends.  The optional edge is used to annotate outputs. *)
@@ -643,43 +692,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let tm, bindables = ensure_synth tm "coconstr input" in
-          let names =
-            List.map
-              (fun (named, label) : name ->
-                {
-                  name = (if named then source_vertex.name else None);
-                  port = Some { source with sort = Output; label = Some label };
-                })
-              outputs in
-          let (Wrap vars) = Vec.of_list names in
-          let vars = namevec_of_vec vars in
-          let bindables =
-            Bindables.add bindables names
-              {
-                used = variables;
-                bind =
-                  (fun body ->
-                    let branch = Named.Branch (locate_opt tm.loc vars, `Normal None, body) in
-                    let branches = Snoc (Emp, (constr, branch)) in
-                    Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] }));
-                sbind =
-                  (fun body ->
-                    let branch =
-                      Named.Branch
-                        ( locate_opt tm.loc vars,
-                          `Normal None,
-                          locate_opt body.loc (Named.Synth body.value) ) in
-                    let branches = Snoc (Emp, (constr, branch)) in
-                    Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] });
-              } in
-          let variables =
-            List.fold_right
-              (fun (x : name) vars ->
-                match x.port with
-                | Some p -> PortSet.add p vars
-                | None -> vars)
-              names variables in
-          ({ bindables; term = Synth (Var (`Port source, None)) }, variables)
+          destruct_constr source source_vertex.name constr outputs tm bindables variables
       | Asc ->
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
@@ -752,7 +765,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     (locate_opt None (Named.ImplicitSApp (oracle, None, locate_opt None givens)), [])))
           in
           ({ bindables; term }, variables)
-      | User { consts; inputs } ->
+      | User { consts; inputs; outputs } ->
           let bindables, variables, args =
             List.fold_left
               (fun (bindables, variables, args) label ->
@@ -778,7 +791,14 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     args,
                   true ))
               consts in
-          ({ bindables; term = Synth (SFirst (terms, None)) }, variables) in
+          let tm = Named.SFirst (terms, None) in
+          (* A block that destructs its own conclusion hands out its components on output ports, as
+             a Coconstr does; otherwise the application itself is what its single output carries. *)
+          (match outputs with
+          | None -> ({ bindables; term = Synth tm }, variables)
+          | Some (constr, outputs) ->
+              destruct_constr source source_vertex.name constr outputs (locate !loc tm) bindables
+                variables) in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments.  The assumptions, given with the

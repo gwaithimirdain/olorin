@@ -995,6 +995,29 @@ function addEndpointsForRule(box, id, restore) {
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    } else if (id === 'arch') {
+        // The Archimedean property: a real number in, and the natural number above it out
+        // alongside the proof that it is above it.  The block destructs the ∃ its axiom concludes,
+        // so like ∃-elimination it binds a variable and hands it out on a value port.  The number
+        // system is fixed here -- the axiom is about ℝ -- so no unknownSet on the input.
+        instance.addEndpoint(box, {
+            anchor: "Left",
+            target: true,
+            parameters: { sort: "input", label: "x", hasValue: true },
+            paintStyle: { fill: VALUECOLOR },
+        });
+        instance.addEndpoint(box, {
+            anchor: [1, 0.2, 1, 0],
+            source: true, maxConnections: -1,
+            parameters: { sort: "output", label: "element", hasValue: true, side: "upper" },
+            paintStyle: { fill: VALUECOLOR },
+            connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
+        });
+        instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        // Double-clicking the box re-opens the dialog to rename the variable it binds.
+        box.addEventListener('dblclick', function () { editVariable(box); });
+        if(!restore) { getVariable(box.id); }
+        typecheck_now = false;
     }
     return typecheck_now;
 }

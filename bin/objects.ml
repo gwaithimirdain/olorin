@@ -124,10 +124,11 @@ module PortSet = Set.Make (Port)
 let outputs_of_vertex (v : Vertex.t) : Port.t list =
   let vertex, sort = (v.id, Sort.Output) in
   match v.rule with
-  (* Currently Fields and Coconstrs are the only kind of vertex that has multiple output ports. *)
+  (* Fields, Coconstrs, and the User rules that destruct their own conclusion are the kinds of
+     vertex that have multiple output ports. *)
   | Fields { outputs } ->
       List.map (fun (_, label) : Port.t -> { vertex; sort; label = Some label }) outputs
-  | Coconstr { outputs; constr = _ } ->
+  | Coconstr { outputs; constr = _ } | User { outputs = Some (_, outputs); _ } ->
       List.map (fun (_, label) : Port.t -> { vertex; sort; label = Some label }) outputs
   (* While the conclusion has zero. *)
   | Conclusion -> []
