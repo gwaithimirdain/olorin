@@ -35,6 +35,11 @@ const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '
 // hasn't got a key for.
 const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴', 'ε', 'δ'];
 
+// A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
+// mathematician does reach for is a Greek letter, so its box offers the lowercase alphabet (see
+// KEYS below for why omicron isn't in it).
+const VARNAME_PALETTE = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
+
 // For some unfathomable reason this is not built into JavaScript
 function escapeRegex(string) {
     return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -78,8 +83,32 @@ const KEYS = [
     { unicode: 'ℝ', keys: [ '\\R ' ] },
     { unicode: 'ℂ', keys: [ '\\C ' ] },
     { unicode: '𝕊', keys: [ '\\S ' ] },
-    { unicode: 'ε', keys: [ '\\eps ', '\\epsilon ' ] },
+    // The lowercase Greek alphabet, under its TeX name.  Omicron is left out: it is identical to a
+    // Latin o, so offering it could only produce two variable names nobody can tell apart.  None of
+    // these sequences contains another shortcut, so they can sit together in alphabetical order.
+    { unicode: 'α', keys: [ '\\alpha ' ] },
+    { unicode: 'β', keys: [ '\\beta ' ] },
+    { unicode: 'γ', keys: [ '\\gamma ' ] },
     { unicode: 'δ', keys: [ '\\delta ' ] },
+    { unicode: 'ε', keys: [ '\\eps ', '\\epsilon ' ] },
+    { unicode: 'ζ', keys: [ '\\zeta ' ] },
+    { unicode: 'η', keys: [ '\\eta ' ] },
+    { unicode: 'θ', keys: [ '\\theta ' ] },
+    { unicode: 'ι', keys: [ '\\iota ' ] },
+    { unicode: 'κ', keys: [ '\\kappa ' ] },
+    { unicode: 'λ', keys: [ '\\lambda ' ] },
+    { unicode: 'μ', keys: [ '\\mu ' ] },
+    { unicode: 'ν', keys: [ '\\nu ' ] },
+    { unicode: 'ξ', keys: [ '\\xi ' ] },
+    { unicode: 'π', keys: [ '\\pi ' ] },
+    { unicode: 'ρ', keys: [ '\\rho ' ] },
+    { unicode: 'σ', keys: [ '\\sigma ' ] },
+    { unicode: 'τ', keys: [ '\\tau ' ] },
+    { unicode: 'υ', keys: [ '\\upsilon ' ] },
+    { unicode: 'φ', keys: [ '\\phi ' ] },
+    { unicode: 'χ', keys: [ '\\chi ' ] },
+    { unicode: 'ψ', keys: [ '\\psi ' ] },
+    { unicode: 'ω', keys: [ '\\omega ' ] },
     // ··2 is what typing **2 leaves behind, each * having already become a ·
     { unicode: '²', keys: [ '^2', '**2', '··2' ] },
     { unicode: '³', keys: [ '^3', '**3', '··3' ] },
@@ -3266,6 +3295,7 @@ makePalette('conclPalette', 'conclusion');
 makePalette('ascPalette', 'ascribe');
 makePalette('wirePalette', 'wire');
 makePalette('exprPalette', 'expression', EXPR_PALETTE);
+makePalette('varnamePalette', 'newvar', VARNAME_PALETTE);
 
 var shortcuts = document.getElementById('shortcuts');
 var shortcut_thead = document.createElement('thead');
