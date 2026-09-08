@@ -217,3 +217,22 @@ test('ℝ₊ is reserved, so no bound variable can be named it', async ({ page }
     expect(await page.evaluate(() => window.Narya.checkVariable('ℝ₊').complete)).toBe(false);
     expect(await page.evaluate(() => window.Narya.checkVariable('ℝ').complete)).toBe(true);
 });
+
+// The lexer skips whatever space surrounds a name, so the checks that a name isn't reserved, and
+// doesn't start with a numeral, have to be made against the name the lexer found rather than the
+// string as typed: against the latter, padding waved anything at all through.
+test('and padding it does not smuggle it past that check', async ({ page }) => {
+    const olorin = new Olorin(page);
+    await olorin.open();
+    await olorin.buildCustom();
+    const check = (v) => page.evaluate((s) => window.Narya.checkVariable(s).complete, v);
+    for (const padded of [' ℝ₊', 'ℝ₊ ', '  ℝ₊  ']) {
+        expect(await check(padded), padded).toBe(false);
+    }
+    // Nor may a variable begin with a numeral, however it's padded.
+    expect(await check('0x')).toBe(false);
+    expect(await check(' 0x')).toBe(false);
+    expect(await check(' 9')).toBe(false);
+    // Padding an ordinary name is just padding, though: the name it spells is a fine one.
+    expect(await check(' z ')).toBe(true);
+});

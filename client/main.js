@@ -2945,11 +2945,15 @@ function submitNewVariable() {
     const box = document.getElementById(newvar.dataset.name);
     // When renaming, the name this box binds now is the one being replaced, so it isn't taken.
     const previous = newvar.dataset.editing === "true" ? box.dataset.variable : undefined;
+    // Narya reads a name the same however it's padded, so " z" and "z" are one variable, not two:
+    // compare and store the trimmed name, or the checks below would let a padded copy of a name
+    // already in use slip past them.
+    const name = newvar.value.trim();
 
-    if(!Narya.checkVariable(newvar.value).complete) {
+    if(!Narya.checkVariable(name).complete) {
         alert("Invalid variable name");
         newvar.focus();
-    } else if(varnames.includes(newvar.value) && newvar.value !== previous) {
+    } else if(varnames.includes(name) && name !== previous) {
         // Enforce the Barendregt convention.
         alert("New variable name must be different from all existing variables");
         newvar.focus();
@@ -2958,15 +2962,15 @@ function submitNewVariable() {
         if(previous !== undefined) {
             varnames = varnames.filter(function (v) { return v !== previous; });
         }
-        varnames.push(newvar.value);
+        varnames.push(name);
         // Attach it to the node that prompted for it.  NOTE: This doesn't allow a single node to contain more than one variable name.
         for (var i in nodes) {
             if (nodes[i].id === newvar.dataset.name) {
-                nodes[i].name = newvar.value;
+                nodes[i].name = name;
             }
         }
         // Save the variable associated to the rule box.  This allows us to remove it from the global list of used variables when that rule is deleted.
-        box.dataset.variable = newvar.value;
+        box.dataset.variable = name;
         // And empty and hide the modal dialog
         newvar.value = '';
         newvar.dataset.editing = "";

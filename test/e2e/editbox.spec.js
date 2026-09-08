@@ -287,6 +287,33 @@ test.describe('Boxes that bind a variable', () => {
         expect(await boundName(page, id)).toBe('y');
     });
 
+    // Narya reads a name the same however it's padded, so a padded copy of a name already in use
+    // is that same variable, and must be refused rather than bound a second time.
+    test('and so is one that differs only by surrounding space', async ({ page }) => {
+        const id = await olorin.dragRule('allI', 420, 240);
+        await enterVariable(page, 'y');
+
+        for (const padded of [' x', 'x ', '  x  ']) {
+            await page.dblclick('#' + id);
+            await page.fill('#newvar', padded); // the level's own variable, padded
+            await page.click('#submitVariable');
+            await expect(page.locator('#variableBG')).toBeVisible();
+            await page.click('#cancelVariable');
+            expect(await boundName(page, id)).toBe('y');
+        }
+        expect(await olorin.varnames()).toEqual(expect.arrayContaining(['x', 'y']));
+    });
+
+    test('a padded name that is free is accepted, and kept without the padding', async ({ page }) => {
+        const id = await olorin.dragRule('allI', 420, 240);
+        await enterVariable(page, '  w  ');
+
+        expect(await page.isVisible('#variableBG')).toBe(false);
+        expect(await boundName(page, id)).toBe('w');
+        expect((await olorin.nodes()).find((n) => n.id === id).name).toBe('w');
+        expect(await olorin.varnames()).toContain('w');
+    });
+
     // Renaming can't reach into text the player wrote by hand, so the dialog says so when the
     // proof has anywhere that could contain it.
     const warning = (page) => page.evaluate(() => {
