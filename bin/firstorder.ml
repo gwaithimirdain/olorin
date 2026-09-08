@@ -1152,6 +1152,7 @@ let install_notations () =
     Scope.Situation.add_user
       (User
          {
+           id = User.Id.make ();
            name = "divisible";
            fixity = Infix No.zero;
            pattern = Var (("a", `Nobreak, []), Var_nil ((Ident [ "∣" ], `Nobreak, []), ("b", [])));
@@ -1162,6 +1163,7 @@ let install_notations () =
     Scope.Situation.add_user
       (User
          {
+           id = User.Id.make ();
            name = "congruent";
            fixity = Postfix No.zero;
            pattern =

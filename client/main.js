@@ -1,4 +1,4 @@
-import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
+import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
@@ -124,6 +124,18 @@ var naryaInited = false;
 
 // connections to close buttons
 var connectionCloseButtons = {};
+
+// The wire, if any, whose tooltip/close-button is currently shown, and the wire, if any,
+// that's pinned open by a tap (for touchscreens, which have no hover state to reveal these
+// via mouseover; see pinConnection/unpinConnection below).
+var activeConnectionId = null;
+var pinnedConnectionId = null;
+
+// A touch device fires a tap's connection-tap event twice -- once from the raw touch, once more
+// from the compatibility mouse events the browser synthesizes right after -- so the second one
+// must be ignored rather than read as the user tapping again to toggle the pin back off.
+var lastTapConnectionId = null;
+var lastTapTime = 0;
 
 // difficulty setting
 var difficulty = 0;
@@ -470,7 +482,7 @@ ready(() => {
             },
         },
         connector: FlowchartConnector.type,
-        paintStyle: { stroke: "#000000", strokeWidth: 2 },
+        paintStyle: { stroke: "#000000", strokeWidth: 2, outlineWidth: 6, outlineStroke: "transparent" },
         endpointStyle: { fill: "#000000" },
         reattachConnections: true,
         connectionOverlays: [
@@ -492,6 +504,7 @@ ready(() => {
                         closebutton.className = "closebutton";
                         closebutton.innerText = "X";
                         closebutton.addEventListener('click', function () {
+                            if(pinnedConnectionId === conn.id) { unpinConnection(); }
                             instance.deleteConnection(conn);
                             typecheck();
                         });
@@ -505,6 +518,7 @@ ready(() => {
 
     // Make close buttons on connections appear on hover, and stay for a second
     instance.bind(EVENT_CONNECTION_MOUSEOVER, (conn, e) => {
+        activeConnectionId = conn.id;
         showWireTooltip(conn, e);
         if(connectionCloseButtons[conn.id]) {
             connectionCloseButtons[conn.id].button.style.visibility = 'visible';
@@ -515,12 +529,48 @@ ready(() => {
         }
     });
     instance.bind(EVENT_CONNECTION_MOUSEOUT, (conn) => {
-        hideWireTooltip();
+        // A tap-pinned wire (see below) stays open till it's explicitly unpinned: touchscreens
+        // fire a compatibility mouseout with no real hover to back it, and it shouldn't undo the pin.
+        if(pinnedConnectionId === conn.id) { return; }
+        if(activeConnectionId === conn.id) {
+            hideWireTooltip();
+            activeConnectionId = null;
+        }
         if(connectionCloseButtons[conn.id]) {
             if(connectionCloseButtons[conn.id].timeout) {
                 clearTimeout(connectionCloseButtons[conn.id].timeout);
             }
             connectionCloseButtons[conn.id].timeout = setTimeout(function () { connectionCloseButtons[conn.id].button.style.visibility = 'hidden'; }, 1000);
+        }
+    });
+
+    // Touchscreens have no hover state, so tapping a wire pins its close button and error
+    // tooltip open (tap it again, tap elsewhere, or delete it to close); this fires for mouse
+    // clicks too, which is a harmless bonus there since hover already does the job.
+    instance.bind(EVENT_CONNECTION_TAP, (conn, e) => {
+        // Ignore the touch/mouse duplicate of the tap that just fired (see lastTapConnectionId above).
+        const now = Date.now();
+        if(conn.id === lastTapConnectionId && now - lastTapTime < 300) { return; }
+        lastTapConnectionId = conn.id;
+        lastTapTime = now;
+        if(pinnedConnectionId === conn.id) {
+            unpinConnection();
+        } else {
+            unpinConnection();
+            pinnedConnectionId = conn.id;
+            activeConnectionId = conn.id;
+            showWireTooltip(conn, e);
+            if(connectionCloseButtons[conn.id]) {
+                clearTimeout(connectionCloseButtons[conn.id].timeout);
+                connectionCloseButtons[conn.id].timeout = undefined;
+                connectionCloseButtons[conn.id].button.style.visibility = 'visible';
+            }
+        }
+    });
+    // Tapping/clicking anywhere that isn't a wire, its close button, or the tooltip unpins.
+    document.addEventListener('click', (e) => {
+        if(pinnedConnectionId != null && !e.target.closest('.jtk-connector, .closebutton, #wireTooltip')) {
+            unpinConnection();
         }
     });
 
@@ -2895,11 +2945,15 @@ function submitNewVariable() {
     const box = document.getElementById(newvar.dataset.name);
     // When renaming, the name this box binds now is the one being replaced, so it isn't taken.
     const previous = newvar.dataset.editing === "true" ? box.dataset.variable : undefined;
+    // Narya reads a name the same however it's padded, so " z" and "z" are one variable, not two:
+    // compare and store the trimmed name, or the checks below would let a padded copy of a name
+    // already in use slip past them.
+    const name = newvar.value.trim();
 
-    if(!Narya.checkVariable(newvar.value).complete) {
+    if(!Narya.checkVariable(name).complete) {
         alert("Invalid variable name");
         newvar.focus();
-    } else if(varnames.includes(newvar.value) && newvar.value !== previous) {
+    } else if(varnames.includes(name) && name !== previous) {
         // Enforce the Barendregt convention.
         alert("New variable name must be different from all existing variables");
         newvar.focus();
@@ -2908,15 +2962,15 @@ function submitNewVariable() {
         if(previous !== undefined) {
             varnames = varnames.filter(function (v) { return v !== previous; });
         }
-        varnames.push(newvar.value);
+        varnames.push(name);
         // Attach it to the node that prompted for it.  NOTE: This doesn't allow a single node to contain more than one variable name.
         for (var i in nodes) {
             if (nodes[i].id === newvar.dataset.name) {
-                nodes[i].name = newvar.value;
+                nodes[i].name = name;
             }
         }
         // Save the variable associated to the rule box.  This allows us to remove it from the global list of used variables when that rule is deleted.
-        box.dataset.variable = newvar.value;
+        box.dataset.variable = name;
         // And empty and hide the modal dialog
         newvar.value = '';
         newvar.dataset.editing = "";
@@ -3371,6 +3425,20 @@ function hideWireTooltip() {
     document.getElementById("wireTooltip").style.display = 'none';
 }
 
+// Close whichever wire a tap has pinned open (see EVENT_CONNECTION_TAP above).
+function unpinConnection() {
+    if(pinnedConnectionId == null) { return; }
+    const id = pinnedConnectionId;
+    pinnedConnectionId = null;
+    if(activeConnectionId === id) {
+        hideWireTooltip();
+        activeConnectionId = null;
+    }
+    if(connectionCloseButtons[id]) {
+        connectionCloseButtons[id].button.style.visibility = 'hidden';
+    }
+}
+
 // Set the color of a connection
 function setStrokeColor(conn, color) {
     const sty = conn.getPaintStyle();
@@ -3408,6 +3476,13 @@ function getUserLabel(edge, editing) {
     wire.focus();
 }
 
+// Where a port sits along the diagram's x axis.  jsPlumb caches this as each endpoint is painted
+// and recomputes it on demand, so it is available even for a wire being restored into a diagram
+// that hasn't been drawn yet.  (getEndpointLocation isn't published in the community edition.)
+function portX(endpoint) {
+    return instance.router.getEndpointLocation(endpoint).curX;
+}
+
 function addConnection(params) {
     const edge = params.connection;
     // While restoring a saved proof, we set the wire labels ourselves and typecheck once at the end, so we skip the prompt/typecheck here (but still apply the connector styling below).
@@ -3426,29 +3501,29 @@ function addConnection(params) {
             getUserLabel(edge, false);
         }
     }
-    // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
-    if(edge.source == edge.target) {
-        // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
-        // two agree.  A block with only one subgoal leaves it unlabelled, and then every
-        // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
-        // bind the condition defining their set on a labelled port beside the unlabelled one that
-        // binds the variable.
-        const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
-        if(from.sort === 'assumption' && to.sort === 'subgoal' &&
-           (to.label === undefined || from.label === to.label)) {
-            // This method isn't published in the jsPlumb community edition, but it's still there!
-            edge._setConnector(StraightConnector.type);
-        } else {
-            // Other cyclic connections are ill-typed, but should at least be displayed looking okay, and Bezier connectors can't handle it.
-            edge._setConnector(FlowchartConnector.type);
-        }
-    } else {
+    // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
+    // two agree.  A block with only one subgoal leaves it unlabelled, and then every
+    // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
+    // bind the condition defining their set on a labelled port beside the unlabelled one that
+    // binds the variable.
+    const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
+    const selfLoop = edge.source == edge.target;
+    if(selfLoop && from.sort === 'assumption' && to.sort === 'subgoal' &&
+       (to.label === undefined || from.label === to.label)) {
+        // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
+        // This method isn't published in the jsPlumb community edition, but it's still there!
+        edge._setConnector(StraightConnector.type);
+    } else if(selfLoop && portX(edge.endpoints[1]) < portX(edge.endpoints[0])) {
+        // A wire that runs back to a port left of where it started has to double back on itself,
+        // which a Bezier connector can't draw without looping over the block.  A self-connection
+        // that still runs forwards -- one branch's assumption into another branch's subgoal, say --
+        // is drawn like any other wire, so it follows the selected style below.
+        edge._setConnector(FlowchartConnector.type);
+    } else if(document.getElementById("angleConnectors").checked) {
         // If the target of a connection is moved to be non-cyclic, reset it to the selected style.
-        if(document.getElementById("angleConnectors").checked) {
-            edge._setConnector(FlowchartConnector.type);
-        } else if(document.getElementById("curvedConnectors").checked) {
-            edge._setConnector(BezierConnector.type);
-        }
+        edge._setConnector(FlowchartConnector.type);
+    } else if(document.getElementById("curvedConnectors").checked) {
+        edge._setConnector(BezierConnector.type);
     }
     // For some reason setting the connector type blows away the Arrow overlay, although it doesn't affect the Custom close-button overlay.
     edge.addOverlay({

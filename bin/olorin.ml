@@ -1511,17 +1511,19 @@ let _ =
          (* We have to put it in the Pauser too, since the lexer has to perform some effects. *)
          Pauser.next @@ fun () ->
          let str = Js.to_string str in
+         (* The lexer skips whatever space surrounds the name, so it is the identifier it came back
+            with, and not the string as typed, that the restrictions below have to be tested
+            against: comparing the raw string would let " ℝ₊" or " 0x" past every one of them. *)
          let ok =
            match Parser.Lexer.single str with
-           | Some (Ident [ _ ]) -> true
+           | Some (Ident [ name ]) ->
+               (* Unlike vanilla Narya, we don't let the user shoot themselves in the foot by starting a variable with a numeral or using a special one-character operator. *)
+               (not ('0' <= name.[0] && name.[0] <= '9'))
+               && (not (Array.exists (fun (_, x) -> x = Token.Ident [ name ]) onechar_ops))
+               (* Nor one of the multi-character tokens that a notation reserves, like the ℝ₊ that
+                  says which set a quantifier ranges over. *)
+               && not (List.mem (Token.Ident [ name ]) special_set_idents)
            | _ -> false in
-         (* Unlike vanilla Narya, we don't let the user shoot themselves in the foot by starting a variable with a numeral or using a special one-character operator. *)
-         let ok = ok && not ('0' <= str.[0] && str.[0] <= '9') in
-         (* We have to return *)
-         let ok = ok && not (Array.exists (fun (_, x) -> x = Token.Ident [ str ]) onechar_ops) in
-         (* Nor one of the multi-character tokens that a notation reserves, like the ℝ₊ that says
-            which set a quantifier ranges over. *)
-         let ok = ok && not (List.mem (Token.Ident [ str ]) special_set_idents) in
          (* And since the Pauser always returns the same type, we have to return a js_checked, so we just put the validity test in the 'complete' field. *)
          object%js
            val mutable complete = Js.bool ok
