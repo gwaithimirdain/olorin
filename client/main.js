@@ -995,17 +995,40 @@ function addEndpointsForRule(box, id, restore) {
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-    } else if (id === 'arch') {
-        // The Archimedean property: a real number in, and the natural number above it out
-        // alongside the proof that it is above it.  The block destructs the ∃ its axiom concludes,
-        // so like ∃-elimination it binds a variable and hands it out on a value port.  The number
-        // system is fixed here -- the axiom is about ℝ -- so no unknownSet on the input.
+    } else if (id === 'omega') {
+        // A real number in, and the statement that it is below ω out.  Nothing is bound and
+        // nothing is taken apart, so this is the plainest shape there is: one value port in, one
+        // statement out.
         instance.addEndpoint(box, {
             anchor: "Left",
             target: true,
             parameters: { sort: "input", label: "x", hasValue: true },
             paintStyle: { fill: VALUECOLOR },
         });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+    } else if (id === 'arch' || id === 'zton' || id === 'frac') {
+        // The blocks whose axiom produces a number: the Archimedean property, which takes a real
+        // and gives a natural above it; ℤ→ℕ, which takes a nonnegative integer and gives the
+        // natural number it is equal to; and frac, which takes a rational and gives the numerator
+        // of its lowest-terms fraction.  Each destructs the ∃ its axiom concludes, so like
+        // ∃-elimination it binds a variable and hands it out on a value port, with the statement
+        // about it on a second port -- for frac that statement is the inner ∃ naming the
+        // denominator, which the player opens with an ∃-elimination of their own.  The number
+        // system is fixed by the axiom in each case, so there is no unknownSet on the inputs.
+        // ℤ→ℕ takes the proof that x is nonnegative on an input of its own, below the value port
+        // for x; the other two take only the number.
+        const two = (id === 'zton');
+        instance.addEndpoint(box, {
+            anchor: (two ? [0, 0.2, -1, 0] : "Left"),
+            target: true,
+            parameters: (two
+                         ? { sort: "input", label: "x", hasValue: true, side: "upper" }
+                         : { sort: "input", label: "x", hasValue: true }),
+            paintStyle: { fill: VALUECOLOR },
+        });
+        if(two) {
+            instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "nonneg", side: "lower"} });
+        }
         instance.addEndpoint(box, {
             anchor: [1, 0.2, 1, 0],
             source: true, maxConnections: -1,

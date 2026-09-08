@@ -218,4 +218,30 @@ let rules =
             outputs =
               Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
           } );
+      (* An integer that is at least zero is a natural number.  The proof that it is nonnegative is
+         an input of its own, alongside the integer; what comes out is that natural number and the
+         equation identifying it with the integer we started from. *)
+      ( "zton",
+        User
+          {
+            consts = [ [ "ℤ"; "tonat" ] ];
+            inputs = [ "x"; "nonneg" ];
+            outputs =
+              Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
+          } );
+      (* Every rational is a fraction in lowest terms.  Its axiom concludes two nested ∃s, one for
+         the numerator and one for the denominator, and a block binds one variable, so this one
+         destructs only the outer: out come the numerator and the statement ∃b∈ℤ,… about it, which
+         the player opens with an ordinary ∃-elimination to name the denominator. *)
+      ( "frac",
+        User
+          {
+            consts = [ [ "ℚ"; "frac" ] ];
+            inputs = [ "x" ];
+            outputs =
+              Some (Constr.intern "exists", [ (true, "element"); (false, "property") ]);
+          } );
+      (* Every real number is smaller than ω.  This one concludes a relation rather than an ∃, so it
+         has the ordinary single output, carrying x<ω. *)
+      ("omega", User { consts = [ [ "ℝ"; "ltomega" ] ]; inputs = [ "x" ]; outputs = None });
     ]
