@@ -159,6 +159,17 @@ let explain : Code.t -> string option = function
             ("This block proves " ^ shape ^ ", but the goal it's wired to is" ^ display ty
            ^ "which isn't of that form.")
       | _, _ -> None)
+  (* An introduction block wired to a goal that's a record of the right general kind, but the
+     wrong specific one -- e.g. an ordinary ∀-introduction wired to a ∀x∈ℝ₊ or ∀x∈[n] goal.  ∧, ⇒,
+     ⇔, ∀ and ¬ are all single- or two-field records that share this checking path, so unlike
+     Checking_tuple_at_nonrecord (the goal isn't a record at all) this fires when it is one, just
+     not the one this block builds.  The payload only names the field the goal wanted, not what
+     the block actually supplied. *)
+  | Missing_field_in_tuple (f, _) -> (
+      match connective_of_field (Field.to_string f) with
+      | Some shape ->
+          Some ("This block doesn't prove " ^ shape ^ ", but the goal it's wired to needs exactly that.")
+      | None -> None)
   (* An elimination block fed something that isn't of the shape it takes apart.  The payload names
      the offending term rather than its type, and that term is an internal variable, so we describe
      only the shape the block wanted. *)
