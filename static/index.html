@@ -841,17 +841,16 @@
           When you place it, it will prompt you for a statement, and then both its input and its output must be labeled with that statement.
           After placing it, you can double-click on it to change the label.
         </p>
-        <img src="hints/asc.png" style="margin-left: auto; margin-right:auto; display:block">
+        <img src="hints/asc.png" style="margin-left: auto; margin-right:auto; display:block"/>
       </div>
-      <div id="integralHint" class="modal hint" style="width: 600px">
+      <div id="deceqHint" class="modal hint" style="width: 600px">
         <p>
-          The algebra block can only prove equations or inequalities, but there are some important "algebraic" facts that are disjunctions.
-          One is that if the product of two numbers is zero, one or the other of them must be zero.
-          If you need this fact, use the block labeled "?·?=0": give it the two numbers and an assumption that their product is zero, and you'll get out that either the first is is zero or the second is zero.
+          If we don't have any "or" statements as hypotheses, we can still do a case split by using some general fact.
+          For example, the block "=∨≠" gives us access to the fact that any two numbers are either equal or unequal.
+          You have to tell it which numbers to compare by connecting them to its inputs.
         </p>
-        <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block"/>
         <p>
-          Blue ports, such as the first two inputs to this box, must be connected to blue wires, which carry <i>values</i> rather than statements.
+          In general, blue ports, such as the first two inputs to this box, must be connected to blue wires, which carry <i>values</i> rather than statements.
           Blue wires are labeled by the value along with the set it belongs to: <span style="text-color: #0000ff">x ∈ ℤ</span> means the value <i>x</i> belongs to the set <i>ℤ</i>.
           Here are the sets of numbers we'll be using:
           <table style="margin-left: auto; margin-right: auto; border-spacing: 20px 5px">
@@ -866,9 +865,27 @@
           </table>
         </p>
       </div>
-      <div id="deceqHint" class="modal hint" style="width: 600px">
-        In fact, the property "?·?=0" can be proven from the simpler property that everything is either equal to zero or not equal to zero, together with the fact that algebra can divide by anything nonzero.
-        More generally, the block "=∨≠" proves that any two numbers are either equal or unequal; the "expr" block can be used to supply constants such as "0".
+      <div id="exprHint" class="modal hint">
+        If you need an input to a blue "value" port that isn't just a variable, use the "expr" block.
+        This will prompt you for an expression; to change the expression later, double-click the block.
+        You must connect all the variables that occur in your expression to the input port of the expression block.
+        <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block"/>
+        <b>Warning:</b> do not connect any black "statement" wires to a blue "expr" block!
+        And do not connect any blue "value" wires to a black "alg" box!
+        All the inputs to an "alg" box must be <i>equations</i> (or inequalities), as those are the only things I can do algebra with; I can figure out on my own which variables appear in the equations.
+      </div>
+      <div id="expr2Hint" class="modal hint">
+        The expression in an "expr" block does not have to involve any variables at all; it can be just a constant.
+      </div>
+      <div id="integralHint" class="modal hint" style="width: 600px">
+        Once we've proven a certain fact, we can then <i>use</i> that fact in other proofs without needing to re-prove it.
+        For example, we introduce a block "?·?=0" that applies the result of the previous level.
+        </p>
+        <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block"/>
+      </div>
+      <div id="contradictoryAlgebraHint" class="modal hint">
+        If the assumption on one side of a "use ∨" contradicts other facts we know, we can basically ignore that case.
+        However, since formally the subgoals on both sides must be connected to something, we allow the algebra block to "prove" anything at all if it is given multiple inputs that contradict each other.
       </div>
       <div id="totalOrderHint" class="modal hint" style="width: 600px">
         Another important disjunctive fact is that numbers are "totally ordered": given any two numbers, one is less than or equal to the other.
@@ -883,15 +900,6 @@
         (This is basically the definition of absolute value, and applies in any of our ordered number systems ℤ, ℚ, ℝ, 𝕊.)
         The algebra block can't deal with absolute values on its own, but if we give it a hypothesis ensuring that one of these conditions holds, then the absolute value simplifies away and the algebra block takes over.
         (Remember to also write out all the algebraic proofs on paper yourself, though!)
-      </div>
-      <div id="exprHint" class="modal hint">
-        If you need an input to a blue "value" port that isn't just a variable, use the "expr" block.
-        This will prompt you for an expression; to change the expression later, double-click the block.
-        You must connect the input port of the expression block to all the variables that occur in your expression.
-        <img src="hints/expr.png" style="margin-left: auto; margin-right:auto; display:block"/>
-        <b>Warning:</b> do not connect any black "statement" wires to a blue "expr" block!
-        And do not connect any blue "value" wires to a black "alg" box!
-        All the inputs to an "alg" box must be <i>equations</i> (or inequalities), as those are the only things I can do algebra with; I can figure out on my own which variables appear in the equations.
       </div>
     </div>
 

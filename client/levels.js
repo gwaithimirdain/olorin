@@ -547,8 +547,8 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "alg" ],
+          { name: "∨=≠",
+            rules: [ "orI1", "orI2", "orE", "alg", "deceq", "expr" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -580,11 +580,54 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(x-y=0)∨(y≠x)" },
+                    hint: "deceqHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" }, { name: "z", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "x·z+y=x+y·z" } ],
+                    conclusion: { ty: "(x=y)∨(z=1)" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(y=x³)∨(x≠y^(1/3))" },
+                    hint: "exprHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "x²=x" } ],
+                    conclusion: { ty: "(x=0)∨(x=1)" },
+                    hint: "expr2Hint",
+                },
+                { // This level can actually be proven by "algebra" alone, but let's not tell anyone.
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "x²=0" } ],
+                    conclusion: { ty: "x=0" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "a·b=0" } ],
+                    conclusion: { ty: "(a=0)∨(b=0)" },
+                },
+            ],
+          },
+          { name: "∨=",
+            rules: [ "orI1", "orI2", "orE", "alg", "integral", "expr" ],
+            levels: [
+                { // We use different variable names for this one so that Olorin can tell it's different from the previous one.
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x·y=0" } ],
                     conclusion: { ty: "(x=0)∨(y=0)" },
                     trivial: true,
                     autoComplete: true,
-                    extrarules: [ "integral" ],
                     hint: "integralHint",
                     saveable: {
                         parameters: [ ],
@@ -593,35 +636,23 @@ export const LEVELS = [
                         conclusion: { ty: "(x=0)∨(y=0)" },
                     }
                 },
-                { // This level can actually be proven by "algebra" alone without "integral", but let's not tell anyone.
+                {
                     parameters: [ ],
-                    variables: [ { name: "x", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "x²=0" } ],
-                    conclusion: { ty: "x=0" },
-                    extrarules: [ "integral" ],
+                    variables: [ { name: "x", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "x²=9" } ],
+                    conclusion: { ty: "(x=3)∨(x=−3)" },
                 },
                 {
                     parameters: [ ],
-                    variables: [ { name: "x", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "x²=x" } ],
-                    conclusion: { ty: "(x=0)∨(x=1)" },
-                    extrarules: [ "integral", "expr" ],
-                    hint: "exprHint",
-                },
-                { // We use different variable names for this one so that Olorin can tell it's different from the previous one.
-                    parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" }, { name: "b", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "a·b=0" } ],
-                    conclusion: { ty: "(a=0)∨(b=0)" },
-                    extrarules: [ "deceq", "expr" ],
-                    hint: "deceqHint",
+                    variables: [ { name: "x", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "x³−2·x²−x+2=0" } ],
+                    conclusion: { ty: "((x=1)∨(x=−1))∨(x=2)" },
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x²−x−2=0)∨(x²−1=0)" } ],
                     conclusion: { ty: "(x=2)∨((x=1)∨(x=−1))" },
-                    extrarules: [ "integral", "deceq", "expr" ],
                     saveable: {
                         parameters: [ ],
                         variables: [ { name: "x", ty: "ℤ" } ],
@@ -634,7 +665,6 @@ export const LEVELS = [
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "(x²−2·x−3=0)∨(x²+3·x+2=0)" } ],
                     conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
-                    extrarules: [ "integral", "deceq", "expr" ],
                     saveable: [
                         {
                             parameters: [ ],
@@ -649,6 +679,19 @@ export const LEVELS = [
                             conclusion: { ty: "(x=3)∨((x=−1)∨(x=−2))" },
                         },
                     ]
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" } ],
+                    variables: [ { name: "x", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "(x=0)∨P" }, { ty: "x=1" } ],
+                    conclusion: { ty: "P" },
+                    hint: "contradictoryAlgebraHint",
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" } ],
+                    variables: [ { name: "x", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "x²=5" }, { ty: "(x≠√5)∨P" }, { ty: "(x≠−√5)∨P" } ],
+                    conclusion: { ty: "P" },
                 },
             ],
           },
@@ -1577,11 +1620,11 @@ export const LEVELS = [
                     hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²" } ],
                     conclusion: { ty: "a=1/2" },
                 },
-                { // TODO: Make this ⊥ when alg can prove that
+                {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
                     hypotheses: [ { ty: "∀x∈ℤ,(a·x²+6·x=a)" } ],
-                    conclusion: { ty: "0=1" },
+                    conclusion: { ty: "⊥" },
                 },
             ],
           },

@@ -106,11 +106,8 @@ let oracle_failed : Reporter.oracle_error -> string option =
   | Not_a_relation p ->
       Option.map
         (fun ty ->
-          "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and the \
-           alg+ block conjunctions (∧) of those.  The goal it's wired to is" ^ display ty
-          ^ "which isn't one of them.  I can still prove a goal like that when the inputs to the \
-             block contradict each other, since anything at all follows from a contradiction, but \
-             here I couldn't prove that they do.")
+           "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless its inputs are contradictory. \
+            The goal it's wired to here is" ^ display ty ^ "which isn't one of them, and its inputs are not contradictory.")
         (printed ~sort:`Type p)
   | Not_a_relation_input p ->
       Option.map
