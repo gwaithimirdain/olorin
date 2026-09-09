@@ -1,4 +1,4 @@
-import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
+import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOVED, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
@@ -643,7 +643,13 @@ ready(() => {
     // Whenever the graph changes, we recompute it and pass to Narya to typecheck it.
     // This includes when a new connection is created:
     instance.bind(EVENT_CONNECTION, addConnection);
-    // It seems that EVENT_CONNECTION also fires after a connection is moved, so no need to separately bind EVENT_CONNECTION_MOVED.
+    // Dragging the end of an existing wire onto another port fires this instead of EVENT_CONNECTION,
+    // so the wire is restyled and rechecked here: it may have just become a connection from a block
+    // to itself, which is drawn in a shape of its own, or stopped being one.
+    instance.bind(EVENT_CONNECTION_MOVED, function (p) {
+        styleConnection(p.connection);
+        typecheck();
+    });
     // We've forbidden connections from being detached by dropping, since it appears to be kind of broken, e.g. EVENT_CONNECTION_DETACHED fires *before* it's detached.  Instead the user removes connections with the close button.
 
     // Dragging a box against a window edge pans the canvas that way, so it can be carried off as
@@ -2294,11 +2300,15 @@ function restoreProof(state, level, countAsCompletion) {
         if(!srcEp || !tgtEp) { return; }
         const edge = instance.connect({ source: srcEp, target: tgtEp });
         if(edge) {
-            // Restore this wire's connector style if it differs from the default just applied
-            // (re-adding the arrow overlay, which _setConnector removes).
-            if(c.connector && edge.connector && c.connector !== edge.connector.type) {
-                edge._setConnector(c.connector);
-                edge.addOverlay({ type: "Arrow", options: { location: -5, width: 10, length: 10 } });
+            // Connecting them styled the wire (see addConnection).  Restore the style it was saved
+            // in over that, when it differs -- but only where the style is the player's choice: a
+            // wire that begins and ends on the same block is drawn in the shape that wire needs,
+            // whatever it was saved as, or a proof saved before it had that shape (or saved after
+            // a restore that lost it) would come back drawn the wrong way round the block.
+            const saved = connectorOfType(c.connector);
+            if(saved && edge.connector && c.connector !== edge.connector.type
+               && !forcedConnector(edge)) {
+                setConnector(edge, saved);
             }
             // Restore the user-supplied wire label, if any (Adept/Master difficulty).
             if(c.ty) { setUserWireLabel(edge, c.ty); }
@@ -3686,6 +3696,68 @@ function portX(endpoint) {
     return instance.router.getEndpointLocation(endpoint).curX;
 }
 
+// The shape a wire has to be drawn in whatever style is selected, or null for one that simply
+// follows the selected style.  A wire that begins and ends on the same block is the only kind that
+// needs a shape of its own: which one depends on where its two ports sit, not on any preference,
+// so this is also what a saved proof must not override (see restoreProof).
+function forcedConnector(edge) {
+    if(edge.source !== edge.target) { return null; }
+    // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
+    // two agree.  A block with only one subgoal leaves it unlabelled, and then every
+    // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
+    // bind the condition defining their set on a labelled port beside the unlabelled one that
+    // binds the variable.
+    const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
+    if(from.sort === 'assumption' && to.sort === 'subgoal' &&
+       (to.label === undefined || from.label === to.label)) {
+        // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
+        return StraightConnector.type;
+    }
+    if(portX(edge.endpoints[1]) < portX(edge.endpoints[0])) {
+        // A wire that runs back to a port left of where it started has to double back on itself,
+        // which a Bezier connector can't draw without looping over the block.  A self-connection
+        // that still runs forwards -- one branch's assumption into another branch's subgoal, say --
+        // is drawn like any other wire, so it follows the selected style.
+        return FlowchartConnector.type;
+    }
+    return null;
+}
+
+// The connector the selected style asks for, or null if neither is selected.
+function selectedConnector() {
+    if(document.getElementById("angleConnectors").checked) { return FlowchartConnector.type; }
+    if(document.getElementById("curvedConnectors").checked) { return CURVED_CONNECTOR; }
+    return null;
+}
+
+// The connector a saved wire's style names.  A curved one is restored as CURVED_CONNECTOR rather
+// than the bare Bezier type: the type is all a saved proof records, and a bare Bezier draws a wire
+// that begins and ends on the same block as a loopback circle sitting on its source port, which is
+// exactly what that connector is configured out of.
+function connectorOfType(type) {
+    if(type === BezierConnector.type) { return CURVED_CONNECTOR; }
+    if(type === FlowchartConnector.type) { return FlowchartConnector.type; }
+    if(type === StraightConnector.type) { return StraightConnector.type; }
+    return null;
+}
+
+// Draw a wire in the given connector, or in the shape it needs, or in the selected style.
+function setConnector(edge, connector) {
+    // This method isn't published in the jsPlumb community edition, but it's still there!
+    if(connector) { edge._setConnector(connector); }
+    // For some reason setting the connector type blows away the Arrow overlay, although it doesn't affect the Custom close-button overlay.
+    edge.addOverlay({
+        type: "Arrow",
+        options: {
+            location: -5,
+            width: 10,
+            length: 10,
+        },
+    });
+}
+
+const styleConnection = (edge) => setConnector(edge, forcedConnector(edge) || selectedConnector());
+
 function addConnection(params) {
     const edge = params.connection;
     // While restoring a saved proof, we set the wire labels ourselves and typecheck once at the end, so we skip the prompt/typecheck here (but still apply the connector styling below).
@@ -3704,39 +3776,7 @@ function addConnection(params) {
             getUserLabel(edge, false);
         }
     }
-    // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
-    // two agree.  A block with only one subgoal leaves it unlabelled, and then every
-    // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
-    // bind the condition defining their set on a labelled port beside the unlabelled one that
-    // binds the variable.
-    const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
-    const selfLoop = edge.source == edge.target;
-    if(selfLoop && from.sort === 'assumption' && to.sort === 'subgoal' &&
-       (to.label === undefined || from.label === to.label)) {
-        // Connections going straight across from an assumption to a subgoal should be straight.  The flowchart connector bends them out for some reason.
-        // This method isn't published in the jsPlumb community edition, but it's still there!
-        edge._setConnector(StraightConnector.type);
-    } else if(selfLoop && portX(edge.endpoints[1]) < portX(edge.endpoints[0])) {
-        // A wire that runs back to a port left of where it started has to double back on itself,
-        // which a Bezier connector can't draw without looping over the block.  A self-connection
-        // that still runs forwards -- one branch's assumption into another branch's subgoal, say --
-        // is drawn like any other wire, so it follows the selected style below.
-        edge._setConnector(FlowchartConnector.type);
-    } else if(document.getElementById("angleConnectors").checked) {
-        // If the target of a connection is moved to be non-cyclic, reset it to the selected style.
-        edge._setConnector(FlowchartConnector.type);
-    } else if(document.getElementById("curvedConnectors").checked) {
-        edge._setConnector(CURVED_CONNECTOR);
-    }
-    // For some reason setting the connector type blows away the Arrow overlay, although it doesn't affect the Custom close-button overlay.
-    edge.addOverlay({
-        type: "Arrow",
-        options: {
-            location: -5,
-            width: 10,
-            length: 10,
-        },
-    });
+    styleConnection(edge);
 }
 
 // Parse the graph into a term and typecheck it, displaying diagnostics.  If 'remove' is true, also remove the connection indicated by the parameters, as this is a detach event.  Since we need to pass the result as an onclick callback, we manually curry the definition.

@@ -45,6 +45,22 @@ test.describe('Connector styles', () => {
 // single wire, so each block below carries just the one being asked about.
 const connectors = (state) => state.connections.map((c) => c.connector);
 
+// The shape the one wire on screen is really drawn in: how wide its SVG is, and how far apart the
+// two ports it joins are.  jsPlumb's loopback circle is a fixed 50px across wherever the ports
+// are, while a wire drawn between them covers the distance from one to the other.
+const drawnShape = (page) => page.evaluate(() => {
+    const svg = Array.from(document.querySelectorAll('.jtk-connector')).find((s) => s.jtk && s.jtk.connector);
+    const conn = svg.jtk.connector.connection;
+    const x = (i) => conn.instance.router.getEndpointLocation(conn.endpoints[i]).curX;
+    return { drawnWidth: svg.getBoundingClientRect().width, portGap: Math.abs(x(1) - x(0)) };
+});
+
+// Whether that wire spans its ports rather than curling up at one of them.
+function expectDrawnBetweenPorts(drawn) {
+    expect(drawn.portGap).toBeGreaterThan(100);
+    expect(drawn.drawnWidth).toBeGreaterThan(drawn.portGap * 0.8);
+}
+
 test.describe('A wire from a block back to itself', () => {
     let olorin;
 
@@ -109,22 +125,44 @@ test.describe('A wire from a block back to itself', () => {
         await olorin.connect({ vertex: orE, sort: 'assumption', label: 'left' }, { vertex: orE, sort: 'subgoal', label: 'right' });
         expect(connectors(await olorin.serialize())).toEqual(['Bezier']);
 
-        const drawn = await page.evaluate(() => {
-            const svg = Array.from(document.querySelectorAll('.jtk-connector')).find((s) => s.jtk && s.jtk.connector);
-            const conn = svg.jtk.connector.connection;
-            const x = (i) => conn.instance.router.getEndpointLocation(conn.endpoints[i]).curX;
-            return { drawnWidth: svg.getBoundingClientRect().width, portGap: Math.abs(x(1) - x(0)) };
-        });
-        // The loopback circle is a fixed 50px across wherever the ports are; a wire drawn between
-        // them covers the distance from one to the other.
-        expect(drawn.portGap).toBeGreaterThan(100);
-        expect(drawn.drawnWidth).toBeGreaterThan(drawn.portGap * 0.8);
+        expectDrawnBetweenPorts(await drawnShape(page));
     });
 
     test('and its own branch\'s subgoal still is', async () => {
         const orE = await olorin.dragRule('orE', 300, 100);
         await olorin.connect({ vertex: orE, sort: 'assumption', label: 'left' }, { vertex: orE, sort: 'subgoal', label: 'left' });
         expect(connectors(await olorin.serialize())).toEqual(['Straight']);
+    });
+
+    // A saved proof records only a wire's connector *type*, and the bare Bezier type draws a wire
+    // that begins and ends on the same block as a loopback circle sitting on its source port.  So
+    // the shape such a wire needs wins over the style it was saved in: a proof saved before the
+    // wire was drawn that way -- or saved after a load that lost it, which would otherwise keep the
+    // loop for good -- comes back drawn across the block, not curled up at its own port.
+    test('is drawn in the shape it needs even when the saved proof says otherwise', async ({ page }) => {
+        const impI = await olorin.dragRule('impI', 300, 100);
+        await olorin.connect({ vertex: impI, sort: 'assumption' }, { vertex: impI, sort: 'subgoal' });
+        const state = await olorin.serialize();
+        state.connections.forEach((c) => { c.connector = 'Bezier'; });
+
+        await olorin.restore(state);
+        expect(connectors(await olorin.serialize())).toEqual(['Straight']);
+        expectDrawnBetweenPorts(await drawnShape(page));
+    });
+
+    // The one whose style *is* the player's choice keeps it, and keeps being drawn between its two
+    // ports, even when the wires being drawn now are angled ones.
+    test('keeps a saved curved one curved, and still not a loopback circle', async ({ page }) => {
+        await olorin.setConnectorStyle('curved');
+        const orE = await olorin.dragRule('orE', 300, 100);
+        await olorin.connect({ vertex: orE, sort: 'assumption', label: 'left' }, { vertex: orE, sort: 'subgoal', label: 'right' });
+        const state = await olorin.serialize();
+        expect(connectors(state)).toEqual(['Bezier']);
+
+        await olorin.setConnectorStyle('angle');
+        await olorin.restore(state);
+        expect(connectors(await olorin.serialize())).toEqual(['Bezier']);
+        expectDrawnBetweenPorts(await drawnShape(page));
     });
 
     test('while one that runs backwards stays angled even when curved wires are selected', async () => {
