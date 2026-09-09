@@ -19,8 +19,9 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { inWorld, inStage, stagesInWorld, prereqStages, firstLevel, completions,
-        thresholdCount, worlds, world, followerWorlds, worldGateSeeds } = require('../lib/levels');
+const { allLevels, inWorld, inStage, stagesInWorld, prereqStages, firstLevel, completions,
+        completionKey, thresholdCount, worlds, world, followerWorlds,
+        worldGateSeeds } = require('../lib/levels');
 
 const FIRST = firstLevel();                            // all a fresh player has unlocked
 const STAGE1 = inStage(FIRST.world, FIRST.stage);      // the stage it opens in
@@ -188,6 +189,34 @@ test.describe('Per-difficulty unlocking', () => {
         // Novice completed 15 completions ago (global time 25) -> adept available again.
         const olorin = await open(page, rule7Base(25, 10));
         expect((await olorin.levelStates(MANUAL.name))[1]).toBe('unlocked');
+    });
+
+    // The wait is counted in completions, so a player with nothing left to complete would be
+    // waiting for something they have no way to make happen: with the whole game finished at
+    // novice, the levels whose novice they finished last would be the only ones left at adept, and
+    // all of them shut.  So finishing every level at the difficulty below lifts the wait.  "Every
+    // level" means every level this player has: a world belonging to a course they aren't taking is
+    // no part of their game, and allLevels() leaves those out as the app does.
+    const finished = (time) => completions(allLevels(), 0)
+        .concat(completions(STAGE1, 1))
+        .concat(completions(STAGE2.slice(0, MANUAL.index - 1), 1))
+        .concat([['time', String(time)]])
+        // This level's novice was the last thing solved, so its adept is inside the window.
+        .concat(completions([MANUAL], 0, { times: { 0: time } }));
+    // Some level elsewhere, to leave unsolved: not one of the seeds above.
+    const ELSEWHERE = allLevels().filter((l) => l !== MANUAL && !STAGE1.includes(l)
+                                           && !STAGE2.slice(0, MANUAL.index - 1).includes(l)).pop();
+
+    test('rule 7: is lifted when every level is complete at the difficulty below', async ({ page }) => {
+        const olorin = await open(page, finished(20));
+        expect((await olorin.levelStates(MANUAL.name))[1]).toBe('unlocked');
+    });
+
+    test('rule 7: ...but not while some level of it is still unsolved', async ({ page }) => {
+        // The same, minus one level nobody has solved: there is still something to do, so the
+        // window is a wait the player can actually finish.
+        const olorin = await open(page, finished(20).filter(([key]) => key !== completionKey(ELSEWHERE)));
+        expect((await olorin.levelStates(MANUAL.name))[1]).toBe('locked');
     });
 });
 

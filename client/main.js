@@ -275,6 +275,10 @@ var customChipEl = null;
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
 // after its lower difficulty was just completed.
 var globalTime = 0;
+
+// Whether every level this player has is complete at each difficulty (see computeUnlockData),
+// which is what lifts that re-locking: see rule 7 in difficultyUnlocked.
+var allCompleteAt = [false, false, false];
 // Whether the current (complete) proof has already been registered as a completion, so re-running
 // typecheck on an already-complete proof doesn't count as a fresh completion.
 var proofRegisteredComplete = false;
@@ -1866,7 +1870,12 @@ function difficultyUnlocked(w, s, c, K, data) {
     // 7. (Adept/Master) the previous difficulty of THIS level must not have been completed within
     //    the last RECENT_COMPLETION_WINDOW completions, so you can't immediately go up a difficulty
     //    and copy what you just did at the lower one.
-    if(K >= 1) {
+    //
+    //    Unless there is nothing else left to do: the wait is counted in completions, so a player
+    //    who has finished the whole game at K-1 and has only levels waiting out their cooling-off
+    //    left at K would be waiting for completions they have no way to make.  When every level
+    //    they have is complete at K-1, the wait is over.
+    if(K >= 1 && !allCompleteAt[K - 1]) {
         const times = stage.levelTimes[c];
         if(times && times[K - 1] !== undefined && globalTime - times[K - 1] <= RECENT_COMPLETION_WINDOW) {
             return false;
@@ -2036,6 +2045,16 @@ function computeUnlockData(res) {
     unlockData.forEach(function (wd, w) {
         if(!worldShown(LEVELS[w])) { return; }
         wd.previous.forEach(function (p) { unlockData[p].followers.push(w); });
+    });
+    // Whether the player has finished every level they have at each difficulty -- every level of
+    // every world they can see, a bonus stage's included, since those are theirs to solve too and
+    // solving one is a way on.  Rule 7 reads this (see difficultyUnlocked).
+    allCompleteAt = [0, 1, 2].map(function (K) {
+        return unlockData.every(function (wd, w) {
+            return !worldShown(LEVELS[w]) || wd.stages.every(function (sd) {
+                return sd.levelDiff.every(function (d) { return d >= K; });
+            });
+        });
     });
 }
 
