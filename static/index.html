@@ -397,15 +397,14 @@
         <div style="flex: 1; overflow-y: scroll; background-color: #ffffff; padding: 10px">
           <h2>What is Olorin?</h2>
           <p class="about">
-            Olorin is a game where you prove abstract theorems in classical predicate logic by connecting boxes with wires.
+            Olorin is a game where you prove theorems in classical predicate logic by connecting boxes with wires.
             It's a fun collection of puzzles, and also an educational tool for learning to write proofs.
-            There are over a hundred levels, divided into six "worlds" with several stages each, and three difficulty settings.
-            You can also create and solve custom levels, although this is not well-documented.
+            There are over a hundred levels, divided into "worlds" with several stages each, and three difficulty settings.
+            You can also create and solve custom levels.
           </p>
           <p class="about">
             If you're just getting started, you should probably close this box now and try it out, <b>starting from level 1-1-1 on Novice difficulty</b> and proceeding in order.
             The game will prompt you with hints at the beginning of each level when new features are introduced, and you can come back to this overview at any time by clicking "About" on the "Select Level" screen.
-            Currently you're allowed to skip around rather than playing the levels in order, but when first learning I highly recommend you go in order on Novice difficulty; some guidelines about progressing through the worlds and increasing the difficulty level are given below.
           </p>
           <h2>How do the graphs work?</h2>
           <p class="about">
@@ -437,14 +436,15 @@
           </p>
           <h2>What do the difficulty settings mean?</h2>
           <p class="about" id="aboutNovice">
-            At Novice difficulty (<span class="noviceColor" style="padding:1px">★☆☆</span>), most unconnected ports are automatically labeled with the statement or value they carry (red for input ports, which are missing something to connect to them).
+            At <span class="noviceColor" style="padding:1px">Novice</span> difficulty, most unconnected ports are automatically labeled with the statement or value they carry (red for input ports, which are missing something to connect to them).
             In addition, all wires are automatically labeled with the statement or value they carry, and incorrectly connected wires are colored red.
+            If you hover over a red wire, an explanation of what's wrong with it should pop up.
             At any given point during the construction of a proof, the labeled output ports can be thought of as "givens" (known or assumed facts), and the red-labeled input ports can be thought of as "goals" (statements to prove).
             (However, not all givens are available for all goals; hypotheses introduced on the left side of a bracket are only usable to prove the corresponding subgoal on the right side of that bracket.)
             <i>A proof novice can choose the rule to apply next, guided by the logical structure of the givens and the goals.</i>
           </p>
           <p class="about" id="aboutAdept">
-            At Adept difficulty (<span class="adeptColor" style="padding:1px">★★☆</span>), ports are not labeled, and most wires are not labeled automatically.
+            At <span class="adeptColor" style="padding:1px">Adept</span> difficulty, ports are not labeled, and most wires are not labeled automatically.
             Instead, you are prompted for a label for each wire.
             (The exceptions are wires connected directly to a hypothesis or the conclusion, since it is obvious what those should be labeled, and wires that carry values.)
             Wires with incorrect labels, or that are incorrectly connected, are colored red, and both prevent the proof from being marked correct.
@@ -452,18 +452,15 @@
             <i>A proof adept knows how each applied rule affects the current givens and goals.</i>
           </p>
           <p class="about" id="aboutMaster">
-            At Master difficulty (<span class="masterColor" style="padding:1px">★★★</span>), you are still required to label all the wires yourself (with the same exceptions), but incorrectly connected or labeled wires are not colored red any more.
+            At <span class="masterColor" style="padding:1px">Master</span> difficulty, you are still required to label all the wires yourself (with the same exceptions), but incorrectly connected or labeled wires are not colored red any more.
             The only information you get about the correctness of the proof (including your labels on the wires) is whether the conclusion turns purple!
             <i>A proof master can plan and execute an entire proof alone, and find and fix their own mistakes.</i>
           </p>
           <p class="about">
-            I recommend that you work up in difficulty setting "one world behind" your most advanced levels.
-            For instance, start by completing Proposition World at Novice setting.
-            Then complete Advanced Proposition World at Novice setting.  Then go back and re-do Proposition World at Adept setting.
-            Next, work on Quantifier World at Novice setting, Advanced Proposition World at Adept setting, and Proposition World at Master setting, and so on.
+            At the beginning, levels are only unlocked on Novice difficulty.
+            Once you've completed enough levels on Novice difficulty, some older levels will start to unlock on Adept difficulty, and so on.
             By inserting a delay before you go back to re-do each level at a higher difficulty, you will reinforce your learning and make the challenge more meaningful.
-            Similarly, when you are working through a given world at a higher difficulty setting, it would be easy to "cheat" by doing each level again at Novice setting and then copying the proof and wire labels from your short-term memory at the higher difficulty, but you won't learn as much that way.
-            If you start working on a higher difficulty setting and get stuck, you can downgrade the difficulty without losing your partial proof using the button in the upper-right corner, but of course then you'll only get credit for completing the level at the lower difficulty.
+            If you are working on a higher difficulty setting and get stuck, you can downgrade the difficulty without losing your partial proof using the button in the upper-right corner; but then the harder difficulty for that level will re-lock until you complete some other levels.
           </p>
           <p class="about">
             It's worth noting that whether a given wire is colored red as "incorrect" in Novice and Adept modes can depend not only on that wire and its label, but on the other wires in the diagram.
@@ -512,7 +509,7 @@
             If Olorin and jsNarya whet your appetite, you can download the full Narya proof assistant to run locally on your computer from its <a href="https://github.com/gwaithimirdain/narya">github page</a>.
           </p>
           <p class="about">
-            The "algebra" blocks that appear in the last couple worlds of Olorin are not actually checked by Narya, but treated as an "oracle" and verified using the SMT solver Z3.
+            Olorin's "algebra" blocks are not actually checked by Narya, but treated as an "oracle" and verified using the SMT solver Z3.
           </p>
           <h2>Narya? Olorin?</h2>
           <p class="about">
@@ -526,7 +523,7 @@
           </p>
           <h2>Who wrote all this?</h2>
           <p class="about">
-            Mike Shulman, a mathematician at the University of San Diego, with help from others.
+            Mike Shulman, a mathematician at the University of San Diego, with help from others, including Gemini and Claude.
             <a href="https://home.sandiego.edu/~shulman/">Here's</a> my web page.
             Send me your questions, suggestions, complaints, and other thoughts!
             I look forward to hearing from you.
