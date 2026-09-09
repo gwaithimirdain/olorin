@@ -996,29 +996,52 @@ end)
 
 (* We've modified Narya to perform 'annotate' effects during typechecking.  Here are our handlers for them. *)
 
-(* Notice the current type, pretty-print it, and add the result to a supplied hashtable of labels by location. *)
-let annotate_ty_handler : (Locable.t, Label.t) Hashtbl.t -> printable Asai.Range.located -> unit =
- fun labels { value; loc } ->
-  let locs = Loc.annotation_locs loc in
-  let buf = Buffer.create 20 in
-  PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf (print value);
-  let ty = Buffer.contents buf in
-  List.iter (fun loc -> Hashtbl.replace labels loc { ty; tm = None }) locs
+(* A label as the handlers collect it: what to print, not yet printed.  Pretty-printing a term is
+   not cheap, and a check annotates the same location again every time it revisits that subterm --
+   the proof in bugs/super-slow.json annotates 54 locations 4000 times between them -- with every
+   printing but the last overwritten by the next.  So the handlers only remember what to print, and
+   each label that survives is printed once, by `render_labels` at the end of the check (but still
+   inside its command, so the terms still mean there what they meant when they were annotated). *)
+type deferred_label = { dty : printable; dtm : printable option }
 
-(* Notice the current term, pretty-print it, and add it to a supplied hashtable of labels by location, but only if it's on an edge that displays the value of terms (rather than just their types). *)
-let annotate_tm_handler (labels : (Locable.t, Label.t) Hashtbl.t)
-    ({ value; loc } : printable Asai.Range.located) : unit =
-  (* If we get an error printing the term, such as "unimplemented unparsing matches", just bail out and don't annotate anything, but don't consider it a fatal error either. *)
-  Reporter.try_with ~fatal:(fun _ -> ()) @@ fun () ->
-  let locs = Loc.annotation_locs loc in
+let print_to_string (value : printable) : string =
   let buf = Buffer.create 20 in
   PPrint.ToBuffer.pretty 1.0 (Display.columns ()) buf (print value);
-  let tm = Some (Buffer.contents buf) in
+  Buffer.contents buf
+
+(* Print the labels the handlers below collected.  Printing can fail -- "unimplemented unparsing
+   matches", say -- and that costs the label its value, or at worst the label, rather than the whole
+   check. *)
+let render_labels (labels : (Locable.t, deferred_label) Hashtbl.t) : (Locable.t, Label.t) Hashtbl.t
+    =
+  let rendered = Hashtbl.create (Hashtbl.length labels) in
+  Hashtbl.iter
+    (fun loc { dty; dtm } ->
+      Reporter.try_with ~fatal:(fun _ -> ()) @@ fun () ->
+      let ty = print_to_string dty in
+      let tm =
+        Option.bind dtm (fun value ->
+            Reporter.try_with ~fatal:(fun _ -> None) @@ fun () -> Some (print_to_string value)) in
+      Hashtbl.replace rendered loc ({ ty; tm } : Label.t))
+    labels;
+  rendered
+
+(* Notice the current type, and note it down as the label of its location. *)
+let annotate_ty_handler :
+    (Locable.t, deferred_label) Hashtbl.t -> printable Asai.Range.located -> unit =
+ fun labels { value; loc } ->
+  List.iter
+    (fun loc -> Hashtbl.replace labels loc { dty = value; dtm = None })
+    (Loc.annotation_locs loc)
+
+(* Notice the current term, and note it down beside the type of its location, but only if it's on an edge that displays the value of terms (rather than just their types). *)
+let annotate_tm_handler (labels : (Locable.t, deferred_label) Hashtbl.t)
+    ({ value; loc } : printable Asai.Range.located) : unit =
   List.iter
     (fun loc ->
       let lbl = Hashtbl.find labels loc in
-      Hashtbl.replace labels loc { lbl with tm })
-    locs
+      Hashtbl.replace labels loc { lbl with dtm = Some value })
+    (Loc.annotation_locs loc)
 
 (* Notice the current context and status, attach it to the correct scope from a hashtable of scopes by location, and add it to a list of available contexts (to be used for synthesizing disconnected ports). *)
 let annotate_ctx_handler : type a b s.
@@ -1233,7 +1256,7 @@ let cut_edges (bad : Port.t list) (bwd : bwd_graph) : Edge.t list * bwd_graph =
   (!cut, pruned)
 
 let rec synth_output_ports ~(fuel : int) (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
-    (labels : (Locable.t, Label.t) Hashtbl.t) (fwd_graph : fwd_graph) (bwd_graph : bwd_graph)
+    (labels : (Locable.t, deferred_label) Hashtbl.t) (fwd_graph : fwd_graph) (bwd_graph : bwd_graph)
     (contexts : context list ref)
     (ports : (Port.t * Diagnostic.js Js.t Dynarray.t * Port.t list) list)
     (diagnostics : Diagnostic.js Js.t Dynarray.t) =
@@ -1459,7 +1482,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
 (* "Parse" the current graph into one or more terms and typecheck them all. *)
 let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.js_array Js.t) :
     js_checked Js.t =
-  let labels : (Locable.t, Label.t) Hashtbl.t = Hashtbl.create 20 in
+  let labels : (Locable.t, deferred_label) Hashtbl.t = Hashtbl.create 20 in
   let diagnostics : Diagnostic.js Js.t Dynarray.t = Dynarray.create () in
   (* Typechecking fails with this error to the console. *)
   let failed msg : js_checked Js.t =
@@ -1467,7 +1490,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       val mutable complete = Js.bool false
       val mutable callback = Js.null
       val mutable error = Js.some (Js.string msg)
-      val mutable labels = Label.to_js_array labels
+      val mutable labels = Label.to_js_array (render_labels labels)
 
       (* Since the error message is what will be displayed, we don't even pass the diagnostics. *)
       val mutable diagnostics = Js.array (Array.of_list [])
@@ -1542,7 +1565,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     (* A single undoable command around the whole check; run_command_then_undo reverts everything it
        created (the holes from an incomplete proof), so we don't have to clean up by hand.  Its own
        return (hole positions) is irrelevant to us, so we stash the real result in a ref. *)
-    let result = ref (false, []) in
+    let result = ref (false, [], Hashtbl.create 0) in
     let _ : int option * (int * int * int) list =
       Global.run_command_then_undo ~holes_allowed:(Ok ()) @@ fun () ->
       (* Create the dummy "definition" constant in this command's origin (see const_ty). *)
@@ -1594,10 +1617,12 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
         (* Whatever is left may be held up by a single out-of-scope wire; try those again without it. *)
         let ports = synth_cut_ports run vertices fwd_graph bwd_graph contexts ports diagnostics in
         (fatal_error, ports) in
-      result := r;
+      (* Print the labels here, inside the command whose terms they name. *)
+      let fatal_error, ports = r in
+      result := (fatal_error, ports, render_labels labels);
       (* run_command_then_undo wants (offset, make_msg); we report holes ourselves, so neither. *)
       (None, fun _ -> None) in
-    let fatal_error, ports = !result in
+    let fatal_error, ports, labels = !result in
     (* Combine all the generated diagnostics. *)
     (* What's left after the cut sweep is pairs: the ports nothing could label, and why. *)
     List.iter (fun (_, ds) -> Dynarray.append diagnostics ds) ports;
