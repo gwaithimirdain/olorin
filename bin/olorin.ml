@@ -12,6 +12,8 @@ let carp str = Js_of_ocaml.Console.console##log (Js.string str)
 (* Narya libraries *)
 open Util
 open Dim
+open Modal
+open Omode
 open Core
 open Term
 open Value
@@ -282,8 +284,22 @@ let scope_error_code (bound : PortSet.t) (p : Port.t) : Code.t =
   if p.sort = Assumption && not (PortSet.mem p bound) then Unattached_assumption
   else Ill_scoped_connection
 
+(* Map over a vector, left to right, threading a state through -- the assumptions of a match branch
+   are named and collected into a set that way. *)
+let rec vec_map_state : type a b n s. (a -> s -> b * s) -> (a, n) Vec.t -> s -> (b, n) Vec.t * s =
+ fun f xs s ->
+  match xs with
+  | [] -> ([], s)
+  | x :: xs ->
+      let y, s = f x s in
+      let ys, s = vec_map_state f xs s in
+      (y :: ys, s)
+
 (* Wrap up the data necessary to resolve a named term and then typecheck it. *)
-type context = Context : ('b, 's) status * ('a, 'b) Ctx.t * (unit, 'a) Resolver.scope -> context
+type context =
+  | Context :
+      (mode, 'b, 's) status * (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope
+      -> context
 
 (* Some nodes can introduce new names and give a way to re-bind them away.  This is basically doing a one-case match, but not explicitly capturing the subgoal with a bracket in the graph.  Instead, the subgoal extends as far as possible, e.g. to the outermost enclosing explicit bracket (match or abstraction) or to the overall goal. *)
 
@@ -382,7 +398,8 @@ let destruct_step (source : Port.t) (names : string list) (constr : Constr.t)
             let branch = Named.Branch (locate_opt tm.loc vars, `Normal None, body) in
             let branches = Snoc (Emp, (constr, branch)) in
             Synth
-              (Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] }));
+              (Named.Match
+                 { tm; window = None; sort = `Implicit; branches; refutables = None; highers = [] }));
         sbind =
           (fun body ->
             let branch =
@@ -390,7 +407,8 @@ let destruct_step (source : Port.t) (names : string list) (constr : Constr.t)
                 (locate_opt tm.loc vars, `Normal None, locate_opt body.loc (Named.Synth body.value))
             in
             let branches = Snoc (Emp, (constr, branch)) in
-            Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] });
+            Named.Match
+              { tm; window = None; sort = `Implicit; branches; refutables = None; highers = [] });
       } in
   let variables =
     List.fold_right
@@ -439,7 +457,7 @@ let destruct_constr (source : Port.t) (names : string list) (steps : destructure
             bindables variables projected
     | Project fields :: rest ->
         let terms =
-          List.map (fun (fld, label) -> (label, Named.Field (tm, `Name fld))) fields in
+          List.map (fun (fld, label) -> (label, Named.Field (tm, `Name fld, None))) fields in
         let projected = terms @ projected in
         if rest = [] then (bindables, variables, projected)
         else
@@ -549,7 +567,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           (* We add the location of the projected term to the location of the projections.  This is necessary so that if the input wire has the wrong type, *it* gets highlighted red.  However, we add it as a non-annotating location, so that the input wire doesn't get labeled by an output type. *)
           let newlocs, _ = Loc.locs_and_content false tm.loc in
           loc := Loc.append ~annote:false !loc newlocs;
-          ({ bindables; term = Synth (Named.Field (tm, `Name fld)) }, variables)
+          ({ bindables; term = Synth (Named.Field (tm, `Name fld, None)) }, variables)
       | Constr { inputs; constr } ->
           let bindables, variables, args =
             List.fold_right
@@ -571,7 +589,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let head =
             match field with
             (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
-            | Some fld -> locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld))
+            | Some fld ->
+                locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld, None))
             | None -> fn in
           (* Apply it to each argument port in turn. *)
           let bindables, variables, tm =
@@ -614,7 +633,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
             Named.App
               ( locate_opt (Loc.non_annotating fn.loc)
-                  (Named.Synth (Named.Field (fn, `Name field))),
+                  (Named.Synth (Named.Field (fn, `Name field, None))),
                 named_arg arg,
                 locate_opt None `Explicit ) in
           (* Make a term for the same application in the opposite order using a constant, so it can be the unnegated argument that gets synthesized. *)
@@ -681,6 +700,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               (Named.Match
                  {
                    tm = locate_opt None term;
+                   window = None;
                    sort = `Implicit;
                    branches = Emp;
                    refutables = None;
@@ -742,14 +762,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 let body, newvariables =
                   check_of_input_port ~seen vertices graph
                     { source with sort = Subgoal; label = Some subgoal } in
-                let module M = Vec.Monadic (Monad.State (PortSet)) in
                 let newvars, assumptions =
-                  M.mmapM
-                    (fun [ label ] assumptions ->
+                  vec_map_state
+                    (fun label assumptions ->
                       let assumption = { source with sort = Assumption; label = Some label } in
                       ( ({ name = None; port = Some assumption } : name),
                         PortSet.add assumption assumptions ))
-                    [ assumptions ] PortSet.empty in
+                    assumptions PortSet.empty in
                 (* As with an abstraction, we bind all the bindables in the body that involve any of the assumption variables, and pass the rest on as bindables for the abstraction. *)
                 let body, newbindables = bind_some assumptions body in
                 (* We remove the local assumptions from the variable dependence. *)
@@ -762,7 +781,17 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               (Emp, bindables, variables) branches in
           ( {
               bindables;
-              term = Synth (Named.Match { tm; sort = `Implicit; branches; refutables = None; highers = [] });
+              term =
+                Synth
+                  (Named.Match
+                     {
+                       tm;
+                       window = None;
+                       sort = `Implicit;
+                       branches;
+                       refutables = None;
+                       highers = [];
+                     });
             },
             variables )
       | Coconstr { constr; outputs } ->
@@ -978,7 +1007,10 @@ let check_of_graph (vertices : Vertex.t IdMap.t) (graph : bwd_graph) :
        { vertex; sort = Input; label = None })
 
 (* After initialization, we store the context of parameters, variables, and hypotheses, the parsing scope of their names, and the conclusion type in a reference cell wrapped up in a GADT. *)
-type problem = Problem : ('a, 'b) Ctx.t * (unit, 'a) Resolver.scope * kinetic value -> problem
+type problem =
+  | Problem :
+      (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope * (mode, kinetic) value
+      -> problem
 
 let problem : problem option ref = ref None
 
@@ -1044,9 +1076,15 @@ let annotate_tm_handler (labels : (Locable.t, deferred_label) Hashtbl.t)
     (Loc.annotation_locs loc)
 
 (* Notice the current context and status, attach it to the correct scope from a hashtable of scopes by location, and add it to a list of available contexts (to be used for synthesizing disconnected ports). *)
-let annotate_ctx_handler : type a b s.
-    context list ref -> (b, s) status -> (a, b) Ctx.t -> a Raw.check located -> unit =
+let annotate_ctx_handler : type m a b s.
+    context list ref -> (m, b, s) status -> (m, a, b) Ctx.t -> a Raw.check located -> unit =
  fun contexts status ctx ctxtm ->
+  (* Narya hands this to us at whatever mode it is checking; everything here is written at Olorin's
+     own one (see Omode), which is the only mode in the process, so this comparison always
+     succeeds.  It is how the types get to know that. *)
+  match Modal.Mode.compare (Ctx.mode ctx) Omode.mode with
+  | Neq -> ()
+  | Eq ->
   match
     List.find_map
       (fun (Resolver.Scope (scopetm, scope)) ->
@@ -1122,7 +1160,8 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
         `No_scope (scoping_diagnostics, Option.value !always_ill_scoped ~default:[])
     | Context
         (type a b s)
-        ((status, ctx, scope) : (b, s) status * (a, b) Ctx.t * (unit, a) Resolver.scope)
+        ((status, ctx, scope) :
+          (mode, b, s) status * (mode, a, b) Ctx.t * (unit, a) Resolver.scope)
       :: contexts -> (
         (* Forbid cyclic scopes for coconstrs: if the scope involves any non-assumption ports from this vertex, skip it.  But we don't do this for variable nodes (those specified as "variables" in the overall level), even though technically we should, since those all go into the overall scope at the beginning and we don't have separate scopes and contexts adding them one by one. *)
         match
@@ -1186,8 +1225,8 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
   (* Try to synthesize a term in a given scope.  Returns true if the term is well *scoped*, even if it doesn't synthesize.  Record typechecking errors to the supplied diagnostics array. *)
   and synth_term_in_scope : type a b s.
       ill_scoped:Port.t list ref ->
-      (b, s) status ->
-      (a, b) Ctx.t ->
+      (mode, b, s) status ->
+      (mode, a, b) Ctx.t ->
       (unit, a) Resolver.scope ->
       term_with_bindables located ->
       Diagnostic.js Js.t Dynarray.t ->
@@ -1429,6 +1468,9 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
               wslparen = [];
               (* We save the ID, and whether it's a parameter, of each such node as "comments" next to its parameter name. *)
               names = [ (name, [ `Line id; cls ]) ];
+              (* No modality: Olorin's parameters are all at its one mode (see Omode). *)
+              modality = [];
+              wsbar = [];
               wscolon = [];
               ty = Parse.Term.final (Parse.Term.parse (`String { title; content = ty }));
               wsrparen = [];
@@ -1458,9 +1500,9 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
           (Parse.Term.parse (`String { title = Some "type of conclusion"; content = concl_ty })) in
       let rawty = Postprocess.process varscope obsty in
       (* We check the parameters to produce a context. *)
-      let Checked_tel (cparams, ctx), _ = Check.check_tel Ctx.empty rawctx in
+      let Checked_tel (cparams, ctx), _ = Check.check_tel (Ctx.empty mode) rawctx in
       (* And then we check the conclusion type. *)
-      let ty = Check.check (Kinetic `Nolet) ctx rawty (universe D.zero) in
+      let ty = Check.check (Kinetic `Nolet) ctx rawty (universe mode D.zero) in
       let ety = Norm.eval_term (Ctx.env ctx) ty in
       (* We save the context, variable scope, conclusion type, and nodes.  As the user creates their graph, we will check it against these. *)
       problem := Some (Problem (ctx, scope, ety));
@@ -1570,7 +1612,9 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       Global.run_command_then_undo ~holes_allowed:(Ok ()) @@ fun () ->
       (* Create the dummy "definition" constant in this command's origin (see const_ty). *)
       let c = Constant.make () in
-      Global.add c (Option.get !const_ty) (`Axiom, `Parametric);
+      Global.add c
+        (Definition
+           { mode; ty = Option.get !const_ty; tm = `Axiom; parametric = `Parametric });
       let r =
         Reporter.try_with
           ~emit:(fun d ->
@@ -1604,7 +1648,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
           ( run @@ fun () ->
             let _ =
               Check.check
-                (Potential (Constant (c, D.zero), Ctx.apps ctx, Ctx.lam ctx))
+                (Potential (Constant (c, mode, D.zero), Ctx.apps ctx, Ctx.lam ctx))
                 ctx conclusion_tm conclusion_ty in
             () );
           (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
