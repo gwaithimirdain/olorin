@@ -17,7 +17,10 @@ class Olorin {
     // Load the app, suppressing the first-visit "About" modal and handling native dialogs
     // (e.g. the Clear confirm).  Dialogs are accepted by default; setDialogAction('dismiss')
     // switches to dismissing the next ones, to test "cancel" paths.  Resolves once interactive.
-    async open() {
+    //
+    // `code` is the "?code=" a course's students are given, which shows that course's worlds and
+    // changes how the rest of the game unlocks for them (see client/levels.js).
+    async open({ code } = {}) {
         this._dialogAction = 'accept';
         this._promptText = '';
         await this.page.addInitScript(() => localStorage.setItem('visited', 'true'));
@@ -26,7 +29,8 @@ class Olorin {
             // prompt() (e.g. naming a custom level) is accepted with the configured text.
             d.accept(d.type() === 'prompt' ? this._promptText : undefined);
         });
-        await this.page.goto('/?test=1', { waitUntil: 'load' });
+        const query = '/?test=1' + (code === undefined ? '' : '&code=' + encodeURIComponent(code));
+        await this.page.goto(query, { waitUntil: 'load' });
         await this.page.waitForFunction(
             () => typeof window.__olorin !== 'undefined' && typeof window.Narya !== 'undefined',
             null,
@@ -59,6 +63,13 @@ class Olorin {
     // The per-difficulty ['locked'|'unlocked'|'completed'] states of a level, by name.
     levelStates(name) {
         return this.page.evaluate((n) => window.__olorin.levelStates(n), name);
+    }
+
+    // The worlds the chooser is showing, in order, by the name in each one's header.  A world a
+    // player doesn't have (a course's, without its code) isn't among them.
+    worldNames() {
+        return this.page.evaluate(() =>
+            Array.from(document.querySelectorAll('#worlds .world-header')).map((h) => h.innerText));
     }
 
     // Set (null clears) one of a stage's unlock options -- 'previous' or 'bonus' -- by 1-based

@@ -1,5 +1,5 @@
 import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOVED, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
-import { LEVELS, saveable, legacySaveables } from "./levels.js"
+import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
@@ -144,6 +144,42 @@ const KEYS = [
 const urlParams = new URLSearchParams(window.location.search);
 // In test mode ("?test") we skip unlock enforcement so the suite can select any level.
 const TEST_MODE = urlParams.has('test');
+
+// The course code this player is using: the "?code=" in the URL if it has one, and otherwise the
+// last one that did.  A course hands out its link once and the game remembers it, while a code in
+// the URL always wins and takes the remembered one's place -- so "?code=" with nothing after it
+// puts a player back to the game without any course.
+const COURSE_CODE = (function () {
+    const param = urlParams.get('code');
+    if(param !== null) { localStorage.setItem("code", param); return param; }
+    return localStorage.getItem("code");
+})();
+
+// The course that code is for, or null for anyone else -- including someone whose code isn't one
+// we know, who simply gets the game (see levels.js).
+const COURSE = COURSE_CODE !== null
+      && Object.prototype.hasOwnProperty.call(COURSE_CODES, COURSE_CODE)
+    ? COURSE_CODES[COURSE_CODE] : null;
+
+// Whether a world is part of the game this player sees at all.  A world belonging to courses is
+// only for their students; one needing a server is only there when we have one.
+function worldShown(world) {
+    if(world.server && !SERVER) { return false; }
+    return !world.courses || (COURSE !== null && world.courses.includes(COURSE));
+}
+
+// Whether a world is the game's own rather than any course's.  A student who came for a course
+// has all of these at novice from the start: they are here for a term, not to play through.
+const outsideCourses = (world) => !world.courses;
+
+// Whether one world's unlock gates may name another at all: the game's own worlds gate each other,
+// and a course's worlds gate each other, but never across that line.  A course's world is no
+// prerequisite for the game's own -- a player without the course could never finish it -- and the
+// game's own are none for a course's, which is where a student's term starts.
+function sameCourseSide(world, other) {
+    if(outsideCourses(world)) { return outsideCourses(other); }
+    return !outsideCourses(other) && other.courses.some(function (c) { return world.courses.includes(c); });
+}
 const ruleParam = urlParams.get('rules');
 var extraRules = [];
 if(ruleParam) {
@@ -239,6 +275,10 @@ var customChipEl = null;
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
 // after its lower difficulty was just completed.
 var globalTime = 0;
+
+// Whether every level this player has is complete at each difficulty (see computeUnlockData),
+// which is what lifts that re-locking: see rule 7 in difficultyUnlocked.
+var allCompleteAt = [false, false, false];
 // Whether the current (complete) proof has already been registered as a completion, so re-running
 // typecheck on an already-complete proof doesn't count as a fresh completion.
 var proofRegisteredComplete = false;
@@ -1347,8 +1387,9 @@ function makeLevelSelect(res) {
     computeUnlockData(res);
     applyAutoCompletions(res);
     LEVELS.forEach(function (world, x) {
-        // Skip this world if it requires a server and we're not in server mode.
-        if(world.server && !SERVER) { return; }
+        // Skip a world this player doesn't have: one needing a server we haven't got, or one
+        // belonging to a course they aren't taking.
+        if(!worldShown(world)) { return; }
 
         const worldPane = document.createElement("div");
         worldPane.className = "world";
@@ -1527,6 +1568,8 @@ function applyAutoCompletions(res) {
         // Use the loop indices (x,y,z) rather than level.worldIndex etc., since this can run during
         // makeLevelSelect before those properties are assigned.
         LEVELS.forEach(function (world, x) {
+            // Nothing in a world this player doesn't have is theirs to have completed.
+            if(!worldShown(world)) { return; }
             world.stages.forEach(function (stage, y) {
                 stage.levels.forEach(function (level, z) {
                     if(!level.autoComplete) { return; }
@@ -1557,6 +1600,9 @@ function updateLevelSelect(res) {
     computeUnlockData(res);
     applyAutoCompletions(res);
     LEVELS.forEach(function (world, x) {
+        // A world this player doesn't have was never given buttons to re-render (see
+        // makeLevelSelect).
+        if(!worldShown(world)) { return; }
         world.stages.forEach(function (stage, y) {
             stage.levels.forEach(function (level, z) {
                 const past = getPast(res, level);
@@ -1746,8 +1792,6 @@ function fraction(done, total) {
     return total === 0 ? 1 : done / total;
 }
 
-// Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
-// is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
 // Whether a world's three inter-world gates (rules 1-3) pass at difficulty K -- i.e. whether the
 // world itself is "open" at K (individual levels still need the stage/level rules 4-6).
 //
@@ -1757,6 +1801,15 @@ function fraction(done, total) {
 // a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
 function worldGatesPass(w, K, data) {
     const world = data[w];
+    // A course's students have the game's own worlds at novice from the start, so that the term's
+    // work is the course's worlds and the rest is theirs to draw on.
+    if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return true; }
+    // 1a. A course's world opens at a difficulty once it is itself >= 80% complete at the one
+    //     below.  Rules 1-3 are all about other worlds, and a course has no game behind it to have
+    //     played through (nothing outside it gates it, and it gates nothing outside), so what earns
+    //     its next difficulty is its own work -- at rule 1's percentage, pointed at itself.
+    if(K > 0 && !outsideCourses(LEVELS[w])
+       && fraction(world.done[K - 1], world.total) < 0.8) { return false; }
     // 1. Every world this one follows is >= 80% complete at difficulty K.
     if(world.previous.some(function (p) { return fraction(data[p].done[K], data[p].total) < 0.8; })) {
         return false;
@@ -1766,7 +1819,10 @@ function worldGatesPass(w, K, data) {
         return fraction(data[f].done[K - 1], data[f].total) < 0.5;
     })) { return false; }
     // 3. Every world followed by a world this one follows is >= 50% complete at K+1 (unless K=2).
-    if(K < 2 && world.previous.some(function (p) {
+    //    A course drops this one: its students haven't the whole game behind them, and asking them
+    //    to go up a difficulty in an earlier world to open a later one is a run-up they don't have
+    //    the term for.
+    if(COURSE === null && K < 2 && world.previous.some(function (p) {
         return data[p].previous.some(function (q) {
             return fraction(data[q].done[K + 1], data[q].total) < 0.5;
         });
@@ -1774,9 +1830,15 @@ function worldGatesPass(w, K, data) {
     return true;
 }
 
+// Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
+// is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
 function difficultyUnlocked(w, s, c, K, data) {
     const world = data[w];
     const stage = world.stages[s];
+    // A course's students have every level of the game's own worlds at novice from the start (see
+    // worldGatesPass), the stage and level rules included: they need to reach whatever the course
+    // is about, not to be walked through the game in order.
+    if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return true; }
     // Rules 1-3: the world must be open at this difficulty.
     if(!worldGatesPass(w, K, data)) { return false; }
     // 4. Each of this stage's prerequisite stages is >= 70% complete at K.  By default that's the
@@ -1801,10 +1863,19 @@ function difficultyUnlocked(w, s, c, K, data) {
             if(stage.hasHint[j] && stage.levelDiff[j] < 0) { return false; }
         }
     }
+    // 8. (A course's worlds, adept/master) this level must have been solved at the difficulty
+    //    below.  In the game proper a difficulty is earned a world at a time, by everything behind
+    //    that world; a course, having nothing behind it, is climbed a level at a time instead.
+    if(K >= 1 && !outsideCourses(LEVELS[w]) && stage.levelDiff[c] < K - 1) { return false; }
     // 7. (Adept/Master) the previous difficulty of THIS level must not have been completed within
     //    the last RECENT_COMPLETION_WINDOW completions, so you can't immediately go up a difficulty
     //    and copy what you just did at the lower one.
-    if(K >= 1) {
+    //
+    //    Unless there is nothing else left to do: the wait is counted in completions, so a player
+    //    who has finished the whole game at K-1 and has only levels waiting out their cooling-off
+    //    left at K would be waiting for completions they have no way to make.  When every level
+    //    they have is complete at K-1, the wait is over.
+    if(K >= 1 && !allCompleteAt[K - 1]) {
         const times = stage.levelTimes[c];
         if(times && times[K - 1] !== undefined && globalTime - times[K - 1] <= RECENT_COMPLETION_WINDOW) {
             return false;
@@ -1934,8 +2005,14 @@ function computeUnlockData(res) {
         // Which worlds this one follows: `previous` lists how many worlds back each is, defaulting
         // to the world right before it.  Entries reaching back past the first world are ignored, so
         // the first world follows nothing; `followers` (filled in below) is the reverse relation.
+        // A world this player doesn't have is left out of the relation at both ends, here and in
+        // the followers below: nobody can complete it, so gating anything on it would lock that
+        // thing for good.  So is a world on the other side of the line between the game and a
+        // course (see sameCourseSide).
         const previous = (world.previous || [1]).map(function (n) { return w - n; })
-              .filter(function (i) { return i >= 0; });
+              .filter(function (i) {
+                  return i >= 0 && worldShown(LEVELS[i]) && sameCourseSide(world, LEVELS[i]);
+              });
         const wd = { total: 0, done: [0, 0, 0], stages: [], previous: previous, followers: [] };
         world.stages.forEach(function (stage) {
             // `previous` is which stages back this one's rule-4 prerequisite is; see difficultyUnlocked.
@@ -1966,14 +2043,29 @@ function computeUnlockData(res) {
     });
     // Now that every world's `previous` is resolved, record each one's followers.
     unlockData.forEach(function (wd, w) {
+        if(!worldShown(LEVELS[w])) { return; }
         wd.previous.forEach(function (p) { unlockData[p].followers.push(w); });
+    });
+    // Whether the player has finished every level they have at each difficulty -- every level of
+    // every world they can see, a bonus stage's included, since those are theirs to solve too and
+    // solving one is a way on.  Rule 7 reads this (see difficultyUnlocked).
+    allCompleteAt = [0, 1, 2].map(function (K) {
+        return unlockData.every(function (wd, w) {
+            return !worldShown(LEVELS[w]) || wd.stages.every(function (sd) {
+                return sd.levelDiff.every(function (d) { return d >= K; });
+            });
+        });
     });
 }
 
-// Snapshot which (world, difficulty) pairs are currently "open" (rules 1-3), from unlockData.
+// Snapshot which (world, difficulty) pairs are currently "open" (rules 1-3), from unlockData.  A
+// world this player doesn't have counts as open at nothing: it is no part of their game, so it
+// neither gets announced nor stands in for one that has been (see announceNewlyUnlockedWorlds).
 function snapshotWorldGates() {
     return unlockData.map(function (_, w) {
-        return [0, 1, 2].map(function (K) { return worldGatesPass(w, K, unlockData); });
+        return [0, 1, 2].map(function (K) {
+            return worldShown(LEVELS[w]) && worldGatesPass(w, K, unlockData);
+        });
     });
 }
 
@@ -1985,6 +2077,7 @@ const ABOUT_DIFFICULTY_IDS = ['aboutNovice', 'aboutAdept', 'aboutMaster'];
 function announceNewlyUnlockedWorlds(before) {
     const events = [];
     for(var w = 0; w < unlockData.length; w++) {
+        if(!worldShown(LEVELS[w])) { continue; }
         for(var K = 0; K < 3; K++) {
             if(worldGatesPass(w, K, unlockData) && !before[w][K]) {
                 events.push({ w: w, K: K });
