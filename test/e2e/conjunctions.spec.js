@@ -81,6 +81,13 @@ test.describe('alg+ and conjunctions', () => {
         expect(await proves(olorin, { hypotheses: ['0<x'], conclusion: '(0<x)∧(0≠1)' })).toBe(true);
     });
 
+    test('says what it takes when a wire carries something else', async () => {
+        expect(await proves(olorin, { hypotheses: ['⊤'], conclusion: '0<x' })).toBe(false);
+        expect(await complaints(olorin)).toEqual([expect.stringContaining(
+            'Everything wired into the alg+ block has to be an equation or inequality (=, ≠, <, ≤, '
+            + '>, ≥), or a conjunction (∧) of those')]);
+    });
+
     test("won't take a conjunction that isn't one of relations", async () => {
         expect(await proves(olorin, { hypotheses: ['0<x'], conclusion: '(0<x)∧⊤' })).toBe(false);
         // The whole goal is named, not just the part that isn't a relation.
@@ -188,8 +195,10 @@ test.describe('the plain alg block', () => {
             hypotheses: ['(0≤x)∧(x<n)'],
             conclusion: '0<n',
         })).toBe(false);
-        expect(await complaints(olorin)).toEqual([expect.stringContaining(
-            'Everything wired into the algebra block has to be')]);
+        const [said] = await complaints(olorin);
+        expect(said).toContain('Everything wired into the algebra block has to be');
+        // What it will take is its own business: it doesn't send the player to the other block.
+        expect(said).not.toContain('alg+');
     });
 });
 

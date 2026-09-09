@@ -112,7 +112,7 @@ let get_head_args : type hmode any.
 let get_args : type hmode any. (hmode, mode, any) apps -> mode normal list option =
  fun args -> Option.map snd (get_head_args args)
 
-let rec get_equality_or_inequality ctx tm =
+let rec get_equality_or_inequality ~(block : Explain.Oracle.block) ctx tm =
   let open Monad.Ops (E) in
   let eq = Scope.lookup [ "eq" ] in
   let neq = Scope.lookup [ "neq" ] in
@@ -126,21 +126,21 @@ let rec get_equality_or_inequality ctx tm =
           let* op =
             if Some name = eq then return `Eq
             else if Some name = neq then return `Neq
-            else Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
+            else Error (Code.Oracle_failed (Not_a_relation (block, Printable.PVal (ctx, tm))))
           in
           return (op, ty.tm, lhs, rhs)
       (* An ordering takes only the two sides. *)
       | Some [ lhs; rhs ] when List.mem_assoc name orders ->
           return (List.assoc name orders, Lazy.force lhs.ty, lhs, rhs)
       | Some [ arg ] when Some name = neg -> (
-          let* op, ty, lhs, rhs = get_equality_or_inequality ctx arg.tm in
+          let* op, ty, lhs, rhs = get_equality_or_inequality ~block ctx arg.tm in
           match op with
           | `Eq -> return (`Neq, ty, lhs, rhs)
           | `Neq -> return (`Eq, ty, lhs, rhs)
           | `Lt -> return (`Le, ty, rhs, lhs)
           | `Le -> return (`Lt, ty, rhs, lhs))
-      | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm)))))
-  | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
+      | _ -> Error (Code.Oracle_failed (Not_a_relation (block, Printable.PVal (ctx, tm)))))
+  | _ -> Error (Code.Oracle_failed (Not_a_relation (block, Printable.PVal (ctx, tm))))
 
 (* The two arguments of a spine that has exactly two, for a guard that has to ask before matching. *)
 let two_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode normal) option =
@@ -154,18 +154,18 @@ let two_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode no
    relations as a hypothesis; the plain block insists on a bare relation.  Underneath a negation
    neither one splits, since the negation of a conjunction is a disjunction, which is not something
    we can hand to Z3 as a fact. *)
-let rec get_relations ~(split : bool) ctx tm =
+let rec get_relations ~(split : bool) ~block ctx tm =
   let open Monad.Ops (E) in
   let land_ = Scope.lookup [ "land" ] in
   match Norm.view_term tm with
   | Neu { head = Const { name; ins }; args; _ }
     when split && Some name = land_ && Option.is_some (is_id_ins ins) && two_args args <> None ->
       let p, q = Option.get (two_args args) in
-      let* p = get_relations ~split ctx p.tm in
-      let* q = get_relations ~split ctx q.tm in
+      let* p = get_relations ~split ~block ctx p.tm in
+      let* q = get_relations ~split ~block ctx q.tm in
       return (p @ q)
   | _ ->
-      let* rel = get_equality_or_inequality ctx tm in
+      let* rel = get_equality_or_inequality ~block ctx tm in
       return [ rel ]
 
 (* A goal, on the other hand, may be a disjunction as well as a conjunction, for the "plus" block.
@@ -178,7 +178,7 @@ let rec get_relations ~(split : bool) ctx tm =
    distributing to get there, since a conjunction inside a disjunction is not one query but one per
    conjunct: "a ∨ (b ∧ c)" is proved by proving "a ∨ b" and "a ∨ c".  Without 'split' the goal is a
    bare relation, as before, which is the same thing with one conjunct of one disjunct. *)
-let rec get_clauses ~(split : bool) ctx tm =
+let rec get_clauses ~(split : bool) ~block ctx tm =
   let open Monad.Ops (E) in
   let land_ = Scope.lookup [ "land" ] in
   let lor_ = Scope.lookup [ "lor" ] in
@@ -189,12 +189,12 @@ let rec get_clauses ~(split : bool) ctx tm =
          && Option.is_some (is_id_ins ins)
          && two_args args <> None ->
       let p, q = Option.get (two_args args) in
-      let* ps = get_clauses ~split ctx p.tm in
-      let* qs = get_clauses ~split ctx q.tm in
+      let* ps = get_clauses ~split ~block ctx p.tm in
+      let* qs = get_clauses ~split ~block ctx q.tm in
       if Some name = land_ then return (ps @ qs)
       else return (List.concat_map (fun p -> List.map (fun q -> p @ q) qs) ps)
   | _ ->
-      let* rel = get_equality_or_inequality ctx tm in
+      let* rel = get_equality_or_inequality ~block ctx tm in
       return [ [ rel ] ]
 
 (* Whether the block's arithmetic can treat two statements as being about the same kind of number:
@@ -237,7 +237,7 @@ let cons_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode n
   | Some [ eqty; _; rest; _ ] -> Some (eqty, rest)
   | _ -> None
 
-let rec get_givens ~split ctx givens =
+let rec get_givens ~split ~block ctx givens =
   let open Monad.Ops (E) in
   let cons_eqs = Scope.lookup [ "Cons_eqs" ] in
   let nil_eqs = Scope.lookup [ "Nil_eqs" ] in
@@ -248,12 +248,12 @@ let rec get_givens ~split ctx givens =
       let* rels =
         (* An input that isn't a relation at all is the same complaint as a goal that isn't one,
            but about a wire rather than about the goal, so it gets its own message. *)
-        match get_relations ~split ctx eqty.tm with
+        match get_relations ~split ~block ctx eqty.tm with
         | Ok rels -> Ok rels
         | Error (Code.Oracle_failed (Not_a_relation _)) ->
-            Error (Code.Oracle_failed (Not_a_relation_input (Printable.PNormal (ctx, eqty))))
+            Error (Code.Oracle_failed (Not_a_relation_input (block, Printable.PNormal (ctx, eqty))))
         | Error e -> Error e in
-      let* rest = get_givens ~split ctx rest.tm in
+      let* rest = get_givens ~split ~block ctx rest.tm in
       return (rels @ rest)
   | Neu { head = Const { name; ins }; args; _ }
     when Some name = nil_eqs && Option.is_some (is_id_ins ins) && get_args args = Some [] ->
@@ -608,7 +608,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      plain one requires the hypotheses to settle each of those first (see Cases below). *)
   let oracle = Scope.lookup [ "oracle" ] in
   let oracle_plus = Scope.lookup [ "oracle_plus" ] in
-  let* plus, givens, goal =
+  let* block, givens, goal =
     match Norm.view_term tm with
     | Neu { head = Const { name; ins }; args; _ }
       when (Some name = oracle || Some name = oracle_plus)
@@ -620,8 +620,12 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
           match get_args args with
           | Some [ givens; _; goal ] -> (givens, goal)
           | _ -> assert false in
-        return (Some name = oracle_plus, givens, goal)
+        return
+          ((if Some name = oracle_plus then `Algplus else `Alg), givens, goal)
     | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
+  (* The "plus" block is the one that splits a statement apart, and the one that decides an
+     absolute value, a minimum or a maximum on its own (see Cases below). *)
+  let plus = block = `Algplus in
   (* The goal is a list of clauses, each a disjunction to prove against all of the hypotheses (see
      get_clauses).  They all go through one translation, so that the same subterm gets the same
      variable throughout.
@@ -631,13 +635,14 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      empty, and what we ask below is whether the hypotheses are inconsistent on their own.  (The
      goal is still reported as a whole, rather than by the part that isn't a relation, as the
      hypotheses are reported by the whole wire.) *)
-  let nonalgebraic_goal = Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal))) in
+  let nonalgebraic_goal =
+    Code.Oracle_failed (Not_a_relation (block, Printable.PNormal (ctx, goal))) in
   let* goals =
-    match get_clauses ~split:plus ctx goal.tm with
+    match get_clauses ~split:plus ~block ctx goal.tm with
     | Ok goals -> Ok goals
     | Error (Code.Oracle_failed (Not_a_relation _)) -> Ok []
     | Error e -> Error e in
-  let* givens = get_givens ~split:plus ctx givens.tm in
+  let* givens = get_givens ~split:plus ~block ctx givens.tm in
   (* The kind of number the block is *about* -- which decides what shares variables with what, and
      nothing else -- comes from the first of the goal's relations, as a single relation's type was
      taken from the goal itself; with no goal relation to read it off, the first hypothesis serves

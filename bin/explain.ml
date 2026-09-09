@@ -13,6 +13,11 @@ open Reporter
    here can't drift apart.  Narya can't display any of these, so anything raised here should be
    explained below. *)
 module Oracle = struct
+  (* Which of the two algebra blocks was asking.  They take and prove different things, so the
+     failures that say what a block will take carry it: the plain block's message must describe
+     the plain block, without advertising the other one. *)
+  type block = [ `Alg | `Algplus ]
+
   type Reporter.oracle_error +=
     (* The goal doesn't follow from the hypotheses by algebra. *)
     | Unprovable
@@ -25,11 +30,12 @@ module Oracle = struct
     (* An absolute value, min or max that the hypotheses don't decide: the term containing it. *)
     | Undecided_sign of printable
     | Undecided_order of printable
-    (* A goal, or an input, that isn't a relation at all: the statement in question.  A goal like
-       that is only reported once the hypotheses have turned out to be consistent, since a
-       contradiction among them proves it (see oracle.ml); an input like that is refused outright. *)
-    | Not_a_relation of printable
-    | Not_a_relation_input of printable
+    (* A goal, or an input, that isn't a relation at all: the block that wouldn't take it, and the
+       statement in question.  A goal like that is only reported once the hypotheses have turned
+       out to be consistent, since a contradiction among them proves it (see oracle.ml); an input
+       like that is refused outright. *)
+    | Not_a_relation of block * printable
+    | Not_a_relation_input of block * printable
     (* Neither of these can happen unless olorin has elaborated an algebra block wrongly: the
        hypotheses aren't a list, or the block isn't an application of an oracle constant. *)
     | Not_a_hypothesis_list of printable
@@ -103,18 +109,31 @@ let oracle_failed : Reporter.oracle_error -> string option =
   | Disequality ->
       Some
         "I won't prove a ≠ statement by algebra unless both sides are plain numbers: use a proof by contradiction instead."
-  | Not_a_relation p ->
+  | Not_a_relation (block, p) ->
       Option.map
         (fun ty ->
-           "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless its inputs are contradictory. \
-            The goal it's wired to here is" ^ display ty ^ "which isn't one of them, and its inputs are not contradictory.")
+          (match block with
+          | `Alg ->
+              "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless \
+               its inputs are contradictory.  The goal it's wired to here is" ^ display ty
+              ^ "which isn't one of them, and its inputs are not contradictory."
+          | `Algplus ->
+              "The alg+ block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and \
+               conjunctions (∧) and disjunctions (∨) of them, unless its inputs are contradictory.  \
+               The goal it's wired to here is" ^ display ty
+              ^ "which isn't one of those, and its inputs are not contradictory."))
         (printed ~sort:`Type p)
-  | Not_a_relation_input p ->
+  | Not_a_relation_input (block, p) ->
       Option.map
         (fun ty ->
-          "Everything wired into the algebra block has to be an equation or inequality (=, ≠, <, \
-           ≤, >, ≥), or for the alg+ block a conjunction (∧) of those.  This one is" ^ display ty
-          ^ "which isn't one of them.")
+          (match block with
+          | `Alg ->
+              "Everything wired into the algebra block has to be an equation or inequality (=, ≠, \
+               <, ≤, >, ≥).  This one is"
+          | `Algplus ->
+              "Everything wired into the alg+ block has to be an equation or inequality (=, ≠, <, \
+               ≤, >, ≥), or a conjunction (∧) of those.  This one is")
+          ^ display ty ^ "which isn't one of them.")
         (printed ~sort:`Type p)
   (* Neither of these is anything the player did; Narya has nothing to say about our tags, so we
      say what we can here rather than leaving a bare "oracle failed". *)
