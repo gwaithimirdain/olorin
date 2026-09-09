@@ -159,6 +159,65 @@ test.describe('The code a student was given', () => {
     });
 });
 
+// A course has nothing behind it to have played through, so its own work is what earns its higher
+// difficulties: the world opens at one when it is 80% complete at the one below (rule 1's
+// percentage, pointed at itself), and a level opens at one when that level has been solved at the
+// one below.  In the game proper both of those come from the worlds behind a world instead.
+test.describe('The difficulties of a course world', () => {
+    const COUNTED = COURSE.counted;
+    // 80% of it, which is what opens the next difficulty; the levels are listed in play order, so
+    // this is a prefix of them.
+    const most = (difficulty) =>
+        completions(COUNTED.slice(0, thresholdCount(COUNTED.length, 0.8)), difficulty);
+    // A level with at most two before it in its stage, so rule 5 has nothing to say about it and
+    // what is being asked about is rule 8 alone.
+    const SECOND = COURSE.levels[1];
+
+    test('are not all open at once, as they were with nothing gating them', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open({ code: CODE.code });
+        expect(await states(olorin, COURSE.levels[0].name)).toEqual(['unlocked', 'locked', 'locked']);
+    });
+
+    test('open at adept once the world is 80% done at novice', async ({ page }) => {
+        const olorin = new Olorin(page);
+        // Solving this one level is not the world; the level itself is no longer the question.
+        await olorin.seed(completions([COURSE.levels[0]], 0));
+        await olorin.open({ code: CODE.code });
+        expect((await states(olorin, COURSE.levels[0].name))[1]).toBe('locked');
+
+        await olorin.seed(most(0));
+        await olorin.open({ code: CODE.code });
+        expect((await states(olorin, COURSE.levels[0].name))[1]).toBe('unlocked');
+    });
+
+    test('...and level by level, on that level at the difficulty below', async ({ page }) => {
+        // The whole world at novice save this one level: the world is open at adept, and every
+        // other level of it is too, but this one hasn't been climbed to yet.
+        const olorin = new Olorin(page);
+        await olorin.seed(completions(COUNTED.filter((l) => l.name !== SECOND.name), 0));
+        await olorin.open({ code: CODE.code });
+        expect((await states(olorin, COURSE.levels[0].name))[1]).toBe('unlocked');
+        expect((await states(olorin, SECOND.name))[1]).toBe('locked');
+
+        await olorin.seed(completions([SECOND], 0));
+        await olorin.open({ code: CODE.code });
+        expect((await states(olorin, SECOND.name))[1]).toBe('unlocked');
+    });
+
+    test('and master waits on the same two things at adept', async ({ page }) => {
+        const olorin = new Olorin(page);
+        // The world 80% done at adept, but this level only at novice.
+        await olorin.seed(most(1).concat(completions([COURSE.levels[0]], 0)));
+        await olorin.open({ code: CODE.code });
+        expect((await states(olorin, COURSE.levels[0].name))[2]).toBe('locked');
+
+        await olorin.seed(most(1));
+        await olorin.open({ code: CODE.code });
+        expect((await states(olorin, COURSE.levels[0].name))[2]).toBe('unlocked');
+    });
+});
+
 // Rule 3: a world normally waits until every world followed by a world it follows is 50% complete
 // one difficulty ABOVE the one being opened -- so opening world 3 at adept asks for world 1 at
 // master.  A course drops that; its students haven't the whole game behind them.

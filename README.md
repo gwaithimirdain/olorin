@@ -106,6 +106,8 @@ With a valid code, that course's worlds are there (another course's still aren't
 
 The unlock rules never reach across the line between the game and a course: a course's worlds gate none of the game's own, and the game's own gate none of a course's, so a course starts at its own first level.  Within a world, and among the worlds of one course, everything unlocks as it always does.
 
+Higher difficulties are earned differently there, for the same reason.  In the game proper a difficulty is opened a world at a time, by the worlds behind it; a course has none, so its own work is what opens it: one of its worlds opens at a difficulty once it is 80% complete at the difficulty below, and a level of it opens at a difficulty once that level has been solved at the difficulty below.
+
 ## Olorin server
 
 The above instructions compile a version of Olorin that runs entirely client-side in the user's browser, saving the list of completed levels locally in the browser.  There is also a version that stores that information on a server associated with the user's email address; this is intended mainly for students in a class, so that the instructor can download a spreadsheet of grades by student and level.  To compile this version of Olorin, simply change the definition `SERVER = false` in `client/main.js` to say `true` instead, and proceed as above.

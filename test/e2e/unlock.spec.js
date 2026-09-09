@@ -8,6 +8,10 @@
 //   5. all but 2 of the levels before C in the stage are complete at K
 //   6. (novice only) every earlier level in the stage that has a hint is complete
 //
+// A world belonging to a course (see courses.spec.js) is not in this game at all -- it gates
+// nothing here and nothing here gates it -- and has two rules of its own instead; everything below
+// is about the game's own worlds.
+//
 // Which worlds a world follows is its own declared `previous` list, so rules 1-3 are about that
 // relation and not about world order: world 1 here is followed by both world 2 and world 3.  The
 // levels and worlds below are therefore selected structurally from levels.js -- the first level,

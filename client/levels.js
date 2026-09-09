@@ -11,7 +11,11 @@
 //                       it.  The unlock rules never reach across that line: a course's worlds gate
 //                       none of the game's own, and the game's own gate none of a course's, so a
 //                       course starts at the first level of its own first world.  Its worlds do
-//                       gate each other, as any worlds of the same kind do.
+//                       gate each other, as any worlds of the same kind do.  Its higher
+//                       difficulties are earned by its own work rather than by the worlds behind
+//                       it, which it hasn't got: a world of a course opens at a difficulty once it
+//                       is 80% complete at the one below, and a level of it once that level has
+//                       been solved at the one below.
 //
 //   previous: [N, ...]  Which worlds this one follows, as how many worlds back each is, instead of
 //                       the default [1] (the world right before it).  All three of the rules that

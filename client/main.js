@@ -1788,8 +1788,6 @@ function fraction(done, total) {
     return total === 0 ? 1 : done / total;
 }
 
-// Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
-// is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
 // Whether a world's three inter-world gates (rules 1-3) pass at difficulty K -- i.e. whether the
 // world itself is "open" at K (individual levels still need the stage/level rules 4-6).
 //
@@ -1802,6 +1800,12 @@ function worldGatesPass(w, K, data) {
     // A course's students have the game's own worlds at novice from the start, so that the term's
     // work is the course's worlds and the rest is theirs to draw on.
     if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return true; }
+    // 1a. A course's world opens at a difficulty once it is itself >= 80% complete at the one
+    //     below.  Rules 1-3 are all about other worlds, and a course has no game behind it to have
+    //     played through (nothing outside it gates it, and it gates nothing outside), so what earns
+    //     its next difficulty is its own work -- at rule 1's percentage, pointed at itself.
+    if(K > 0 && !outsideCourses(LEVELS[w])
+       && fraction(world.done[K - 1], world.total) < 0.8) { return false; }
     // 1. Every world this one follows is >= 80% complete at difficulty K.
     if(world.previous.some(function (p) { return fraction(data[p].done[K], data[p].total) < 0.8; })) {
         return false;
@@ -1822,6 +1826,8 @@ function worldGatesPass(w, K, data) {
     return true;
 }
 
+// Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
+// is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
 function difficultyUnlocked(w, s, c, K, data) {
     const world = data[w];
     const stage = world.stages[s];
@@ -1853,6 +1859,10 @@ function difficultyUnlocked(w, s, c, K, data) {
             if(stage.hasHint[j] && stage.levelDiff[j] < 0) { return false; }
         }
     }
+    // 8. (A course's worlds, adept/master) this level must have been solved at the difficulty
+    //    below.  In the game proper a difficulty is earned a world at a time, by everything behind
+    //    that world; a course, having nothing behind it, is climbed a level at a time instead.
+    if(K >= 1 && !outsideCourses(LEVELS[w]) && stage.levelDiff[c] < K - 1) { return false; }
     // 7. (Adept/Master) the previous difficulty of THIS level must not have been completed within
     //    the last RECENT_COMPLETION_WINDOW completions, so you can't immediately go up a difficulty
     //    and copy what you just did at the lower one.

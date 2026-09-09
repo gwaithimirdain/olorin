@@ -90,6 +90,7 @@ function courseWorlds() {
                 world: x + 1,
                 stage: y + 1,
                 index: z + 1,
+                bonus: !!stage.bonus,
                 saveable: saveable(level),
             })));
         // Which worlds it follows, resolved as the app resolves them: `previous` counts worlds
@@ -99,7 +100,16 @@ function courseWorlds() {
             const prev = p >= 1 && LEVELS[p - 1];
             return prev && prev.courses && prev.courses.some((c) => world.courses.includes(c));
         });
-        return [{ number: x + 1, name: world.name, courses: world.courses.slice(), previous, levels }];
+        // `counted` is the levels its percentages are of, a bonus stage's being left out as
+        // anywhere else -- which is what its own difficulties are gated on (see worldGatesPass).
+        return [{
+            number: x + 1,
+            name: world.name,
+            courses: world.courses.slice(),
+            previous,
+            levels,
+            counted: levels.filter((l) => !l.bonus),
+        }];
     });
 }
 
