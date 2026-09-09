@@ -34,7 +34,8 @@ test.describe('Expression boxes', () => {
 
     // An expression is arithmetic, so its dialog gets a shorter palette than the statement boxes do
     // -- no connectives or quantifiers, just the symbols an expression needs and a keyboard hasn't
-    // got.  Most have a typed spelling too (- for −, * for ·, | for ∣, ^2 for ²); √ has only \sqrt.
+    // got, plus the Greek dropdown for whatever the variables in it are called.  Most have a typed
+    // spelling too (- for −, * for ·, | for ∣, ^2 for ²); √ has only \sqrt.
     //
     // Nothing here reads on the palette's exact contents, so that adding a symbol to it can't
     // break this: what is asserted is that the symbols an expression needs are offered, that the
@@ -72,6 +73,33 @@ test.describe('Expression boxes', () => {
         await page.fill('#expression', '');
         await page.locator('#expression').pressSequentially('|x*2|');
         expect(await page.inputValue('#expression')).toBe('∣x·2∣');
+    });
+
+    // The Greek letters are a dropdown here as they are in a statement box, rather than the button
+    // each that ε and δ used to have: a level can name a variable with any of them, and an
+    // expression has to be able to write the name it was given.
+    test('the dialog offers the Greek alphabet in a dropdown, not just ε and δ', async ({ page }) => {
+        await olorin.dragRule('expr', 420, 240);
+        await page.waitForSelector('#expressionBG', { state: 'visible' });
+        const menus = await page.evaluate(() => Array.from(document.querySelectorAll('#exprPalette select'))
+            .map((s) => Array.from(s.options).map((o) => o.textContent)));
+        expect(menus).toHaveLength(1);
+        const [label, ...letters] = menus[0];
+        expect(label).toBe('Greek');
+        expect(letters).toEqual(expect.arrayContaining(['α', 'δ', 'ε', 'λ', 'π', 'ω']));
+
+        // What the dropdown holds is no longer a button of its own.
+        const buttons = await page.evaluate(() => Array.from(
+            document.querySelectorAll('#exprPalette .unicode-button')).map((b) => b.textContent));
+        for (const letter of letters) {
+            expect(buttons).not.toContain(letter);
+        }
+
+        // And picking one types it into the box, at the cursor.
+        await page.fill('#expression', 'x2');
+        await page.evaluate(() => document.getElementById('expression').setSelectionRange(1, 1));
+        await page.selectOption('#exprPalette select', 'ε');
+        expect(await page.inputValue('#expression')).toBe('xε2');
     });
 
     test('double-clicking one re-opens the dialog, pre-filled, and edits it in place', async ({ page }) => {

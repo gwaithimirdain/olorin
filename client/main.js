@@ -48,8 +48,10 @@ const PALETTE_GROUPS = [{ label: 'sets', chars: NUMBER_PALETTE }, GREEK_GROUP];
 
 // An expression is arithmetic, not logic, so its box gets its own shorter row: no connectives, no
 // quantifiers, no number systems, just the symbols an expression is written out of that a keyboard
-// hasn't got a key for.
-const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴', 'ε', 'δ'];
+// hasn't got a key for.  It does get the Greek dropdown, though: an expression is written in
+// whatever the variables around it are called, and ε and δ (which had a button each here) are not
+// the only Greek names the levels give them.
+const EXPR_PALETTE = ['−', '·', '∣', '√', '²', '³', '⁴'];
 
 // Left to itself, jsPlumb draws every curved wire that starts and ends on the same block as a
 // circle sitting on its source port: the loopback case reads only where the wire starts, and never
@@ -3475,7 +3477,7 @@ makePalette('hypPalette', 'hypotheses', PALETTE, PALETTE_GROUPS);
 makePalette('conclPalette', 'conclusion', PALETTE, PALETTE_GROUPS);
 makePalette('ascPalette', 'ascribe', PALETTE, PALETTE_GROUPS);
 makePalette('wirePalette', 'wire', PALETTE, PALETTE_GROUPS);
-makePalette('exprPalette', 'expression', EXPR_PALETTE, []);
+makePalette('exprPalette', 'expression', EXPR_PALETTE, [GREEK_GROUP]);
 // A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
 // mathematician does reach for is a Greek letter, so that dropdown is the whole of this palette.
 makePalette('varnamePalette', 'newvar', [], [GREEK_GROUP]);
