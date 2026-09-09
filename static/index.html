@@ -309,17 +309,9 @@
           </tbody>
         </table>
         <p>
-          Only some number systems like ℚ, ℝ, and 𝕊 allow division, and of course only by a nonzero denominator.
-          Any algebra block involving division requires sufficient inputs to prove that every denominator is nonzero.
-        </p>
-        <p>
-          Only the number systems ℝ and 𝕊 allow square roots and fractional exponents.
-          Furthermore, a square root or a fractional exponent with even denominator requires the base to be nonnegative; any algebra block involving such operations requires sufficient inputs to prove such nonnegativity.
-        </p>
-        <p>
-          The ordinary algebra block also cannot prove things about case-split functions like absolute values, minima, or maxima unless it has sufficient inputs to determine which case holds, i.e. that x in ∣x∣ is ≥0 or ≤0, and that in min(x,y) and max(x,y) we have x≤y or y≤x.
-          The "≤∨&gt;" block is helpful for this.
-          (The advanced "alg+" block does that reasoning itself.)
+          Only ℚ, ℝ, and 𝕊 allow division and negative exponents, in which case the denominator or base must be nonzero.
+          Likewise, only ℝ and 𝕊 allow square roots and fractional exponents, in which case the base must be nonnegative.
+          (In theory ℝ should also allow irrational exponents, but I don't know how to compute with those.)
         </p>
         <div style="text-align: center; margin-top: 30px">
           <button id="submitExpression" style="font-size: 16px">Submit</button>
