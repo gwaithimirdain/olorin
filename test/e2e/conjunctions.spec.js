@@ -102,13 +102,14 @@ test.describe('the plain alg block', () => {
         await olorin.open();
     });
 
-    test('refuses a conjunctive goal, and says which block does take one', async () => {
+    test('refuses a conjunctive goal, quoting the goal it wouldn\'t take', async () => {
         expect(await plainProves(olorin, {
             hypotheses: ['0≤x', 'x<n'],
             conclusion: '(0≤x)∧(x<n)',
         })).toBe(false);
         expect(await complaints(olorin)).toEqual([expect.stringContaining(
-            'the alg+ block conjunctions (∧) of those. The goal it\'s wired to is (0≤x)∧(x<n)')]);
+            'only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless its inputs are '
+            + 'contradictory. The goal it\'s wired to here is (0≤x)∧(x<n)')]);
     });
 
     test('refuses a conjunctive hypothesis, blaming the wire rather than the goal', async () => {
