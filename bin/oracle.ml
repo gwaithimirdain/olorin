@@ -142,11 +142,6 @@ let rec get_equality_or_inequality ctx tm =
       | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm)))))
   | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
 
-(* All the relations a statement asserts.  With 'split' -- which is what the "plus" block asks for
-   -- a conjunction contributes those of both its components, so that block takes a conjunction of
-   relations as a hypothesis and proves one as a goal; the plain block insists on a bare relation.
-   Underneath a negation neither one splits, since the negation of a conjunction is a disjunction,
-   which is not something we can hand to Z3 as a fact or ask it to prove. *)
 (* The two arguments of a spine that has exactly two, for a guard that has to ask before matching. *)
 let two_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode normal) option =
  fun args ->
@@ -154,6 +149,11 @@ let two_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode no
   | Some [ p; q ] -> Some (p, q)
   | _ -> None
 
+(* All the relations a statement asserts.  With 'split' -- which is what the "plus" block asks for
+   -- a conjunction contributes those of both its components, so that block takes a conjunction of
+   relations as a hypothesis; the plain block insists on a bare relation.  Underneath a negation
+   neither one splits, since the negation of a conjunction is a disjunction, which is not something
+   we can hand to Z3 as a fact. *)
 let rec get_relations ~(split : bool) ctx tm =
   let open Monad.Ops (E) in
   let land_ = Scope.lookup [ "land" ] in
@@ -167,6 +167,35 @@ let rec get_relations ~(split : bool) ctx tm =
   | _ ->
       let* rel = get_equality_or_inequality ctx tm in
       return [ rel ]
+
+(* A goal, on the other hand, may be a disjunction as well as a conjunction, for the "plus" block.
+   A disjunction is proved the way a single relation is, only with every disjunct negated at once:
+   the disjunction fails exactly when all of its sides do, so hypotheses that rule out every one of
+   them are contradictory.  (Which side actually holds the block doesn't say, and needn't: it is
+   the disjunction it proves.)
+
+   So we read the goal as a conjunction of disjunctions of relations -- each conjunct one query --
+   distributing to get there, since a conjunction inside a disjunction is not one query but one per
+   conjunct: "a ∨ (b ∧ c)" is proved by proving "a ∨ b" and "a ∨ c".  Without 'split' the goal is a
+   bare relation, as before, which is the same thing with one conjunct of one disjunct. *)
+let rec get_clauses ~(split : bool) ctx tm =
+  let open Monad.Ops (E) in
+  let land_ = Scope.lookup [ "land" ] in
+  let lor_ = Scope.lookup [ "lor" ] in
+  match Norm.view_term tm with
+  | Neu { head = Const { name; ins }; args; _ }
+    when split
+         && (Some name = land_ || Some name = lor_)
+         && Option.is_some (is_id_ins ins)
+         && two_args args <> None ->
+      let p, q = Option.get (two_args args) in
+      let* ps = get_clauses ~split ctx p.tm in
+      let* qs = get_clauses ~split ctx q.tm in
+      if Some name = land_ then return (ps @ qs)
+      else return (List.concat_map (fun p -> List.map (fun q -> p @ q) qs) ps)
+  | _ ->
+      let* rel = get_equality_or_inequality ctx tm in
+      return [ [ rel ] ]
 
 (* Whether the block's arithmetic can treat two statements as being about the same kind of number:
    one type is a subtype of the other, so both embed in the ordered field the translation is really
@@ -593,17 +622,18 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
           | _ -> assert false in
         return (Some name = oracle_plus, givens, goal)
     | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
-  (* A conjunctive goal is a list of relations to prove, each against all of the hypotheses.  They
-     all go through one translation, so that the same subterm gets the same variable throughout.
+  (* The goal is a list of clauses, each a disjunction to prove against all of the hypotheses (see
+     get_clauses).  They all go through one translation, so that the same subterm gets the same
+     variable throughout.
 
      A goal that isn't a relation at all isn't refused out of hand: anything whatsoever follows from
-     hypotheses that contradict each other, so such a goal leaves the list of relations to prove
+     hypotheses that contradict each other, so such a goal leaves the list of clauses to prove
      empty, and what we ask below is whether the hypotheses are inconsistent on their own.  (The
-     goal is still reported as a whole, rather than by the conjunct that isn't a relation, as the
+     goal is still reported as a whole, rather than by the part that isn't a relation, as the
      hypotheses are reported by the whole wire.) *)
   let nonalgebraic_goal = Code.Oracle_failed (Not_a_relation (Printable.PNormal (ctx, goal))) in
   let* goals =
-    match get_relations ~split:plus ctx goal.tm with
+    match get_clauses ~split:plus ctx goal.tm with
     | Ok goals -> Ok goals
     | Error (Code.Oracle_failed (Not_a_relation _)) -> Ok []
     | Error e -> Error e in
@@ -614,13 +644,13 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      instead.  If there is neither, there is nothing that could be inconsistent, so a non-algebraic
      goal fails here rather than at a query with no facts in it. *)
   let* ty =
-    match goals @ givens with
+    match List.concat goals @ givens with
     | (_, ty, _, _) :: _ -> Ok ty
     | [] -> Error nonalgebraic_goal in
   (* Both ends are tagged together, so that a hypothesis about a larger number system than the goal
      pulls the goal up to it rather than being translated down. *)
-  let ty = widest ctx ty (goals @ givens) in
-  let goals = relation_types ctx ty goals in
+  let ty = widest ctx ty (List.concat goals @ givens) in
+  let goals = List.map (relation_types ctx ty) goals in
   let givens = relation_types ctx ty givens in
   let (givens, goals), { steps; _ } =
     (let open Monad.Ops (S) in
@@ -634,15 +664,22 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            let* g = poly g in
            let* gs = polys gs in
            return (g :: gs) in
+     let rec clauses = function
+       | [] -> return []
+       | c :: cs ->
+           let* c = polys c in
+           let* cs = clauses cs in
+           return (c :: cs) in
      (* The goal before the hypotheses, so that the side conditions come out in the order they did
         when a goal was always a single relation. *)
-     let* goals = polys goals in
+     let* goals = clauses goals in
      let* givens = polys givens in
      return (givens, goals))
       { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
   (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
      literals, like 0≠1.  A disequality with anything else in it is one we want the student to
-     prove by contradiction. *)
+     prove by contradiction -- as a disjunct of a goal as much as on its own, since a disjunction
+     with the other sides ruled out is a proof of that disequality like any other. *)
   let* () =
     List.fold_left
       (fun acc (op, lhs, rhs) ->
@@ -650,7 +687,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
         if op = `Neq && not (is_literal lhs && is_literal rhs) then
           Error (Code.Oracle_failed Disequality)
         else Ok ())
-      (Ok ()) goals in
+      (Ok ()) (List.concat goals) in
   (* Encoding division faithfully means the goal query below is sound whatever the denominators
      turn out to be, since a statement about a quotient by zero is then a statement about an
      unspecified value.  But answering such questions isn't what the student wants: writing a
@@ -695,7 +732,17 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let* facts = discharge givens (Bwd.to_list steps) in
   (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
-     swapping the order of the arguments (although for a (dis)equality swapping does nothing). *)
+     swapping the order of the arguments (although for a (dis)equality swapping does nothing).  A
+     conjunct with several disjuncts is negated all at once: what makes the disjunction follow is
+     that the hypotheses can't be had along with every one of its sides failing. *)
+  let negate (op, lhs, rhs) =
+    let neg_op =
+      match op with
+      | `Eq -> `Neq
+      | `Neq -> `Eq
+      | `Lt -> `Le
+      | `Le -> `Lt in
+    (neg_op, rhs, lhs) in
   match goals with
   (* A goal that isn't algebraic at all, which we prove only by the hypotheses being contradictory:
      from a contradiction anything follows, that statement included.  Where they aren't, the
@@ -703,14 +750,8 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   | [] -> if unsat facts then Ok () else Error nonalgebraic_goal
   | _ ->
       List.fold_left
-        (fun acc (op, lhs, rhs) ->
+        (fun acc clause ->
           let* () = acc in
-          let neg_op =
-            match op with
-            | `Eq -> `Neq
-            | `Neq -> `Eq
-            | `Lt -> `Le
-            | `Le -> `Lt in
-          if unsat ((neg_op, rhs, lhs) :: facts) then Ok ()
+          if unsat (List.map negate clause @ facts) then Ok ()
           else Error (Code.Oracle_failed Unprovable))
         (Ok ()) goals
