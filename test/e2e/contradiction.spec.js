@@ -4,7 +4,8 @@
 // but the goal no longer does: anything whatsoever follows from hypotheses that contradict each
 // other, so a non-algebraic goal is proved exactly when the inputs are inconsistent on their own.
 // Where they aren't, the block says so as part of the "not a relation" complaint, rather than
-// leaving the player to think the goal was of the wrong shape and nothing else.
+// leaving the player to think the goal was of the wrong shape and nothing else.  Each block
+// describes itself there: what the plain one takes, or what alg+ takes on top of that.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -33,6 +34,20 @@ async function algebraProves(olorin, rule, { parameters = '', variables = '', hy
 async function complaint(olorin) {
     return (await olorin.diagnostics()).map((d) => d.explanation).join(' ');
 }
+
+// What each block says of itself: what it proves, in the complaint about a goal it wouldn't take,
+// and what it takes, in the complaint about a wire.  Each describes itself alone.
+const SAYS = {
+    alg: {
+        goal: 'The algebra block only proves equations and inequalities',
+        input: 'Everything wired into the algebra block',
+    },
+    algplus: {
+        goal: 'The alg+ block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and '
+            + 'conjunctions (∧) and disjunctions (∨) of them',
+        input: 'Everything wired into the alg+ block',
+    },
+};
 
 for (const rule of ['alg', 'algplus']) {
     test.describe(`A goal that isn't a relation, and the "${rule}" block`, () => {
@@ -69,8 +84,10 @@ for (const rule of ['alg', 'algplus']) {
                 conclusion: 'P',
             })).toBe(false);
             const said = await complaint(olorin);
-            expect(said).toContain('only proves equations and inequalities');
+            expect(said.replace(/\s+/g, ' ')).toContain(SAYS[rule].goal);
             expect(said).toContain('its inputs are not contradictory');
+            // The plain block describes itself, and doesn't send the player to the other one.
+            if (rule === 'alg') expect(said).not.toContain('alg+');
         });
 
         test('says the same thing when there are no inputs at all to be inconsistent',
@@ -82,8 +99,9 @@ for (const rule of ['alg', 'algplus']) {
                     conclusion: 'P',
                 })).toBe(false);
                 const said = await complaint(olorin);
-                expect(said).toContain('only proves equations and inequalities');
+                expect(said.replace(/\s+/g, ' ')).toContain(SAYS[rule].goal);
                 expect(said).toContain('its inputs are not contradictory');
+                if (rule === 'alg') expect(said).not.toContain('alg+');
             });
 
         // Only the goal was generalized.  A wire carrying something that isn't a relation is still
@@ -97,7 +115,9 @@ for (const rule of ['alg', 'algplus']) {
                 hypotheses: ['P', '0<x'],
                 conclusion: 'x·x≥0',
             })).toBe(false);
-            expect(await complaint(olorin)).toContain('Everything wired into the algebra block');
+            const said = await complaint(olorin);
+            expect(said).toContain(SAYS[rule].input);
+            if (rule === 'alg') expect(said).not.toContain('alg+');
         });
     });
 }
