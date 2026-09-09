@@ -1,6 +1,8 @@
 open Bwd
 open Util
 open Dim
+open Modal
+open Omode
 open Core
 open Value
 open Subtype
@@ -73,6 +75,43 @@ let order_relations () =
         [ ("lt", `Lt); ("le", `Le) ])
     Firstorder.numbers
 
+(* The arguments of an application spine, oldest first, if it is a plain sequence of applications of
+   the ordinary kind: a field projection or an instantiation isn't something we take apart, nor is a
+   modal application -- Olorin's logic has no modalities, so an argument always lives at the mode of
+   the spine itself, and this is where we recover that.
+
+   The equation between the mode the spine starts at and the ambient one only becomes available at
+   the end of the sequence, so it comes back out of the recursion, as in Narya's own
+   Check.check_constr_type. *)
+let get_head_args : type hmode any.
+    (hmode, mode, any) apps -> ((hmode, mode) Eq.t * mode normal list) option =
+ fun args ->
+  let rec go : type m1. (m1, mode) Fwd_app.fwd -> ((m1, mode) Eq.t * mode normal list) option =
+    function
+    | Nil -> Some (Eq, [])
+    | Cons
+        ( Fwd_app.Arg
+            (type dom modality n m mk k)
+            ((filter, arg, ins) :
+              (dom, modality, m1, n, m) Modality.filter_dim
+              * (n, dom normal) CubeOf.t
+              * (mk, m, k) insertion),
+          rest ) -> (
+        match go rest with
+        | None -> None
+        | Some (Eq, acc) -> (
+            match (is_id_ins ins, Modality.compare_id (Modality.filter_modality filter)) with
+            | Some _, Eq -> Some (Eq, CubeOf.find_top arg :: acc)
+            | _ -> None))
+    | Cons (Fwd_app.Field _, _) -> None in
+  match args with
+  | Inst _ -> None
+  | _ -> go (Fwd_app.of_apps args)
+
+(* Just the arguments, for the callers that don't need to know the head is at this mode too. *)
+let get_args : type hmode any. (hmode, mode, any) apps -> mode normal list option =
+ fun args -> Option.map snd (get_head_args args)
+
 let rec get_equality_or_inequality ctx tm =
   let open Monad.Ops (E) in
   let eq = Scope.lookup [ "eq" ] in
@@ -80,39 +119,27 @@ let rec get_equality_or_inequality ctx tm =
   let neg = Scope.lookup [ "neg" ] in
   let orders = order_relations () in
   match Norm.view_term tm with
-  (* Equality holds of two things of any one type, which it takes as its first argument. *)
-  | Neu
-      {
-        head = Const { name; ins };
-        args = Arg (Arg (Arg (Emp, ty, tyins), lhs, lhsins), rhs, rhsins);
-        _;
-      }
-    when Option.is_some (is_id_ins ins)
-         && Option.is_some (is_id_ins tyins)
-         && Option.is_some (is_id_ins lhsins)
-         && Option.is_some (is_id_ins rhsins) ->
-      let* op =
-        if Some name = eq then return `Eq
-        else if Some name = neq then return `Neq
-        else Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
-      in
-      return (op, (CubeOf.find_top ty).tm, CubeOf.find_top lhs, CubeOf.find_top rhs)
-  (* An ordering takes only the two sides. *)
-  | Neu { head = Const { name; ins }; args = Arg (Arg (Emp, lhs, lhsins), rhs, rhsins); _ }
-    when Option.is_some (is_id_ins ins)
-         && Option.is_some (is_id_ins lhsins)
-         && Option.is_some (is_id_ins rhsins)
-         && List.mem_assoc name orders ->
-      let lhs = CubeOf.find_top lhs in
-      return (List.assoc name orders, lhs.ty, lhs, CubeOf.find_top rhs)
-  | Neu { head = Const { name; ins }; args = Arg (Emp, tm, tyins); _ }
-    when Some name = neg && Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins tyins) -> (
-      let* op, ty, lhs, rhs = get_equality_or_inequality ctx (CubeOf.find_top tm).tm in
-      match op with
-      | `Eq -> return (`Neq, ty, lhs, rhs)
-      | `Neq -> return (`Eq, ty, lhs, rhs)
-      | `Lt -> return (`Le, ty, rhs, lhs)
-      | `Le -> return (`Lt, ty, rhs, lhs))
+  | Neu { head = Const { name; ins }; args; _ } when Option.is_some (is_id_ins ins) -> (
+      match get_args args with
+      (* Equality holds of two things of any one type, which it takes as its first argument. *)
+      | Some [ ty; lhs; rhs ] ->
+          let* op =
+            if Some name = eq then return `Eq
+            else if Some name = neq then return `Neq
+            else Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
+          in
+          return (op, ty.tm, lhs, rhs)
+      (* An ordering takes only the two sides. *)
+      | Some [ lhs; rhs ] when List.mem_assoc name orders ->
+          return (List.assoc name orders, Lazy.force lhs.ty, lhs, rhs)
+      | Some [ arg ] when Some name = neg -> (
+          let* op, ty, lhs, rhs = get_equality_or_inequality ctx arg.tm in
+          match op with
+          | `Eq -> return (`Neq, ty, lhs, rhs)
+          | `Neq -> return (`Eq, ty, lhs, rhs)
+          | `Lt -> return (`Le, ty, rhs, lhs)
+          | `Le -> return (`Lt, ty, rhs, lhs))
+      | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm)))))
   | _ -> Error (Code.Oracle_failed (Not_a_relation (Printable.PVal (ctx, tm))))
 
 (* All the relations a statement asserts.  With 'split' -- which is what the "plus" block asks for
@@ -120,18 +147,22 @@ let rec get_equality_or_inequality ctx tm =
    relations as a hypothesis and proves one as a goal; the plain block insists on a bare relation.
    Underneath a negation neither one splits, since the negation of a conjunction is a disjunction,
    which is not something we can hand to Z3 as a fact or ask it to prove. *)
+(* The two arguments of a spine that has exactly two, for a guard that has to ask before matching. *)
+let two_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode normal) option =
+ fun args ->
+  match get_args args with
+  | Some [ p; q ] -> Some (p, q)
+  | _ -> None
+
 let rec get_relations ~(split : bool) ctx tm =
   let open Monad.Ops (E) in
   let land_ = Scope.lookup [ "land" ] in
   match Norm.view_term tm with
-  | Neu { head = Const { name; ins }; args = Arg (Arg (Emp, p, pins), q, qins); _ }
-    when split
-         && Some name = land_
-         && Option.is_some (is_id_ins ins)
-         && Option.is_some (is_id_ins pins)
-         && Option.is_some (is_id_ins qins) ->
-      let* p = get_relations ~split ctx (CubeOf.find_top p).tm in
-      let* q = get_relations ~split ctx (CubeOf.find_top q).tm in
+  | Neu { head = Const { name; ins }; args; _ }
+    when split && Some name = land_ && Option.is_some (is_id_ins ins) && two_args args <> None ->
+      let p, q = Option.get (two_args args) in
+      let* p = get_relations ~split ctx p.tm in
+      let* q = get_relations ~split ctx q.tm in
       return (p @ q)
   | _ ->
       let* rel = get_equality_or_inequality ctx tm in
@@ -170,22 +201,21 @@ let widest ctx =
 let relation_types ctx ty =
   List.map (fun (op, ty', x, y) -> (op, (if comparable ctx ty ty' then ty else ty'), x, y))
 
+(* The statement and the rest, out of a hypothesis list's four arguments. *)
+let cons_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode normal) option =
+ fun args ->
+  match get_args args with
+  | Some [ eqty; _; rest; _ ] -> Some (eqty, rest)
+  | _ -> None
+
 let rec get_givens ~split ctx givens =
   let open Monad.Ops (E) in
   let cons_eqs = Scope.lookup [ "Cons_eqs" ] in
   let nil_eqs = Scope.lookup [ "Nil_eqs" ] in
   match Norm.view_term givens with
-  | Neu
-      {
-        head = Const { name; ins };
-        args = Arg (Arg (Arg (Arg (Emp, eqty, eqtyins), _, _), rest, restins), _, _);
-        _;
-      }
-    when Some name = cons_eqs
-         && Option.is_some (is_id_ins ins)
-         && Option.is_some (is_id_ins eqtyins)
-         && Option.is_some (is_id_ins restins) ->
-      let eqty = CubeOf.find_top eqty in
+  | Neu { head = Const { name; ins }; args; _ }
+    when Some name = cons_eqs && Option.is_some (is_id_ins ins) && cons_args args <> None ->
+      let eqty, rest = Option.get (cons_args args) in
       let* rels =
         (* An input that isn't a relation at all is the same complaint as a goal that isn't one,
            but about a wire rather than about the goal, so it gets its own message. *)
@@ -194,11 +224,20 @@ let rec get_givens ~split ctx givens =
         | Error (Code.Oracle_failed (Not_a_relation _)) ->
             Error (Code.Oracle_failed (Not_a_relation_input (Printable.PNormal (ctx, eqty))))
         | Error e -> Error e in
-      let* rest = get_givens ~split ctx (CubeOf.find_top rest).tm in
+      let* rest = get_givens ~split ctx rest.tm in
       return (rels @ rest)
-  | Neu { head = Const { name; ins }; args = Emp; _ }
-    when Some name = nil_eqs && Option.is_some (is_id_ins ins) -> return []
+  | Neu { head = Const { name; ins }; args; _ }
+    when Some name = nil_eqs && Option.is_some (is_id_ins ins) && get_args args = Some [] ->
+      return []
   | _ -> Error (Code.Oracle_failed (Not_a_hypothesis_list (Printable.PVal (ctx, givens))))
+
+(* The value a constructor's argument carries, at the mode of the constructor itself.  As with the
+   arguments of an application, Olorin's constructors are never modal. *)
+let get_constr_arg : type n a. (n, mode, a) modal_value_cube -> (mode, a) value option =
+ fun (Modal (filter, arg)) ->
+  match Modality.compare_id (Modality.filter_modality filter) with
+  | Eq -> Some (CubeOf.find_top arg)
+  | Neq -> None
 
 let rec get_posint tm =
   match Norm.view_term tm with
@@ -212,7 +251,9 @@ let rec get_posint tm =
       | Pos _ -> None)
   | Constr (name, dim, [ arg ]) when name = Constr.intern "suc" -> (
       match D.compare_zero dim with
-      | Zero -> Option.map (fun n -> n + 1) (get_posint (CubeOf.find_top arg))
+      | Zero ->
+          Option.bind (get_constr_arg arg) (fun arg ->
+              Option.map (fun n -> n + 1) (get_posint arg))
       | Pos _ -> None)
   | _ -> None
 
@@ -242,9 +283,9 @@ type step =
   | Define of Relation.t list
   (* A denominator, which the hypotheses have to force to be nonzero, paired with the term it came
      from so we can point at it in an error. *)
-  | Nonzero of Symbolic.t * kinetic value
+  | Nonzero of Symbolic.t * (mode, kinetic) value
   (* Likewise the base of an even root, which they have to force to be nonnegative. *)
-  | Nonneg of Symbolic.t * kinetic value
+  | Nonneg of Symbolic.t * (mode, kinetic) value
   (* A case split the translation introduced.  An absolute value, a minimum and a maximum are each
      a conditional on which way two things compare: for ∣x∣ on 0 against x, for min(x,y) and
      max(x,y) on x against y.  Z3 decides such a conditional on its own, so the stronger algebra
@@ -255,37 +296,26 @@ type step =
      also makes the "≤∨>" block enough to discharge this, which is the point: its branches give
      "a ≤ b" and "b < a", and each of those is one of these two.  The tag says which message to
      give when nothing settles it, and the value is the term to point at there. *)
-  | Cases of [ `Sign | `Order ] * Symbolic.t * Symbolic.t * kinetic value
+  | Cases of [ `Sign | `Order ] * Symbolic.t * Symbolic.t * (mode, kinetic) value
 
 (* The head of an application we can hand to Z3 as a function symbol.  A constant or a variable,
    and only a bare one: a degeneracy or a nonidentity insertion on it makes a different term, so
    rather than deciding when two of those agree we leave such a term opaque. *)
 type funhead = [ `Const of Constant.t | `Var of level ]
 
-let get_funhead : head -> funhead option = function
+let get_funhead : mode head -> funhead option = function
   | Const { name; ins } when Option.is_some (is_id_ins ins) -> Some (`Const name)
   | Var { level; deg } when Option.is_some (is_id_deg deg) -> Some (`Var level)
   | _ -> None
-
-(* The arguments of an application spine, oldest first, if it is a plain sequence of applications.
-   A field projection or an instantiation isn't something we take apart. *)
-let get_args : type any. any apps -> normal list option =
- fun args ->
-  let rec go : type any. any apps -> normal list -> normal list option =
-   fun args acc ->
-    match args with
-    | Emp -> Some acc
-    | Arg (rest, arg, ins) when Option.is_some (is_id_ins ins) ->
-        go rest (CubeOf.find_top arg :: acc)
-    | _ -> None in
-  go args []
 
 (* Whether a type is ℕ.  Its elements are nonnegative, which to Z3 -- for whom they are opaque
    reals like any other -- is not a fact about them at all until we say so. *)
 let is_natural ty =
   match Norm.view_term ty with
-  | Neu { head = Const { name; ins }; args = Emp; _ } ->
-      Option.is_some (is_id_ins ins) && Some name = Scope.lookup [ "ℕ" ]
+  | Neu { head = Const { name; ins }; args; _ } ->
+      Option.is_some (is_id_ins ins)
+      && get_args args = Some []
+      && Some name = Scope.lookup [ "ℕ" ]
   | _ -> false
 
 (* State threaded through the translation of a term into a Z3 expression. *)
@@ -295,7 +325,7 @@ type translation = {
      variable and states its definition once.  We record the type each was met at as well as the
      term, since an argument of an uninterpreted function can be of any type at all, and asking
      whether two terms agree only makes sense once we know they're of the same type. *)
-  vars : normal Bwd.t;
+  vars : mode normal Bwd.t;
   count : int;
   (* Likewise the heads we've turned into uninterpreted function symbols, each paired with the
      number of arguments it was applied to.  Z3's functions have no partial application, so a head
@@ -320,11 +350,13 @@ end)
 let var_for ctx ty tm : (Symbolic.t * bool) S.t =
   let open Monad.Ops (S) in
   let* ({ vars; count; _ } as st) = S.get in
-  let same (x : normal) =
-    Result.is_ok (Equal.equal_val ctx ty x.ty) && Result.is_ok (Equal.equal_at ctx tm x.tm ty) in
+  let same (x : mode normal) =
+    Result.is_ok (Equal.equal_val ctx ty (Lazy.force x.ty))
+    && Result.is_ok (Equal.equal_at ctx tm x.tm ty) in
   match Bwd.find_index same vars with
   | None ->
-      let* () = S.put { st with vars = Snoc (vars, { tm; ty }); count = count + 1 } in
+      let* () =
+        S.put { st with vars = Snoc (vars, { tm; ty = Lazy.from_val ty }); count = count + 1 } in
       return (`Var count, true)
   | Some i -> return (`Var (count - i - 1), false)
 
@@ -395,8 +427,10 @@ let get_poly ctx ty tm =
            being contained in it. *)
         | Neu { head; args; ty = tmty; _ } -> (
             let* v =
-              match (get_funhead head, get_args args) with
-              | Some hd, Some ((_ :: _) as args) ->
+              (* The Eq is what says the head is at the ambient mode, so it can be one of ours. *)
+              match get_head_args args with
+              | Some (Eq, ((_ :: _) as args)) when Option.is_some (get_funhead head) ->
+                  let hd = Option.get (get_funhead head) in
                   let* f = fun_for hd (List.length args) in
                   let* args = go_args ty args in
                   return (`App (f, args))
@@ -426,8 +460,9 @@ let get_poly ctx ty tm =
      consider, never fewer. *)
   and go_args ty = function
     | [] -> return []
-    | (a : normal) :: rest ->
-        let* a = go (if comparable ctx ty a.ty then ty else a.ty) a.tm in
+    | (a : mode normal) :: rest ->
+        let aty = Lazy.force a.ty in
+        let* a = go (if comparable ctx ty aty then ty else aty) a.tm in
         let* rest = go_args ty rest in
         return (a :: rest)
   and go ty tm =
@@ -435,13 +470,12 @@ let get_poly ctx ty tm =
     (* Binary operation.  The arguments are translated inside each branch rather than before the
        match, so that a head that isn't one of these doesn't translate them twice -- once here and
        again as the arguments of its function symbol. *)
-    | Neu { head = Const { name; ins }; args = Arg (Arg (Emp, x, xins), y, yins); _ }
-      when Option.is_some (is_id_ins ins)
-           && Option.is_some (is_id_ins xins)
-           && Option.is_some (is_id_ins yins) -> (
+    | Neu { head = Const { name; ins }; args; _ }
+      when Option.is_some (is_id_ins ins) && two_args args <> None -> (
+        let x, y = Option.get (two_args args) in
         let binary k =
-          let* px = go ty (CubeOf.find_top x).tm in
-          let* py = go ty (CubeOf.find_top y).tm in
+          let* px = go ty x.tm in
+          let* py = go ty y.tm in
           k px py in
         match Firstorder.get_root name with
         | "plus" -> binary (fun px py -> return (`Plus (px, py)))
@@ -466,18 +500,24 @@ let get_poly ctx ty tm =
                    with the value at a zero denominator left uninterpreted, so this is sound however
                    the denominator turns out; but we also require it to be provably nonzero. *)
                 | _ ->
-                    let* () = add_step (Nonzero (py, (CubeOf.find_top y).tm)) in
+                    let* () = add_step (Nonzero (py, y.tm)) in
                     return (`Div (px, py)))
         | "pow" ->
             binary (fun px py ->
                 match rational_of py with
-                | Some e -> power ty tm px e (CubeOf.find_top x).tm
+                | Some e -> power ty tm px e x.tm
                 | None -> opaque ty tm)
         | _ -> opaque ty tm)
     (* Unary operation *)
-    | Neu { head = Const { name; ins }; args = Arg (Emp, x, xins); _ }
-      when Option.is_some (is_id_ins ins) && Option.is_some (is_id_ins xins) -> (
-        let src = (CubeOf.find_top x).tm in
+    | Neu { head = Const { name; ins }; args; _ }
+      when Option.is_some (is_id_ins ins)
+           && (match get_args args with
+              | Some [ _ ] -> true
+              | _ -> false) -> (
+        let src =
+          match get_args args with
+          | Some [ x ] -> x.tm
+          | _ -> assert false in
         let unary k =
           let* x = go ty src in
           k x in
@@ -499,11 +539,13 @@ let get_poly ctx ty tm =
     | _ -> opaque ty tm in
   go ty tm
 
-let vars_of_ctx : type a b. (a, b) Ctx.t -> string Bwd.t = function
+let vars_of_ctx : type a b. (mode, a, b) Ctx.t -> string Bwd.t = function
   | Permute { ctx; _ } ->
-      let rec vars_of_ctx : type a b. (a, b) Ctx.Ordered.t -> string Bwd.t = function
-        | Emp -> Emp
-        | Lock ctx -> vars_of_ctx ctx
+      (* A lock changes the mode of the context inside it, so this is polymorphic in the mode. *)
+      let rec vars_of_ctx : type m a b. (m, a, b) Ctx.Ordered.t -> string Bwd.t = function
+        | Emp _ -> Emp
+        | Lock (ctx, _) -> vars_of_ctx ctx
+        | Weaken (ctx, _) -> vars_of_ctx ctx
         | Snoc (ctx, Invis _, _) -> vars_of_ctx ctx
         | Snoc (ctx, Vis { vars; _ }, _) -> (
             match NICubeOf.find_top vars with
@@ -526,6 +568,12 @@ let unsat (command : Relation.t list) =
 
 let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
+  (* Narya's question is existential in the mode it was asked at, while everything here is written
+     at Olorin's own one (see Omode).  There is only one mode in the process, so this always
+     succeeds; it is how the types get to know that. *)
+  match Modal.Mode.compare (Ctx.mode ctx) Omode.mode with
+  | Neq -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm))))
+  | Eq ->
   (* The two algebra blocks ask through constants of their own, so the question says which one is
      asking: the "plus" block decides an absolute value, a minimum or a maximum itself, while the
      plain one requires the hypotheses to settle each of those first (see Cases below). *)
@@ -533,17 +581,17 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let oracle_plus = Scope.lookup [ "oracle_plus" ] in
   let* plus, givens, goal =
     match Norm.view_term tm with
-    | Neu
-        {
-          head = Const { name; ins };
-          args = Arg (Arg (Arg (Emp, givens, givins), _, _), goal, appins);
-          _;
-        }
+    | Neu { head = Const { name; ins }; args; _ }
       when (Some name = oracle || Some name = oracle_plus)
            && Option.is_some (is_id_ins ins)
-           && Option.is_some (is_id_ins givins)
-           && Option.is_some (is_id_ins appins) ->
-        return (Some name = oracle_plus, CubeOf.find_top givens, CubeOf.find_top goal)
+           && (match get_args args with
+              | Some [ _; _; _ ] -> true
+              | _ -> false) ->
+        let givens, goal =
+          match get_args args with
+          | Some [ givens; _; goal ] -> (givens, goal)
+          | _ -> assert false in
+        return (Some name = oracle_plus, givens, goal)
     | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
   (* A conjunctive goal is a list of relations to prove, each against all of the hypotheses.  They
      all go through one translation, so that the same subterm gets the same variable throughout.
@@ -576,15 +624,20 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
   let givens = relation_types ctx ty givens in
   let (givens, goals), { steps; _ } =
     (let open Monad.Ops (S) in
-     let poly (op, ty, (x : normal), (y : normal)) =
+     let poly (op, ty, (x : mode normal), (y : mode normal)) =
        let* x = get_poly ctx ty x.tm in
        let* y = get_poly ctx ty y.tm in
        return (op, x, y) in
-     let open Mlist.Monadic (S) in
+     let rec polys = function
+       | [] -> return []
+       | g :: gs ->
+           let* g = poly g in
+           let* gs = polys gs in
+           return (g :: gs) in
      (* The goal before the hypotheses, so that the side conditions come out in the order they did
         when a goal was always a single relation. *)
-     let* goals = mmapM (fun [ g ] -> poly g) [ goals ] in
-     let* givens = mmapM (fun [ g ] -> poly g) [ givens ] in
+     let* goals = polys goals in
+     let* givens = polys givens in
      return (givens, goals))
       { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
   (* The quantifier eliminator can prove disequalities, but we only let it do so between rational

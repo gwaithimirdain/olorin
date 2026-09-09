@@ -70,7 +70,7 @@ for (const rule of ['alg', 'algplus']) {
             })).toBe(false);
             const said = await complaint(olorin);
             expect(said).toContain('only proves equations and inequalities');
-            expect(said).toContain('contradict each other');
+            expect(said).toContain('its inputs are not contradictory');
         });
 
         test('says the same thing when there are no inputs at all to be inconsistent',
@@ -83,7 +83,7 @@ for (const rule of ['alg', 'algplus']) {
                 })).toBe(false);
                 const said = await complaint(olorin);
                 expect(said).toContain('only proves equations and inequalities');
-                expect(said).toContain('contradict each other');
+                expect(said).toContain('its inputs are not contradictory');
             });
 
         // Only the goal was generalized.  A wire carrying something that isn't a relation is still
