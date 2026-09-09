@@ -174,6 +174,14 @@ def existsbelow (n : ℕ) (P : ℕ → Type) : Type ≔ data [ existsbelow. (ele
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
+
+def seqconv (s : ℕ → ℝ) (L : ℝ) : Type ≔
+  forallpos (ε ↦ exists ℕ (N ↦ forall ℕ (n ↦ imp (ℕ.le N n) (ℝ.lt (ℝ.abs (ℝ.minus (s n) L)) ε))))
+notation(0) \"lim\" s \"=\" L ≔ seqconv s L
+
+def seqdiv_posinf (s : ℕ → ℝ) : Type ≔
+  forall ℝ (M ↦ exists ℕ (N ↦ forall ℕ (n ↦ imp (ℕ.le N n) (ℝ.ge (s n) M))))
+notation \"lim\" s \"⟶∞\" ≔ seqdiv_posinf s
 "
 
 (* Raw.App now takes a *check* function and an *optional* check argument; these helpers build an
@@ -1208,6 +1216,7 @@ def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ 𝕊.lt (𝕊.abs 
 notation(0) x \"is\" \"infinitesimal\" ≔ 𝕊.infinitesimal x
 def 𝕊.infclose (x y : 𝕊) : Type ≔ 𝕊.infinitesimal (𝕊.minus x y)
 notation(0) x \"≈\" y ≔ 𝕊.infclose x y
+
 axiom ℝ.archimedean (x : ℝ) : exists ℕ (n ↦ ℝ.lt x n)
 axiom ℤ.tonat (x : ℤ) : ℤ.ge x 0 → exists ℕ (n ↦ eq ℤ x n)
 axiom ℝ.ltomega (x : ℝ) : 𝕊.lt x ω
