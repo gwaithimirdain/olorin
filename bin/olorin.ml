@@ -194,9 +194,21 @@ module Resolver = struct
 
   type wrapped_scope = Scope : 'b Raw.check located * (unit, 'b) scope -> wrapped_scope
 
+  (* Each scope is looked up by the term it was recorded for (annotate_ctx_handler does that for
+     every context Narya annotates), and a proof of any size produces thousands of them, so they
+     are held indexed by a hash of that term rather than in one long list: scanning every scope on
+     every annotation is quadratic in the size of the proof, and was most of the time spent
+     checking a large one.  Structurally equal terms hash equally, so a lookup finds everything a
+     scan would, and the terms in the bucket are then compared exactly as before. *)
+  module ScopeMap = Map.Make (Int)
+
+  type scopes = wrapped_scope list ScopeMap.t
+
   module Scopes = State.Make (struct
-    type t = wrapped_scope list
+    type t = scopes
   end)
+
+  let no_scopes : scopes = ScopeMap.empty
 
   (* Possibly this doesn't work in js_of_ocaml? *)
   let () =
@@ -204,7 +216,19 @@ module Resolver = struct
       | `Get -> Some "unhandled Resolver.Scopes get effect"
       | `Set _ -> Some "unhandled Resolver.Scopes set effect")
 
-  let visit scope tm = Scopes.modify (fun scopes -> Scope (tm, scope) :: scopes)
+  let visit scope tm = Scopes.modify (ScopeMap.add_to_list (Hashtbl.hash tm) (Scope (tm, scope)))
+
+  (* The scopes recorded for a term: the only ones that can be its. *)
+  let scopes_of : type a. a Raw.check located -> wrapped_scope list =
+   fun tm -> Option.value ~default:[] (ScopeMap.find_opt (Hashtbl.hash tm) (Scopes.get ()))
+
+  (* Every scope seen so far, in no particular order. *)
+  let all_scopes () : wrapped_scope list =
+    ScopeMap.fold (fun _ scopes acc -> List.rev_append scopes acc) (Scopes.get ()) []
+
+  (* Add the scopes of a nested run to the ambient ones. *)
+  let add_scopes (scopes : scopes) =
+    Scopes.modify (ScopeMap.union (fun _ ambient added -> Some (ambient @ added)) scopes)
 
   let embed : ('a1, 'a2) scope -> 'a1 I1.embed -> ('a1 T1.check, 'a2 T2.check) Either.t =
    fun ctx (variables, Notation.Wrap tm) ->
@@ -244,7 +268,7 @@ let bound_ports () : PortSet.t =
           | Some p -> PortSet.add p set
           | None -> set)
         set (Bwv.to_list scope))
-    PortSet.empty (Scopes.get ())
+    PortSet.empty (Resolver.all_scopes ())
 
 (* What to say about a wire that no scope could place.  In the conclusion's own term, every wire is
    on a path to the goal, so an assumption reached along one really is being carried out of the
@@ -1006,11 +1030,13 @@ let annotate_ctx_handler : type a b s.
         match N.compare (Bwv.length scope) (Ctx.raw_length ctx) with
         | Neq -> None
         | Eq ->
-            if scopetm = ctxtm then (
+            (* The scope was recorded while resolving this very term, so the usual hit is one term
+               twice over; structural equality is the fallback for when it isn't. *)
+            if scopetm == ctxtm || scopetm = ctxtm then (
               contexts := Context (status, ctx, scope) :: !contexts;
               Some ())
             else None)
-      (Scopes.get ())
+      (Resolver.scopes_of ctxtm)
   with
   | None ->
       (* This could indicate a bug, but it also happens when new terms are constructed in the process of checking, such as with the expansion of numerals into constructors, so we don't report it as an error. *)
@@ -1037,6 +1063,16 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
   (* Which ports were out of scope in every scope we tried (`None` until the first attempt): a port
      that some scope did resolve isn't what's holding this fragment up, so it isn't one to cut. *)
   let always_ill_scoped : Port.t list option ref = ref None in
+  (* Whether this fragment *resolves* in a context is decided by the scope beside it, not by the
+     context or status: those matter only once resolution has succeeded and it is typechecked.  And
+     one scope comes back in hundreds of the contexts we collect, since every context Narya
+     annotates records one.  So we remember the scopes resolution has already failed in, by
+     identity, along with what that attempt reported -- the ports it found out of scope and the
+     diagnostics it filed -- and replay that instead of resolving the fragment all over again for
+     every later context carrying the same scope.  (Identity is compared through Obj.repr because
+     the scopes come out of existentials, so their types are formally distinct.) *)
+  let failed_scopes : (Obj.t * (Port.t list * Diagnostic.js Js.t list)) list ref = ref [] in
+  let failure_of scope = List.assq_opt (Obj.repr scope) !failed_scopes in
   let record_attempt (failed : Port.t list) =
     always_ill_scoped :=
       Some
@@ -1079,6 +1115,13 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
             (* If there is a cycle, report it, skip this scope and go on to the next one. *)
             Diagnostic.add scoping_diagnostics true (Reporter.diagnostic Cyclic_term);
             look_for_scope contexts
+        (* If resolution has already failed in this scope, it fails the same way again, so we
+           report what it reported then and move on without checking anything. *)
+        | _ when Option.is_some (failure_of scope) ->
+            let ill_scoped, diagnostics = Option.get (failure_of scope) in
+            List.iter (Dynarray.add_last scoping_diagnostics) diagnostics;
+            record_attempt ill_scoped;
+            look_for_scope contexts
         | _ ->
             (* Now we remove any of the bindables of the term that already appear in the scope, so they don't get duplicated. *)
             let bindables = Bindables.remove tm.value.bindables (Bwv.to_list scope) in
@@ -1087,6 +1130,9 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
             let diagnostics = Dynarray.create () in
             (* What this attempt, and only this attempt, finds out of scope. *)
             let ill_scoped = ref [] in
+            (* Where this attempt's own scoping diagnostics start, so that a later context with
+               this same scope can file them again without checking anything. *)
+            let filed = Dynarray.length scoping_diagnostics in
             let ok =
               (* Check if there are any edges coming *out* of the current port. *)
               match SourceMap.find_opt p fwd_graph with
@@ -1105,6 +1151,13 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
               Dynarray.append diagnostics hole_diagnostics;
               `Found_scope diagnostics)
             else (
+              failed_scopes :=
+                ( Obj.repr scope,
+                  ( !ill_scoped,
+                    List.init
+                      (Dynarray.length scoping_diagnostics - filed)
+                      (fun i -> Dynarray.get scoping_diagnostics (filed + i)) ) )
+                :: !failed_scopes;
               record_attempt !ill_scoped;
               look_for_scope contexts))
   (* Try to synthesize a term in a given scope.  Returns true if the term is well *scoped*, even if it doesn't synthesize.  Record typechecking errors to the supplied diagnostics array. *)
@@ -1142,15 +1195,15 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
                 Diagnostic.add diagnostics true d;
                 true)
         @@ fun () ->
-        let (stm, scopes) : a Raw.synth located * Resolver.wrapped_scope list =
+        let (stm, scopes) : a Raw.synth located * Resolver.scopes =
           (* We only want to record the new scopes observed in the case that succeeds (if any), so we make a new map in each "go" invocation. *)
-          Scopes.run ~init:[] @@ fun () ->
+          Scopes.run ~init:Resolver.no_scopes @@ fun () ->
           let stm =
             RequireScoping.run ~env:{ bail_out = true; ill_scoped } @@ fun () ->
             Resolve.synth scope stm in
           (stm, Scopes.get ()) in
         (* But if parsing and resolution succeeded, we merge the scopes we found during this parsing run with the ambient ones.  We have to do this before typechecking it, so that they're available for annotate_ctx_handler to attach to. *)
-        Scopes.modify (fun oldscopes -> oldscopes @ scopes);
+        Resolver.add_scopes scopes;
         (* Now typecheck it, discarding the result (the point is only to annotate). *)
         ( run @@ fun () ->
           let _ = Check.synth status ctx stm in
@@ -1452,7 +1505,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
         (IdMap.empty, SourceMap.empty, TargetMap.empty)
         (Js.to_array edges) in
     (* Accumulate the scopes we've seen and the IDs associated to them *)
-    Scopes.run ~init:[] @@ fun () ->
+    Scopes.run ~init:Resolver.no_scopes @@ fun () ->
     (* Trap diagnostics and add them to a dynamic array to be passed back to javascript. *)
     Pauser.next @@ fun () ->
     guarded @@ fun () ->
