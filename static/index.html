@@ -586,7 +586,8 @@
           <img src="hints/wire.png" style="margin-left: auto; margin-right:auto; display:block">
         </p>
         <p>
-          To view this hint again during this level, click "Show Hint" in the upper-right corner.
+          To view this hint again during this level (or any other hint during the level it was given), click "Show Hint" in the upper-right corner.
+          You can view the hint for an older level from the "Select Level" screen by clicking on the "i" in the corner of the level when it was given.
         </p>
       </div>
       <div id="muxHint" class="modal hint">
@@ -600,12 +601,15 @@
           If a box has a symbol on the <i>right</i>, it is called a <i>prove rule</i>, and you should connect its <i>output port</i> to something first.
           That will give me more information about what its other ports must be.
           The output port should be connected to an input port whose label uses the same symbol:
-          <img src="hints/andI.png" style="margin-left: auto; margin-right:auto; display:block">
+          <img src="hints/andI.png" style="margin-left: auto; margin-right:auto; display:block"/>
           Therefore, if you have an open input port using some symbol, you probably want to add a box that has that symbol on the right.
         </p>
         <p>
           The symbol ∧ means "and".  Mnemonic: it looks like a capital "A" for And, or like a lowercase "n" as in "salt 'n pepper".
         </p>
+      </div>
+      <div id="contractionHint" class="modal hint" style="width: 600px">
+        You can use a hypothesis, or other intermediate conclusion, as many times as you need to, by connecting multiple wires to its output port.
       </div>
       <div id="elimHint" class="modal hint" style="width: 600px">
           If a box has a symbol on the <i>left</i>, it is called a <i>use rule</i>, and you should connect one of its <i>input ports</i> to something first.
@@ -778,8 +782,13 @@
         The "alg" (for "algebra") block can prove algebraic equations.  If the equation is always true, it doesn't need any inputs.
       </div>
       <div id="multiplicationHint" class="modal hint">
-        Multiplication is denoted with a <tt>·</tt>, which you get by typing <tt>*</tt> as in many programming languages.
-        You <i>cannot</i> write <tt>xy</tt> as you often do on paper; it must be <tt>x·y</tt>.
+        <p>
+          Multiplication is denoted with a <tt>·</tt> as on paper, which you get by typing <tt>*</tt> as in many programming languages.
+          You <i>cannot</i> write <tt>xy</tt> as you often do on paper; it must be <tt>x·y</tt>.
+        </p>
+        <p>
+          Similarly, squaring is written <tt>x²</tt> as on paper, which you get by typing <tt>x^2</tt>, as in many programming languages.
+          Likewise, typing <tt>x^3</tt> yields <tt>x³</tt>, and so on.
       </div>
       <div id="algebra2Hint" class="modal hint">
         If an equation you want to prove isn't always true, but is true because of some assumptions, you can attach those assumptions as inputs to the algebra block.
@@ -810,19 +819,15 @@
         The only kind of disequalities the algebra block can prove automatically are disequalities between different constants, without any variables involved.
       </div>
       <div id="redexHint" class="modal hint">
-        <p>
-          This is the same as the last level, but you have a limit of <b>seven</b> rule blocks.
-          If you look at your solution to the previous level, you'll probably see that you proved P⇒R twice.
-          We'd like to just prove it once and then <emph>use</emph> it twice, reducing us under seven blocks.
-          This basically works, but we need a bit of help.
-        </p>
-        <p>
-          Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
-          However, I can't guess the output of a "prove ⇒" block or the ⇒ input of a "use ⇒" block, so if one of those is connected directly to the other, I'm stuck.
-          To help me out, use a "label" block in between.
-          When you place a label block, it will prompt you for a statement, and then both its input and its output must be labeled with that statement.
-          After placing it, you can double-click on it to change the label.
-        </p>
+        Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
+        However, I can't guess the output of a "prove ⇒" block or the ⇒ input of a "use ⇒" block, so if one of those is connected directly to the other, I'm stuck.
+        To help me out, use a "label" block in between.
+        When you place a label block, it will prompt you for a statement, and then both its input and its output must be labeled with that statement.
+        After placing it, you can double-click on it to change the label.
+      </div>
+      <div id="redex2Hint" class="modal hint">
+        I need a label block <i>whenever</i> the output of a "prove ⇒" block is connected to the ⇒ input of a "use ⇒" block, even if that same output is also connected somewhere else with a wire whose label I <i>can</i> guess.
+        (I'm a little dense sometimes.)
       </div>
       <div id="ascHint" class="modal hint">
         <p>
