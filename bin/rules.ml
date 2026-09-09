@@ -234,7 +234,7 @@ let rules =
           } );
       (* The Archimedean property: every real is below some natural number.  The axiom concludes an
          ∃, so the block destructs it, giving out the natural number n it produces on a value port
-         and the proof that x<n on another.  There is no 𝕊 version: the superreals are exactly the
+         and the proof that x<n on another.  There is no 𝕊 version: the surreals are exactly the
          number system where this fails. *)
       ( "arch",
         User

@@ -66,9 +66,9 @@ test.describe('The "Arch" block', () => {
         expect(await archProves(olorin, 'ℝ')).toBe(true);
     });
 
-    // The superreals are exactly the number system where the Archimedean property fails, and the
+    // The surreals are exactly the number system where the Archimedean property fails, and the
     // axiom is stated about ℝ, so there is no coercion to carry an 𝕊 into the block.
-    test('does not apply to a superreal', async ({ page }) => {
+    test('does not apply to a surreal', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await archProves(olorin, '𝕊')).toBe(false);
@@ -400,9 +400,9 @@ test.describe('The "ℝ<ω" block', () => {
         expect(await omegaProves(olorin)).toBe(true);
     });
 
-    // ω is a superreal, so what the block proves is a statement about 𝕊 -- but its input is a real,
-    // and a superreal has nowhere to be coerced to.
-    test('does not apply to a superreal', async ({ page }) => {
+    // ω is a surreal, so what the block proves is a statement about 𝕊 -- but its input is a real,
+    // and a surreal has nowhere to be coerced to.
+    test('does not apply to a surreal', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await omegaProves(olorin, { set: '𝕊' })).toBe(false);

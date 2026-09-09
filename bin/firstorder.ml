@@ -1186,7 +1186,7 @@ let install_notations () =
 (* Some definitions can't be typechecked as part of the startup code above, because they depend on
    things that install_notations sets up: notably the subtyping relations between the number types,
    which add_subtypes only installs at the very end.  (For instance, 𝕊.finite below bounds the
-   absolute value of a superreal by a *real* u, which typechecks only once ℝ≤𝕊 exists, and
+   absolute value of a surreal by a *real* u, which typechecks only once ℝ≤𝕊 exists, and
    ℝ.archimedean compares a real to a *natural* number n, which needs ℕ≤ℝ.  The axioms behind the
    number blocks are all of this kind: each relates one number system to another.)  Those
    definitions go here instead, in secondary startup code that gets loaded after install_notations
