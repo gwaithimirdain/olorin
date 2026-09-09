@@ -906,8 +906,8 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "⊥⊤⇔∧∨⇒",
-            rules: [ "andI", "andE", "orI1", "orI2", "orE", "impI", "impE", "botE", "iffI", "iffE1", "iffE2", "topI" ],
+          { name: "⊥⊤⇔∧∨",
+            rules: [ "andI", "andE", "orI1", "orI2", "orE", "botE", "iffI", "iffE1", "iffE2", "topI" ],
             levels: [
                 {
                     parameters: [ { name: "P", ty: "Type" } ],
@@ -917,16 +917,6 @@ export const LEVELS = [
                     trivial: true,
                     autoComplete: true,
                     hint: "botHint",
-                },
-                {
-                    parameters: [ { name: "x", ty: "ℝ" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "x<x" } ],
-                    conclusion: { ty: "0=1" },
-                    trivial: true,
-                    autoComplete: true,
-                    hint: "algebraBotHint",
-                    extrarules: [ "alg" ],
                 },
                 {
                     parameters: [ { name: "P", ty: "Type" } ],
