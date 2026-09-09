@@ -23,7 +23,7 @@ function loadLevelsModule() {
     const transformed = src
         .replace(/export\s+const\s+/g, 'const ')
         .replace(/export\s+function\s+/g, 'function ')
-        + '\nreturn { LEVELS, saveable, legacySaveables };';
+        + '\nreturn { LEVELS, COURSE_CODES, saveable, legacySaveables };';
     // eslint-disable-next-line no-new-func
     return new Function(transformed)();
 }
@@ -37,6 +37,11 @@ function allLevels() {
     const { LEVELS, saveable, legacySaveables } = loadLevelsModule();
     const out = [];
     LEVELS.forEach((world, x) => {
+        // A world belonging to a course isn't in the game a player without that course's code
+        // sees, and the suite opens the app without one, so it isn't in the game these tests are
+        // about either (see courseWorlds for the ones that are).  Level ids still count it, as the
+        // app's do: they are positions in levels.js, not in what happens to be shown.
+        if (world.courses) return;
         world.stages.forEach((stage, y) => {
             stage.levels.forEach((level, z) => {
                 out.push({
@@ -69,8 +74,38 @@ function allLevels() {
 
 // The worlds' display names, in order (as the chooser and the unlock announcement show them).
 function worldNames() {
-    return loadLevelsModule().LEVELS.map((w) => w.name);
+    return loadLevelsModule().LEVELS.filter((w) => !w.courses).map((w) => w.name);
 }
+
+// The worlds a course keeps to itself, as {number, name, courses, levels}: the ones everything
+// above leaves out, for the tests that open the app with a course code and expect to see them.
+// `number` is the world's id in levels.js, which is what a level name is numbered by.
+function courseWorlds() {
+    const { LEVELS, saveable } = loadLevelsModule();
+    return LEVELS.flatMap(function (world, x) {
+        if (!world.courses) return [];
+        const levels = world.stages.flatMap((stage, y) =>
+            stage.levels.map((level, z) => ({
+                name: `${x + 1}-${y + 1}-${z + 1}`,
+                world: x + 1,
+                stage: y + 1,
+                index: z + 1,
+                saveable: saveable(level),
+            })));
+        // Which worlds it follows, resolved as the app resolves them: `previous` counts worlds
+        // back, defaulting to the one before, and only a world of the same course counts -- the
+        // game's own worlds are no prerequisite for a course's (see sameCourseSide in main.js).
+        const previous = (world.previous || [1]).map((n) => x + 1 - n).filter(function (p) {
+            const prev = p >= 1 && LEVELS[p - 1];
+            return prev && prev.courses && prev.courses.some((c) => world.courses.includes(c));
+        });
+        return [{ number: x + 1, name: world.name, courses: world.courses.slice(), previous, levels }];
+    });
+}
+
+// The codes a course hands out, as {code, course} pairs, and one code no course claims.
+const courseCodes = () =>
+    Object.entries(loadLevelsModule().COURSE_CODES).map(([code, course]) => ({ code, course }));
 
 const inWorld = (w) => allLevels().filter((l) => l.world === w);
 const inStage = (w, s) => allLevels().filter((l) => l.world === w && l.stage === s);
@@ -111,21 +146,26 @@ let worldsCached = null;
 function worlds() {
     if (worldsCached) return worldsCached;
     const { LEVELS } = loadLevelsModule();
-    worldsCached = LEVELS.map(function (world, i) {
+    worldsCached = LEVELS.flatMap(function (world, i) {
         const w = i + 1;
-        return {
+        // A course's world is no part of this relation for a player without its code: the app
+        // leaves it out of every gate, at both ends, so neither it nor anything it would have
+        // followed is affected by it (see computeUnlockData).
+        if (world.courses) return [];
+        return [{
             number: w,
             name: world.name,
             declared: world.previous,
-            previous: (world.previous || [1]).map((n) => w - n).filter((p) => p >= 1),
+            previous: (world.previous || [1]).map((n) => w - n)
+                .filter((p) => p >= 1 && !LEVELS[p - 1].courses),
             levels: inWorld(w),
             counted: world.stages.flatMap((stage, j) => (stage.bonus ? [] : inStage(w, j + 1))),
-        };
+        }];
     });
     return worldsCached;
 }
 
-const world = (w) => worlds()[w - 1];
+const world = (w) => worlds().find((x) => x.number === w);
 // The worlds `w` follows (rules 1 and 3), and the worlds that follow it (rule 2).
 const prereqWorlds = (w) => world(w).previous.map(world);
 const followerWorlds = (w) => worlds().filter((x) => x.previous.includes(w));
@@ -247,7 +287,8 @@ const prereqSeeds = (level, difficulty) =>
         .concat(prereqs(level, difficulty).flatMap(([levels, d]) => completions(levels, d)));
 
 module.exports = {
-    allLevels, worldNames, worldCount, inWorld, inStage, stagesInWorld, prereqStages, find,
+    allLevels, worldNames, worldCount, courseWorlds, courseCodes,
+    inWorld, inStage, stagesInWorld, prereqStages, find,
     worlds, world, prereqWorlds, followerWorlds, worldGateSeeds,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, wrappableStatementLevel,
     hintedLevel, otherLevel, nextLevel,

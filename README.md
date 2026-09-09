@@ -91,6 +91,21 @@ node test/add-fixture.js exported.json
 ```
 which reads the level out of the proof itself — there's no level name to type, and no way to file a proof under the wrong level.  Levels with no fixture yet are reported by the suite as a tracked TODO rather than a failure, so coverage grows a level at a time.  See [`test/README.md`](test/README.md) for the details.
 
+## Course worlds
+
+A world in `client/levels.js` may carry a `courses` list naming the courses it belongs to, which makes it that course's rather than the game's.  Which code lets a student into a course is the `COURSE_CODES` table beside the levels, mapping each code to the course it is for; a student opens the game with it in the URL, as `.../?code=math360fall2026`.
+
+The code is remembered, so the link is needed only once; a code in the URL always wins and takes the remembered one's place, which is how a student changes courses — or leaves one, with an empty `?code=`, since no course claims that.
+
+Without a code — or with one no course claims — a course's worlds are not in the game at all: they aren't in the chooser, and they neither gate another world nor are gated by one, so adding a course changes nothing for everyone else.
+
+With a valid code, that course's worlds are there (another course's still aren't), and the rest of the game opens differently for someone who came for a term's work rather than to play through:
+
+* every world outside any course is unlocked at novice from the start, every level of it;
+* a world no longer waits on a difficulty *above* the one being opened (rule 3 of the unlock rules), so reaching a later world doesn't mean going up a difficulty in an earlier one.
+
+The unlock rules never reach across the line between the game and a course: a course's worlds gate none of the game's own, and the game's own gate none of a course's, so a course starts at its own first level.  Within a world, and among the worlds of one course, everything unlocks as it always does.
+
 ## Olorin server
 
 The above instructions compile a version of Olorin that runs entirely client-side in the user's browser, saving the list of completed levels locally in the browser.  There is also a version that stores that information on a server associated with the user's email address; this is intended mainly for students in a class, so that the instructor can download a spreadsheet of grades by student and level.  To compile this version of Olorin, simply change the definition `SERVER = false` in `client/main.js` to say `true` instead, and proceed as above.

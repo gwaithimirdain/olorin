@@ -2,6 +2,17 @@
 //
 // A world is { name, stages }: its title in the chooser and the stages it holds.  It may also carry:
 //
+//   courses: [ "name", ...]
+//                       This world belongs to those courses, and is shown only to their students:
+//                       a player sees it when the code they hold (see COURSE_CODES) is for one of
+//                       those courses, and otherwise doesn't see it at all -- it isn't in the
+//                       chooser, and it may as well not be in this file.  A world without this
+//                       property belongs to the game rather than to any course, and everyone has
+//                       it.  The unlock rules never reach across that line: a course's worlds gate
+//                       none of the game's own, and the game's own gate none of a course's, so a
+//                       course starts at the first level of its own first world.  Its worlds do
+//                       gate each other, as any worlds of the same kind do.
+//
 //   previous: [N, ...]  Which worlds this one follows, as how many worlds back each is, instead of
 //                       the default [1] (the world right before it).  All three of the rules that
 //                       open a world ask about every world named, and about the whole relation:
@@ -43,6 +54,19 @@
 //                       proof that is correct but over budget doesn't count as complete, so the
 //                       player has to find a shorter one.
 //
+// The codes that let a student into a course's worlds, and which course each one is for.  A code
+// goes in the URL as "?code=...", so a course hands out one link, and is then remembered until
+// another code replaces it; anything else in that parameter, or none ever given, is a player who
+// simply sees the game without the course worlds in it.
+//
+// Beyond opening its own worlds, a course changes how the rest of the game unlocks for its
+// students, who come to it for a term's work rather than to play through: every world outside any
+// course is theirs at novice from the start, and a world no longer waits on a difficulty *above*
+// the one being opened anywhere behind it (rule 3, in main.js's worldGatesPass).
+export const COURSE_CODES = {
+    "math360fall2026": "analysis",
+};
+
 export const LEVELS = [
     { name: "Conjunction world",
       stages: [
