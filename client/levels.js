@@ -1641,7 +1641,55 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∀<",
+          { name: "∀<₁",
+            rules: [ "allI", "allE", "expr", "alg", "omega", ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "ω is positive infinite" },
+                    hint: "infiniteHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "2·ω is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "−ω is negative infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "ω−1 is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "ω/2 is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "√ω is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "ω² is positive infinite" },
+                },
+            ],
+          },
+          { name: "∀<₂",
             rules: [ "allI", "allE", "expr", "alg", "omega", ],
             levels: [
                 {
@@ -1655,14 +1703,6 @@ export const LEVELS = [
                         hypotheses: [ { ty: "∀u∈ℝ,(u<x)" } ],
                         conclusion: { ty: "∀u∈ℝ,(u<x+1)" },
                     },
-                    hint: "infiniteHint",
-                },
-                {
-                    parameters: [ ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "ω is positive infinite" },
-                    hint: "omegaHint",
                 },
                 {
                     parameters: [ ],
@@ -1699,12 +1739,6 @@ export const LEVELS = [
                     variables: [ { name: "x", ty: "𝕊" } ],
                     hypotheses: [ { ty: "x is positive infinite" } ],
                     conclusion: { ty: "√x is positive infinite" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "−ω is negative infinite" },
                 },
                 {
                     parameters: [ ],
@@ -1745,7 +1779,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀∨<",
-            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "tord" ],
+            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1823,7 +1857,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<₂",
-            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord" ],
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
