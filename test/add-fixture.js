@@ -10,8 +10,8 @@
 
 const fs = require('fs');
 const { allLevels } = require('./lib/levels');
-const { canonicalStatement, statementHash, fixturePath, hasFixture, levelOfFixture, writeFixture } =
-    require('./lib/fixtures');
+const { canonicalStatement, statementHash, fixturePath, hasFixture, levelOfFixture, writeFixture,
+    unavailableRules } = require('./lib/fixtures');
 
 function die(msg) {
     console.error(msg);
@@ -39,10 +39,24 @@ if (state.complete === false) {
         + 'complete, so finish the proof in the app and export it again.');
 }
 
-const level = allLevels().find((l) => canonicalStatement(l) === canonicalStatement(stated));
-if (!level) {
+// Every level stating this -- more than one may, and they are all filed under the one hash, so the
+// proof has to be buildable on each of them.
+const stating = allLevels().filter((l) => canonicalStatement(l) === canonicalStatement(stated));
+if (stating.length === 0) {
     die(`No level in client/levels.js states ${canonicalStatement(stated)}.\n`
         + 'A fixture for a statement no game level makes would never be run (probably a custom level).');
+}
+const level = stating[0];
+
+// A proof a level's palette can't build isn't a proof of that level -- it was probably made on a
+// custom level, or on another level that states the same thing with more rules to hand.
+for (const l of stating) {
+    const missing = unavailableRules(state, l.rules);
+    if (missing.length) {
+        die(`${file} uses ${missing.join(', ')}, which level ${l.name} doesn't offer.\n`
+            + `Its palette is ${l.rules.join(', ') || '(empty)'} -- its stage's rules plus its own `
+            + 'extrarules (see client/levels.js).');
+    }
 }
 
 const existed = hasFixture(level);

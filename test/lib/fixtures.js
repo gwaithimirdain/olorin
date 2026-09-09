@@ -45,6 +45,28 @@ function writeFixture(level, state) {
     return fixturePath(level);
 }
 
+// The rules of the blocks a level starts with (laid out by the app, not dropped from the palette),
+// read out of client/main.js so this can't drift from the app's own list.
+function fixedRules() {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'client', 'main.js'), 'utf8');
+    const m = src.match(/const\s+FIXED_RULES\s*=\s*\[([^\]]*)\]/);
+    if (!m) throw new Error("client/main.js no longer declares FIXED_RULES; update lib/fixtures.js");
+    return m[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+}
+
+// The palette rules a proof uses: every distinct rule among its blocks, less the fixed ones the
+// level starts with.  Everything left had to be dragged out of the palette, so the level's palette
+// must offer it.
+function proofRules(state) {
+    const fixed = fixedRules();
+    return [...new Set((state.nodes || []).map((n) => n.rule))].filter((r) => !fixed.includes(r));
+}
+
+// The rules a proof uses that `palette` doesn't offer -- empty when the proof is playable on the
+// level.  `palette` is the level's rules (its stage's plus its own `extrarules`), or the rules the
+// app's palette is actually showing.
+const unavailableRules = (state, palette) => proofRules(state).filter((r) => !palette.includes(r));
+
 // The statement an exported proof was made on, or null if it doesn't carry one (proofs exported
 // before the level was included in the export).
 const levelOfFixture = (state) => (state && state.level && state.level.conclusion ? state.level : null);
@@ -76,4 +98,5 @@ function coverage(allLevels) {
 module.exports = {
     FIXTURE_DIR, canonicalStatement, statementHash, fixturePath, hasFixture,
     readFixture, readFixtureText, writeFixture, levelOfFixture, fixtureMatches, coverage,
+    fixedRules, proofRules, unavailableRules,
 };

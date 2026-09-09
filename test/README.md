@@ -20,6 +20,7 @@ test/
   fixtures/proofs/        # One <statement-hash>.json per covered level (a correct proof)
   e2e/                    # Test specs
     levels.spec.js        # One test per level: load its fixture proof, assert it's complete
+                          #   and that its blocks are all in that level's palette
     autosave.spec.js      # autosave + reload/discard-prompt tests
     exportimport.spec.js  # Export/Import (incl. cross-level switch) tests
 ```
@@ -29,8 +30,14 @@ test/
 `levels.spec.js` has one test per level (enumerated from `client/levels.js`). For each level it
 loads that level's fixture proof, restores it, and asserts the app marks it complete — so a
 correct proof for every covered level is guaranteed to keep working across rule/typechecker/restore
-changes. Levels without a fixture yet appear as `fixme` (a tracked TODO), so they don't fail the
-build.
+changes. It also checks the proof against the palette the level actually offers (its stage's
+`rules` plus the level's own `extrarules`): restore doesn't consult the palette, so without this a
+fixture could "prove" a level with a block no player could place there — which is what would happen
+if a stage's rules were narrowed, or if two levels stating the same thing (they share one fixture)
+offered different rules. `add-fixture.js` refuses such a proof, and `--list` reports any already
+filed as *unplayable*.
+
+Levels without a fixture yet appear as `fixme` (a tracked TODO), so they don't fail the build.
 
 **Fixtures are named by the level's statement, not its number.** The filename is a hash of the
 level's canonical parameters/variables/hypotheses/conclusion (`lib/fixtures.js`), which is the same

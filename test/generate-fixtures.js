@@ -25,7 +25,8 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { chromium } = require('@playwright/test');
 const { allLevels } = require('./lib/levels');
-const { FIXTURE_DIR, writeFixture, coverage } = require('./lib/fixtures');
+const { FIXTURE_DIR, writeFixture, coverage, hasFixture, readFixture, unavailableRules } =
+    require('./lib/fixtures');
 
 const PORT = process.env.OLORIN_PORT || 8127;
 
@@ -230,13 +231,23 @@ async function solveLevel(page, level) {
     return complete ? page.evaluate(() => window.__olorin.serialize()) : null;
 }
 
-// Report which levels have a fixture, and any fixture whose statement is no longer in levels.js
-// (a level whose statement was edited, or that was deleted).
+// Report which levels have a fixture, any fixture whose statement is no longer in levels.js (a
+// level whose statement was edited, or that was deleted), and any whose proof the level's palette
+// couldn't build -- which levels.spec.js fails on, so it is worth saying here too.
 function list() {
     const { covered, orphans, dir } = coverage(allLevels());
     for (const { file, level } of covered) console.log(`  ${level.name}  ${file}`);
     for (const file of orphans) console.log(`  (orphan: no level states this) ${file}`);
-    console.log(`\n${covered.length}/${allLevels().length} levels covered, ${orphans.length} orphaned, in ${dir}`);
+    // Checked over every level with a fixture, not just `covered`: two levels can state the same
+    // thing and so share one fixture, and only one of them is listed above.
+    const unplayable = allLevels().filter((l) => hasFixture(l))
+        .map((l) => ({ level: l, missing: unavailableRules(readFixture(l), l.rules) }))
+        .filter(({ missing }) => missing.length > 0);
+    for (const { level, missing } of unplayable) {
+        console.log(`  (unplayable: level ${level.name}'s palette has no ${missing.join(', ')})`);
+    }
+    console.log(`\n${covered.length}/${allLevels().length} levels covered, ${orphans.length} orphaned, `
+        + `${unplayable.length} unplayable, in ${dir}`);
 }
 
 async function main() {
