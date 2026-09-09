@@ -1093,27 +1093,27 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "∣∃=",
+          { name: "∣∃=₁",
             rules: [ "exE", "exI", "expr", "alg" ],
             levels: [
                 {
                     parameters: [ ],
-                    variables: [ { name: "n", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "2 ∣ n" } ],
-                    conclusion: { ty: "2 ∣ n²" },
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "2 ∣ 6" },
                     hint: "dividesHint",
-                    saveable: {
-                        parameters: [ ],
-                        variables: [ { name: "n", ty: "ℤ" } ],
-                        hypotheses: [ { ty: "∃k∈ℤ,(n=2*k)" } ],
-                        conclusion: { ty: "∃k∈ℤ,(n²=2*k)" },
-                    }
                 },
                 {
                     parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" } ],
+                    variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "a ∣ 0" },
+                    conclusion: { ty: "5 ∣ −40" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "−10 ∣ 380" },
                 },
                 {
                     parameters: [ ],
@@ -1125,6 +1125,29 @@ export const LEVELS = [
                         variables: [ { name: "b", ty: "ℤ" } ],
                         hypotheses: [  ],
                         conclusion: { ty: "∃k∈ℤ,(b=k*1)" },
+                    }
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "a", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "a ∣ 0" },
+                },
+            ],
+          },
+          { name: "∣∃=₂",
+            rules: [ "exE", "exI", "expr", "alg" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "n", ty: "ℤ" } ],
+                    hypotheses: [ { ty: "2 ∣ n" } ],
+                    conclusion: { ty: "2 ∣ n²" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "n", ty: "ℤ" } ],
+                        hypotheses: [ { ty: "∃k∈ℤ,(n=2*k)" } ],
+                        conclusion: { ty: "∃k∈ℤ,(n²=2*k)" },
                     }
                 },
                 {
@@ -1619,7 +1642,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀<",
-            rules: [ "allI", "allE", "expr", "alg" ],
+            rules: [ "allI", "allE", "expr", "alg", "omega", ],
             levels: [
                 {
                     parameters: [ ],
@@ -1633,6 +1656,13 @@ export const LEVELS = [
                         conclusion: { ty: "∀u∈ℝ,(u<x+1)" },
                     },
                     hint: "infiniteHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "ω is positive infinite" },
+                    hint: "omegaHint",
                 },
                 {
                     parameters: [ ],
@@ -1663,6 +1693,18 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ { ty: "x is positive infinite" }, { ty: "q>0" } ],
                     conclusion: { ty: "x·q is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" } ],
+                    hypotheses: [ { ty: "x is positive infinite" } ],
+                    conclusion: { ty: "√x is positive infinite" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "−ω is negative infinite" },
                 },
                 {
                     parameters: [ ],
@@ -1726,7 +1768,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<₁",
-            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord" ],
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1734,6 +1776,12 @@ export const LEVELS = [
                     hypotheses: [ { ty: "x is infinitesimal" }, { ty: "y is infinitesimal" } ],
                     conclusion: { ty: "x+y is infinitesimal" },
                     hint: "infinitesimalHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "1/ω is infinitesimal" },
                 },
                 {
                     parameters: [ ],
