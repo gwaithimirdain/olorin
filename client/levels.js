@@ -1974,7 +1974,7 @@ export const LEVELS = [
             ]
           },
           { name: "∃∀=",
-            rules: [ "allE", "allI", "exI", "exE", "expr", "alg" ],
+            rules: [ "allE", "allI", "exI", "exE", "expr", "algplus" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2021,7 +2021,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃∀∧⇒<",
-            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "alg" ],
+            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "algplus" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2380,7 +2380,7 @@ export const LEVELS = [
             ]
           },
           { name: "¬∀∃=",
-            rules: [ "allE", "allI", "exE", "exI", "cnegI", "negE", "expr", "alg", "asc" ],
+            rules: [ "allE", "allI", "exE", "exI", "cnegI", "negE", "expr", "alg", "asc" ], // alg not algplus
             levels: [
                 {
                     parameters: [ ],
