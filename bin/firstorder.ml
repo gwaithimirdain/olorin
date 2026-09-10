@@ -1212,6 +1212,8 @@ def 𝕊.posinf (x : 𝕊) : Type ≔ forall ℝ (u ↦ 𝕊.lt u x)
 notation(0) x \"is\" \"positive\" \"infinite\" ≔ 𝕊.posinf x
 def 𝕊.neginf (x : 𝕊) : Type ≔ forall ℝ (u ↦ 𝕊.lt x u)
 notation(0) x \"is\" \"negative\" \"infinite\" ≔ 𝕊.neginf x
+def 𝕊.infinite (x : 𝕊) : Type ≔ lor (𝕊.posinf x) (𝕊.neginf x)
+notation(0) x \"is\" \"infinite\" ≔ 𝕊.infinite x
 def 𝕊.infinitesimal (x : 𝕊) : Type ≔ forallpos (u ↦ 𝕊.lt (𝕊.abs x) u)
 notation(0) x \"is\" \"infinitesimal\" ≔ 𝕊.infinitesimal x
 def 𝕊.infclose (x y : 𝕊) : Type ≔ 𝕊.infinitesimal (𝕊.minus x y)
