@@ -413,48 +413,6 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∧⇒🏷",
-            rules: [ "andE", "andI", "impE", "impI", "asc" ],
-            levels: [
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P" }, { ty: "Q" } ],
-                    conclusion: { ty: "((P∧Q)∧(P∧Q))∧(P∧Q)" },
-                    maxrules: 3,
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒Q" }, { ty: "Q⇒R" } ],
-                    conclusion: { ty: "(P⇒R)∧(P⇒R)" },
-                    maxrules: 4,
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" }, { name: "T", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒Q" }, { ty: "Q⇒R" }, { ty: "(P⇒R)⇒S" }, { ty: "(P⇒R)⇒T" } ],
-                    conclusion: { ty: "S∧T" },
-                    maxrules: 7,
-                    hint: "redexHint"
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" }, { name: "T", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒Q" }, { ty: "P⇒R" }, { ty: "(P⇒(Q∧R))⇒S" }, { ty: "(P⇒(Q∧R))⇒T" } ],
-                    conclusion: { ty: "S∧T" },
-                    maxrules: 8,
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" }, { name: "T", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒Q" }, { ty: "Q⇒R" }, { ty: "R⇒S" }, { ty: "S⇒T" } ],
-                    conclusion: { ty: "(P⇒S)∧(P⇒T)" },
-                    maxrules: 9,
-                    hint: "redex2Hint"
-                },
-            ]
-          },
       ]
     },
     { name: "Disjunction world",

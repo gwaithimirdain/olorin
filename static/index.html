@@ -820,21 +820,20 @@
       <div id="neq2Hint" class="modal hint">
         The only kind of disequalities the algebra block can prove automatically are disequalities between different constants, without any variables involved.
       </div>
-      <div id="redexHint" class="modal hint">
-        Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
-        However, I can't guess the output of a "prove ⇒" block or the ⇒ input of a "use ⇒" block, so if one of those is connected directly to the other, I'm stuck.
-        To help me out, use a "label" block in between.
-        When you place a label block, it will prompt you for a statement, and then both its input and its output must be labeled with that statement.
-        After placing it, you can double-click on it to change the label.
-      </div>
-      <div id="redex2Hint" class="modal hint">
-        I need a label block <i>whenever</i> the output of a "prove ⇒" block is connected to the ⇒ input of a "use ⇒" block, even if that same output is also connected somewhere else with a wire whose label I <i>can</i> guess.
-        (I'm a little dense sometimes.)
-      </div>
       <div id="ascHint" class="modal hint">
-        Remember that sometimes I need a little help from the 🏷 block in guessing labels for wires.
-        Specifically here, the inputs of an algebra block never determine its output, and the output of a "prove ¬" block never determines its inputs.
-        Therefore, if the both inputs of a "prove ¬" block come from the outputs of algebra blocks, I have no way to guess what labels should go on those wires without a label block.
+        <p>
+          Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
+          However, the inputs of an algebra block never determine its output, and the output of a "use ¬" block never determines its inputs.
+          Therefore, if the both inputs of a "use ¬" block come from the outputs of algebra blocks, I have no way to guess what labels should go on those wires.
+        </p>
+        <p>
+          To help me out, use a "label" block (🏷) in between.
+          When you place a label block, I will prompt you for a statement, and then both the input and output wires of that block will be labeled with that statement (which must match the ports they are connected to).
+          After placing a label block, you can double-click on it to change the label.
+        </p>
+        <p>
+          Label blocks are never required on Adept or Master difficulty, since in that case you are directly labeling all the wires.
+        </p>
       </div>
       <div id="deceqHint" class="modal hint" style="width: 600px">
         <p>
