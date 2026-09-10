@@ -4190,6 +4190,12 @@ function plainDiagnosticText(text) {
         .trim();
 }
 
+// A port, as the key of a lookup table: the two shapes a port arrives in -- a label's loc and an
+// edge's end -- name the vertex differently, so we take either.
+function portKey(port) {
+    return (port.id || port.vertex) + "|" + port.sort + "|" + port.label;
+}
+
 function continue_typechecking(nodes, edges, connections, result) {
     // If a callback string was supplied, we pass it off to Z3 and wait for a response.
     if(result.callback) {
@@ -4222,6 +4228,29 @@ function continue_typechecking(nodes, edges, connections, result) {
         // result.labels is an array of objects of type {loc, ty:string, tm:string opt}, where loc represents either an edge or a port and has type {isEdge:bool, id:string, sort:string optdef, label:string optdef, hasValue:bool}.
         // To this we add the ports that have default labels from being "primary" (synthesizing inputs or checking outputs).  But we add them last, so they don't override any labels produced by Narya.
         var labels = result.labels;
+        // Narya's own labels for the *output* ports, before the placeholder ones below are added
+        // to the same array, keyed by port.  A wire that Narya couldn't give a type of its own
+        // falls back to these at the end of this function.
+        const portLabels = {};
+        labels.forEach(function (label) {
+            if(!label.loc.isEdge && (label.loc.sort === "output" || label.loc.sort === "assumption")) {
+                const key = portKey(label.loc);
+                if(!portLabels[key]) { portLabels[key] = label; }
+            }
+        });
+        // Whether a wire gets a type label without the player asking: on novice difficulty, always;
+        // otherwise only if it starts at a given or ends at the goal, or carries a value.  (It
+        // would be silly to make the user retype the givens or goals to label those wires, and
+        // currently the user can't annotate values.)
+        const autoLabelWire = function (edge) {
+            return difficulty === 0 ||
+                nodes.some(function (x) {
+                    const ishyp = (x.id === edge.source.id && (x.rule === 'hypothesis' || x.rule === 'variable'));
+                    const isconcl = (x.id === edge.target.id && x.rule === 'conclusion');
+                    const hasval = edge.endpoints[0].parameters.hasValue;
+                    return (ishyp || isconcl || hasval);
+                });
+        };
         nodes.forEach(function (x) {
             instance.getEndpoints(x.node).forEach(function (endpoint) {
                 if(endpoint.parameters.primary) {
@@ -4242,15 +4271,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         labels.forEach(function(label) {
             if(label.loc.isEdge) {
                 const edge = connections[label.loc.id];
-                // We only auto-label the wires if we're on novice difficulty, or if they start at a given or end at the goal, or carry a value.
-                // (It would be silly to make the user retype the givens or goals to label those wires, and currently the user can't annotate values.)
-                if(difficulty === 0 ||
-                   nodes.some(function (x) {
-                       const ishyp = (x.id === edge.source.id && (x.rule === 'hypothesis' || x.rule === 'variable'));
-                       const isconcl = (x.id === edge.target.id && x.rule === 'conclusion');
-                       const hasval = edge.endpoints[0].parameters.hasValue;
-                       return (ishyp || isconcl || hasval);
-                   })) {
+                if(autoLabelWire(edge)) {
                     var cssClass = "connLabel";
                     var lbl = label.ty;
                     if(edge.parameters.hasValue && label.tm) { // or label.loc.hasValue?
@@ -4490,6 +4511,42 @@ function continue_typechecking(nodes, edges, connections, result) {
         // The block count follows whatever the branches above settled on: hidden once the level is
         // finished within budget, and showing (red, if over) otherwise.
         updateBlockBanner();
+        // A wire Narya gave no type of its own takes the type of the port it comes out of, if that
+        // port has one.  The standing example is the wire from a "prove ⇒" block into the ⇒ input
+        // of a "use ⇒" block: the two of them together make a redex that never forms the P⇒Q the
+        // port is labeled with, so nothing types the wire itself, even though what it carries is
+        // exactly what the port carries.  A wire we're calling wrong keeps its silence: telling
+        // the player what a red wire carries would only muddy the error.
+        const wiresInError = {};
+        (result.diagnostics || []).forEach(function (d) {
+            if(d.isfatal) {
+                (d.locs || []).forEach(function (loc) {
+                    if(loc.isEdge) { wiresInError[loc.id] = true; }
+                });
+            }
+        });
+        edges.forEach(function (e) {
+            const edge = e.connector;
+            const ovl = edge.getOverlay("label");
+            // A wire the player labeled themselves shows that label, in an overlay of its own, and
+            // doesn't want a second one saying the same thing.
+            if(edge.parameters.ty || wiresInError[e.id] || !autoLabelWire(edge)) { return; }
+            if(ovl && ovl.getLabel() !== "") { return; }
+            const label = portLabels[portKey(e.source)];
+            if(!label) { return; }
+            var cssClass = "connLabel";
+            var lbl = label.ty;
+            if(edge.parameters.hasValue && label.tm) {
+                cssClass = cssClass + " connLabelValue";
+                lbl = label.tm + ' ∈ ' + lbl;
+            }
+            if(!ovl) {
+                edge.addOverlay({ type: "Label", options: { id: "label", label: lbl, cssClass: cssClass} });
+            } else {
+                ovl.setLabel(lbl);
+            }
+            instance.revalidate(edge.source);
+        });
         // Now delete the label overlays (ordinary and mismatch) that didn't get set this time, and
         // move whatever is left off each other and off the boxes.
         edges.forEach(function(c) {
