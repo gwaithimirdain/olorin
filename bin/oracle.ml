@@ -334,7 +334,7 @@ type funhead = [ `Const of Constant.t | `Var of level ]
 
 let get_funhead : mode head -> funhead option = function
   | Const { name; ins } when Option.is_some (is_id_ins ins) -> Some (`Const name)
-  | Var { level; deg } when Option.is_some (is_id_deg deg) -> Some (`Var level)
+  | Var { level; deg; key = _ } when Option.is_some (is_id_deg deg) -> Some (`Var level)
   | _ -> None
 
 (* Whether a type is ℕ.  Its elements are nonnegative, which to Z3 -- for whom they are opaque

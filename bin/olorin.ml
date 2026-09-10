@@ -12,7 +12,6 @@ let carp str = Js_of_ocaml.Console.console##log (Js.string str)
 (* Narya libraries *)
 open Util
 open Dim
-open Modal
 open Omode
 open Core
 open Term
