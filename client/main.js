@@ -148,7 +148,7 @@ const urlParams = new URLSearchParams(window.location.search);
 //
 // This is the only place it is written down: the test suite reads it back out of this file (see
 // test/lib/testmode.js), so changing the word here changes it everywhere.
-const TEST_PASSWORD = "xyzzy";
+const TEST_PASSWORD = "Cee1ie";
 const TEST_MODE = urlParams.get('test') === TEST_PASSWORD;
 
 // The course code this player is using: the "?code=" in the URL if it has one, and otherwise the
