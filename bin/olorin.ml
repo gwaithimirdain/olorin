@@ -365,6 +365,40 @@ let ensure_synth (tm : term_with_bindables located) (err : string) :
   | { value = { bindables; term = _ }; loc } ->
       (locate_opt loc (Named.Fail (Nonsynthesizing err)), bindables)
 
+(* An introduction block for one of the connectives doesn't produce a bare abstraction or pair:
+   since ⇒, ∀, ¬ and ⇔ are all *records* for Narya's internals, "prove if-then" produces the record
+   (implies ≔ x ↦ M), and "prove and" the record (fst ≔ M, snd ≔ N).  So when such a block is wired
+   straight into the elimination block for the same connective, the term we build is a *record
+   redex*, (implies ≔ x ↦ M) .implies N, and Narya can't typecheck one of those: projecting out a
+   field requires the record to synthesize, and a record never does.  (That is why such a wire comes
+   out red, and has to be given a type -- with a label block, or a type label on the wire itself --
+   before the proof will go through.)  But Narya *can* typecheck a plain redex (x ↦ M) N, and even
+   synthesize it when the argument and the body of the abstraction both synthesize.  So we do the
+   record's own beta-reduction here ourselves, replacing the projection by the contents of the
+   field.  Then the proof goes through with no label at all, and the wire is no longer red.
+
+   We look through the alternatives of a First, which is what an unordered tuple ("prove and") is,
+   but only when none of them is conditional on the goal type, since projecting changes that type. *)
+let rec project_struct (fld : string) (tm : unit Named.check located) :
+    unit Named.check located option =
+  match tm.value with
+  | Named.Struct (Eta, flds) -> (
+      match Abwd.find_opt (Some (fld, [])) flds with
+      | Some (_, body) -> Some body
+      | None -> None)
+  | Named.First alts when List.for_all (fun (test, _, _) -> test = `Any) alts ->
+      let projected =
+        List.filter_map
+          (fun (test, alt, passthru) ->
+            Option.map
+              (fun (body : unit Named.check located) -> (test, body.value, passthru))
+              (project_struct fld (locate_opt tm.loc alt)))
+          alts in
+      if List.length projected = List.length alts then
+        Some (locate_opt tm.loc (Named.First projected))
+      else None
+  | _ -> None
+
 (* One step of destructing: match a synthesizing term against a one-constructor type, handing out
    one output port of the vertex for each component of that constructor.  Each output port becomes
    one of the variables the branch binds, and the match itself is deferred as a bindable, to be
@@ -562,11 +596,27 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
-          let tm, bindables = ensure_synth tm "input to field projection" in
-          (* We add the location of the projected term to the location of the projections.  This is necessary so that if the input wire has the wrong type, *it* gets highlighted red.  However, we add it as a non-annotating location, so that the input wire doesn't get labeled by an output type. *)
-          let newlocs, _ = Loc.locs_and_content false tm.loc in
-          loc := Loc.append ~annote:false !loc newlocs;
-          ({ bindables; term = Synth (Named.Field (tm, `Name fld, None)) }, variables)
+          (* As with an application below, if the input is the record produced by the matching
+             introduction block, we take the projection ourselves; see project_struct. *)
+          (match
+             (if snd fld = [] then project_struct (fst fld) (locate_opt tm.loc tm.value.term)
+              else None)
+           with
+          | Some body ->
+              (* The term we return is located at this output port, and taking the projection
+                 here is what drops the field's own location, so we fold both that and the input
+                 wire into it, non-annotatingly, so that a wire carrying the wrong sort of thing
+                 still gets colored. *)
+              let inlocs, _ = Loc.locs_and_content false tm.loc in
+              let bodylocs, _ = Loc.locs_and_content false body.loc in
+              loc := Loc.append ~annote:false !loc (inlocs @ bodylocs);
+              ({ bindables = tm.value.bindables; term = body.value }, variables)
+          | None ->
+              let tm, bindables = ensure_synth tm "input to field projection" in
+              (* We add the location of the projected term to the location of the projections.  This is necessary so that if the input wire has the wrong type, *it* gets highlighted red.  However, we add it as a non-annotating location, so that the input wire doesn't get labeled by an output type. *)
+              let newlocs, _ = Loc.locs_and_content false tm.loc in
+              loc := Loc.append ~annote:false !loc newlocs;
+              ({ bindables; term = Synth (Named.Field (tm, `Name fld, None)) }, variables))
       | Constr { inputs; constr } ->
           let bindables, variables, args =
             List.fold_right
@@ -584,17 +634,33 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let fn, fn_variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = Some fn }
           in
-          let fn, fn_bindables = ensure_synth fn "function" in
-          let head =
-            match field with
-            (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function.  But we don't use those locations for annotations, because we don't want strings to be labeled by types like P→Q instead of P⇒Q. *)
-            | Some fld ->
-                locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld, None))
-            | None -> fn in
+          (* If the function is the record produced by the matching introduction block, we take the
+             projection ourselves rather than asking Narya to typecheck a record redex; see
+             project_struct.  Either way we don't use the head's locations for annotations, because
+             we don't want wires to be labeled by types like P→Q instead of P⇒Q -- but we do keep
+             them for errors, so that a wire carrying the wrong sort of thing is colored. *)
+          let head, fn_bindables =
+            match Option.bind field (fun (fld, pbij) ->
+                      if pbij = [] then project_struct fld (locate_opt fn.loc fn.value.term)
+                      else None)
+            with
+            | Some body ->
+                let newlocs, _ = Loc.locs_and_content false fn.loc in
+                (Loc.append_to_loc ~annote:false body newlocs, fn.value.bindables)
+            | None -> (
+                let fn, fn_bindables = ensure_synth fn "function" in
+                match field with
+                (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function. *)
+                | Some fld ->
+                    ( named_synth
+                        (locate_opt (Loc.non_annotating fn.loc)
+                           (Named.Field (fn, `Name fld, None))),
+                      fn_bindables )
+                | None -> (named_synth fn, fn_bindables)) in
           (* Apply it to each argument port in turn. *)
           let bindables, variables, tm =
             List.fold_left
-              (fun (bindables, variables, (tm : unit Named.synth located)) label ->
+              (fun (bindables, variables, (tm : unit Named.check located)) label ->
                 let ( ({ value = { bindables = arg_bindables; term = argtm }; loc = argloc } :
                         term_with_bindables located),
                       arg_variables ) =
@@ -603,12 +669,13 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 ( Bindables.union bindables arg_bindables,
                   PortSet.union variables arg_variables,
                   locate_opt None
-                    (Named.App
-                       ( named_synth tm,
-                         named_arg (locate_opt argloc argtm),
-                         locate_opt None `Explicit )) ))
+                    (Named.Synth
+                       (Named.App
+                          ( tm,
+                            named_arg (locate_opt argloc argtm),
+                            locate_opt None `Explicit ))) ))
               (fn_bindables, fn_variables, head) args in
-          ({ bindables; term = Named.Synth tm.value }, variables)
+          ({ bindables; term = tm.value }, variables)
       | Neg { inputs = fn, arg; field; implicit_pre } ->
           (* Get the two inputs, which we will allow to appear in either order *)
           let get_tm lbl =

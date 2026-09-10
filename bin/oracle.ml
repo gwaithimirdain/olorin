@@ -334,6 +334,7 @@ type funhead = [ `Const of Constant.t | `Var of level ]
 
 let get_funhead : mode head -> funhead option = function
   | Const { name; ins } when Option.is_some (is_id_ins ins) -> Some (`Const name)
+  (* Olorin's mode theory is trivial, so a variable's modal key is always the identity. *)
   | Var { level; deg; key = _ } when Option.is_some (is_id_deg deg) -> Some (`Var level)
   | _ -> None
 
