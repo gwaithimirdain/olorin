@@ -140,7 +140,7 @@ const KEYS = [
     return entry
 });
 
-// Allow the expert user to supply a "rules=andE,asc" query string to get extra rules available
+// What the URL asks for: a course's code (see COURSE below) and the test-mode password.
 const urlParams = new URLSearchParams(window.location.search);
 // Test mode is not for players: it skips every unlock rule and exposes the seam the test suite
 // drives.  So it takes a password -- "?test=xyzzy" rather than "?test" -- which is no secret from
@@ -186,12 +186,6 @@ function sameCourseSide(world, other) {
     if(outsideCourses(world)) { return outsideCourses(other); }
     return !outsideCourses(other) && other.courses.some(function (c) { return world.courses.includes(c); });
 }
-const ruleParam = urlParams.get('rules');
-var extraRules = [];
-if(ruleParam) {
-    extraRules = ruleParam.split(",");
-}
-
 // All nodes currently in the diagram, including variables, hypotheses, and conclusion, as {id, name, rule, value, node} objects.  The 'rule' is a string denoting the kind of node it is, while the 'value' (which could be undefined) stores a type or value.  The 'name' is a variable name, for variable nodes.
 var nodes = [];
 
@@ -3095,8 +3089,8 @@ document.getElementById("doneUnlock").onclick = function () {
 
 function selectCurrentLevel(level, skipSavedPrompt) {
     // The palette holds this level's stage's rules, plus any the level itself asks for on top of
-    // them (`extrarules`), plus any the ?rules= query string added.
-    if(!setLevel(level, level.stage.rules.concat(level.extrarules || [], extraRules))) { return; }
+    // them (`extrarules`).
+    if(!setLevel(level, level.stage.rules.concat(level.extrarules || []))) { return; }
     currentLevel = level;
     currentLevelButton = level.button;
     currentCustom = null;
