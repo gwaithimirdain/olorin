@@ -25,6 +25,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { chromium } = require('@playwright/test');
 const { allLevels } = require('./lib/levels');
+const { testQuery } = require('./lib/testmode');
 const { FIXTURE_DIR, writeFixture, coverage, hasFixture, readFixture, unavailableRules } =
     require('./lib/fixtures');
 
@@ -263,7 +264,7 @@ async function main() {
     const page = await browser.newPage();
     page.on('dialog', (d) => d.accept());
     await page.addInitScript(() => localStorage.setItem('visited', 'true'));
-    await page.goto(`http://localhost:${PORT}/?test=1`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}${testQuery()}`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.__olorin !== 'undefined' && typeof window.Narya !== 'undefined');
 
     let solved = 0, attempted = 0;

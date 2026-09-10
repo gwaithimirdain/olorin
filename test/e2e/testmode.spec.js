@@ -2,10 +2,14 @@
 // level is playable regardless of the unlock rules, and double-clicking one of a level's three
 // difficulty marks toggles whether it counts as completed at that difficulty, which feeds straight
 // back into the unlock rules.
+//
+// It takes a password, which client/main.js declares and lib/testmode reads back, so that the game
+// a student is given doesn't hand them all of it for typing "?test" on the end of the URL.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 const { firstLevel, inStage } = require('../lib/levels');
+const { testPassword } = require('../lib/testmode');
 
 const FIRST = firstLevel();
 const AFTER_FIRST = inStage(FIRST.world, FIRST.stage)[1]; // gated on FIRST at novice (rule 6)
@@ -77,5 +81,43 @@ test.describe('Test mode', () => {
     test('the level button itself still opens the level', async () => {
         await olorin.selectLevel(FIRST.name);
         expect(await olorin.currentLevelName()).toBe(FIRST.name);
+    });
+});
+
+// Anything but the password leaves the game exactly as a player has it.
+test.describe('Without the password', () => {
+    // Open the app at a query of our own, rather than through the page object (which knows the
+    // password), and wait for it to be interactive.
+    async function openAt(page, query) {
+        await page.addInitScript(() => localStorage.setItem('visited', 'true'));
+        await page.goto(query, { waitUntil: 'load' });
+        await page.waitForFunction(() => typeof window.Narya !== 'undefined', null, { timeout: 30000 });
+        // The chooser is already up for a fresh player; open it only if it isn't.
+        await page.evaluate(() => {
+            const bg = document.getElementById('levelChooseBG');
+            if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
+        });
+    }
+    // A locked level keeps its three marks in test mode and collapses to one padlock outside it.
+    const marks = (page, level) =>
+        page.locator(`#worlds .level[data-name="${level.name}"] .lvmark`).count();
+
+    for (const [what, query] of [
+        ['the bare parameter', '/?test'],
+        ['an empty one', '/?test='],
+        ['a wrong password', '/?test=notthepassword'],
+        ['no parameter at all', '/'],
+    ]) {
+        test(`${what} leaves the seam away and the unlock rules on`, async ({ page }) => {
+            await openAt(page, query);
+            expect(await page.evaluate(() => typeof window.__olorin)).toBe('undefined');
+            expect(await marks(page, AFTER_FIRST)).toBe(1);
+        });
+    }
+
+    test('while the password itself turns it on', async ({ page }) => {
+        await openAt(page, `/?test=${testPassword()}`);
+        expect(await page.evaluate(() => typeof window.__olorin)).toBe('object');
+        expect(await marks(page, AFTER_FIRST)).toBe(3);
     });
 });

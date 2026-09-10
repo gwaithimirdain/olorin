@@ -142,8 +142,14 @@ const KEYS = [
 
 // Allow the expert user to supply a "rules=andE,asc" query string to get extra rules available
 const urlParams = new URLSearchParams(window.location.search);
-// In test mode ("?test") we skip unlock enforcement so the suite can select any level.
-const TEST_MODE = urlParams.has('test');
+// Test mode is not for players: it skips every unlock rule and exposes the seam the test suite
+// drives.  So it takes a password -- "?test=xyzzy" rather than "?test" -- which is no secret from
+// anyone reading this file, but is a door a student doesn't fall through by guessing at the URL.
+//
+// This is the only place it is written down: the test suite reads it back out of this file (see
+// test/lib/testmode.js), so changing the word here changes it everywhere.
+const TEST_PASSWORD = "xyzzy";
+const TEST_MODE = urlParams.get('test') === TEST_PASSWORD;
 
 // The course code this player is using: the "?code=" in the URL if it has one, and otherwise the
 // last one that did.  A course hands out its link once and the game remembers it, while a code in
@@ -1958,7 +1964,7 @@ function renderLevelButton(b, name, states, level) {
 }
 
 // ===== Test-mode completion toggles =====
-// With "?test" in the URL every level is playable; on top of that, double-clicking one of a level's
+// In test mode every level is playable; on top of that, double-clicking one of a level's
 // three difficulty marks flips whether the level counts as completed at that difficulty, so the
 // unlock rules can be experimented with directly instead of by hand-editing localStorage.
 function makeMarksToggleable(b, level) {
@@ -2524,11 +2530,11 @@ function restoreProofIntoCustom(state, cl) {
     restoreProof(state);
 }
 
-// Test instrumentation seam.  When the page is loaded with "?test" in the URL, we expose a
-// small read/drive API on window.__olorin so the Playwright suite can create wire
-// connections (which are impractical to simulate via raw jsPlumb endpoint dragging) and read
-// the proof state for assertions.  It is inert during normal use.
-if (new URLSearchParams(window.location.search).has("test")) {
+// Test instrumentation seam.  In test mode (see TEST_PASSWORD) we expose a small read/drive API on
+// window.__olorin so the Playwright suite can create wire connections (which are impractical to
+// simulate via raw jsPlumb endpoint dragging) and read the proof state for assertions.  It is
+// inert during normal use.
+if (TEST_MODE) {
     window.__olorin = {
         // Snapshot of the diagram nodes (id, rule, name/value, geometry).
         nodes: () => nodes.map((n) => ({

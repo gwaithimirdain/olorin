@@ -15,6 +15,7 @@ test/
   helpers/olorin.js       # Page-object: open, selectLevel, dragRule, connect, restore, state readers
   lib/levels.js           # Enumerate the game's levels (read from client/levels.js)
   lib/fixtures.js         # Store/find proof fixtures by a hash of the level's statement
+  lib/testmode.js         # The password ?test takes (read from client/main.js)
   generate-fixtures.js    # Auto-solve levels and write verified proof fixtures
   add-fixture.js          # File a hand-made proof (an exported JSON) as a fixture
   fixtures/proofs/        # One <statement-hash>.json per covered level (a correct proof)
@@ -105,7 +106,7 @@ Most gestures are genuine browser events:
   `DataTransfer`, exactly the contract the app's drop handler reads.
 
 Two things go through a tiny **test seam** instead, `window.__olorin`, which the app exposes
-**only** when loaded with `?test` in the URL (it is inert in normal use):
+**only** in test mode (see below) — it is inert in normal use:
 
 - **Creating wire connections.** Dragging between jsPlumb endpoints is not reliably
   reproducible with synthetic mouse events, so `__olorin.connect(source, target)` makes the
@@ -123,7 +124,14 @@ Ports are identified the way the app identifies them: `{ vertex, sort, label }`,
 
 ## Test mode
 
-`?test` does two more things beyond exposing that seam, useful for playing with the game by hand
+Test mode is `?test=` **with a password**: the word `TEST_PASSWORD` in `client/main.js`, which is
+the only place it is written down.  The suite reads it back out of that file (`lib/testmode.js`),
+so changing the word there changes it everywhere — nothing in the suite spells it out.  It is no
+secret from anyone reading the source; it is a door a student doesn't fall through by typing
+`?test` on the end of the URL.  Anything else in that parameter, or none at all, is the ordinary
+game.
+
+Test mode does two more things beyond exposing that seam, useful for playing with the game by hand
 as well as for the suite:
 
 - **Every level is playable**, whatever the unlock rules say, and it opens at the current
@@ -142,7 +150,8 @@ the next); and the auto-completion rule still applies afterwards, so toggling a 
 Because the marks are toggles, a click on one doesn't open the level — click the level's number
 (that's what the page object's `selectLevel` does).
 
-Open `http://localhost:8123/?test` (or any other server for `static/`) to use this by hand.
+Open `http://localhost:8123/?test=<password>` (or any other server for `static/`) to use this by
+hand.
 
 ## Adding tests
 

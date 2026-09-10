@@ -6,8 +6,11 @@
 //   - the Save / Load / Clear buttons (real clicks)
 //
 // Creating wire connections and reading proof state go through window.__olorin, a tiny
-// test seam the app exposes only when the page is loaded with "?test" in the URL (raw
-// jsPlumb endpoint dragging is not reliably reproducible via synthetic mouse events).
+// test seam the app exposes only in test mode -- "?test=" with the password client/main.js
+// declares (raw jsPlumb endpoint dragging is not reliably reproducible via synthetic mouse
+// events).
+
+const { testQuery } = require('../lib/testmode');
 
 class Olorin {
     constructor(page) {
@@ -29,7 +32,7 @@ class Olorin {
             // prompt() (e.g. naming a custom level) is accepted with the configured text.
             d.accept(d.type() === 'prompt' ? this._promptText : undefined);
         });
-        const query = '/?test=1' + (code === undefined ? '' : '&code=' + encodeURIComponent(code));
+        const query = testQuery(code === undefined ? '' : '&code=' + encodeURIComponent(code));
         await this.page.goto(query, { waitUntil: 'load' });
         await this.page.waitForFunction(
             () => typeof window.__olorin !== 'undefined' && typeof window.Narya !== 'undefined',
