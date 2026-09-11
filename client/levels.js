@@ -541,7 +541,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨=≠",
-            rules: [ "orI1", "orI2", "orE", "alg", "deceq", "expr" ],
+            rules: [ "orI1", "orI2", "orE", "alg", "asc", "deceq", "expr" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -612,7 +612,7 @@ export const LEVELS = [
             ],
           },
           { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "alg", "integral", "expr" ],
+            rules: [ "orI1", "orI2", "orE", "alg", "asc", "integral", "expr" ],
             levels: [
                 { // We use different variable names for this one so that Olorin can tell it's different from the previous one.
                     parameters: [ ],
@@ -689,7 +689,7 @@ export const LEVELS = [
             ],
           },
           { name: "∨<",
-            rules: [ "orI1", "orI2", "orE", "expr", "alg", "tord" ],
+            rules: [ "orI1", "orI2", "orE", "expr", "alg", "asc", "tord" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1087,7 +1087,7 @@ export const LEVELS = [
             ]
           },
           { name: "∣∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1237,7 +1237,7 @@ export const LEVELS = [
             ],
           },
           { name: "≡∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1379,7 +1379,7 @@ export const LEVELS = [
             ],
           },
           { name: "≡∣∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1416,7 +1416,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃₊<",
-            rules: [ "exposE", "exposI", "expr", "algplus" ],
+            rules: [ "exposE", "exposI", "expr", "algplus", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1595,7 +1595,7 @@ export const LEVELS = [
             ]
           },
           { name: "∀=⊥",
-            rules: [ "allI", "allE", "expr", "alg", "botE" ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "botE" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1624,7 +1624,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀<₁",
-            rules: [ "allI", "allE", "expr", "alg", "omega", ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "omega", ],
             levels: [
                 {
                     parameters: [ ],
@@ -1672,7 +1672,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀<₂",
-            rules: [ "allI", "allE", "expr", "alg", "omega", ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "omega", ],
             levels: [
                 {
                     parameters: [ ],
@@ -1761,7 +1761,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀∨<",
-            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "tord", "omega" ],
+            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "asc", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1784,7 +1784,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<₁",
-            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord", "omega" ],
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1852,7 +1852,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<₂",
-            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord", "omega" ],
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1969,7 +1969,7 @@ export const LEVELS = [
             ]
           },
           { name: "∃∀=",
-            rules: [ "allE", "allI", "exI", "exE", "expr", "algplus" ],
+            rules: [ "allE", "allI", "exI", "exE", "expr", "algplus", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2016,7 +2016,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃∀∧⇒<",
-            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "algplus" ],
+            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "algplus", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2045,7 +2045,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃₊∀₊<",
-            rules: [ "allE", "allI", "exI", "exE", "allposE", "allposI", "exposI", "exposE", "expr", "algplus", "tord" ],
+            rules: [ "allE", "allI", "exI", "exE", "allposE", "allposI", "exposI", "exposE", "expr", "algplus", "asc", "tord" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2172,7 +2172,7 @@ export const LEVELS = [
             ]
           },
           { name: "=≠∧",
-            rules: [ "andE", "andI", "negE", "cnegI", "alg" ],
+            rules: [ "andE", "andI", "negE", "cnegI", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -2446,7 +2446,7 @@ export const LEVELS = [
       courses: [ "analysis" ],
       stages: [
           { name: "conv₁",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch" ],
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2476,7 +2476,7 @@ export const LEVELS = [
             ],
           },
           { name: "div₁",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch" ],
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2558,7 +2558,7 @@ export const LEVELS = [
             ],
           },
           { name: "div₂",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch" ],
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
                 {
                     parameters: [ ],
