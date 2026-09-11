@@ -813,6 +813,19 @@
       <div id="inequalityHint" class="modal hint">
         The algebra block can also prove inequalities.
       </div>
+      <div id="labelHint" class="modal hint">
+        Usually I can guess the label that should go on any wire from the surrounding blocks and wires, if they are connected correctly.
+        However, the inputs and outputs of an algebra block never determine each other, so if you ever connect the output of one algebra block to the input of another algebra block I'll be stuck.
+        (This is true even if the output of the first algebra block is also connected somewhere else that gives it a label; I can be kind of dense sometimes.)
+        <img src="hints/alg-to-alg.png" style="margin-left: auto; margin-right:auto; display:block"/>
+        To help me out, you can use a "label" block (🏷) in between.
+        When you place a label block, I will prompt you for a statement, and then both the input and output wires of that block will be labeled with that statement.
+        After placing a label block, you can double-click on it to change the label.
+        <img src="hints/alg-label-alg.png" style="margin-left: auto; margin-right:auto; display:block"/>
+        With algebra blocks, you can also avoid this issue entirely by never attaching the output of one algebra block to the input of another.
+        There's no limit on the "amount of algebra" that can be done by one algebra block, so you can just attach all the inputs of the first block directly to the second instead of using an "intermediate result".
+        <img src="hints/alg-not-to-alg.png" style="margin-left: auto; margin-right:auto; display:block"/>
+      </div>
       <div id="neqHint" class="modal hint">
         The statement "x≠y" means the same as "¬(x=y)", and is called a <i>disequality</i>.
         I can't prove disequalities involving variables automatically; you have to use the rule blocks for ¬.

@@ -257,13 +257,20 @@ export const LEVELS = [
             ],
           },
           { name: "∧=<",
-            rules: [ "andI", "andE", "alg" ],
+            rules: [ "andI", "andE", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1+y=y+2)" } ],
+                    hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1=y+4)" } ],
                     conclusion: { ty: "(x=1)∧(y=−2)" },
+                    hint: "labelHint",
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1+y=y+2)" } ],
+                        conclusion: { ty: "(x=1)∧(y=−2)" },
+                    },
                 },
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
