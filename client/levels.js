@@ -1612,7 +1612,7 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²" } ],
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²)" } ],
                     conclusion: { ty: "a=1/2" },
                 },
                 {
