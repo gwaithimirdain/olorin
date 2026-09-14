@@ -2452,6 +2452,13 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
+                    conclusion: { ty: "lim (n ↦ 3) = 3" },
+                    hint: "convergenceHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
                     conclusion: { ty: "lim (n ↦ 1/(n+1)) = 0" },
                     hint: "archimedeanHint",
                 },
