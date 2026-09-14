@@ -928,6 +928,7 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ ],
                     conclusion: { ty: "(⊥⇒P)⇔⊤" },
+                    extrarules: [ "impI", "impE" ],
                 },
             ],
           },
