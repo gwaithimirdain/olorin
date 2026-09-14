@@ -181,7 +181,7 @@ notation(0) \"lim\" s \"=\" L ≔ seqconv s L
 
 def seqdiv_posinf (s : ℕ → ℝ) : Type ≔
   forall ℝ (M ↦ exists ℕ (N ↦ forall ℕ (n ↦ imp (ℕ.le N n) (ℝ.ge (s n) M))))
-notation \"lim\" s \"⟶∞\" ≔ seqdiv_posinf s
+notation \"lim\" s \"↗∞\" ≔ seqdiv_posinf s
 "
 
 (* Raw.App now takes a *check* function and an *optional* check argument; these helpers build an
