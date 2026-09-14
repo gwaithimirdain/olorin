@@ -102,6 +102,40 @@ test.describe('Expression boxes', () => {
         expect(await page.inputValue('#expression')).toBe('xε2');
     });
 
+    // As with the palette, so with the shortcuts: only those for the symbols on offer are active in
+    // this box, and only they are listed when its shortcuts dialog is opened.  A statement's symbol
+    // typed here is left just as it was typed.
+    test('only the shortcuts for the symbols on offer are active, and listed', async ({ page }) => {
+        await olorin.dragRule('expr', 420, 240);
+        await page.waitForSelector('#expressionBG', { state: 'visible' });
+        const offered = await page.evaluate(() => [
+            ...Array.from(document.querySelectorAll('#exprPalette .unicode-button')).map((b) => b.textContent),
+            ...Array.from(document.querySelectorAll('#exprPalette select'))
+                .flatMap((s) => Array.from(s.options).slice(1).map((o) => o.textContent)),
+        ]);
+        const listed = () => page.evaluate(() =>
+            Array.from(document.querySelectorAll('#shortcuts td.symbol')).map((td) => td.textContent));
+
+        await page.click('#exprPalette .unicode-button:has-text("shortcuts")');
+        await expect(page.locator('#shortcutsBG')).toBeVisible();
+        const exprListed = await listed();
+        expect(exprListed).toEqual(expect.arrayContaining(['·', 'α']));
+        for (const sym of exprListed) {
+            expect(offered).toContain(sym);
+        }
+        await page.click('#shortcutsBG');
+
+        await page.fill('#expression', '');
+        await page.locator('#expression').pressSequentially('\\forall x => \\alpha ');
+        expect(await page.inputValue('#expression')).toBe('\\forall x => α');
+
+        // The one dialog serves every box, so it mustn't be left listing only these: a statement
+        // box's button lists the statement symbols again.
+        await page.evaluate(() => Array.from(document.querySelectorAll('#ascPalette .unicode-button'))
+            .find((b) => b.textContent === 'shortcuts').click());
+        expect(await listed()).toEqual(expect.arrayContaining(['∀', '⇒', '·', 'α']));
+    });
+
     test('double-clicking one re-opens the dialog, pre-filled, and edits it in place', async ({ page }) => {
         const id = await olorin.dragRule('expr', 420, 240);
         await enterExpression(page, 'x−1');
@@ -359,6 +393,11 @@ test.describe('Boxes that bind a variable', () => {
             expect(await page.inputValue('#newvar')).toBe(letter);
             expect(await page.evaluate((s) => window.Narya.checkVariable(s).complete, letter), letter).toBe(true);
         }
+
+        // Only the Greek letters' shortcuts are active here: a statement's symbol is left as typed.
+        await page.fill('#newvar', '');
+        await page.locator('#newvar').pressSequentially('\\forall ->');
+        expect(await page.inputValue('#newvar')).toBe('\\forall ->');
 
         // The backslash shortcuts reach this box too, and the name they spell is accepted.
         await page.fill('#newvar', '');

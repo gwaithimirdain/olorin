@@ -3513,7 +3513,16 @@ function addDropdownToPalette(pal, elt, label, chars) {
     pal.appendChild(sel);
 }
 
-function makePalette(palid, eltid, chars, groups) {
+// The shortcuts for just the symbols a restricted palette offers, for a box that shouldn't turn
+// what's typed in it into anything else: in an expression, \forall or => can only be a mistake, and
+// leaving it as typed makes the mistake plainer than a ∀ or ⇒ would.
+function shortcutsFor(chars, groups) {
+    const offered = chars.concat(...groups.map((g) => g.chars));
+    return KEYS.filter((entry) => offered.includes(entry.unicode));
+}
+
+// `keys` is the part of KEYS that is active in the box, and that its shortcuts dialog lists.
+function makePalette(palid, eltid, chars, groups, keys) {
     const pal = document.getElementById(palid);
     const elt = document.getElementById(eltid);
     // Create palette of buttons, and of dropdowns for the groups that get one
@@ -3531,15 +3540,16 @@ function makePalette(palid, eltid, chars, groups) {
     b.style.width = '80px';
     b.textContent = 'shortcuts';
     b.addEventListener('click', function() {
+        fillShortcuts(keys);
         document.getElementById("shortcutsBG").style.display = 'flex';
     });
     pal.appendChild(b);
-    addShortcuts(eltid);
+    addShortcuts(eltid, keys);
 }
 
-// Replace every shortcut key sequence in a string with the character it stands for.
-function substituteShortcuts(str) {
-    KEYS.forEach(function (entry) {
+// Replace every shortcut key sequence in `keys` in a string with the character it stands for.
+function substituteShortcuts(str, keys) {
+    keys.forEach(function (entry) {
         entry.regexes.forEach(function (re) {
             str = str.replace(re, entry.unicode);
         });
@@ -3548,32 +3558,21 @@ function substituteShortcuts(str) {
 }
 
 // Detect shortcut key sequences in a text box
-function addShortcuts(eltid) {
+function addShortcuts(eltid, keys) {
     const elt = document.getElementById(eltid);
     elt.addEventListener('input', () => {
-        const text = substituteShortcuts(elt.value);
+        const text = substituteShortcuts(elt.value, keys);
         // Leave the box alone when there was nothing to replace, so that ordinary typing never
         // goes near the cursor.
         if(text === elt.value) { return; }
         // Assigning to value drops the cursor at the end of the box, so work out where it belongs
         // first: at the end of whatever preceded it, once that has been through the same
         // substitutions, since they are what changed its length.
-        const caret = substituteShortcuts(elt.value.slice(0, elt.selectionStart)).length;
+        const caret = substituteShortcuts(elt.value.slice(0, elt.selectionStart), keys).length;
         elt.value = text;
         elt.setSelectionRange(caret, caret);
     });
 }
-
-makePalette('paramPalette', 'parameters', PALETTE, PALETTE_GROUPS);
-makePalette('varPalette', 'variables', PALETTE, PALETTE_GROUPS);
-makePalette('hypPalette', 'hypotheses', PALETTE, PALETTE_GROUPS);
-makePalette('conclPalette', 'conclusion', PALETTE, PALETTE_GROUPS);
-makePalette('ascPalette', 'ascribe', PALETTE, PALETTE_GROUPS);
-makePalette('wirePalette', 'wire', PALETTE, PALETTE_GROUPS);
-makePalette('exprPalette', 'expression', EXPR_PALETTE, [GREEK_GROUP]);
-// A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
-// mathematician does reach for is a Greek letter, so that dropdown is the whole of this palette.
-makePalette('varnamePalette', 'newvar', [], [GREEK_GROUP]);
 
 var shortcuts = document.getElementById('shortcuts');
 var shortcut_thead = document.createElement('thead');
@@ -3588,26 +3587,37 @@ shortcut_tr.appendChild(shortcut_keyslabel);
 shortcut_thead.appendChild(shortcut_tr);
 shortcuts.appendChild(shortcut_thead);
 var shortcut_tbody = document.createElement('tbody');
-KEYS.forEach(function(entry) {
-    var tr = document.createElement('tr');
-    var sym = document.createElement('td');
-    sym.innerText = entry.unicode;
-    sym.className = 'symbol';
-    tr.appendChild(sym);
-    var keys = '';
-    entry.keys.forEach(function(seq) {
-        if(keys) {
-            keys = keys + ', ';
-        }
-        keys = keys + seq;
-    });
-    var keylist = document.createElement('td');
-    keylist.innerText = keys;
-    keylist.className = 'keyseq';
-    tr.appendChild(keylist);
-    shortcut_tbody.appendChild(tr);
-});
 shortcuts.appendChild(shortcut_tbody);
+
+// The one shortcuts dialog serves every box, so each time it is opened it lists the shortcuts
+// active in the box it was opened from, and no others.
+function fillShortcuts(keys) {
+    shortcut_tbody.replaceChildren();
+    keys.forEach(function(entry) {
+        var tr = document.createElement('tr');
+        var sym = document.createElement('td');
+        sym.innerText = entry.unicode;
+        sym.className = 'symbol';
+        tr.appendChild(sym);
+        var keylist = document.createElement('td');
+        keylist.innerText = entry.keys.join(', ');
+        keylist.className = 'keyseq';
+        tr.appendChild(keylist);
+        shortcut_tbody.appendChild(tr);
+    });
+}
+
+makePalette('paramPalette', 'parameters', PALETTE, PALETTE_GROUPS, KEYS);
+makePalette('varPalette', 'variables', PALETTE, PALETTE_GROUPS, KEYS);
+makePalette('hypPalette', 'hypotheses', PALETTE, PALETTE_GROUPS, KEYS);
+makePalette('conclPalette', 'conclusion', PALETTE, PALETTE_GROUPS, KEYS);
+makePalette('ascPalette', 'ascribe', PALETTE, PALETTE_GROUPS, KEYS);
+makePalette('wirePalette', 'wire', PALETTE, PALETTE_GROUPS, KEYS);
+makePalette('exprPalette', 'expression', EXPR_PALETTE, [GREEK_GROUP], shortcutsFor(EXPR_PALETTE, [GREEK_GROUP]));
+// A variable is a name rather than a statement, so almost nothing in PALETTE can go in one.  What a
+// mathematician does reach for is a Greek letter, so that dropdown is the whole of this palette,
+// and its shortcuts the only ones active.
+makePalette('varnamePalette', 'newvar', [], [GREEK_GROUP], shortcutsFor([], [GREEK_GROUP]));
 
 document.getElementById("shortcutsBG").onclick = function() {
     document.getElementById("shortcutsBG").style.display = 'none';

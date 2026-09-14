@@ -1,0 +1,115 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "lim (n ↦ (2·n+1)/(5·n+1)) = 2/5"
+    }
+  },
+  "complete": false,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 32,
+    "paramCounter": 0,
+    "varCounter": 0,
+    "hypCounter": 0,
+    "conclCounter": 8
+  },
+  "nodes": [
+    {
+      "id": "concl7",
+      "rule": "conclusion",
+      "left": "1251px",
+      "top": "449px",
+      "value": "lim (n ↦ (2·n+1)/(5·n+1)) = 2/5"
+    },
+    {
+      "id": "rule28",
+      "rule": "allposI",
+      "left": "103px",
+      "top": "810px",
+      "names": [
+        "ε"
+      ],
+      "width": "1253px",
+      "height": "70px"
+    },
+    {
+      "id": "rule29",
+      "rule": "exI",
+      "left": "994.717px",
+      "top": "726px"
+    },
+    {
+      "id": "rule30",
+      "rule": "arch",
+      "left": "784.717px",
+      "top": "653px",
+      "names": [
+        "N"
+      ]
+    },
+    {
+      "id": "rule31",
+      "rule": "expr",
+      "left": "376.717px",
+      "top": "653px",
+      "value": "(3/ε−5)/25",
+      "width": "fit-content"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule28",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl7",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule28",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule30",
+        "sort": "output",
+        "label": "element"
+      },
+      "target": {
+        "vertex": "rule29",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule31",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "input",
+        "label": "x"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}
