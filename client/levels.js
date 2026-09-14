@@ -2490,6 +2490,7 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ ],
                     conclusion: { ty: "lim (n ↦ n) ⟶∞" },
+                    hint: "divergenceHint",
                 },
                 {
                     parameters: [ ],
