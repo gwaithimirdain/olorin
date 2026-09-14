@@ -257,13 +257,20 @@ export const LEVELS = [
             ],
           },
           { name: "∧=<",
-            rules: [ "andI", "andE", "alg" ],
+            rules: [ "andI", "andE", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1+y=y+2)" } ],
+                    hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1=y+4)" } ],
                     conclusion: { ty: "(x=1)∧(y=−2)" },
+                    hint: "labelHint",
+                    saveable: {
+                        parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
+                        variables: [ ],
+                        hypotheses: [ { ty: "(x+y+2=x−y−2)∧(x+1+y=y+2)" } ],
+                        conclusion: { ty: "(x=1)∧(y=−2)" },
+                    },
                 },
                 {
                     parameters: [ { name: "x", ty: "ℝ" }, { name: "y", ty: "ℝ" } ],
@@ -534,7 +541,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨=≠",
-            rules: [ "orI1", "orI2", "orE", "alg", "deceq", "expr" ],
+            rules: [ "orI1", "orI2", "orE", "alg", "asc", "deceq", "expr" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -605,7 +612,7 @@ export const LEVELS = [
             ],
           },
           { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "alg", "integral", "expr" ],
+            rules: [ "orI1", "orI2", "orE", "alg", "asc", "integral", "expr" ],
             levels: [
                 { // We use different variable names for this one so that Olorin can tell it's different from the previous one.
                     parameters: [ ],
@@ -682,7 +689,7 @@ export const LEVELS = [
             ],
           },
           { name: "∨<",
-            rules: [ "orI1", "orI2", "orE", "expr", "alg", "tord" ],
+            rules: [ "orI1", "orI2", "orE", "expr", "alg", "asc", "tord" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1080,7 +1087,7 @@ export const LEVELS = [
             ]
           },
           { name: "∣∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1230,7 +1237,7 @@ export const LEVELS = [
             ],
           },
           { name: "≡∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1372,7 +1379,7 @@ export const LEVELS = [
             ],
           },
           { name: "≡∣∃=",
-            rules: [ "exE", "exI", "expr", "alg" ],
+            rules: [ "exE", "exI", "expr", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1409,7 +1416,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃₊<",
-            rules: [ "exposE", "exposI", "expr", "algplus" ],
+            rules: [ "exposE", "exposI", "expr", "algplus", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1588,7 +1595,7 @@ export const LEVELS = [
             ]
           },
           { name: "∀=⊥",
-            rules: [ "allI", "allE", "expr", "alg", "botE" ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "botE" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1605,7 +1612,7 @@ export const LEVELS = [
                 {
                     parameters: [ ],
                     variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²" } ],
+                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²)" } ],
                     conclusion: { ty: "a=1/2" },
                 },
                 {
@@ -1617,7 +1624,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀<₁",
-            rules: [ "allI", "allE", "expr", "alg", "omega", ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "omega", ],
             levels: [
                 {
                     parameters: [ ],
@@ -1665,7 +1672,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀<₂",
-            rules: [ "allI", "allE", "expr", "alg", "omega", ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "omega", ],
             levels: [
                 {
                     parameters: [ ],
@@ -1754,7 +1761,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀∨<",
-            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "tord", "omega" ],
+            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "alg", "asc", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1777,7 +1784,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<₁",
-            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord", "omega" ],
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1845,7 +1852,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<₂",
-            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "tord", "omega" ],
+            rules: [ "allposI", "allposE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1962,7 +1969,7 @@ export const LEVELS = [
             ]
           },
           { name: "∃∀=",
-            rules: [ "allE", "allI", "exI", "exE", "expr", "algplus" ],
+            rules: [ "allE", "allI", "exI", "exE", "expr", "algplus", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2009,7 +2016,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃∀∧⇒<",
-            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "algplus" ],
+            rules: [ "allE", "allI", "exI", "exE", "andI", "andE", "impI", "impE", "expr", "algplus", "asc" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2038,7 +2045,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃₊∀₊<",
-            rules: [ "allE", "allI", "exI", "exE", "allposE", "allposI", "exposI", "exposE", "expr", "algplus", "tord" ],
+            rules: [ "allE", "allI", "exI", "exE", "allposE", "allposI", "exposI", "exposE", "expr", "algplus", "asc", "tord" ],
             levels: [
                 {
                     parameters: [ ],
@@ -2165,7 +2172,7 @@ export const LEVELS = [
             ]
           },
           { name: "=≠∧",
-            rules: [ "andE", "andI", "negE", "cnegI", "alg" ],
+            rules: [ "andE", "andI", "negE", "cnegI", "alg", "asc" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -2439,8 +2446,15 @@ export const LEVELS = [
       courses: [ "analysis" ],
       stages: [
           { name: "conv₁",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch" ],
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "lim (n ↦ 3) = 3" },
+                    hint: "convergenceHint",
+                },
                 {
                     parameters: [ ],
                     variables: [ ],
@@ -2469,25 +2483,26 @@ export const LEVELS = [
             ],
           },
           { name: "div₁",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch" ],
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ n) ⟶∞" },
+                    conclusion: { ty: "lim (n ↦ n) ↗∞" },
+                    hint: "divergenceHint",
                 },
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ √n) ⟶∞" },
+                    conclusion: { ty: "lim (n ↦ √n) ↗∞" },
                 },
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ (n²-1)/(n+2)) ⟶∞" },
+                    conclusion: { ty: "lim (n ↦ (n²-1)/(n+2)) ↗∞" },
                 },
             ],
           },
@@ -2551,30 +2566,30 @@ export const LEVELS = [
             ],
           },
           { name: "div₂",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch" ],
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
                 {
                     parameters: [ ],
                     variables: [ { name: "s", ty: "ℕ → ℝ" } ],
-                    hypotheses: [ { ty: "lim (n ↦ s(n)) ⟶∞" } ],
-                    conclusion: { ty: "lim (n ↦ s(n)²) ⟶∞" },
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) ↗∞" } ],
+                    conclusion: { ty: "lim (n ↦ s(n)²) ↗∞" },
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "s", ty: "ℕ → ℝ" } ],
                     hypotheses: [ { ty: "∀n∈ℕ,(0<s(n))" }, { ty: "lim (n ↦ s(n)) = 0" } ],
-                    conclusion: { ty: "lim (n ↦ 1/s(n)) ⟶∞" },
+                    conclusion: { ty: "lim (n ↦ 1/s(n)) ↗∞" },
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "s", ty: "ℕ → ℝ" } ],
-                    hypotheses: [ { ty: "∀n∈ℕ,(0<s(n))" }, { ty: "lim (n ↦ s(n)) ⟶∞" } ],
+                    hypotheses: [ { ty: "∀n∈ℕ,(0<s(n))" }, { ty: "lim (n ↦ s(n)) ↗∞" } ],
                     conclusion: { ty: "lim (n ↦ 1/s(n)) = 0" },
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "s", ty: "ℕ → ℝ" } ],
-                    hypotheses: [ { ty: "lim (n ↦ s(n)) ⟶∞" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) ↗∞" } ],
                     conclusion: { ty: "∃L∈ℝ,(lim (n ↦ s(n)/(s(n)+1)) = L)" },
                 },
             ],

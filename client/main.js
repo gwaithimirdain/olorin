@@ -30,7 +30,7 @@ const CLOSE_BUTTON_HOME = 0.8;
 // Unicode characters to put in the button palette below text boxes.  ∼ and ∣ are left out: their
 // shortcuts are the ~ and | already on the keyboard, which look enough like them that they can be
 // typed without knowing there was a shortcut involved.
-const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '≈', '√'];
+const PALETTE = ['∧', '∨', '⇒', '⇔', '¬', '⊤', '⊥', '∀', '∃', '∈', '≠', '≤', '≥', '≈', '√', '→', '↗', '∞'];
 
 // The number systems, and the Greek alphabet, go in dropdowns at the end of that row rather than
 // getting a button each: there are a lot of them, they group naturally, and they come up far less
@@ -86,6 +86,8 @@ const KEYS = [
     // bar having become ∣ and the hyphen − on the way past.
     { unicode: '↦', keys: [ '\\mapsto ', '|->', '∣->', '∣−>' ] },
     { unicode: '→', keys: [ '\\to ', '\\rightarrow ', '->', '−>' ] },
+    { unicode: '↗', keys: [ '\\ur ', '\\nearrow' ] },
+    { unicode: '∞', keys: [ '\\infty ', '\\oo' ] },
     { unicode: '×', keys: [ '\\times ', '\\x ', '><' ] },
     { unicode: '⊔', keys: [ '\\sqcup ' ] },
     { unicode: '∣', keys: [ '|', '\\mid ', '\\abs ', '\\divides ' ] },
