@@ -2446,7 +2446,7 @@ export const LEVELS = [
     { name: "Sequence world",
       courses: [ "analysis" ],
       stages: [
-          { name: "conv₁",
+          { name: "lim₁",
             rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
                 {
@@ -2481,33 +2481,21 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "lim (n ↦ (2·n+1)/(5·n+1)) = 2/5" },
                 },
-            ],
-          },
-          { name: "div₁",
-            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
-            levels: [
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ n) ↗∞" },
-                    hint: "divergenceHint",
+                    conclusion: { ty: "lim (n ↦ n²/(3·n²+1)) = 1/3" },
                 },
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ √n) ↗∞" },
-                },
-                {
-                    parameters: [ ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ (n²-1)/(n+2)) ↗∞" },
+                    conclusion: { ty: "lim (n ↦ (3·n+2)/(n²+5)) = 0" },
                 },
             ],
           },
-          { name: "conv₂",
+          { name: "lim₂",
             rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "arch", "asc" ],
             levels: [
                 {
@@ -2566,9 +2554,28 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "div₂",
+          { name: "lim↗",
             rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
             levels: [
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "lim (n ↦ n) ↗∞" },
+                    hint: "divergenceHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "lim (n ↦ √n) ↗∞" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "lim (n ↦ (n²-1)/(n+2)) ↗∞" },
+                },
                 {
                     parameters: [ ],
                     variables: [ { name: "s", ty: "ℕ → ℝ" } ],
@@ -2592,6 +2599,53 @@ export const LEVELS = [
                     variables: [ { name: "s", ty: "ℕ → ℝ" } ],
                     hypotheses: [ { ty: "lim (n ↦ s(n)) ↗∞" } ],
                     conclusion: { ty: "∃L∈ℝ,(lim (n ↦ s(n)/(s(n)+1)) = L)" },
+                },
+            ],
+          },
+          { name: "lim=<",
+            rules: [ "impE", "impI", "allE", "allI", "exE", "exI", "allposE", "allposI", "exposE", "exposI", "expr", "algplus", "asc", "arch" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" }, { name: "C", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" } ],
+                    conclusion: { ty: "lim (n ↦ C·s(n)) = C·L" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" } ],
+                    conclusion: { ty: "lim (n ↦ ∣s(n)∣) = ∣L∣" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" }, { name: "t", ty: "ℕ → ℝ" }, { name: "M", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" }, { ty: "lim (n ↦ t(n)) = M" } ],
+                    conclusion: { ty: "lim (n ↦ s(n)+t(n)) = L+M" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" }, { name: "t", ty: "ℕ → ℝ" }, { name: "M", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" }, { ty: "lim (n ↦ t(n)) = M" }, { ty: "∀n∈ℕ,(s(n)≤t(n))" } ],
+                    conclusion: { ty: "L≤M" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" }, { name: "t", ty: "ℕ → ℝ" }, { name: "u", ty: "ℕ → ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" }, { ty: "lim (n ↦ t(n)) = L" }, { ty: "∀n∈ℕ,(s(n)≤u(n))" }, { ty: "∀n∈ℕ,(u(n)≤t(n))" } ],
+                    conclusion: { ty: "lim (n ↦ u(n)) = L" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" }, { name: "t", ty: "ℕ → ℝ" }, { name: "M", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" }, { ty: "lim (n ↦ t(n)) = M" } ],
+                    conclusion: { ty: "lim (n ↦ s(n)·t(n)) = L·M" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" }, { ty: "∀n∈ℕ,(s(n)>0)" }, { ty: "L>0" } ],
+                    conclusion: { ty: "lim (n ↦ 1/s(n)) = 1/L" },
                 },
             ],
           },
