@@ -293,7 +293,10 @@ var registerWithoutAdvancingTime = false;
 var unlockData = [];
 
 // Exclude these rules from "all"
-const excludeFromAll = [ "negI" ] // Classical negation suffices
+const excludeFromAll = [
+    "negI",   // Classical negation suffices
+    "algneq", // This is a special gift to players before they get to negation world
+];
 
 // The rules of the blocks a level starts with, laid out by setLevel rather than added by the
 // player: everything else in `nodes` is a block the player put there.
@@ -989,7 +992,7 @@ function addEndpointsForRule(box, id, restore) {
             ascribe.focus();
         }
         typecheck_now = false;
-    } else if (id === 'alg' || id === 'algplus') {
+    } else if (id === 'alg' || id === 'algplus' || id === 'algneq') {
         instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
     } else if (id === 'expr') {

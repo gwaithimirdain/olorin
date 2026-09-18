@@ -608,12 +608,12 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      asking: the "plus" block decides an absolute value, a minimum or a maximum itself, while the
      plain one requires the hypotheses to settle each of those first (see Cases below). *)
   let oracle = Scope.lookup [ "oracle" ] in
+  let oracle_neq = Scope.lookup [ "oracle_neq" ] in
   let oracle_plus = Scope.lookup [ "oracle_plus" ] in
   let* block, givens, goal =
     match Norm.view_term tm with
     | Neu { head = Const { name; ins }; args; _ }
-      when (Some name = oracle || Some name = oracle_plus)
-           && Option.is_some (is_id_ins ins)
+      when Option.is_some (is_id_ins ins)
            && (match get_args args with
               | Some [ _; _; _ ] -> true
               | _ -> false) ->
@@ -621,12 +621,19 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
           match get_args args with
           | Some [ givens; _; goal ] -> (givens, goal)
           | _ -> assert false in
-        return
-          ((if Some name = oracle_plus then `Algplus else `Alg), givens, goal)
+        if Some name = oracle then
+          return (`Alg, givens, goal)
+        else if Some name = oracle_plus then
+          return (`Algplus, givens, goal)
+        else if Some name = oracle_neq then
+          return (`Algneq, givens, goal)
+        else
+          Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm))))
     | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
   (* The "plus" block is the one that splits a statement apart, and the one that decides an
      absolute value, a minimum or a maximum on its own (see Cases below). *)
   let plus = block = `Algplus in
+  let allow_neq = block = `Algneq in
   (* The goal is a list of clauses, each a disjunction to prove against all of the hypotheses (see
      get_clauses).  They all go through one translation, so that the same subterm gets the same
      variable throughout.
@@ -683,14 +690,14 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      return (givens, goals))
       { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
   (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
-     literals, like 0≠1.  A disequality with anything else in it is one we want the student to
+     literals, like 0≠1, unless the `Neq flag is in effect.  A disequality with anything else in it is one we want the student to
      prove by contradiction -- as a disjunct of a goal as much as on its own, since a disjunction
      with the other sides ruled out is a proof of that disequality like any other. *)
   let* () =
     List.fold_left
       (fun acc (op, lhs, rhs) ->
         let* () = acc in
-        if op = `Neq && not (is_literal lhs && is_literal rhs) then
+        if op = `Neq && not allow_neq && not (is_literal lhs && is_literal rhs) then
           Error (Code.Oracle_failed Disequality)
         else Ok ())
       (Ok ()) (List.concat goals) in

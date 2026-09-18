@@ -41,6 +41,7 @@ axiom Cons_eqs (x_eq_y : Type) (_ : x_eq_y) (rest : Type) (_ : rest) : Type
 axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs x_eq_y H rest r
 axiom oracle (A : Type) (x : A) (C : Type) : C
 axiom oracle_plus (A : Type) (x : A) (C : Type) : C
+axiom oracle_neq (A : Type) (x : A) (C : Type) : C
 
 {` The ordering is asserted separately on each number system, rather than once for every type at
 all.  A < that made sense at any type would be an axiom with no laws of its own, and reading one as

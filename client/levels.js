@@ -541,7 +541,7 @@ export const LEVELS = [
             ]
           },
           { name: "∨=≠",
-            rules: [ "orI1", "orI2", "orE", "alg", "asc", "deceq", "expr" ],
+            rules: [ "orI1", "orI2", "orE", "algneq", "asc", "deceq", "expr" ],
             levels: [
                 {
                     parameters: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
@@ -612,7 +612,7 @@ export const LEVELS = [
             ],
           },
           { name: "∨=",
-            rules: [ "orI1", "orI2", "orE", "alg", "asc", "integral", "expr" ],
+            rules: [ "orI1", "orI2", "orE", "algneq", "asc", "integral", "expr" ],
             levels: [
                 { // We use different variable names for this one so that Olorin can tell it's different from the previous one.
                     parameters: [ ],
@@ -689,7 +689,7 @@ export const LEVELS = [
             ],
           },
           { name: "∨<",
-            rules: [ "orI1", "orI2", "orE", "expr", "alg", "asc", "tord" ],
+            rules: [ "orI1", "orI2", "orE", "expr", "algneq", "asc", "tord" ],
             levels: [
                 {
                     parameters: [ ],

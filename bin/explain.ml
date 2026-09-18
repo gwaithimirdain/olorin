@@ -13,10 +13,10 @@ open Reporter
    here can't drift apart.  Narya can't display any of these, so anything raised here should be
    explained below. *)
 module Oracle = struct
-  (* Which of the two algebra blocks was asking.  They take and prove different things, so the
+  (* Which of the algebra blocks was asking.  They take and prove different things, so the
      failures that say what a block will take carry it: the plain block's message must describe
      the plain block, without advertising the other one. *)
-  type block = [ `Alg | `Algplus ]
+  type block = [ `Alg | `Algplus | `Algneq ]
 
   type Reporter.oracle_error +=
     (* The goal doesn't follow from the hypotheses by algebra. *)
@@ -113,7 +113,7 @@ let oracle_failed : Reporter.oracle_error -> string option =
       Option.map
         (fun ty ->
           (match block with
-          | `Alg ->
+          | `Alg | `Algneq ->
               "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless \
                its inputs are contradictory.  The goal it's wired to here is" ^ display ty
               ^ "which isn't one of them, and its inputs are not contradictory."
@@ -127,7 +127,7 @@ let oracle_failed : Reporter.oracle_error -> string option =
       Option.map
         (fun ty ->
           (match block with
-          | `Alg ->
+          | `Alg | `Algneq ->
               "Everything wired into the algebra block has to be an equation or inequality (=, ≠, \
                <, ≤, >, ≥).  This one is"
           | `Algplus ->

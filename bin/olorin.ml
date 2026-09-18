@@ -899,14 +899,17 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             Named.Embed
               (Some variables, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc))) in
           ({ bindables; term = e }, variables)
-      | Algebra { plus } ->
+      | Algebra { sort } ->
           let nil_eqs = Named.Const (Parser.Scope.lookup [ "nil_eqs" ] <||> "nil_eqs not found") in
           let cons_eqs =
             locate_opt None
               (Named.Const (Parser.Scope.lookup [ "cons_eqs" ] <||> "cons_eqs not found")) in
           (* The two algebra blocks ask through constants of their own, so that oracle.ml can tell
              which one is asking and how hard it has to work. *)
-          let oname = if plus then "oracle_plus" else "oracle" in
+          let oname = match sort with
+            | `None -> "oracle"
+            | `Plus -> "oracle_plus"
+            | `Neq -> "oracle_neq" in
           let oracle =
             locate_opt None (Named.Const (Parser.Scope.lookup [ oname ] <||> oname ^ " not found"))
           in

@@ -42,10 +42,8 @@ type rule =
     }
   | Asc
   | Expr
-  (* The two algebra blocks: the "plus" one lets Z3 decide an absolute value, a minimum or a
-     maximum on its own, while the plain one requires the hypotheses to settle each such case
-     first.  They differ only in which oracle constant they ask through. *)
-  | Algebra of { plus : bool }
+  (* Algebra blocks, with flags.  If "plus" is on, then Z3 can decide an absolute value, a minimum or a maximum on its own; otherwise the hypotheses must settle each such case first.  If "neq" is on, then Z3 can solve inequalities as goals; otherwise it insists the user deal with them using proof by contradiction. *)
+  | Algebra of { sort: [ `None | `Plus | `Neq ] }
   | Var
   | Conclusion
   | User of {
@@ -208,8 +206,9 @@ let rules =
       ("topI", Tuple { inputs = []; unordered = false });
       ("asc", Asc);
       ("expr", Expr);
-      ("alg", Algebra { plus = false });
-      ("algplus", Algebra { plus = true });
+      ("alg", Algebra { sort = `None });
+      ("algneq", Algebra { sort = `Neq });
+      ("algplus", Algebra { sort = `Plus });
       ( "integral",
         User
           {
