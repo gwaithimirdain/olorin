@@ -51,3 +51,53 @@ test.describe('Deleting selected nodes', () => {
         expect(ruleCount(await olorin.nodes(), 'andI')).toBe(0);
     });
 });
+
+// A touchscreen has no hover to reveal a box's red X, so tapping a box selects it, which shows
+// its X; tapping that deletes it.
+test.describe('Deleting by touch', () => {
+    test.use({ hasTouch: true });
+
+    const center = (page, selector) => page.evaluate((s) => {
+        const r = document.querySelector(s).getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, selector);
+    const xVisible = (page, id) => page.evaluate((i) =>
+        getComputedStyle(document.querySelector(`#${i} .closebutton`)).visibility === 'visible', id);
+
+    test('tapping a box reveals its X, and tapping the X deletes the box', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.selectLevel(LEVEL.name);
+        const id = await olorin.dragRule('andI', 400, 250);
+        const other = await olorin.dragRule('andI', 400, 450);
+        expect(await xVisible(page, id)).toBe(false);
+
+        const c = await center(page, `#${id}`);
+        await page.touchscreen.tap(c.x, c.y);
+        expect(await xVisible(page, id)).toBe(true);
+        expect(await xVisible(page, other)).toBe(false);
+
+        const x = await center(page, `#${id} .closebutton`);
+        await page.touchscreen.tap(x.x, x.y);
+        const ids = (await olorin.nodes()).map((n) => n.id);
+        expect(ids).not.toContain(id);
+        expect(ids).toContain(other);
+    });
+
+    test('tapping the background deselects the box and hides its X again', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.selectLevel(LEVEL.name);
+        const id = await olorin.dragRule('andI', 400, 250);
+        const c = await center(page, `#${id}`);
+        await page.touchscreen.tap(c.x, c.y);
+        expect(await xVisible(page, id)).toBe(true);
+
+        const d = await page.evaluate(() => {
+            const r = document.getElementById('diagram').getBoundingClientRect();
+            return { x: r.right - 20, y: r.bottom - 20 };
+        });
+        await page.touchscreen.tap(d.x, d.y);
+        expect(await xVisible(page, id)).toBe(false);
+    });
+});

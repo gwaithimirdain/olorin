@@ -1,4 +1,4 @@
-import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOVED, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
+import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOVED, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_ELEMENT_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 
@@ -658,6 +658,14 @@ ready(() => {
                 connectionCloseButtons[conn.id].button.style.visibility = 'visible';
             }
         }
+    });
+    // Likewise tapping (or clicking) a box selects it alone, which shows its close button (see the
+    // CSS for .jtk-drag-selected) and lets Delete remove it; tapping the background deselects.
+    // Shift-clicks are left to toggleDragSelected, and a tap on the X itself has just deleted the box.
+    instance.bind(EVENT_ELEMENT_TAP, (el, e) => {
+        if(e.shiftKey || e.target.closest('.closebutton') || !el.isConnected) { return; }
+        instance.clearDragSelection();
+        instance.addToDragSelection(el);
     });
     // Tapping/clicking anywhere that isn't a wire, its close button, or the tooltip unpins.
     document.addEventListener('click', (e) => {
@@ -3125,6 +3133,11 @@ function addBoxCloseButton(box) {
     closebutton.className = "closebutton";
     closebutton.innerText = "X";
     closebutton.addEventListener('click', function () { deleteRule(box) });
+    // Pressing the X mustn't start a drag of its box: jsPlumb cancels the touchstart it drags by,
+    // and then a touchscreen never delivers the click.
+    ['touchstart', 'mousedown'].forEach(function (type) {
+        closebutton.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
     box.appendChild(closebutton);
 }
 
