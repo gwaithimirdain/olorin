@@ -358,7 +358,9 @@ body {
     right: 5px;
 }
 
-.rule:hover .closebutton {
+.rule:hover .closebutton,
+.rule.jtk-drag-selected .closebutton {
+    /* Touchscreens have no hover, so tapping a box selects it to reveal its X. */
     visibility: visible;
 }
 
