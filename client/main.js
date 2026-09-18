@@ -1470,8 +1470,7 @@ function makeLevelSelect(res) {
 
         maxrows = Math.max(maxrows, countstages);
 
-        // The last "pseudo-stage" has a "Random" level (a single "Custom" button lives at the
-        // bottom of the chooser, not per-world).
+        // The last "pseudo-stage" has a "Random" level
         const otherStage = document.createElement('div');
         otherStage.className = 'stage';
 

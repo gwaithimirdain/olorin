@@ -13,7 +13,7 @@ Olorin contains Narya as a git submodule, along with custom code in OCaml (compi
 
 One-time setup, from the repository root:
 ```
-git submodule update --init --recursive   # fetch the Narya submodule
+git submodule update --init --recursive    # fetch the Narya submodule
 dune build olorin.opam                     # generate the opam file
 opam install . --deps-only                 # install the OCaml dependencies (incl. Narya's)
 npm install                                # install the JavaScript dependencies
