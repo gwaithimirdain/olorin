@@ -12,6 +12,7 @@
       (>= 5.2.1))
     dune
     zarith
+    zarith_stubs_js
     uuseg
     bwd
     algaeff
@@ -21,8 +22,10 @@
     lwt
     lambda-term
     fmlib
+    fmlib_parse
     fileutils
     pprint
     ppx_blob
-    zarith_stubs_js))
+    js_of_ocaml
+    js_of_ocaml-ppx))
 (generate_opam_files)
