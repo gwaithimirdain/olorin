@@ -922,6 +922,20 @@
         The algebra block can't deal with absolute values on its own, but if we give it a hypothesis ensuring that one of these conditions holds, then the absolute value simplifies away and the algebra block takes over.
         (Remember to also write out all the algebraic proofs on paper yourself, though!)
       </div>
+      <div id="peano1Hint" class="modal hint">
+        The natural numbers ℕ are characterized by Peano's axioms.
+        The first few of these axioms say that 0 is a natural number, that if <i>n</i> is a natural number then so is <i>n</i>+1 (its <b>successor</b>), and that equality of natural numbers behaves correctly.
+        The first interesting axiom says that if two natural numbers have the same successor, then they are the same.
+      </div>
+      <div id="peano2Hint" class="modal hint">
+        The next Peano axiom says that 0 is not a successor.
+        Note that this would be false if <i>n</i> were an integer instead of a natural number!
+      </div>
+      <div id="peano3Hint" class="modal hint">
+        The final Peano axiom is induction.
+        Part of induction is that every natural number is either zero or a successor.
+        We can't prove this with just algebra and logic; we need a new block.
+      </div>
       <div id="convergenceHint" class="modal hint" style="width: 600px">
         A sequence (of real numbers) is a function from natural numbers to real numbers.
         We say that a sequence <i>s</i> <b>converges</b> to a limit <i>L</i> if ∀ε∈ℝ₊,∃N∈ℕ,∀n∈ℕ,((N≤n)⇒(∣s(n)−L∣&lt;ε)), and write lim (n↦s(n)) = L.

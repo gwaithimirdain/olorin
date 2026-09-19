@@ -2443,6 +2443,37 @@ export const LEVELS = [
           },
       ],
     },
+    { name: "Induction world",
+      stages: [
+          { name: "ℕ",
+            rules: [ "orE", "orI1", "orI2", "cnegI", "negE", "expr", "algplus", "asc" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ { name: "m", ty: "ℕ" }, { name: "n", ty: "ℕ" } ],
+                    hypotheses: [ { ty: "m+1=n+1" } ],
+                    conclusion: { ty: "m=n" },
+                    hint: "peano1Hint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "n", ty: "ℕ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "0≠n+1" },
+                    hint: "peano2Hint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "n", ty: "ℕ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(n=0)∨(n≥1)" },
+                    extrarules: [ "natE" ],
+                    hint: "peano3Hint",
+                },
+            ],
+          },
+      ],
+    },
     { name: "Sequence world",
       courses: [ "analysis" ],
       stages: [
