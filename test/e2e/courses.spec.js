@@ -96,9 +96,9 @@ test.describe("A course's worlds", () => {
     test('gate nothing of the game\'s own', async ({ page }) => {
         const LAST = world(worldCount());
         const olorin = new Olorin(page);
-        await olorin.seed(worldGateSeeds(LAST.number, 1));
+        await olorin.seed(worldGateSeeds(LAST.number, 1).concat(completions([LAST.levels[0]], 0)));
         await olorin.open({ code: CODE.code });
-        expect((await states(olorin, LAST.levels[0].name))[1]).toBe('unlocked');
+        expect((await states(olorin, LAST.levels[0].name))[1]).not.toBe('locked');
     });
 });
 
@@ -162,7 +162,7 @@ test.describe('The code a student was given', () => {
 // A course has nothing behind it to have played through, so its own work is what earns its higher
 // difficulties: the world opens at one when it is 80% complete at the one below (rule 1's
 // percentage, pointed at itself), and a level opens at one when that level has been solved at the
-// one below.  In the game proper both of those come from the worlds behind a world instead.
+// one below.  In the game proper the first of those comes from the worlds behind a world instead.
 test.describe('The difficulties of a course world', () => {
     const COUNTED = COURSE.counted;
     // 80% of it, which is what opens the next difficulty; the levels are listed in play order, so
@@ -228,10 +228,17 @@ test.describe('Rule 3, the difficulty above', () => {
         for (const w of worlds()) { await olorin.setWorldOption(w.number, 'previous', [1]); }
     }
     // World 3 at adept: world 2 is finished at adept (rule 1) and world 4 at novice (rule 2), but
-    // world 1 is only at adept, where rule 3 wants master.
+    // world 1 is only at adept, where rule 3 wants master.  The level asked about is solved at
+    // novice (rule 8), and doesn't auto-complete (which it would do on opening, before chain()
+    // puts the relation under test in place); it is in world 3's first stage, and the levels
+    // before it there are done at adept, so no stage or level rule asks anything more of it.
+    const STAGE = inWorld(3).filter((l) => l.stage === inWorld(3)[0].stage);
+    const LEVEL = STAGE.find((l) => !l.autoComplete);
+    if (!LEVEL) throw new Error('This suite assumes a non-auto-completing level in world 3\'s first stage.');
     const seeds = [].concat(
-        completions(inWorld(1), 1), completions(inWorld(2), 1), completions(inWorld(4), 0));
-    const adept = async (olorin) => (await olorin.levelStates(inWorld(3)[0].name))[1];
+        completions(inWorld(1), 1), completions(inWorld(2), 1), completions(inWorld(4), 0),
+        completions(STAGE.filter((l) => l.index < LEVEL.index), 1), completions([LEVEL], 0));
+    const adept = async (olorin) => (await olorin.levelStates(LEVEL.name))[1];
 
     test('holds a world back for a player without a code', async ({ page }) => {
         const olorin = new Olorin(page);
