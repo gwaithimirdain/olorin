@@ -1712,8 +1712,8 @@ export const LEVELS = [
                     },
                 },
                 {
-                    parameters: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" } ],
-                    variables: [ ],
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "𝕊" }, { name: "q", ty: "ℝ" } ],
                     hypotheses: [ { ty: "x is positive infinite" }, { ty: "q>0" } ],
                     conclusion: { ty: "x·q is positive infinite" },
                 },
