@@ -1001,9 +1001,11 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                             (Bwd.to_list args) ),
                       true ))
                   consts in
-              match outputs with
-              | [] -> ({ bindables; term = First terms }, variables)
-              | _ :: _ ->
+              match (outputs, terms) with
+              (* Don't wrap it in a First if there is only one term that doesn't do any extra testing. *)
+              | [], [ (`Any, term, _) ] -> ({ bindables; term }, variables)
+              | [], _ -> ({ bindables; term = First terms }, variables)
+              | _ :: _, _ ->
                   ( without_bindables
                       (Synth
                          (Fail
@@ -1024,7 +1026,11 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                         (const_of const) args,
                       true ))
                   consts in
-              let tm = Named.SFirst (terms, None) in
+              let tm =
+                match terms with
+                (* Don't wrap it in a SFirst if there is only one term that doesn't do any extra testing. *)
+                | [ (`Any, tm, _) ] -> tm
+                | _ -> Named.SFirst (terms, None) in
               (* A block that destructs its own conclusion hands out its components on output ports, as
                a Coconstr does; otherwise the application itself is what its single output carries. *)
               match outputs with
