@@ -2962,9 +2962,7 @@ function hideBlockBanner() {
     document.getElementById("blockCountBanner").classList.remove("shown");
 }
 
-// Show a hint by its id.  Only showing it on the level itself records that it's been seen: a hint
-// read from the chooser is browsing, and shouldn't cost the player the greeting when they get
-// there.
+// Show a hint by its id.
 function showHintById(hint) {
     document.getElementById("hintBG").style.display = 'flex';
     document.getElementById(hint).style.display = 'block';
@@ -2972,7 +2970,6 @@ function showHintById(hint) {
 
 function showHint() {
     showHintById(currentHint);
-    localStorage.setItem(currentHint, "true");
 }
 
 document.getElementById("showHint").onclick = showHint;
@@ -3211,10 +3208,12 @@ function selectCurrentLevel(level, skipSavedPrompt) {
     currentCustom = null;
     updateSaveButtonVisibility();
     document.getElementById("currentLevel").innerText = "Level: " + level.name;
-    // If there's an autosaved proof for this level, offer to reload it (unless we're already
-    // in the middle of restoring/importing a specific proof, which passes skipSavedPrompt).
+    // If there's an autosaved proof for this level, offer to reload it, and pop up its hint (if
+    // any) until the level has been completed (at novice or above) -- unless we're already in the
+    // middle of restoring/importing a specific proof, which passes skipSavedPrompt.
     if(!skipSavedPrompt) {
         offerSavedProof(level);
+        if(currentHint && !getPast(null, level).complete) { showHint(); }
     }
 }
 
@@ -4965,18 +4964,10 @@ function setLevel(level, rulesAllowed) {
 
     // Done setting up the new level!
 
-    // Show the level's hint (if any) automatically the first time the player sees this level;
-    // afterwards it's available via the "Show Hint" button.  This also means restoring a saved
-    // proof (which re-runs setLevel) doesn't pop the hint a second time.
+    // The level's hint (if any) is available via the "Show Hint" button; selectCurrentLevel also
+    // pops it up when the level is opened afresh.
     currentHint = level.hint;
-    if(currentHint) {
-        document.getElementById("showHint").style.display = 'block';
-        if(!localStorage.getItem(currentHint)) {
-            showHint();
-        }
-    } else {
-        document.getElementById("showHint").style.display = 'none';
-    }
+    document.getElementById("showHint").style.display = currentHint ? 'block' : 'none';
     return true;
 }
 

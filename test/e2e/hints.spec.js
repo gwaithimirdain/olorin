@@ -1,12 +1,12 @@
-// A level's hint should pop up automatically only the first time the player visits it, and in
-// particular should not reappear when returning to the level or loading its saved proof.
+// A level's hint should pop up automatically whenever the player opens it until it's been
+// completed (at novice or above), but not when loading its saved proof.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { allLevels, hintedLevel, otherLevel } = require('../lib/levels');
+const { allLevels, hintedLevel, otherLevel, completions } = require('../lib/levels');
 
-// A level that pops a hint on its first visit and has a hypothesis to wire a partial proof from,
-// plus any other level to leave for; taken from levels.js rather than named, since ids shift.
+// A level with a hint and a hypothesis to wire a partial proof from, plus any other level to leave
+// for; taken from levels.js rather than named, since ids shift.
 const HINTED = hintedLevel((l) => l.hypotheses.length > 0);
 const ELSEWHERE = otherLevel(HINTED);
 
@@ -22,7 +22,7 @@ async function selectLevelKeepingHint(page, name) {
 }
 
 test.describe('Hints', () => {
-    test('a hint shows only on the first visit, not on return or on loading a saved proof', async ({ page }) => {
+    test('a hint shows on every visit until the level is completed, but not on loading a saved proof', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
 
@@ -35,15 +35,28 @@ test.describe('Hints', () => {
         const andId = await olorin.dragRule('andI', 420, 230);
         await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: andId, sort: 'input', label: 'fst' });
 
-        // Leave and come back: the hint must NOT pop up again (it's been seen)...
+        // Leave and come back: the level isn't completed yet, so the hint pops up again...
         await olorin.selectLevel(ELSEWHERE.name);
         await selectLevelKeepingHint(page, HINTED.name);
-        expect(await olorin.hintVisible()).toBe(false);
+        expect(await olorin.hintVisible()).toBe(true);
+        await olorin.dismissHints();
 
-        // ...and loading the saved proof must not pop it up either.
+        // ...but loading the saved proof doesn't pop it up a second time.
         expect(await olorin.savedPromptVisible()).toBe(true);
         await olorin.loadSaved();
         expect(await olorin.hintVisible()).toBe(false);
+    });
+
+    test('a hint does not show on opening a level already completed at novice', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.seed(completions([HINTED], 0));
+        await olorin.open();
+
+        await selectLevelKeepingHint(page, HINTED.name);
+        expect(await olorin.hintVisible()).toBe(false);
+        // It's still available on request.
+        await page.click('#showHint');
+        expect(await olorin.hintVisible()).toBe(true);
     });
 });
 
@@ -119,9 +132,8 @@ test.describe('Hint markers in the level chooser', () => {
         expect(await page.isVisible('#levelChooseBG')).toBe(true);
     });
 
-    // Reading a hint from the chooser is browsing, not playing, so it doesn't count as having seen
-    // it: the level still greets the player with it the first time they open it.
-    test('a hint read from the chooser still pops up on the first visit to the level', async ({ page }) => {
+    // Reading a hint from the chooser doesn't stop the level greeting the player with it.
+    test('a hint read from the chooser still pops up on opening the level', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         await olorin.openChooser();
@@ -133,10 +145,5 @@ test.describe('Hint markers in the level chooser', () => {
 
         await selectLevelKeepingHint(page, open.name);
         expect(await olorin.hintVisible()).toBe(true);
-        // And now that it has been seen on the level, it stays down.
-        await olorin.dismissHints();
-        await olorin.selectLevel(ELSEWHERE.name);
-        await selectLevelKeepingHint(page, open.name);
-        expect(await olorin.hintVisible()).toBe(false);
     });
 });
