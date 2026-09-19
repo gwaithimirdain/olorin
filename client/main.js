@@ -929,6 +929,28 @@ function addEndpointsForRule(box, id, restore) {
         box.addEventListener('dblclick', function () { editVariable(box); });
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
+    } else if (id === 'natInd') {
+        // Strong induction on the natural numbers, shaped like ∀-introduction over [n]: a single
+        // bracket binding a natural number n, on a value port, and assuming the inductive
+        // hypothesis ∀k∈[n],P(k) on a port below it, whose subgoal is P(n).  What it proves is
+        // ∀n∈ℕ,P(n).  (The User rule "natInd" in bin/rules.ml.)
+        instance.addEndpoint(box, {
+            anchor: [0, 0.5, 1, 0, 22, -22],
+            source: true, maxConnections: -1,
+            parameters: { sort: "assumption", label: "n", hasValue: true, side: "upper" },
+            paintStyle: { fill: VALUECOLOR },
+            connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 },
+        });
+        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, 2], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "IH", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -22], target: true, parameters: {sort: "subgoal", label: "step", side: "upper"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: "∀?∈ℕ,?"} });
+        box.style.width = '200px';
+        box.style.height = '70px';
+        makeResizable(box);
+        // Double-clicking the box re-opens the dialog to rename the variable it binds.
+        box.addEventListener('dblclick', function () { editVariable(box); });
+        if(!restore) { getVariable(box.id); }
+        typecheck_now = false;
     } else if (id === 'iffI') {
         instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, -25], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "ltor", side: "upper"} });
         instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -25], target: true, parameters: {sort: "subgoal", label: "ltor", side: "upper"} });

@@ -805,6 +805,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                         ( locate_opt None
                             (Named.Const
                                (Scope.lookup [ fn ] <||> "implicit_post function not found")),
+                          `Goal,
                           [ (None, locate_opt None term) ] ),
                       false );
                   ] in
@@ -943,8 +944,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             Named.Oracle
               (locate_opt None
                  (Named.ImplicitApp
-                    (locate_opt None (Named.ImplicitSApp (oracle, None, locate_opt None givens)), [])))
-          in
+                    ( locate_opt None (Named.ImplicitSApp (oracle, None, locate_opt None givens)),
+                      `Goal,
+                      [] ))) in
           ({ bindables; term }, variables)
       | User { consts; inputs; implicit_first; outputs } -> (
           (* The brackets take the block's bound names first, in order; the steps of 'outputs'
@@ -983,49 +985,51 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             Named.Const
               (Scope.lookup const <||> "user constant " ^ String.concat "." const ^ " not found")
           in
-          if implicit_first then
-            (* The axioms get their first argument from the goal, so the rest are all given at once
+          match implicit_first with
+          | Some src -> (
+              (* The axioms get their first argument from the goal, so the rest are all given at once
                to an ImplicitApp, and the alternatives are checking terms. *)
-            let terms =
-              List.map
-                (fun const ->
-                  ( `Any,
-                    Named.ImplicitApp
-                      ( locate_opt None (const_of const),
-                        List.map
-                          (fun (arg : unit Named.check located) -> (None, arg))
-                          (Bwd.to_list args) ),
-                    true ))
-                consts in
-            match outputs with
-            | [] -> ({ bindables; term = First terms }, variables)
-            | _ :: _ ->
-                ( without_bindables
-                    (Synth
-                       (Fail
-                          (Anomaly
-                             "user rule with implicit first argument can't destruct its conclusion"))),
-                  variables )
-          else
-            let terms =
-              List.map
-                (fun const ->
-                  ( `Any,
-                    Bwd.fold_left
-                      (fun tm arg ->
-                        Named.App
-                          ( named_synth (locate_opt None tm),
-                            named_arg arg,
-                            locate_opt None `Explicit ))
-                      (const_of const) args,
-                    true ))
-                consts in
-            let tm = Named.SFirst (terms, None) in
-            (* A block that destructs its own conclusion hands out its components on output ports, as
+              let terms =
+                List.map
+                  (fun const ->
+                    ( `Any,
+                      Named.ImplicitApp
+                        ( locate_opt None (const_of const),
+                          src,
+                          List.map
+                            (fun (arg : unit Named.check located) -> (None, arg))
+                            (Bwd.to_list args) ),
+                      true ))
+                  consts in
+              match outputs with
+              | [] -> ({ bindables; term = First terms }, variables)
+              | _ :: _ ->
+                  ( without_bindables
+                      (Synth
+                         (Fail
+                            (Anomaly
+                               "user rule with implicit first argument can't destruct its conclusion"))),
+                    variables ))
+          | None -> (
+              let terms =
+                List.map
+                  (fun const ->
+                    ( `Any,
+                      Bwd.fold_left
+                        (fun tm arg ->
+                          Named.App
+                            ( named_synth (locate_opt None tm),
+                              named_arg arg,
+                              locate_opt None `Explicit ))
+                        (const_of const) args,
+                      true ))
+                  consts in
+              let tm = Named.SFirst (terms, None) in
+              (* A block that destructs its own conclusion hands out its components on output ports, as
                a Coconstr does; otherwise the application itself is what its single output carries. *)
-            match outputs with
-            | [] -> ({ bindables; term = Synth tm }, variables)
-            | steps -> destruct_constr source names steps (locate !loc tm) bindables variables)
+              match outputs with
+              | [] -> ({ bindables; term = Synth tm }, variables)
+              | steps -> destruct_constr source names steps (locate !loc tm) bindables variables))
     in
     (locate !loc tm, variables)
 

@@ -47,11 +47,12 @@ type rule =
       consts : string list list;
       (* The arguments the axioms take after any implicit first one, in order. *)
       inputs : user_input list;
-      (* If set, the axioms take their first argument, a type, implicitly from the goal: the
-         block's term applies them with ImplicitApp, so it is a checking term rather than a
-         synthesizing one.  Such a block can't take its conclusion apart, since that would need a
-         synthesizing term, so its outputs must be empty. *)
-      implicit_first : bool;
+      (* If set, the axioms take their first argument implicitly from the goal: either the goal
+         itself, a type, or one of the arguments of the constant the goal is an application of,
+         such as the P of "forall ℕ P".  The block's term applies them with ImplicitApp, so it is a
+         checking term rather than a synthesizing one.  Such a block can't take its conclusion
+         apart, since that would need a synthesizing term, so its outputs must be empty. *)
+      implicit_first : Raw.implicit_source option;
       (* Some user axioms conclude a statement built up out of ∃ and ∧.  Rather than making the
          player follow such a block with the ∃- and ∧-eliminations that take that statement apart
          again, the block takes its own conclusion apart, handing out one output port per piece.
@@ -218,7 +219,7 @@ let rules =
             consts =
               [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
             inputs = [ Arg "x"; Arg "y"; Arg "xy0" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs = [];
           } );
       ( "deceq",
@@ -226,7 +227,7 @@ let rules =
           {
             consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
             inputs = [ Arg "x"; Arg "y" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs = [];
           } );
       ( "tord",
@@ -234,7 +235,7 @@ let rules =
           {
             consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
             inputs = [ Arg "x"; Arg "y" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs = [];
           } );
       (* The Archimedean property: every real is below some natural number.  The axiom concludes an
@@ -246,7 +247,7 @@ let rules =
           {
             consts = [ [ "ℝ"; "archimedean" ] ];
             inputs = [ Arg "x" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* An integer that is at least zero is a natural number.  The proof that it is nonnegative is
@@ -257,7 +258,7 @@ let rules =
           {
             consts = [ [ "ℤ"; "tonat" ] ];
             inputs = [ Arg "x"; Arg "nonneg" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* Every rational is a fraction in lowest terms.  Its axiom concludes two nested ∃s, one for
@@ -272,7 +273,7 @@ let rules =
           {
             consts = [ [ "ℚ"; "frac" ] ];
             inputs = [ Arg "x" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs =
               [
                 Open (Constr.intern "exists", [ (true, "numerator"); (false, "rest") ]);
@@ -288,7 +289,7 @@ let rules =
           {
             consts = [ [ "ℝ"; "ltomega" ] ];
             inputs = [ Arg "x" ];
-            implicit_first = false;
+            implicit_first = None;
             outputs = [];
           } );
       (* Proof by cases on a natural number n: it is either 0 or the successor of some k.  The
@@ -305,7 +306,19 @@ let rules =
                 Bracket { assumptions = [ (false, "zero") ]; subgoal = "zero" };
                 Bracket { assumptions = [ (true, "pred"); (false, "succ") ]; subgoal = "succ" };
               ];
-            implicit_first = true;
+            implicit_first = Some `Goal;
+            outputs = [];
+          } );
+      (* Strong induction on the natural numbers: to prove ∀n∈ℕ,P(n), prove P(n) for a natural
+         number n assuming ∀k∈[n],P(k).  The axiom's first argument is the P of the goal
+         "forall ℕ P", its second, so it takes that implicitly from the goal, and the step is a
+         bracket binding n, on a value port, and assuming the inductive hypothesis. *)
+      ( "natInd",
+        User
+          {
+            consts = [ [ "ℕ"; "induction" ] ];
+            inputs = [ Bracket { assumptions = [ (true, "n"); (false, "IH") ]; subgoal = "step" } ];
+            implicit_first = Some (`Goal_arg 1);
             outputs = [];
           } );
     ]
