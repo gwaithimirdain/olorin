@@ -45,7 +45,8 @@ type rule =
   | Conclusion
   | User of {
       consts : string list list;
-      inputs : string list;
+      (* The arguments the axioms take after any implicit first one, in order. *)
+      inputs : user_input list;
       (* If set, the axioms take their first argument, a type, implicitly from the goal: the
          block's term applies them with ImplicitApp, so it is a checking term rather than a
          synthesizing one.  Such a block can't take its conclusion apart, since that would need a
@@ -60,6 +61,16 @@ type rule =
          usual single unlabeled output carrying the conclusion itself. *)
       outputs : destructure list;
     }
+
+(* An argument of a User rule's axiom is either an ordinary input port with the given label, or a
+   bracket on the side of the block, like those of ∨-elimination, for an argument that is a
+   function: a case of a proof by cases.  A bracket's assumption ports are bound as nested lambdas,
+   outermost first, around what its subgoal port is wired to.  The flag on an assumption says that
+   it carries a value the player names, so it takes the next of the block's bound variable names;
+   the brackets take theirs first, in order, and the steps of 'outputs' take those left over. *)
+and user_input =
+  | Arg of string
+  | Bracket of { assumptions : (bool * string) list; subgoal : string }
 
 (* One step of that.  A datatype with a single constructor -- an ∃ -- comes apart by matching it,
    which binds a variable for each of its components; the flag says which of them carry a value the
@@ -206,7 +217,7 @@ let rules =
           {
             consts =
               [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
-            inputs = [ "x"; "y"; "xy0" ];
+            inputs = [ Arg "x"; Arg "y"; Arg "xy0" ];
             implicit_first = false;
             outputs = [];
           } );
@@ -214,7 +225,7 @@ let rules =
         User
           {
             consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
-            inputs = [ "x"; "y" ];
+            inputs = [ Arg "x"; Arg "y" ];
             implicit_first = false;
             outputs = [];
           } );
@@ -222,7 +233,7 @@ let rules =
         User
           {
             consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
-            inputs = [ "x"; "y" ];
+            inputs = [ Arg "x"; Arg "y" ];
             implicit_first = false;
             outputs = [];
           } );
@@ -234,7 +245,7 @@ let rules =
         User
           {
             consts = [ [ "ℝ"; "archimedean" ] ];
-            inputs = [ "x" ];
+            inputs = [ Arg "x" ];
             implicit_first = false;
             outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
@@ -245,7 +256,7 @@ let rules =
         User
           {
             consts = [ [ "ℤ"; "tonat" ] ];
-            inputs = [ "x"; "nonneg" ];
+            inputs = [ Arg "x"; Arg "nonneg" ];
             implicit_first = false;
             outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
@@ -260,7 +271,7 @@ let rules =
         User
           {
             consts = [ [ "ℚ"; "frac" ] ];
-            inputs = [ "x" ];
+            inputs = [ Arg "x" ];
             implicit_first = false;
             outputs =
               [
@@ -276,8 +287,25 @@ let rules =
         User
           {
             consts = [ [ "ℝ"; "ltomega" ] ];
-            inputs = [ "x" ];
+            inputs = [ Arg "x" ];
             implicit_first = false;
+            outputs = [];
+          } );
+      (* Proof by cases on a natural number n: it is either 0 or the successor of some k.  The
+         axiom's conclusion is whatever the goal is, so it takes that implicitly from the goal, and
+         each case is a bracket proving that same goal: the upper one assuming n=0, and the lower
+         one binding k, on a value port, and assuming n=k+1. *)
+      ( "natE",
+        User
+          {
+            consts = [ [ "ℕ"; "cases" ] ];
+            inputs =
+              [
+                Arg "n";
+                Bracket { assumptions = [ (false, "zero") ]; subgoal = "zero" };
+                Bracket { assumptions = [ (true, "pred"); (false, "succ") ]; subgoal = "succ" };
+              ];
+            implicit_first = true;
             outputs = [];
           } );
     ]

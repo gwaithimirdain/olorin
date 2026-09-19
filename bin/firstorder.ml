@@ -1190,7 +1190,8 @@ let install_notations () =
    which add_subtypes only installs at the very end.  (For instance, 𝕊.finite below bounds the
    absolute value of a surreal by a *real* u, which typechecks only once ℝ≤𝕊 exists, and
    ℝ.archimedean compares a real to a *natural* number n, which needs ℕ≤ℝ.  The axioms behind the
-   number blocks are all of this kind: each relates one number system to another.)  Those
+   number blocks are nearly all of this kind: each relates one number system to another.  ℕ.cases,
+   behind the natE block, doesn't, but it sits here with the others.)  Those
    definitions go here instead, in secondary startup code that gets loaded after install_notations
    by load_secondary_startup.  Like the primary startup code, this is executed with a fresh file
    origin, whose notation situation is inherited from the toplevel rather than from the interactive
@@ -1216,6 +1217,7 @@ notation(0) x \"≈\" y ≔ 𝕊.infclose x y
 axiom ℝ.archimedean (x : ℝ) : exists ℕ (n ↦ ℝ.lt x n)
 axiom ℤ.tonat (x : ℤ) : ℤ.ge x 0 → exists ℕ (n ↦ eq ℤ x n)
 axiom ℝ.ltomega (x : ℝ) : 𝕊.lt x ω
+axiom ℕ.cases (P : Type) (n : ℕ) (pz : eq ℕ n 0 → P) (ps : (k : ℕ) → eq ℕ n (ℕ.plus k 1) → P) : P
 axiom ℚ.frac (x : ℚ) : exists ℤ (a ↦ exists ℤ (b ↦ land (ℤ.ge b 1) (land (eq ℚ x (ℚ.divide a b)) (forall ℕ (c ↦ imp (land (divisible c a) (divisible c b)) (eq ℕ c 1))))))
 "
 

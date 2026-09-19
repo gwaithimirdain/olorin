@@ -399,6 +399,14 @@ let rec project_struct (fld : string) (tm : unit Named.check located) :
       else None
   | _ -> None
 
+(* A port that carries a value the player names takes the next of its vertex's bound names, if
+   there is one left; any other port takes none. *)
+let take_name (named : bool) (names : string list) : string option * string list =
+  match (named, names) with
+  | true, n :: ns -> (Some n, ns)
+  | true, [] -> (None, [])
+  | false, _ -> (None, names)
+
 (* One step of destructing: match a synthesizing term against a one-constructor type, handing out
    one output port of the vertex for each component of that constructor.  Each output port becomes
    one of the variables the branch binds, and the match itself is deferred as a bindable, to be
@@ -413,11 +421,7 @@ let destruct_step (source : Port.t) (names : string list) (constr : Constr.t)
   let leftover, ports =
     List.fold_left_map
       (fun names (named, label) : (string list * name) ->
-        let name, names =
-          match (named, names) with
-          | true, n :: ns -> (Some n, ns)
-          | true, [] -> (None, [])
-          | false, _ -> (None, names) in
+        let name, names = take_name named names in
         (names, { name; port = Some { source with sort = Output; label = Some label } }))
       names outputs in
   let (Wrap vars) = Vec.of_list ports in
@@ -943,17 +947,37 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           in
           ({ bindables; term }, variables)
       | User { consts; inputs; implicit_first; outputs } -> (
-          let bindables, variables, args =
+          (* The brackets take the block's bound names first, in order; the steps of 'outputs'
+             take those left over. *)
+          let bindables, variables, args, names =
             List.fold_left
-              (fun (bindables, variables, args) label ->
-                let ( ({ value = { term; bindables = tm_bind }; loc } : term_with_bindables located),
-                      newvars ) =
-                  check_of_input_port ~seen vertices graph
-                    { source with sort = Input; label = Some label } in
-                ( Bindables.union bindables tm_bind,
-                  PortSet.union variables newvars,
-                  Snoc (args, locate_opt loc term) ))
-              (Bindables.empty, PortSet.empty, Emp)
+              (fun (bindables, variables, args, names) input ->
+                match input with
+                | Arg label ->
+                    let ( ({ value = { term; bindables = tm_bind }; loc } :
+                            term_with_bindables located),
+                          newvars ) =
+                      check_of_input_port ~seen vertices graph
+                        { source with sort = Input; label = Some label } in
+                    ( Bindables.union bindables tm_bind,
+                      PortSet.union variables newvars,
+                      Snoc (args, locate_opt loc term),
+                      names )
+                | Bracket { assumptions; subgoal } ->
+                    let names, assumptions =
+                      List.fold_left_map
+                        (fun names (named, label) ->
+                          let name, names = take_name named names in
+                          (names, ({ source with sort = Assumption; label = Some label }, name)))
+                        names assumptions in
+                    let newbinds, lam, newvars =
+                      lam_of_output_port ~seen vertices graph assumptions
+                        { source with sort = Subgoal; label = Some subgoal } in
+                    ( Bindables.union bindables newbinds,
+                      PortSet.union variables newvars,
+                      Snoc (args, locate_opt None lam),
+                      names ))
+              (Bindables.empty, PortSet.empty, Emp, source_vertex.names)
               inputs in
           let const_of const =
             Named.Const
@@ -1001,9 +1025,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                a Coconstr does; otherwise the application itself is what its single output carries. *)
             match outputs with
             | [] -> ({ bindables; term = Synth tm }, variables)
-            | steps ->
-                destruct_constr source source_vertex.names steps (locate !loc tm) bindables
-                  variables) in
+            | steps -> destruct_constr source names steps (locate !loc tm) bindables variables)
+    in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments.  The assumptions, given with the

@@ -148,7 +148,7 @@ let outputs_of_vertex (v : Vertex.t) : Port.t list =
 let assumptions_of_vertex (v : Vertex.t) =
   let vertex, sort = (v.id, Sort.Assumption) in
   match v.rule with
-  (* Match and Abstraction (including proof-by-contradiction) vertices, plus some Tuples, are the ones that have assumption ports. *)
+  (* Match and Abstraction (including proof-by-contradiction) vertices, plus some Tuples and User rules, are the ones that have assumption ports. *)
   | Match { branches; _ } ->
       List.flatten
         (List.map
@@ -163,6 +163,14 @@ let assumptions_of_vertex (v : Vertex.t) =
   | Abs { extras; _ } ->
       { vertex; sort; label = None }
       :: List.map (fun label : Port.t -> { vertex; sort; label = Some label }) extras
+  (* A User rule has those of its brackets. *)
+  | User { inputs; _ } ->
+      List.concat_map
+        (function
+          | Arg _ -> []
+          | Bracket { assumptions; _ } ->
+              List.map (fun (_, label) : Port.t -> { vertex; sort; label = Some label }) assumptions)
+        inputs
   | Tuple { inputs; _ } ->
       List.filter_map
         (fun (a, _, _) -> Option.map (fun label : Port.t -> { vertex; sort; label = Some label }) a)

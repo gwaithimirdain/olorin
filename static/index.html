@@ -137,6 +137,19 @@
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="zton" data-rule="zton" title="Use that a nonnegative integer is a natural number: give an integer x and a proof that x≥0, and get a natural number n together with a proof that x=n">ℤ→ℕ</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="frac" data-rule="frac" title="Use that a rational number is a fraction in lowest terms: give a rational x, and get integers a and b with a proof that b≥1, that x=a/b, and that a and b have no common factor except 1">frac</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="omega" data-rule="omega" title="Use that ω is bigger than every real number: give a real number x, and get a proof that x&lt;ω">ℝ&lt;ω</div>
+        <div class="container rule" id="natE" data-rule="natE" title="Prove something by cases on a natural number n: prove it once assuming n=0, and once for a natural number k assuming n=k+1">
+          <div class="mid bar"></div>
+          <div class="doubleleft assumption"><div class="subgoallabel">ℕ</div></div>
+          <div class="doubleright subgoal"></div>
+          <div class="mid midleft"></div>
+          <div class="mid midright"></div>
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; bottom: -5px; transform: scaleX(-1)">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; top: -7px; transform: scaleY(-1)">
+          <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="left: -1px; top: -7px; transform: scaleX(-1) scaleY(-1)">
+          <div class="resize-handle-right"></div>
+          <div class="resize-handle-left"></div>
+        </div>
       </div>
       <div style="display: block; align-items: end" id="buttons">
         <button id="exportProof" class="proofOption" title="Copy this proof out as JSON text">Export</button>
