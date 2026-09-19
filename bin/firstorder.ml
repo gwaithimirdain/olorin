@@ -67,6 +67,7 @@ axiom ℕ.lt : ℕ → ℕ → Type
 def ℕ.le (x y : ℕ) : Type ≔ data [ left. (_ : ℕ.lt x y) | right. (_ : eq ℕ x y) ]
 def ℕ.gt (x y : ℕ) : Type ≔ ℕ.lt y x
 def ℕ.ge (x y : ℕ) : Type ≔ ℕ.le y x
+axiom ℕ.cases (P : Type) (n : ℕ) (pz : eq ℕ n 0 → P) (ps : (k : ℕ) → eq ℕ n (ℕ.plus k 1) → P) : P
 
 def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) ]
 axiom ℤ.plus : ℤ → ℤ → ℤ
@@ -172,6 +173,8 @@ cut down by (x<n) alone: being a natural is already being at least 0, and says s
 block without being carried around as half of the condition. `}
 def forallbelow (n : ℕ) (P : ℕ → Type) : Type ≔ sig ( forallbelow : (x : ℕ) → ℕ.lt x n → P x )
 def existsbelow (n : ℕ) (P : ℕ → Type) : Type ≔ data [ existsbelow. (element : ℕ) (below : ℕ.lt element n) (property : P element) ]
+
+axiom ℕ.induction (P : ℕ → Type) (step : (n : ℕ) (IH : forallbelow n (k ↦ P k)) → P n) : forall ℕ P
 
 def divisible (a b : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ b (ℤ.times k a))
 def congruent (a b n : ℤ) : Type ≔ exists ℤ (k ↦ eq ℤ (ℤ.minus a b) (ℤ.times k n))
@@ -1217,7 +1220,6 @@ notation(0) x \"≈\" y ≔ 𝕊.infclose x y
 axiom ℝ.archimedean (x : ℝ) : exists ℕ (n ↦ ℝ.lt x n)
 axiom ℤ.tonat (x : ℤ) : ℤ.ge x 0 → exists ℕ (n ↦ eq ℤ x n)
 axiom ℝ.ltomega (x : ℝ) : 𝕊.lt x ω
-axiom ℕ.cases (P : Type) (n : ℕ) (pz : eq ℕ n 0 → P) (ps : (k : ℕ) → eq ℕ n (ℕ.plus k 1) → P) : P
 axiom ℚ.frac (x : ℚ) : exists ℤ (a ↦ exists ℤ (b ↦ land (ℤ.ge b 1) (land (eq ℚ x (ℚ.divide a b)) (forall ℕ (c ↦ imp (land (divisible c a) (divisible c b)) (eq ℕ c 1))))))
 "
 
