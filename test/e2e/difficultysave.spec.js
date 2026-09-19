@@ -67,17 +67,24 @@ test.describe('Per-difficulty saved proofs', () => {
 
     // Make MANUAL reachable at Adept: the next world >= 50% novice (rule 2), the earlier stages of
     // its own world complete at adept (rule 4), and its stage predecessors complete at adept (rule 5).
+    // Rule 8 also wants MANUAL itself solved at novice, which each test seeds with its own times.
     const reachAdept = () => prereqSeeds(MANUAL, 1);
 
     test('reducing difficulty and re-solving re-locks the higher difficulty for a while', async ({ page }) => {
         const olorin = new Olorin(page);
-        await olorin.seed([['difficulty', '1'], ...reachAdept()]);
+        // Its novice was completed long ago (time 5 of 30), so Adept is unlocked.
+        await olorin.seed([
+            ['difficulty', '1'],
+            ['time', '30'],
+            [completionKey(MANUAL), JSON.stringify({ complete: true, difficulty: 0, times: { 0: 5 } })],
+            ...reachAdept(),
+        ]);
         await olorin.open();
         await olorin.selectLevel(MANUAL.name); // opens at Adept
         expect((await olorin.levelStates(MANUAL.name))[1]).toBe('unlocked');
 
         await page.click('#reduceDifficulty'); // -> Novice (no saved novice proof, so no prompt)
-        await olorin.restore(manualProof); // solve novice
+        await olorin.restore(manualProof); // solve novice again
         expect(await olorin.isComplete()).toBe(true);
 
         // Adept is re-locked now that this level's novice was just completed (rule 7).

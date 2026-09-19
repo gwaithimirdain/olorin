@@ -1951,10 +1951,10 @@ function unlockBlockers(w, s, c, K, data) {
             }
         }
     }
-    // 8. (A course's worlds, adept/master) this level must have been solved at the difficulty
-    //    below.  In the game proper a difficulty is earned a world at a time, by everything behind
-    //    that world; a course, having nothing behind it, is climbed a level at a time instead.
-    if(K >= 1 && !outsideCourses(LEVELS[w]) && stage.levelDiff[c] < K - 1) {
+    // 8. (Adept/Master) this level must have been solved at the difficulty below: a level's
+    //    difficulties are climbed one at a time, whatever the world gates say.  (In a course, having
+    //    nothing behind it to gate its worlds, this is most of what earns a higher difficulty.)
+    if(K >= 1 && stage.levelDiff[c] < K - 1) {
         blockers.push('Complete this level at ' + DIFFICULTIES[K - 1]);
     }
     // 7. (Adept/Master) the previous difficulty of THIS level must not have been completed within

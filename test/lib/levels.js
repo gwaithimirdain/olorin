@@ -283,7 +283,8 @@ function worldGateSeeds(w, K) {
 
 // Levels whose completion unlocks `level` at `difficulty`: its world's own gates (rules 1-3), this
 // world's earlier stages (rule 4), and this stage's earlier levels (rules 5 and 6).  Deliberately
-// generous -- it satisfies each gate outright rather than just clearing it.
+// generous -- it satisfies each gate outright rather than just clearing it.  The level itself at
+// the difficulty below (rule 8) is left to the caller, which knows when it was solved (rule 7).
 function prereqs(level, difficulty) {
     return [
         [inWorld(level.world).filter((l) => l.stage < level.stage), difficulty],
