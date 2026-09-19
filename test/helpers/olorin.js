@@ -454,9 +454,11 @@ class Olorin {
         return json;
     }
 
-    // Rebuild the proof from a snapshot object (as exported/autosaved), into the current level.
+    // Rebuild the proof from a snapshot object (as exported/autosaved), into the current level, and
+    // wait for its typecheck to settle (an algebra block's answer from Z3 comes back asynchronously).
     async restore(state) {
         await this.page.evaluate((s) => window.__olorin.restore(s), state);
+        await this.waitForTypecheck();
         await this.dismissHints();
     }
 
