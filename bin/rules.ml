@@ -49,6 +49,11 @@ type rule =
   | User of {
       consts : string list list;
       inputs : string list;
+      (* If set, the axioms take their first argument, a type, implicitly from the goal: the
+         block's term applies them with ImplicitApp, so it is a checking term rather than a
+         synthesizing one.  Such a block can't take its conclusion apart, since that would need a
+         synthesizing term, so its outputs must be empty. *)
+      implicit_first : bool;
       (* Some user axioms conclude a statement built up out of ∃ and ∧.  Rather than making the
          player follow such a block with the ∃- and ∧-eliminations that take that statement apart
          again, the block takes its own conclusion apart, handing out one output port per piece.
@@ -215,6 +220,7 @@ let rules =
             consts =
               [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
             inputs = [ "x"; "y"; "xy0" ];
+            implicit_first = false;
             outputs = [];
           } );
       ( "deceq",
@@ -222,6 +228,7 @@ let rules =
           {
             consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
             inputs = [ "x"; "y" ];
+            implicit_first = false;
             outputs = [];
           } );
       ( "tord",
@@ -229,6 +236,7 @@ let rules =
           {
             consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
             inputs = [ "x"; "y" ];
+            implicit_first = false;
             outputs = [];
           } );
       (* The Archimedean property: every real is below some natural number.  The axiom concludes an
@@ -240,6 +248,7 @@ let rules =
           {
             consts = [ [ "ℝ"; "archimedean" ] ];
             inputs = [ "x" ];
+            implicit_first = false;
             outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* An integer that is at least zero is a natural number.  The proof that it is nonnegative is
@@ -250,6 +259,7 @@ let rules =
           {
             consts = [ [ "ℤ"; "tonat" ] ];
             inputs = [ "x"; "nonneg" ];
+            implicit_first = false;
             outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
           } );
       (* Every rational is a fraction in lowest terms.  Its axiom concludes two nested ∃s, one for
@@ -264,6 +274,7 @@ let rules =
           {
             consts = [ [ "ℚ"; "frac" ] ];
             inputs = [ "x" ];
+            implicit_first = false;
             outputs =
               [
                 Open (Constr.intern "exists", [ (true, "numerator"); (false, "rest") ]);
@@ -274,5 +285,12 @@ let rules =
           } );
       (* Every real number is smaller than ω.  This one concludes a relation rather than an ∃, so it
          has the ordinary single output, carrying x<ω. *)
-      ("omega", User { consts = [ [ "ℝ"; "ltomega" ] ]; inputs = [ "x" ]; outputs = [] });
+      ( "omega",
+        User
+          {
+            consts = [ [ "ℝ"; "ltomega" ] ];
+            inputs = [ "x" ];
+            implicit_first = false;
+            outputs = [];
+          } );
     ]
