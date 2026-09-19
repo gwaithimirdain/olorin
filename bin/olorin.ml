@@ -1450,6 +1450,35 @@ let rec synth_output_ports ~(fuel : int) (run : (unit -> unit) -> unit)
       diagnostics
   else ports
 
+(* The blocks some diagnostic already points at, as somewhere the player has to look.  An unfinished
+   part of the proof isn't a mistake in the block it's reported at, so holes don't count. *)
+let errored_vertices (diagnostics : Diagnostic.js Js.t Dynarray.t) : IdSet.t =
+  let hole_code = Code.short_code (No_holes_allowed (`Other "")) in
+  Dynarray.fold_left
+    (fun set (d : Diagnostic.js Js.t) ->
+      if Js.to_string d##.code = hole_code then set
+      else
+        Array.fold_left
+          (fun set (l : js_loc Js.t) ->
+            if Js.to_bool l##.isEdge then set else IdSet.add (Id.Id (Js.to_string l##.id)) set)
+          set
+          (Js.to_array d##.locs))
+    IdSet.empty diagnostics
+
+(* Every block that a wire out of the given one leads to, following wires forward as far as they go,
+   including the block itself. *)
+let downstream_vertices (fwd : fwd_graph) (v : Id.t) : IdSet.t =
+  let rec go seen v =
+    if IdSet.mem v seen then seen
+    else
+      SourceMap.fold
+        (fun (p : Port.t) es seen ->
+          if p.vertex = v then
+            List.fold_left (fun seen (e : Edge.t) -> go seen e.target.vertex) seen es
+          else seen)
+        fwd (IdSet.add v seen) in
+  go IdSet.empty v
+
 (* A last pass over the ports no scope worked for.  If the reason was a wire reaching out of scope
    -- a box under a binder feeding one outside it, say -- then the rest of that fragment is perfectly
    good, and shouldn't lose all of its labels along with the bad wire: report the offending wires (on
@@ -1477,9 +1506,19 @@ let synth_cut_ports (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
                  run by now, so the scopes we've collected are all the scopes there are, and can say
                  which of these wires come out of a block that was never elaborated at all. *)
               let bound = bound_ports () in
+              let errored = errored_vertices diagnostics in
               List.iter
                 (fun (e : Edge.t) ->
-                  if not (Hashtbl.mem reported e.id) then (
+                  (* A block only enters a scope when a term containing it is elaborated, so when
+                     the block that the assumption comes out of is inside another one that failed to
+                     typecheck, nothing inside it could be elaborated and none of its wires can be
+                     placed -- through no fault of their own.  The error on that block is the one
+                     the player has to fix, and it is already reported, so we say nothing more here
+                     rather than painting the whole inside of the block red. *)
+                  if
+                    (not (Hashtbl.mem reported e.id))
+                    && IdSet.disjoint errored (downstream_vertices fwd_graph e.source.vertex)
+                  then (
                     Hashtbl.replace reported e.id ();
                     Diagnostic.add diagnostics true
                       (Reporter.diagnostic

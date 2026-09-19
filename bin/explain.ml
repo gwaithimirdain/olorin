@@ -68,6 +68,14 @@ let connective_of_field = function
   | "negation" -> Some "a negation (¬A)"
   | _ -> None
 
+(* Likewise for the axioms behind blocks that take their goal apart rather than checking against it
+   whole: they prove a statement of one particular shape, and the goal has to be of that shape for
+   the block to get the predicate it proves out of it.  Keyed by the axiom's name, since that is
+   what the error reports. *)
+let shape_of_axiom = function
+  | "ℕ.induction" -> Some "a universal statement about the natural numbers (∀n∈ℕ,…)"
+  | _ -> None
+
 (* Likewise for the constructors of the connectives defined as datatypes. *)
 let connective_of_constr = function
   | "left" | "right" -> Some "a disjunction (A∨B)"
@@ -252,6 +260,19 @@ let explain : Code.t -> string option = function
         ("There is no variable called "
         ^ x
         ^ " here.  A variable introduced by a block is only in scope inside that block.")
+  (* A block whose axiom takes the predicate it proves from the goal, wired to a goal it can't take
+     that predicate from: either the goal isn't of the shape the block proves at all, or it is that
+     shape but about the wrong set. *)
+  | No_implicit_goal_arg (fn, ty) -> (
+      match (Option.bind (printed fn) shape_of_axiom, printed ~sort:`Type ty) with
+      | Some shape, Some ty ->
+          Some
+            ("This block proves "
+            ^ shape
+            ^ ", but the goal it's wired to is"
+            ^ display ty
+            ^ "which isn't of that form.")
+      | _, _ -> None)
   | Choice_mismatch ty ->
       Option.map
         (fun ty -> "This block can't produce a proof of the needed statement" ^ display ty)
