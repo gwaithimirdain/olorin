@@ -279,7 +279,7 @@ var customChipEl = null;
 var globalTime = 0;
 
 // Whether every level this player has is complete at each difficulty (see computeUnlockData),
-// which is what lifts that re-locking: see rule 7 in difficultyUnlocked.
+// which is what lifts that re-locking: see rule 7 in unlockBlockers.
 var allCompleteAt = [false, false, false];
 // Whether the current (complete) proof has already been registered as a completion, so re-running
 // typecheck on an already-complete proof doesn't count as a fresh completion.
@@ -1834,55 +1834,93 @@ function fraction(done, total) {
     return total === 0 ? 1 : done / total;
 }
 
-// Whether a world's three inter-world gates (rules 1-3) pass at difficulty K -- i.e. whether the
-// world itself is "open" at K (individual levels still need the stage/level rules 4-6).
+// How many more than `done` of `total` must be complete to reach the fraction `p`.  (The slack
+// keeps a product like 0.8 * 15 = 12.000000000000002 from rounding up past what `fraction` wants.)
+function moreNeeded(done, total, p) {
+    return Math.max(0, Math.ceil(p * total - 1e-9) - done);
+}
+
+// "1 more level", "3 more levels".
+function moreLevels(n) {
+    return n + ' more level' + (n === 1 ? '' : 's');
+}
+
+// A world as a lock's tooltip names it, noting when its percentage leaves out a bonus stage.
+function worldLabel(w) {
+    const world = LEVELS[w];
+    return world.name + (world.stages.some(function (st) { return st.bonus; })
+                         ? ' (not counting bonus stages)' : '');
+}
+
+// A stage as a lock's tooltip names it: its number, and its name as plain text if it has one.
+function stageLabel(w, s) {
+    const div = document.createElement('div');
+    div.innerHTML = LEVELS[w].stages[s].name || '';
+    const text = div.textContent.trim();
+    return 'stage ' + (w + 1) + '-' + (s + 1) + (text ? ' (' + text + ')' : '');
+}
+
+// What still keeps a world's three inter-world gates (rules 1-3) shut at difficulty K, as a list
+// of things for the player to do -- empty when the world is "open" at K (individual levels still
+// need the stage/level rules 4-6).
 //
 // Which worlds a world follows is its `previous` list in levels.js, defaulting to [1], the world
 // right before it (see computeUnlockData); each gate then asks about ALL the worlds it names, so a
 // world following two others waits for both.  The percentages are of each world's non-bonus levels;
 // a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
-function worldGatesPass(w, K, data) {
+function worldGateBlockers(w, K, data) {
     const world = data[w];
+    const blockers = [];
+    // Complete enough of world `v` at difficulty `k` to reach the fraction `p`, if it hasn't yet.
+    function need(v, k, p) {
+        const n = moreNeeded(data[v].done[k], data[v].total, p);
+        if(n > 0) {
+            blockers.push('Complete ' + moreLevels(n) + ' of ' + worldLabel(v) + ' at ' + DIFFICULTIES[k]);
+        }
+    }
     // A course's students have the game's own worlds at novice from the start, so that the term's
     // work is the course's worlds and the rest is theirs to draw on.
-    if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return true; }
+    if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return blockers; }
     // 1a. A course's world opens at a difficulty once it is itself >= 80% complete at the one
     //     below.  Rules 1-3 are all about other worlds, and a course has no game behind it to have
     //     played through (nothing outside it gates it, and it gates nothing outside), so what earns
     //     its next difficulty is its own work -- at rule 1's percentage, pointed at itself.
-    if(K > 0 && !outsideCourses(LEVELS[w])
-       && fraction(world.done[K - 1], world.total) < 0.8) { return false; }
+    if(K > 0 && !outsideCourses(LEVELS[w])) { need(w, K - 1, 0.8); }
     // 1. Every world this one follows is >= 80% complete at difficulty K.
-    if(world.previous.some(function (p) { return fraction(data[p].done[K], data[p].total) < 0.8; })) {
-        return false;
-    }
+    world.previous.forEach(function (p) { need(p, K, 0.8); });
     // 2. Every world that follows this one is >= 50% complete at K-1 (unless K is 0).
-    if(K > 0 && world.followers.some(function (f) {
-        return fraction(data[f].done[K - 1], data[f].total) < 0.5;
-    })) { return false; }
+    if(K > 0) { world.followers.forEach(function (f) { need(f, K - 1, 0.5); }); }
     // 3. Every world followed by a world this one follows is >= 50% complete at K+1 (unless K=2).
     //    A course drops this one: its students haven't the whole game behind them, and asking them
     //    to go up a difficulty in an earlier world to open a later one is a run-up they don't have
     //    the term for.
-    if(COURSE === null && K < 2 && world.previous.some(function (p) {
-        return data[p].previous.some(function (q) {
-            return fraction(data[q].done[K + 1], data[q].total) < 0.5;
+    if(COURSE === null && K < 2) {
+        world.previous.forEach(function (p) {
+            data[p].previous.forEach(function (q) { need(q, K + 1, 0.5); });
         });
-    })) { return false; }
-    return true;
+    }
+    // Two worlds can share a world they follow, which would otherwise be asked for twice.
+    return blockers.filter(function (b, i) { return blockers.indexOf(b) === i; });
 }
 
-// Whether difficulty K (0,1,2) of level A-B-C is unlocked, given the completion `data`.  The level
-// is passed 0-indexed as world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
-function difficultyUnlocked(w, s, c, K, data) {
+// Whether a world's three inter-world gates (rules 1-3) pass at difficulty K.
+function worldGatesPass(w, K, data) {
+    return worldGateBlockers(w, K, data).length === 0;
+}
+
+// What still keeps difficulty K (0,1,2) of level A-B-C locked, given the completion `data`, as a
+// list of things for the player to do: empty when it is unlocked.  The level is passed 0-indexed as
+// world w (=A-1), stage s (=B-1), level c (=C-1).  All conditions must hold.
+function unlockBlockers(w, s, c, K, data) {
     const world = data[w];
     const stage = world.stages[s];
+    const diff = DIFFICULTIES[K];
     // A course's students have every level of the game's own worlds at novice from the start (see
-    // worldGatesPass), the stage and level rules included: they need to reach whatever the course
-    // is about, not to be walked through the game in order.
-    if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return true; }
+    // worldGateBlockers), the stage and level rules included: they need to reach whatever the
+    // course is about, not to be walked through the game in order.
+    if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return []; }
     // Rules 1-3: the world must be open at this difficulty.
-    if(!worldGatesPass(w, K, data)) { return false; }
+    const blockers = worldGateBlockers(w, K, data);
     // 4. Each of this stage's prerequisite stages is >= 70% complete at K.  By default that's the
     //    single stage right before it; a stage can instead declare `previous: [...]` in levels.js,
     //    listing how many stages back each prerequisite is -- [2] to look past the stage in between
@@ -1891,24 +1929,34 @@ function difficultyUnlocked(w, s, c, K, data) {
     const previous = stage.previous || [1];
     for(var pi = 0; pi < previous.length; pi++) {
         const ps = s - previous[pi];
-        if(ps >= 0 && fraction(world.stages[ps].done[K], world.stages[ps].total) < 0.7) { return false; }
+        if(ps < 0) { continue; }
+        const n = moreNeeded(world.stages[ps].done[K], world.stages[ps].total, 0.7);
+        if(n > 0) { blockers.push('Complete ' + moreLevels(n) + ' of ' + stageLabel(w, ps) + ' at ' + diff); }
     }
     // 5. All but (at most) 2 of the levels before this one in the stage are complete at K -- so a
     //    stage's first three levels are available as soon as it opens.
     var completedBefore = 0;
     for(var i = 0; i < c; i++) { if(stage.levelDiff[i] >= K) { completedBefore++; } }
-    if(completedBefore < c - 2) { return false; }
+    if(completedBefore < c - 2) {
+        blockers.push('Complete ' + (c - 2 - completedBefore) +
+                      ' more of the levels before this one in its stage at ' + diff);
+    }
     // 6. (Novice only) every earlier level in this stage that has a hint is completed -- so you
     //    can't skip past a level that teaches something new.
     if(K === 0) {
         for(var j = 0; j < c; j++) {
-            if(stage.hasHint[j] && stage.levelDiff[j] < 0) { return false; }
+            if(stage.hasHint[j] && stage.levelDiff[j] < 0) {
+                blockers.push('Complete level ' + (w + 1) + '-' + (s + 1) + '-' + (j + 1) +
+                              ', which introduces something new');
+            }
         }
     }
     // 8. (A course's worlds, adept/master) this level must have been solved at the difficulty
     //    below.  In the game proper a difficulty is earned a world at a time, by everything behind
     //    that world; a course, having nothing behind it, is climbed a level at a time instead.
-    if(K >= 1 && !outsideCourses(LEVELS[w]) && stage.levelDiff[c] < K - 1) { return false; }
+    if(K >= 1 && !outsideCourses(LEVELS[w]) && stage.levelDiff[c] < K - 1) {
+        blockers.push('Complete this level at ' + DIFFICULTIES[K - 1]);
+    }
     // 7. (Adept/Master) the previous difficulty of THIS level must not have been completed within
     //    the last RECENT_COMPLETION_WINDOW completions, so you can't immediately go up a difficulty
     //    and copy what you just did at the lower one.
@@ -1920,10 +1968,24 @@ function difficultyUnlocked(w, s, c, K, data) {
     if(K >= 1 && !allCompleteAt[K - 1]) {
         const times = stage.levelTimes[c];
         if(times && times[K - 1] !== undefined && globalTime - times[K - 1] <= RECENT_COMPLETION_WINDOW) {
-            return false;
+            blockers.push('You solved this level at ' + DIFFICULTIES[K - 1] + ' too recently: complete ' +
+                          moreLevels(times[K - 1] + RECENT_COMPLETION_WINDOW + 1 - globalTime) +
+                          ' first (or every level at ' + DIFFICULTIES[K - 1] + ')');
         }
     }
-    return true;
+    return blockers;
+}
+
+// Whether difficulty K (0,1,2) of level A-B-C is unlocked (see unlockBlockers).
+function difficultyUnlocked(w, s, c, K, data) {
+    return unlockBlockers(w, s, c, K, data).length === 0;
+}
+
+// The tooltip on a level's padlock at difficulty K: what remains to be done to unlock it.
+function lockTooltip(level, K) {
+    const blockers = unlockBlockers(level.worldIndex, level.stageIndex, level.levelIndex, K, unlockData);
+    return 'To unlock ' + DIFFICULTIES[K] + ':\n' +
+        blockers.map(function (b) { return '• ' + b; }).join('\n');
 }
 
 // How many completions must pass before a just-completed difficulty stops re-locking the next.
@@ -1946,7 +2008,15 @@ function difficultyMark(state, d) {
     const color = COLORS[d][1].backgroundColor;
     if(state === 'completed') { return '<span class="lvmark" style="color:' + color + '">★</span>'; }
     if(state === 'unlocked')  { return '<span class="lvmark" style="color:' + color + '">' + UNLOCK_SVG + '</span>'; }
-    return '<span class="lvmark locked" style="color:' + color + '">' + LOCK_SVG + '</span>';
+    return '<span class="lvmark locked" data-difficulty="' + d + '" style="color:' + color + '">' + LOCK_SVG + '</span>';
+}
+
+// Give each closed padlock on a level's button a tooltip saying what remains to unlock it.
+function addLockTooltips(b, level) {
+    if(!level) { return; }
+    b.querySelectorAll('.lvmark.locked').forEach(function (mark) {
+        mark.title = lockTooltip(level, parseInt(mark.dataset.difficulty));
+    });
 }
 
 // A level that has a hint carries an "i" in the top-right corner of its button.  While the level
@@ -1980,7 +2050,8 @@ function renderLevelButton(b, name, states, level) {
         b.classList.add('level-locked');
         if(!TEST_MODE) {
             b.innerHTML = '<div class="level-number">' + name + '</div>' +
-                '<div class="level-marks"><span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span></div>';
+                '<div class="level-marks"><span class="lvmark locked" data-difficulty="0" style="color:#888">' + LOCK_SVG + '</span></div>';
+            addLockTooltips(b, level);
             addHintBubble(b, level, false);
             return;
         }
@@ -1993,6 +2064,7 @@ function renderLevelButton(b, name, states, level) {
         '<div class="level-marks">' +
         difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2) +
         '</div>';
+    addLockTooltips(b, level);
     var hc = -1;
     for(var d = 0; d < 3; d++) { if(states[d] === 'completed') { hc = d; } }
     if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
@@ -2058,7 +2130,7 @@ function computeUnlockData(res) {
               });
         const wd = { total: 0, done: [0, 0, 0], stages: [], previous: previous, followers: [] };
         world.stages.forEach(function (stage) {
-            // `previous` is which stages back this one's rule-4 prerequisite is; see difficultyUnlocked.
+            // `previous` is which stages back this one's rule-4 prerequisite is; see unlockBlockers.
             const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
                          previous: stage.previous };
             // A `bonus` stage is extra credit: its levels are left out of the world's totals, so the
@@ -2091,7 +2163,7 @@ function computeUnlockData(res) {
     });
     // Whether the player has finished every level they have at each difficulty -- every level of
     // every world they can see, a bonus stage's included, since those are theirs to solve too and
-    // solving one is a way on.  Rule 7 reads this (see difficultyUnlocked).
+    // solving one is a way on.  Rule 7 reads this (see unlockBlockers).
     allCompleteAt = [0, 1, 2].map(function (K) {
         return unlockData.every(function (wd, w) {
             return !worldShown(LEVELS[w]) || wd.stages.every(function (sd) {

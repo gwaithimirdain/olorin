@@ -66,6 +66,16 @@ for (const [ok, what] of [
 }
 
 
+// Adept of a non-auto-completed level is reachable once its world's gates pass at adept (rules
+// 1-3), the first stage is complete at adept (rule 4), and its own stage predecessors are
+// complete at adept (rule 5); rule 7 then gates it on how recently this level's novice was
+// completed (the global "time" counts completions).
+const rule7Base = (time, noviceTime) => OPEN_ADEPT
+    .concat(completions(STAGE1, 1))
+    .concat(completions(STAGE2.slice(0, MANUAL.index - 1), 1))
+    .concat([['time', String(time)]])
+    .concat(completions([MANUAL], 0, { times: { 0: noviceTime } }));
+
 async function open(page, pairs) {
     const olorin = new Olorin(page);
     if (pairs) await olorin.seed(pairs);
@@ -169,16 +179,6 @@ test.describe('Per-difficulty unlocking', () => {
         expect((await olorin.levelStates(FOURTH.name))[1]).toBe('unlocked');
     });
 
-    // Adept of a non-auto-completed level is reachable once its world's gates pass at adept (rules
-    // 1-3), the first stage is complete at adept (rule 4), and its own stage predecessors are
-    // complete at adept (rule 5); rule 7 then gates it on how recently this level's novice was
-    // completed (the global "time" counts completions).
-    const rule7Base = (time, noviceTime) => OPEN_ADEPT
-        .concat(completions(STAGE1, 1))
-        .concat(completions(STAGE2.slice(0, MANUAL.index - 1), 1))
-        .concat([['time', String(time)]])
-        .concat(completions([MANUAL], 0, { times: { 0: noviceTime } }));
-
     test('rule 7: a recently-completed lower difficulty re-locks the higher one', async ({ page }) => {
         // Novice completed at time 10, only 5 completions ago (global time 15) -> adept re-locked.
         const olorin = await open(page, rule7Base(15, 10));
@@ -217,6 +217,35 @@ test.describe('Per-difficulty unlocking', () => {
         // window is a wait the player can actually finish.
         const olorin = await open(page, finished(20).filter(([key]) => key !== completionKey(ELSEWHERE)));
         expect((await olorin.levelStates(MANUAL.name))[1]).toBe('locked');
+    });
+});
+
+// Hovering a closed padlock says what remains to be done to open that difficulty.
+test.describe('A padlock\'s tooltip', () => {
+    test('names the hinted level still to be solved (rule 6)', async ({ page }) => {
+        const olorin = await open(page);
+        const tip = await olorin.lockTooltip(AFTER_FIRST.name, 0);
+        expect(tip).toMatch(/^To unlock Novice:\n/);
+        expect(tip).toContain(`Complete level ${FIRST.name}, which introduces something new`);
+    });
+
+    test('counts the levels still wanted in the world before (rule 1)', async ({ page }) => {
+        const olorin = await open(page, completions(W1.slice(0, W1_MOST - 1), 0));
+        expect(await olorin.lockTooltip(NEXT_WORLD.name, 0))
+            .toContain(`Complete 1 more level of ${world(FIRST.world).name}`);
+    });
+
+    test('counts the completions still to wait out (rule 7)', async ({ page }) => {
+        // Novice completed at time 10, global time 15: 6 more completions take it past the window.
+        const olorin = await open(page, rule7Base(15, 10));
+        expect(await olorin.lockTooltip(MANUAL.name, 1)).toBe(
+            'To unlock Adept:\n• You solved this level at Novice too recently: complete 6 more levels ' +
+            'first (or every level at Novice)');
+    });
+
+    test('is absent once the difficulty is unlocked', async ({ page }) => {
+        const olorin = await open(page, completions([FIRST], 0));
+        expect(await olorin.lockTooltip(AFTER_FIRST.name, 0)).toBeNull();
     });
 });
 

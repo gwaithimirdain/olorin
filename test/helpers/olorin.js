@@ -111,6 +111,16 @@ class Olorin {
         }, name);
     }
 
+    // The tooltip on a level's closed padlock at a difficulty (0-2), saying what remains to unlock
+    // it -- or null if that difficulty shows no closed padlock.
+    lockTooltip(name, difficulty) {
+        return this.page.evaluate(({ n, d }) => {
+            const e = document.querySelector(
+                `#worlds .level[data-name="${n}"] .lvmark.locked[data-difficulty="${d}"]`);
+            return e ? e.title : null;
+        }, { n: name, d: difficulty });
+    }
+
     // Whether a level's chooser button is highlighted as "active" (has an unlocked, uncompleted
     // difficulty).
     levelActive(name) {
