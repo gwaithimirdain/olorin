@@ -1669,6 +1669,7 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ ],
                     conclusion: { ty: "ω² is positive infinite" },
+                    hint: "algOmegaHint",
                 },
             ],
           },
