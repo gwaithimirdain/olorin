@@ -14,11 +14,11 @@
 <body>
     <div id="paletteBar">
       <div id="palette">
-        <div class="basic logical intro rule" id="andI" data-rule="andI" title="Prove A∧B: give a proof of A and a proof of B">∧</div>
-        <div class="basic logical elim rule" id="andE" data-rule="andE" title="Use A∧B: get a proof of A and a proof of B">∧</div>
-        <div class="basic logical intro rule" id="orI1" data-rule="orI1" title="Prove A∨B by its left half: give a proof of A">∨<sub>L</sub></div>
-        <div class="basic logical intro rule" id="orI2" data-rule="orI2" title="Prove A∨B by its right half: give a proof of B">∨<sub>R</sub></div>
-        <div class="container rule" id="orE" data-rule="orE" title="Use A∨B: prove what you want twice, once assuming A and once assuming B">
+        <div class="basic logical intro rule" id="andI" data-rule="andI" title="Prove P∧Q: give a proof of P and a proof of Q">∧</div>
+        <div class="basic logical elim rule" id="andE" data-rule="andE" title="Use P∧Q: get a proof of P and a proof of Q">∧</div>
+        <div class="basic logical intro rule" id="orI1" data-rule="orI1" title="Prove P∨Q by its left part: give a proof of P">∨<sub>L</sub></div>
+        <div class="basic logical intro rule" id="orI2" data-rule="orI2" title="Prove P∨Q by its right part: give a proof of Q">∨<sub>R</sub></div>
+        <div class="container rule" id="orE" data-rule="orE" title="Use P∨Q: prove what you want twice, once assuming P and once assuming Q">
           <div class="mid bar"></div>
           <div class="doubleleft assumption"><div class="subgoallabel">∨</div></div>
           <div class="doubleright subgoal"></div>
@@ -31,7 +31,7 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="container rule" id="impI" data-rule="impI" title="Prove A⇒B: assume A, then prove B">
+        <div class="container rule" id="impI" data-rule="impI" title="Prove P⇒Q: assume P, then prove Q">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
           <div class="singleright subgoal"><div class="subgoallabel">⇒</div></div>
@@ -42,8 +42,8 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="basic logical elim rule" id="impE" data-rule="impE" title="Use A⇒B: give a proof of A, and get a proof of B">⇒</div>
-        <div class="container rule" id="iffI" data-rule="iffI" title="Prove A⇔B: assume A and prove B, then assume B and prove A">
+        <div class="basic logical elim rule" id="impE" data-rule="impE" title="Use P⇒Q: give a proof of P, and get a proof of Q">⇒</div>
+        <div class="container rule" id="iffI" data-rule="iffI" title="Prove P⇔Q: assume P and prove Q, then assume Q and prove P">
           <div class="mid bar"></div>
           <div class="doubleleft assumption"></div>
           <div class="doubleright subgoal"><div class="subgoallabel">⇔</div></div>
@@ -56,8 +56,8 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="basic logical elim rule" id="iffE1" data-rule="iffE1" title="Use A⇔B from left to right: give a proof of A, and get a proof of B">⇔<sub>L→R</sub></div>
-        <div class="basic logical elim rule" id="iffE2" data-rule="iffE2" title="Use A⇔B from right to left: give a proof of B, and get a proof of A">⇔<sub>R→L</sub></div>
+        <div class="basic logical elim rule" id="iffE1" data-rule="iffE1" title="Use P⇔Q from left to right: give a proof of P, and get a proof of Q">⇔<sub>L→R</sub></div>
+        <div class="basic logical elim rule" id="iffE2" data-rule="iffE2" title="Use P⇔Q from right to left: give a proof of Q, and get a proof of P">⇔<sub>R→L</sub></div>
         <div class="basic logical intro rule" id="exI" data-rule="exI" title="Prove ∃x∈A,P(x): give an element x of A and a proof of P(x)"> ∃</div>
         <div class="basic logical elim rule" id="exE" data-rule="exE" title="Use ∃x∈A,P(x): get an element x of A and a proof of P(x)">∃</div>
         <div class="container rule" id="allI" data-rule="allI" title="Prove ∀x∈A,P(x): assume an element x of A, then prove P(x)">
@@ -100,8 +100,8 @@
           <div class="resize-handle-left"></div>
         </div>
         <div class="basic logical elim rule" id="allbelowE" data-rule="allbelowE" title="Use ∀x∈[n],P(x): give an integer x and a proof of (0≤x)∧(x&lt;n), and get P(x)">∀[]</div>
-        <div class="basic logical elim rule" id="negE" data-rule="negE" title="Use ¬A: give a proof of A as well, and since the two contradict, get anything at all">¬</div>
-        <div class="container rule" id="negI" data-rule="negI" title="Prove ¬A: assume A, then prove a contradiction (⊥)">
+        <div class="basic logical elim rule" id="negE" data-rule="negE" title="Use ¬P: give a proof of P as well, and since the two contradict, get anything at all">¬</div>
+        <div class="container rule" id="negI" data-rule="negI" title="Prove ¬P: assume P, then prove a contradiction (⊥)">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
           <div class="singleright subgoal"><div class="subgoallabel">¬</div></div>
@@ -128,8 +128,8 @@
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc" title="Say what statement a wire carries, when Olorin can't work it out on its own; double-click to change it">🏷</div>
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr" title="Write an arithmetic expression for a blue value port: wire it to every variable the expression uses, and double-click to change it">expr</div>
         <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg" title="Prove an equation or inequality by algebra, from the ones wired into it">alg</div>
-        <div class="basic logical rule" style="text-align: center" id="algneq" data-rule="algneq" title="Prove an equation or inequality by algebra, from the ones wired into it">alg</div>
-        <div class="basic logical rule" style="text-align: center" id="algplus" data-rule="algplus" title="Like alg, but it also takes conjunctions (∧) of them, proves conjunctions and disjunctions (∨) of them, and settles ∣ ∣, min and max on its own">alg+</div>
+        <div class="basic logical rule" style="text-align: center" id="algneq" data-rule="algneq" title="Prove an equation, inequality, or disequality by algebra, from the ones wired into it">alg</div>
+        <div class="basic logical rule" style="text-align: center" id="algplus" data-rule="algplus" title="Prove an equation, inequality, or conjunction (∧) and disjunction (∨) of such, by algebra, from the equations, inequalities, or conjunctions of such wired into it.  Handles absolute value, min, and max without explicit case analysis.">alg+</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral" title="Use x·y=0: give two numbers and a proof that their product is zero, and get that one of them is zero">?·?=0</div>
         <div class="basic logical rule" style="text-align: center" id="deceq" data-rule="deceq" title="Split into cases on two numbers x and y: get that either x=y or x≠y">=∨≠</div>
         <div class="basic logical rule" style="text-align: center" id="tord" data-rule="tord" title="Split into cases on two numbers x and y: get that either x≤y or y&lt;x">≤∨&gt;</div>
