@@ -121,7 +121,9 @@ module Unresolver = struct
   type (_, _) pop = Pop : ('a1, 'a2) scope * ('a2 I2.suc, 'a2s) Eq.t -> ('a1, 'a2s) pop
 
   let pop : type a1 a2. (a1 I1.suc, a2) scope -> (a1, a2) pop =
-   fun scope -> match scope with Bwv.Snoc (s, _) -> Pop (s, Eq)
+   fun scope ->
+    match scope with
+    | Bwv.Snoc (s, _) -> Pop (s, Eq)
 
   let visit _scope _ = ()
 
@@ -296,9 +298,7 @@ let rec vec_map_state : type a b n s. (a -> s -> b * s) -> (a, n) Vec.t -> s -> 
 
 (* Wrap up the data necessary to resolve a named term and then typecheck it. *)
 type context =
-  | Context :
-      (mode, 'b, 's) status * (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope
-      -> context
+  | Context : (mode, 'b, 's) status * (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope -> context
 
 (* Some nodes can introduce new names and give a way to re-bind them away.  This is basically doing a one-case match, but not explicitly capturing the subgoal with a bracket in the graph.  Instead, the subgoal extends as far as possible, e.g. to the outermost enclosing explicit bracket (match or abstraction) or to the overall goal. *)
 
@@ -567,8 +567,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               inputs in
           let entries = List.rev entries in
           let strct entries =
-            Named.Struct
-              (Eta, Bwd.of_list (List.map (fun (fld, tm) -> (Some fld, tm)) entries)) in
+            Named.Struct (Eta, Bwd.of_list (List.map (fun (fld, tm) -> (Some fld, tm)) entries))
+          in
           let term =
             match (unordered, entries) with
             | false, _ -> strct entries
@@ -588,7 +588,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                   ]
             | true, _ -> raise (Jserror "unordered tuple without exactly two inputs") in
           ({ bindables; term }, variables)
-      | Fields { outputs } ->
+      | Fields { outputs } -> (
           let label = source.label <||> "missing label" in
           let fld, _ =
             List.find_opt (fun (_, port) -> port = label) outputs
@@ -598,10 +598,10 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           in
           (* As with an application below, if the input is the record produced by the matching
              introduction block, we take the projection ourselves; see project_struct. *)
-          (match
-             (if snd fld = [] then project_struct (fst fld) (locate_opt tm.loc tm.value.term)
-              else None)
-           with
+          match
+            if snd fld = [] then project_struct (fst fld) (locate_opt tm.loc tm.value.term)
+            else None
+          with
           | Some body ->
               (* The term we return is located at this output port, and taking the projection
                  here is what drops the field's own location, so we fold both that and the input
@@ -640,9 +640,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
              we don't want wires to be labeled by types like P→Q instead of P⇒Q -- but we do keep
              them for errors, so that a wire carrying the wrong sort of thing is colored. *)
           let head, fn_bindables =
-            match Option.bind field (fun (fld, pbij) ->
-                      if pbij = [] then project_struct fld (locate_opt fn.loc fn.value.term)
-                      else None)
+            match
+              Option.bind field (fun (fld, pbij) ->
+                  if pbij = [] then project_struct fld (locate_opt fn.loc fn.value.term) else None)
             with
             | Some body ->
                 let newlocs, _ = Loc.locs_and_content false fn.loc in
@@ -653,8 +653,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function. *)
                 | Some fld ->
                     ( named_synth
-                        (locate_opt (Loc.non_annotating fn.loc)
-                           (Named.Field (fn, `Name fld, None))),
+                        (locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld, None))),
                       fn_bindables )
                 | None -> (named_synth fn, fn_bindables)) in
           (* Apply it to each argument port in turn. *)
@@ -671,10 +670,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                   locate_opt None
                     (Named.Synth
                        (Named.App
-                          ( tm,
-                            named_arg (locate_opt argloc argtm),
-                            locate_opt None `Explicit ))) ))
-              (fn_bindables, fn_variables, head) args in
+                          (tm, named_arg (locate_opt argloc argtm), locate_opt None `Explicit))) ))
+              (fn_bindables, fn_variables, head)
+              args in
           ({ bindables; term = tm.value }, variables)
       | Neg { inputs = fn, arg; field; implicit_pre } ->
           (* Get the two inputs, which we will allow to appear in either order *)
@@ -771,8 +769,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                    branches = Emp;
                    refutables = None;
                    highers = [];
-                 })
-          in
+                 }) in
           ({ bindables; term }, variables)
       | Abs { field; has_value = _; extras; implicit_post } ->
           (* In an abstraction, we bind all the bindables in the body that involve the assumption variables, and pass the rest on as bindables for the abstraction. *)
@@ -788,7 +785,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             match field with
             (* We don't locate the lambda, because we don't want strings to be labeled by *its* type (which would be, say, P→Q instead of P⇒Q). *)
             | Some fld ->
-                Named.Struct (Eta, Snoc (Emp, (Some fld, (locate_opt None `Normal, locate_opt None lam))))
+                Named.Struct
+                  (Eta, Snoc (Emp, (Some fld, (locate_opt None `Normal, locate_opt None lam))))
             | None -> lam in
           let term =
             match implicit_post with
@@ -865,8 +863,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let tm, bindables = ensure_synth tm "coconstr input" in
-          destruct_constr source source_vertex.names [ Open (constr, outputs) ] tm bindables
-            variables
+          destruct_constr source source_vertex.names
+            [ Open (constr, outputs) ]
+            tm bindables variables
       | Asc ->
           let tm, variables =
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
@@ -906,7 +905,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               (Named.Const (Parser.Scope.lookup [ "cons_eqs" ] <||> "cons_eqs not found")) in
           (* The two algebra blocks ask through constants of their own, so that oracle.ml can tell
              which one is asking and how hard it has to work. *)
-          let oname = match sort with
+          let oname =
+            match sort with
             | `None -> "oracle"
             | `Plus -> "oracle_plus"
             | `Neq -> "oracle_neq" in
@@ -942,7 +942,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     (locate_opt None (Named.ImplicitSApp (oracle, None, locate_opt None givens)), [])))
           in
           ({ bindables; term }, variables)
-      | User { consts; inputs; implicit_first; outputs } ->
+      | User { consts; inputs; implicit_first; outputs } -> (
           let bindables, variables, args =
             List.fold_left
               (fun (bindables, variables, args) label ->
@@ -990,7 +990,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                     Bwd.fold_left
                       (fun tm arg ->
                         Named.App
-                          (named_synth (locate_opt None tm), named_arg arg, locate_opt None `Explicit))
+                          ( named_synth (locate_opt None tm),
+                            named_arg arg,
+                            locate_opt None `Explicit ))
                       (const_of const) args,
                     true ))
                 consts in
@@ -1000,8 +1002,8 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             match outputs with
             | [] -> ({ bindables; term = Synth tm }, variables)
             | steps ->
-                destruct_constr source source_vertex.names steps (locate !loc tm) bindables variables
-          in
+                destruct_constr source source_vertex.names steps (locate !loc tm) bindables
+                  variables) in
     (locate !loc tm, variables)
 
 (* Subroutine for abstractions and tuples with binding arguments.  The assumptions, given with the
@@ -1103,9 +1105,7 @@ let check_of_graph (vertices : Vertex.t IdMap.t) (graph : bwd_graph) :
 
 (* After initialization, we store the context of parameters, variables, and hypotheses, the parsing scope of their names, and the conclusion type in a reference cell wrapped up in a GADT. *)
 type problem =
-  | Problem :
-      (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope * (mode, kinetic) value
-      -> problem
+  | Problem : (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope * (mode, kinetic) value -> problem
 
 let problem : problem option ref = ref None
 
@@ -1148,7 +1148,8 @@ let render_labels (labels : (Locable.t, deferred_label) Hashtbl.t) : (Locable.t,
       let ty = print_to_string dty in
       let tm =
         Option.bind dtm (fun value ->
-            Reporter.try_with ~fatal:(fun _ -> None) @@ fun () -> Some (print_to_string value)) in
+            Reporter.try_with ~fatal:(fun _ -> None) @@ fun () -> Some (print_to_string value))
+      in
       Hashtbl.replace rendered loc ({ ty; tm } : Label.t))
     labels;
   rendered
@@ -1179,27 +1180,27 @@ let annotate_ctx_handler : type m a b s.
      succeeds.  It is how the types get to know that. *)
   match Modal.Mode.compare (Ctx.mode ctx) Omode.mode with
   | Neq -> ()
-  | Eq ->
-  match
-    List.find_map
-      (fun (Resolver.Scope (scopetm, scope)) ->
-        match N.compare (Bwv.length scope) (Ctx.raw_length ctx) with
-        | Neq -> None
-        | Eq ->
-            (* The scope was recorded while resolving this very term, so the usual hit is one term
+  | Eq -> (
+      match
+        List.find_map
+          (fun (Resolver.Scope (scopetm, scope)) ->
+            match N.compare (Bwv.length scope) (Ctx.raw_length ctx) with
+            | Neq -> None
+            | Eq ->
+                (* The scope was recorded while resolving this very term, so the usual hit is one term
                twice over; structural equality is the fallback for when it isn't. *)
-            if scopetm == ctxtm || scopetm = ctxtm then (
-              contexts := Context (status, ctx, scope) :: !contexts;
-              Some ())
-            else None)
-      (Resolver.scopes_of ctxtm)
-  with
-  | None ->
-      (* This could indicate a bug, but it also happens when new terms are constructed in the process of checking, such as with the expansion of numerals into constructors, so we don't report it as an error. *)
-      carp
-        (Printf.sprintf "no matching scope for context of length %d"
-           (N.to_int (Ctx.raw_length ctx)))
-  | Some () -> ()
+                if scopetm == ctxtm || scopetm = ctxtm then (
+                  contexts := Context (status, ctx, scope) :: !contexts;
+                  Some ())
+                else None)
+          (Resolver.scopes_of ctxtm)
+      with
+      | None ->
+          (* This could indicate a bug, but it also happens when new terms are constructed in the process of checking, such as with the expansion of numerals into constructors, so we don't report it as an error. *)
+          carp
+            (Printf.sprintf "no matching scope for context of length %d"
+               (N.to_int (Ctx.raw_length ctx)))
+      | Some () -> ())
 
 (* Attempt to parse, resolve, and typecheck a synthesizing term from a given output port by trying all the possible context/scope pairs that we know of so far that it could be in.  Return a flag indicating whether we found a *scope* in which the term *parses*.  If so, we return all the error codes generated by trying to check that term.  If not, we return all the error codes generated by looking for scopes (including holes). *)
 (* On failure this reports, along with the diagnostics, the ports that were out of scope in every
@@ -1246,130 +1247,129 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     @@ fun () -> check_of_output_port ~seen:IdSet.empty vertices bwd_graph ~edge:None p in
   (* A cyclic term is invalid in any scope, and cutting an out-of-scope wire wouldn't help. *)
   if !cyclic then `No_scope (scoping_diagnostics, [])
-  else
-    (* Now we recurse through the supplied contexts/scopes. *)
-  let rec look_for_scope contexts =
-    match contexts with
-    | [] ->
-        (* If there are no remaining available scopes, that means we haven't found any, and so we report all the scoping diagnostics, along with what every attempt agreed was out of scope. *)
-        `No_scope (scoping_diagnostics, Option.value !always_ill_scoped ~default:[])
-    | Context
-        (type a b s)
-        ((status, ctx, scope) :
-          (mode, b, s) status * (mode, a, b) Ctx.t * (unit, a) Resolver.scope)
-      :: contexts -> (
-        (* Forbid cyclic scopes for coconstrs: if the scope involves any non-assumption ports from this vertex, skip it.  But we don't do this for variable nodes (those specified as "variables" in the overall level), even though technically we should, since those all go into the overall scope at the beginning and we don't have separate scopes and contexts adding them one by one. *)
-        match
-          ( IdMap.find_opt p.vertex vertices,
-            Bwv.find_opt
-              (function
-                | ({ port = Some (q : Port.t); _ } : name) ->
-                    p.vertex = q.vertex && q.sort != Assumption
-                | _ -> false)
-              scope )
-        with
-        | Some { rule; _ }, Some _ when rule != Var ->
-            (* If there is a cycle, report it, skip this scope and go on to the next one. *)
-            Diagnostic.add scoping_diagnostics true (Reporter.diagnostic Cyclic_term);
-            look_for_scope contexts
-        (* If resolution has already failed in this scope, it fails the same way again, so we
+  else (* Now we recurse through the supplied contexts/scopes. *)
+    let rec look_for_scope contexts =
+      match contexts with
+      | [] ->
+          (* If there are no remaining available scopes, that means we haven't found any, and so we report all the scoping diagnostics, along with what every attempt agreed was out of scope. *)
+          `No_scope (scoping_diagnostics, Option.value !always_ill_scoped ~default:[])
+      | Context
+          (type a b s)
+          ((status, ctx, scope) :
+            (mode, b, s) status * (mode, a, b) Ctx.t * (unit, a) Resolver.scope)
+        :: contexts -> (
+          (* Forbid cyclic scopes for coconstrs: if the scope involves any non-assumption ports from this vertex, skip it.  But we don't do this for variable nodes (those specified as "variables" in the overall level), even though technically we should, since those all go into the overall scope at the beginning and we don't have separate scopes and contexts adding them one by one. *)
+          match
+            ( IdMap.find_opt p.vertex vertices,
+              Bwv.find_opt
+                (function
+                  | ({ port = Some (q : Port.t); _ } : name) ->
+                      p.vertex = q.vertex && q.sort != Assumption
+                  | _ -> false)
+                scope )
+          with
+          | Some { rule; _ }, Some _ when rule != Var ->
+              (* If there is a cycle, report it, skip this scope and go on to the next one. *)
+              Diagnostic.add scoping_diagnostics true (Reporter.diagnostic Cyclic_term);
+              look_for_scope contexts
+          (* If resolution has already failed in this scope, it fails the same way again, so we
            report what it reported then and move on without checking anything. *)
-        | _ when Option.is_some (failure_of scope) ->
-            let ill_scoped, diagnostics = Option.get (failure_of scope) in
-            List.iter (Dynarray.add_last scoping_diagnostics) diagnostics;
-            record_attempt ill_scoped;
-            look_for_scope contexts
-        | _ ->
-            (* Now we remove any of the bindables of the term that already appear in the scope, so they don't get duplicated. *)
-            let bindables = Bindables.remove tm.value.bindables (Bwv.to_list scope) in
-            let tm = { tm with value = { tm.value with bindables } } in
-            (* We create a separate array of diagnostics to accumulate while checking this term, since we only want to record them if the scope succeeds. *)
-            let diagnostics = Dynarray.create () in
-            (* What this attempt, and only this attempt, finds out of scope. *)
-            let ill_scoped = ref [] in
-            (* Where this attempt's own scoping diagnostics start, so that a later context with
+          | _ when Option.is_some (failure_of scope) ->
+              let ill_scoped, diagnostics = Option.get (failure_of scope) in
+              List.iter (Dynarray.add_last scoping_diagnostics) diagnostics;
+              record_attempt ill_scoped;
+              look_for_scope contexts
+          | _ ->
+              (* Now we remove any of the bindables of the term that already appear in the scope, so they don't get duplicated. *)
+              let bindables = Bindables.remove tm.value.bindables (Bwv.to_list scope) in
+              let tm = { tm with value = { tm.value with bindables } } in
+              (* We create a separate array of diagnostics to accumulate while checking this term, since we only want to record them if the scope succeeds. *)
+              let diagnostics = Dynarray.create () in
+              (* What this attempt, and only this attempt, finds out of scope. *)
+              let ill_scoped = ref [] in
+              (* Where this attempt's own scoping diagnostics start, so that a later context with
                this same scope can file them again without checking anything. *)
-            let filed = Dynarray.length scoping_diagnostics in
-            let ok =
-              (* Check if there are any edges coming *out* of the current port. *)
-              match SourceMap.find_opt p fwd_graph with
-              | Some es ->
-                  (* If so, for each of them, we add it to the label of the current term, ascribe by its user label if any, and proceed, accumulating errors from all cases and requiring them all to succeed. *)
-                  List.fold_left
-                    (fun ok (e : Edge.t) ->
-                      let tm = ascribe_with_user_label (Loc.append_to_loc tm [ `Edge e.id ]) e in
-                      ok && synth_term_in_scope ~ill_scoped status ctx scope tm diagnostics)
-                    true es
-              | None ->
-                  (* Otherwise, we just go ahead. *)
-                  synth_term_in_scope ~ill_scoped status ctx scope tm diagnostics in
-            (* If all of those checkings succeeded, we report success and our diagnostics; otherwise we discard those diagnostics and go on to the next scope. *)
-            if ok then (
-              Dynarray.append diagnostics hole_diagnostics;
-              `Found_scope diagnostics)
-            else (
-              failed_scopes :=
-                ( Obj.repr scope,
-                  ( !ill_scoped,
-                    List.init
-                      (Dynarray.length scoping_diagnostics - filed)
-                      (fun i -> Dynarray.get scoping_diagnostics (filed + i)) ) )
-                :: !failed_scopes;
-              record_attempt !ill_scoped;
-              look_for_scope contexts))
-  (* Try to synthesize a term in a given scope.  Returns true if the term is well *scoped*, even if it doesn't synthesize.  Record typechecking errors to the supplied diagnostics array. *)
-  and synth_term_in_scope : type a b s.
-      ill_scoped:Port.t list ref ->
-      (mode, b, s) status ->
-      (mode, a, b) Ctx.t ->
-      (unit, a) Resolver.scope ->
-      term_with_bindables located ->
-      Diagnostic.js Js.t Dynarray.t ->
-      bool =
-   fun ~ill_scoped status ctx scope tm diagnostics ->
-    (* We first bind it and check that it's synthesizing. *)
-    match sbind tm with
-    | Some stm ->
-        (* Resolve to a term with De Bruijn indices.  RequireScoping true means that this will throw "ill-scoped connection" errors.  If we get any such error, that means this scope is no good, so we bail out and go on to the next one.  If we get *other* errors, we must have found a good scope and be typechecking, so we report them as the result. *)
-        Reporter.try_with
-          ~emit:(fun d ->
-            (* Non-fatal diagnostics emitted while checking this candidate term (e.g. a match that
+              let filed = Dynarray.length scoping_diagnostics in
+              let ok =
+                (* Check if there are any edges coming *out* of the current port. *)
+                match SourceMap.find_opt p fwd_graph with
+                | Some es ->
+                    (* If so, for each of them, we add it to the label of the current term, ascribe by its user label if any, and proceed, accumulating errors from all cases and requiring them all to succeed. *)
+                    List.fold_left
+                      (fun ok (e : Edge.t) ->
+                        let tm = ascribe_with_user_label (Loc.append_to_loc tm [ `Edge e.id ]) e in
+                        ok && synth_term_in_scope ~ill_scoped status ctx scope tm diagnostics)
+                      true es
+                | None ->
+                    (* Otherwise, we just go ahead. *)
+                    synth_term_in_scope ~ill_scoped status ctx scope tm diagnostics in
+              (* If all of those checkings succeeded, we report success and our diagnostics; otherwise we discard those diagnostics and go on to the next scope. *)
+              if ok then (
+                Dynarray.append diagnostics hole_diagnostics;
+                `Found_scope diagnostics)
+              else (
+                failed_scopes :=
+                  ( Obj.repr scope,
+                    ( !ill_scoped,
+                      List.init
+                        (Dynarray.length scoping_diagnostics - filed)
+                        (fun i -> Dynarray.get scoping_diagnostics (filed + i)) ) )
+                  :: !failed_scopes;
+                record_attempt !ill_scoped;
+                look_for_scope contexts))
+    (* Try to synthesize a term in a given scope.  Returns true if the term is well *scoped*, even if it doesn't synthesize.  Record typechecking errors to the supplied diagnostics array. *)
+    and synth_term_in_scope : type a b s.
+        ill_scoped:Port.t list ref ->
+        (mode, b, s) status ->
+        (mode, a, b) Ctx.t ->
+        (unit, a) Resolver.scope ->
+        term_with_bindables located ->
+        Diagnostic.js Js.t Dynarray.t ->
+        bool =
+     fun ~ill_scoped status ctx scope tm diagnostics ->
+      (* We first bind it and check that it's synthesizing. *)
+      match sbind tm with
+      | Some stm ->
+          (* Resolve to a term with De Bruijn indices.  RequireScoping true means that this will throw "ill-scoped connection" errors.  If we get any such error, that means this scope is no good, so we bail out and go on to the next one.  If we get *other* errors, we must have found a good scope and be typechecking, so we report them as the result. *)
+          Reporter.try_with
+            ~emit:(fun d ->
+              (* Non-fatal diagnostics emitted while checking this candidate term (e.g. a match that
                won't refine the goal of a disconnected fragment).  We must handle them here: this
                whole synthesis runs outside check's ambient Reporter handler, so an unhandled emit
                would abort the command via History.do_command, deleting its metavariables and leaving
                dangling references ("undefined metavariable" anomaly). *)
-            match d.message with
-            | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
-            | _ -> Diagnostic.add diagnostics true d)
-          ~fatal:(fun d ->
-            match d.message with
-            | Ill_scoped_connection | Cyclic_term ->
-                (* But we do record the scoping diagnostic to the *overall* outside one, to be saved. *)
-                Diagnostic.add scoping_diagnostics true d;
-                false
-            | _ ->
-                (* If we get a different fatal error, that means *scope* checking still succeeded, since this is a typechecking error. *)
-                Diagnostic.add diagnostics true d;
-                true)
-        @@ fun () ->
-        let (stm, scopes) : a Raw.synth located * Resolver.scopes =
-          (* We only want to record the new scopes observed in the case that succeeds (if any), so we make a new map in each "go" invocation. *)
-          Scopes.run ~init:Resolver.no_scopes @@ fun () ->
-          let stm =
-            RequireScoping.run ~env:{ bail_out = true; ill_scoped } @@ fun () ->
-            Resolve.synth scope stm in
-          (stm, Scopes.get ()) in
-        (* But if parsing and resolution succeeded, we merge the scopes we found during this parsing run with the ambient ones.  We have to do this before typechecking it, so that they're available for annotate_ctx_handler to attach to. *)
-        Resolver.add_scopes scopes;
-        (* Now typecheck it, discarding the result (the point is only to annotate). *)
-        ( run @@ fun () ->
-          let _ = Check.synth status ctx stm in
-          () );
-        (* And we report scoping success, along with any hole diagnostics created. *)
-        true
-    (* If parsing succeeds but does not produce a synthesizing term, we still report success, since the wires may be connected correctly but we just don't have enough information to typecheck. *)
-    | None -> true in
-  look_for_scope contexts
+              match d.message with
+              | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
+              | _ -> Diagnostic.add diagnostics true d)
+            ~fatal:(fun d ->
+              match d.message with
+              | Ill_scoped_connection | Cyclic_term ->
+                  (* But we do record the scoping diagnostic to the *overall* outside one, to be saved. *)
+                  Diagnostic.add scoping_diagnostics true d;
+                  false
+              | _ ->
+                  (* If we get a different fatal error, that means *scope* checking still succeeded, since this is a typechecking error. *)
+                  Diagnostic.add diagnostics true d;
+                  true)
+          @@ fun () ->
+          let (stm, scopes) : a Raw.synth located * Resolver.scopes =
+            (* We only want to record the new scopes observed in the case that succeeds (if any), so we make a new map in each "go" invocation. *)
+            Scopes.run ~init:Resolver.no_scopes @@ fun () ->
+            let stm =
+              RequireScoping.run ~env:{ bail_out = true; ill_scoped } @@ fun () ->
+              Resolve.synth scope stm in
+            (stm, Scopes.get ()) in
+          (* But if parsing and resolution succeeded, we merge the scopes we found during this parsing run with the ambient ones.  We have to do this before typechecking it, so that they're available for annotate_ctx_handler to attach to. *)
+          Resolver.add_scopes scopes;
+          (* Now typecheck it, discarding the result (the point is only to annotate). *)
+          ( run @@ fun () ->
+            let _ = Check.synth status ctx stm in
+            () );
+          (* And we report scoping success, along with any hole diagnostics created. *)
+          true
+      (* If parsing succeeds but does not produce a synthesizing term, we still report success, since the wires may be connected correctly but we just don't have enough information to typecheck. *)
+      | None -> true in
+    look_for_scope contexts
 
 (* Attempt to parse and synthesize terms for all the supplied output ports, which should *not* be the sources of any connections (otherwise, they would get included while checking or synthesizing from other ports, and their diagnostics would be incorrectly reported from this function as not knowing about those edges).  If not all of them succeed, try again with those that failed (since new scopes and contexts may have been observed while synthesizing the others).  Repeat until there is no more progress.
 
@@ -1389,9 +1389,9 @@ let cut_edges (bad : Port.t list) (bwd : bwd_graph) : Edge.t list * bwd_graph =
       bwd in
   (!cut, pruned)
 
-let rec synth_output_ports ~(fuel : int) (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
-    (labels : (Locable.t, deferred_label) Hashtbl.t) (fwd_graph : fwd_graph) (bwd_graph : bwd_graph)
-    (contexts : context list ref)
+let rec synth_output_ports ~(fuel : int) (run : (unit -> unit) -> unit)
+    (vertices : Vertex.t IdMap.t) (labels : (Locable.t, deferred_label) Hashtbl.t)
+    (fwd_graph : fwd_graph) (bwd_graph : bwd_graph) (contexts : context list ref)
     (ports : (Port.t * Diagnostic.js Js.t Dynarray.t * Port.t list) list)
     (diagnostics : Diagnostic.js Js.t Dynarray.t) =
   let progress = ref false in
@@ -1592,7 +1592,8 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
       let concl_ty = Js.to_string conclusion##.ty in
       let (Wrap obsty) =
         Parse.Term.final
-          (Parse.Term.parse (`String { title = Some "type of conclusion"; content = concl_ty })) in
+          (Parse.Term.parse (`String { title = Some "type of conclusion"; content = concl_ty }))
+      in
       let rawty = Postprocess.process varscope obsty in
       (* We check the parameters to produce a context. *)
       let Checked_tel (cparams, ctx), _ = Check.check_tel (Ctx.empty mode) rawctx in
@@ -1611,7 +1612,7 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
     with Jserror msg ->
       Buffer.add_string errbuf msg;
       err_checked ()
-  (* Only reachable if something raises past the handler above, in which case the coroutine is
+    (* Only reachable if something raises past the handler above, in which case the coroutine is
      gone and the page needs a reload; we still hand JavaScript the message rather than an
      exception. *)
   with Top.Exit -> err_checked ()
@@ -1641,8 +1642,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
         Reporter.display ~output:stderr d;
         Out_channel.flush stderr;
         failed (Buffer.contents errbuf))
-    @@ fun () ->
-    try f () with Jserror msg -> failed msg in
+    @@ fun () -> try f () with Jserror msg -> failed msg in
   try
     (* Get the context and goal that were set by initialization. *)
     let (Problem (ctx, scope, conclusion_ty)) = Option.get !problem in
@@ -1690,7 +1690,9 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       IdMap.fold
         (fun _ (v : Vertex.t) ps ->
           (* We do have to consider even the ones that have a wire running out of them, because it might be connected to a non-synthesizing term from which we couldn't even get started, whereas this term might itself be synthesizing.  *)
-          List.map (fun p -> (p, Dynarray.create (), [])) (outputs_of_vertex v @ assumptions_of_vertex v)
+          List.map
+            (fun p -> (p, Dynarray.create (), []))
+            (outputs_of_vertex v @ assumptions_of_vertex v)
           @ ps)
         vertices [] in
     (* Both the conclusion check and the synthesis of disconnected ports must run *inside* the same
@@ -1708,8 +1710,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       (* Create the dummy "definition" constant in this command's origin (see const_ty). *)
       let c = Constant.make () in
       Global.add c
-        (Definition
-           { mode; ty = Option.get !const_ty; tm = `Axiom; parametric = `Parametric });
+        (Definition { mode; ty = Option.get !const_ty; tm = `Axiom; parametric = `Parametric });
       let r =
         Reporter.try_with
           ~emit:(fun d ->
@@ -1779,65 +1780,65 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
 (* We interface with JavaScript by exporting an object called 'Narya' with methods. *)
 let _ =
   Js.export "Narya"
-    (object%js
-       (* One-time global initialization; call exactly once before the first `start`. *)
-       method init =
-         Oracle.Callback.halt ();
-         init ()
+    object%js
+      (* One-time global initialization; call exactly once before the first `start`. *)
+      method init =
+        Oracle.Callback.halt ();
+        init ()
 
-       method start (parameters : Variable.js Js.t Js.js_array Js.t)
-           (variables : Variable.js Js.t Js.js_array Js.t)
-           (hypotheses : Variable.js Js.t Js.js_array Js.t) (conclusion : Variable.js Js.t) =
-         Oracle.Callback.halt ();
-         start parameters variables hypotheses conclusion
+      method start (parameters : Variable.js Js.t Js.js_array Js.t)
+          (variables : Variable.js Js.t Js.js_array Js.t)
+          (hypotheses : Variable.js Js.t Js.js_array Js.t) (conclusion : Variable.js Js.t) =
+        Oracle.Callback.halt ();
+        start parameters variables hypotheses conclusion
 
-       method check (vertices : Vertex.js Js.t Js.js_array Js.t)
-           (edges : Edge.js Js.t Js.js_array Js.t) : js_checked Js.t =
-         Oracle.Callback.halt ();
-         Oracle.Callback.run @@ fun () -> check vertices edges
+      method check (vertices : Vertex.js Js.t Js.js_array Js.t)
+          (edges : Edge.js Js.t Js.js_array Js.t) : js_checked Js.t =
+        Oracle.Callback.halt ();
+        Oracle.Callback.run @@ fun () -> check vertices edges
 
-       method reenter (response : bool Js.t) = Oracle.Callback.reenter (Js.to_bool response)
+      method reenter (response : bool Js.t) = Oracle.Callback.reenter (Js.to_bool response)
 
-       (* Check validity of a new local variable name.  We do this in OCaml rather than JavaScript so that we can actually call the lexer, ensuring it remains as consistent as possible with Narya. *)
-       method checkVariable (str : Js.js_string Js.t) =
-         (* We have to put it in the Pauser too, since the lexer has to perform some effects. *)
-         Pauser.next @@ fun () ->
-         let str = Js.to_string str in
-         (* The lexer skips whatever space surrounds the name, so it is the identifier it came back
+      (* Check validity of a new local variable name.  We do this in OCaml rather than JavaScript so that we can actually call the lexer, ensuring it remains as consistent as possible with Narya. *)
+      method checkVariable (str : Js.js_string Js.t) =
+        (* We have to put it in the Pauser too, since the lexer has to perform some effects. *)
+        Pauser.next @@ fun () ->
+        let str = Js.to_string str in
+        (* The lexer skips whatever space surrounds the name, so it is the identifier it came back
             with, and not the string as typed, that the restrictions below have to be tested
             against: comparing the raw string would let " ℝ₊" or " 0x" past every one of them. *)
-         let ok =
-           match Parser.Lexer.single str with
-           | Some (Ident [ name ]) ->
-               (* Unlike vanilla Narya, we don't let the user shoot themselves in the foot by starting a variable with a numeral or using a special one-character operator. *)
-               (not ('0' <= name.[0] && name.[0] <= '9'))
-               && (not (Array.exists (fun (_, x) -> x = Token.Ident [ name ]) onechar_ops))
-               (* Nor one of the multi-character tokens that a notation reserves, like the ℝ₊ that
+        let ok =
+          match Parser.Lexer.single str with
+          | Some (Ident [ name ]) ->
+              (* Unlike vanilla Narya, we don't let the user shoot themselves in the foot by starting a variable with a numeral or using a special one-character operator. *)
+              (not ('0' <= name.[0] && name.[0] <= '9'))
+              && (not (Array.exists (fun (_, x) -> x = Token.Ident [ name ]) onechar_ops))
+              (* Nor one of the multi-character tokens that a notation reserves, like the ℝ₊ that
                   says which set a quantifier ranges over. *)
-               && not (List.mem (Token.Ident [ name ]) special_set_idents)
-           | _ -> false in
-         (* And since the Pauser always returns the same type, we have to return a js_checked, so we just put the validity test in the 'complete' field. *)
-         object%js
-           val mutable complete = Js.bool ok
-           val mutable callback = Js.null
-           val mutable error = Js.null
-           val mutable labels = Js.array (Array.of_list [])
-           val mutable diagnostics = Js.array (Array.of_list [])
-         end
+              && not (List.mem (Token.Ident [ name ]) special_set_idents)
+          | _ -> false in
+        (* And since the Pauser always returns the same type, we have to return a js_checked, so we just put the validity test in the 'complete' field. *)
+        object%js
+          val mutable complete = Js.bool ok
+          val mutable callback = Js.null
+          val mutable error = Js.null
+          val mutable labels = Js.array (Array.of_list [])
+          val mutable diagnostics = Js.array (Array.of_list [])
+        end
 
-       (* Similarly, check that an expression parses.  (Whether it typechecks, including whether its variables resolve, depends on what wires it connects to and hence is in the scope of.) *)
-       method checkParse (str : Js.js_string Js.t) =
-         Pauser.next @@ fun () ->
-         let str = Js.to_string str in
-         let ok =
-           Reporter.try_with ~fatal:(fun _ -> false) @@ fun () ->
-           let _ = Parse.Term.final (Parse.Term.parse (`String { title = None; content = str })) in
-           true in
-         object%js
-           val mutable complete = Js.bool ok
-           val mutable callback = Js.null
-           val mutable error = Js.null
-           val mutable labels = Js.array (Array.of_list [])
-           val mutable diagnostics = Js.array (Array.of_list [])
-         end
-    end)
+      (* Similarly, check that an expression parses.  (Whether it typechecks, including whether its variables resolve, depends on what wires it connects to and hence is in the scope of.) *)
+      method checkParse (str : Js.js_string Js.t) =
+        Pauser.next @@ fun () ->
+        let str = Js.to_string str in
+        let ok =
+          Reporter.try_with ~fatal:(fun _ -> false) @@ fun () ->
+          let _ = Parse.Term.final (Parse.Term.parse (`String { title = None; content = str })) in
+          true in
+        object%js
+          val mutable complete = Js.bool ok
+          val mutable callback = Js.null
+          val mutable error = Js.null
+          val mutable labels = Js.array (Array.of_list [])
+          val mutable diagnostics = Js.array (Array.of_list [])
+        end
+    end

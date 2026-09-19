@@ -19,26 +19,30 @@ module Oracle = struct
   type block = [ `Alg | `Algplus | `Algneq ]
 
   type Reporter.oracle_error +=
-    (* The goal doesn't follow from the hypotheses by algebra. *)
-    | Unprovable
-    (* A denominator that isn't provably nonzero, or an even root whose base isn't provably
+    | (* The goal doesn't follow from the hypotheses by algebra. *)
+        Unprovable
+    | (* A denominator that isn't provably nonzero, or an even root whose base isn't provably
        nonnegative: the term in question. *)
-    | Zero_denominator of printable
+        Zero_denominator of
+        printable
     | Negative_base of printable
-    (* A disequality between things that aren't both literals. *)
-    | Disequality
-    (* An absolute value, min or max that the hypotheses don't decide: the term containing it. *)
-    | Undecided_sign of printable
+    | (* A disequality between things that aren't both literals. *)
+        Disequality
+    | (* An absolute value, min or max that the hypotheses don't decide: the term containing it. *)
+        Undecided_sign of
+        printable
     | Undecided_order of printable
-    (* A goal, or an input, that isn't a relation at all: the block that wouldn't take it, and the
+    | (* A goal, or an input, that isn't a relation at all: the block that wouldn't take it, and the
        statement in question.  A goal like that is only reported once the hypotheses have turned
        out to be consistent, since a contradiction among them proves it (see oracle.ml); an input
        like that is refused outright. *)
-    | Not_a_relation of block * printable
+        Not_a_relation of
+        block * printable
     | Not_a_relation_input of block * printable
-    (* Neither of these can happen unless olorin has elaborated an algebra block wrongly: the
+    | (* Neither of these can happen unless olorin has elaborated an algebra block wrongly: the
        hypotheses aren't a list, or the block isn't an application of an oracle constant. *)
-    | Not_a_hypothesis_list of printable
+        Not_a_hypothesis_list of
+        printable
     | Not_an_oracle_application of printable
 end
 
@@ -78,33 +82,34 @@ let oracle_failed : Reporter.oracle_error -> string option =
   function
   | Unprovable ->
       Some
-        "I couldn't prove this from the inputs to the algebra block.  Either it doesn't \
-         follow from them by algebra alone, or a hypothesis it needs isn't connected."
+        "I couldn't prove this from the inputs to the algebra block.  Either it doesn't follow from them by algebra alone, or a hypothesis it needs isn't connected."
   | Zero_denominator p ->
       Option.map
         (fun den ->
-          "I couldn't prove that" ^ display den
+          "I couldn't prove that"
+          ^ display den
           ^ "is nonzero, so I can't divide by it.  Wire in a hypothesis ensuring it's nonzero.")
         (printed p)
   | Negative_base p ->
       Option.map
         (fun b ->
-          "I couldn't prove that" ^ display b
+          "I couldn't prove that"
+          ^ display b
           ^ "is nonnegative, so I can't take an even root of it.  Wire in a hypothesis ensuring it's nonnegative.")
         (printed p)
   | Undecided_sign p ->
       Option.map
         (fun x ->
-          "Before I can prove anything about the absolute value of" ^ display x
-          ^ "I have to know which way that goes, so that the absolute value goes away.  Wire in a \
-             hypothesis making it nonnegative or nonpositive (perhaps by doing a case split).")
+          "Before I can prove anything about the absolute value of"
+          ^ display x
+          ^ "I have to know which way that goes, so that the absolute value goes away.  Wire in a hypothesis making it nonnegative or nonpositive (perhaps by doing a case split).")
         (printed p)
   | Undecided_order p ->
       Option.map
         (fun x ->
-          "Before I can prove anything about" ^ display x
-          ^ "I have to know which of those two numbers is the smaller, so that the min or max goes \
-             away.  Wire in a hypothesis saying which is bigger (perhaps by doing a case split).")
+          "Before I can prove anything about"
+          ^ display x
+          ^ "I have to know which of those two numbers is the smaller, so that the min or max goes away.  Wire in a hypothesis saying which is bigger (perhaps by doing a case split).")
         (printed p)
   | Disequality ->
       Some
@@ -112,35 +117,32 @@ let oracle_failed : Reporter.oracle_error -> string option =
   | Not_a_relation (block, p) ->
       Option.map
         (fun ty ->
-          (match block with
+          match block with
           | `Alg | `Algneq ->
-              "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless \
-               its inputs are contradictory.  The goal it's wired to here is" ^ display ty
+              "The algebra block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), unless its inputs are contradictory.  The goal it's wired to here is"
+              ^ display ty
               ^ "which isn't one of them, and its inputs are not contradictory."
           | `Algplus ->
-              "The alg+ block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and \
-               conjunctions (∧) and disjunctions (∨) of them, unless its inputs are contradictory.  \
-               The goal it's wired to here is" ^ display ty
-              ^ "which isn't one of those, and its inputs are not contradictory."))
+              "The alg+ block only proves equations and inequalities (=, ≠, <, ≤, >, ≥), and conjunctions (∧) and disjunctions (∨) of them, unless its inputs are contradictory.  The goal it's wired to here is"
+              ^ display ty
+              ^ "which isn't one of those, and its inputs are not contradictory.")
         (printed ~sort:`Type p)
   | Not_a_relation_input (block, p) ->
       Option.map
         (fun ty ->
           (match block with
-          | `Alg | `Algneq ->
-              "Everything wired into the algebra block has to be an equation or inequality (=, ≠, \
-               <, ≤, >, ≥).  This one is"
-          | `Algplus ->
-              "Everything wired into the alg+ block has to be an equation or inequality (=, ≠, <, \
-               ≤, >, ≥), or a conjunction (∧) of those.  This one is")
-          ^ display ty ^ "which isn't one of them.")
+            | `Alg | `Algneq ->
+                "Everything wired into the algebra block has to be an equation or inequality (=, ≠, <, ≤, >, ≥).  This one is"
+            | `Algplus ->
+                "Everything wired into the alg+ block has to be an equation or inequality (=, ≠, <, ≤, >, ≥), or a conjunction (∧) of those.  This one is")
+          ^ display ty
+          ^ "which isn't one of them.")
         (printed ~sort:`Type p)
   (* Neither of these is anything the player did; Narya has nothing to say about our tags, so we
      say what we can here rather than leaving a bare "oracle failed". *)
   | Not_a_hypothesis_list p ->
       Some
-        ("Something has gone wrong inside Olorin: what's wired into this algebra block isn't a \
-          list of statements, but"
+        ("Something has gone wrong inside Olorin: what's wired into this algebra block isn't a list of statements, but"
         ^ Option.fold ~none:" something unprintable." ~some:display (printed p))
   | Not_an_oracle_application p ->
       Some
@@ -154,17 +156,19 @@ let explain : Code.t -> string option = function
       match (printed ~sort:`Type got, printed ~sort:`Type expected) with
       | Some got, Some expected ->
           Some
-            ("This wire carries a proof of" ^ display got
-           ^ "but the block it runs into needs a proof of" ^ display expected)
+            ("This wire carries a proof of"
+            ^ display got
+            ^ "but the block it runs into needs a proof of"
+            ^ display expected)
       | _, _ -> None)
   (* An introduction block wired to a goal that isn't of its shape.  Narya defines ∧, ⇒, ⇔, ∀ and ¬
      as record types, so building one at the wrong goal reads as checking a tuple. *)
   | Checking_tuple_at_nonrecord ty ->
       Option.map
         (fun ty ->
-          "This block proves a conjunction (A∧B), an implication (A⇒B), a \
-           biconditional (A⇔B), a universal (∀x∈A,…) or a negation (¬A).  But the goal \
-           it's wired to is" ^ display ty ^ "which isn't any of those.")
+          "This block proves a conjunction (A∧B), an implication (A⇒B), a biconditional (A⇔B), a universal (∀x∈A,…) or a negation (¬A).  But the goal it's wired to is"
+          ^ display ty
+          ^ "which isn't any of those.")
         (printed ~sort:`Type ty)
   (* An introduction block for ∨ or ∃, which are datatypes, wired to a goal of the wrong shape. *)
   | No_such_constructor (d, c) -> (
@@ -176,8 +180,11 @@ let explain : Code.t -> string option = function
       match (connective_of_constr (Constr.to_string c), ty) with
       | Some shape, Some ty ->
           Some
-            ("This block proves " ^ shape ^ ", but the goal it's wired to is" ^ display ty
-           ^ "which isn't of that form.")
+            ("This block proves "
+            ^ shape
+            ^ ", but the goal it's wired to is"
+            ^ display ty
+            ^ "which isn't of that form.")
       | _, _ -> None)
   (* An introduction block wired to a goal that's a record of the right general kind, but the
      wrong specific one -- e.g. an ordinary ∀-introduction wired to a ∀x∈ℝ₊ or ∀x∈[n] goal.  ∧, ⇒,
@@ -188,7 +195,10 @@ let explain : Code.t -> string option = function
   | Missing_field_in_tuple (f, _) -> (
       match connective_of_field (Field.to_string f) with
       | Some shape ->
-          Some ("This block doesn't prove " ^ shape ^ ", but the goal it's wired to needs exactly that.")
+          Some
+            ("This block doesn't prove "
+            ^ shape
+            ^ ", but the goal it's wired to needs exactly that.")
       | None -> None)
   (* An elimination block fed something that isn't of the shape it takes apart.  The payload names
      the offending term rather than its type, and that term is an internal variable, so we describe
@@ -203,8 +213,9 @@ let explain : Code.t -> string option = function
       match connective_of_field name with
       | Some shape ->
           Some
-            ("This block takes apart " ^ shape
-           ^ ", but what's wired into it is a proof of something else.")
+            ("This block takes apart "
+            ^ shape
+            ^ ", but what's wired into it is a proof of something else.")
       | None -> None)
   (* Case-splitting on a proof that offers no cases. *)
   | Matching_on_nondatatype ty ->
@@ -220,32 +231,25 @@ let explain : Code.t -> string option = function
       Some "This part of the proof isn't finished: something that needs to be connected isn't."
   | Nonsynthesizing _ ->
       Some
-        "I can't tell what statement belongs here.  Connect a wire to this \
-         input, or use a label block to say what it should be."
+        "I can't tell what statement belongs here.  Connect a wire to this input, or use a label block to say what it should be."
   (* Wires that lead out of a block and back into it. *)
   | Cyclic_term ->
       Some
-        "These wires run in a circle: following them out of a block leads back into that same \
-         block, so one of these steps would end up justifying itself.  A proof has to build up \
-         from what is already known, so the wires can't loop."
+        "These wires run in a circle: following them out of a block leads back into that same block, so one of these steps would end up justifying itself.  A proof has to build up from what is already known, so the wires can't loop."
   (* An assumption or bound variable wired out of the block that introduced it. *)
   | Ill_scoped_connection ->
       Some
-        "This wire carries an assumption, or a variable, out of the block that introduced it.  \
-         Such a thing only exists inside its own block, so it can only be used on the way to that \
-         block's subgoal."
+        "This wire carries an assumption, or a variable, out of the block that introduced it.  Such a thing only exists inside its own block, so it can only be used on the way to that block's subgoal."
   (* An assumption wired into a fragment that leads nowhere, out of a block that nothing ever
      elaborates: its output is dangling, or leads only somewhere that dangles.  Nothing is being
      carried anywhere, and there is no scope to escape from yet, so the message above would point at
      the wrong thing. *)
   | Unattached_assumption ->
       Some
-        "This wire carries an assumption, or a variable, out of a block whose own output isn't \
-         wired into the proof yet.  Until it is, I can't tell what that block is proving, so \
-         I don't know what this assumption says either: connect the block's output on the way to \
-         the goal."
+        "This wire carries an assumption, or a variable, out of a block whose own output isn't wired into the proof yet.  Until it is, I can't tell what that block is proving, so I don't know what this assumption says either: connect the block's output on the way to the goal."
   | Unbound_variable (x, _) ->
       Some
-        ("There is no variable called " ^ x
-       ^ " here.  A variable introduced by a block is only in scope inside that block.")
+        ("There is no variable called "
+        ^ x
+        ^ " here.  A variable introduced by a block is only in scope inside that block.")
   | _ -> None

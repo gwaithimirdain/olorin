@@ -216,7 +216,8 @@ module Variable = struct
     let id, name, ty =
       (Id.Id (Js.to_string v##.id), option_of_string_optdef v##.name, Js.to_string v##.ty) in
     vars :=
-      !vars |> IdMap.add id ({ id; names = Option.to_list name; rule = Var; value = Some ty } : Vertex.t);
+      !vars
+      |> IdMap.add id ({ id; names = Option.to_list name; rule = Var; value = Some ty } : Vertex.t);
     { id; name; ty; cls }
 end
 
@@ -383,11 +384,14 @@ module Diagnostic = struct
     method isfatal : bool Js.t Js.prop
     method locs : js_loc Js.t Js.js_array Js.t Js.prop
     method text : Js.js_string Js.t Js.prop
+
     (* Narya's short code for the error, e.g. "E0401". *)
     method code : Js.js_string Js.t Js.prop
+
     (* A student-facing explanation of the error, for the tooltip on the wire it's reported at.
        Null for the codes Explain doesn't cover, which fall back to Narya's own text. *)
     method explanation : Js.js_string Js.t Js.opt Js.prop
+
     (* For a type mismatch on a wire, the two types that don't match: what the term coming out of
        the source port synthesized, and what the target port expected.  Null for anything else. *)
     method got : Js.js_string Js.t Js.opt Js.prop
@@ -423,6 +427,7 @@ module Diagnostic = struct
         Option.fold ~none:Js.null
           ~some:(fun x -> Js.some (Js.string x))
           (Explain.explain (d.message :> Code.t))
+
       val mutable got = got
       val mutable expected = expected
     end
@@ -493,7 +498,9 @@ module Symbolic = struct
     | `Max (p, q) -> "Max(" ^ to_string p ^ ", " ^ to_string q ^ ")"
     | `Var i -> "Var(" ^ string_of_int i ^ ")"
     | `App (f, args) ->
-        "App(" ^ string_of_int f ^ String.concat "" (List.map (fun x -> ", " ^ to_string x) args)
+        "App("
+        ^ string_of_int f
+        ^ String.concat "" (List.map (fun x -> ", " ^ to_string x) args)
         ^ ")"
     | `Const n -> "Const(" ^ Q.to_string n ^ ")"
 end

@@ -126,8 +126,7 @@ let rec get_equality_or_inequality ~(block : Explain.Oracle.block) ctx tm =
           let* op =
             if Some name = eq then return `Eq
             else if Some name = neq then return `Neq
-            else Error (Code.Oracle_failed (Not_a_relation (block, Printable.PVal (ctx, tm))))
-          in
+            else Error (Code.Oracle_failed (Not_a_relation (block, Printable.PVal (ctx, tm)))) in
           return (op, ty.tm, lhs, rhs)
       (* An ordering takes only the two sides. *)
       | Some [ lhs; rhs ] when List.mem_assoc name orders ->
@@ -210,8 +209,7 @@ let comparable ctx ty ty' =
    so there is a largest.  A statement about anything else is comparable with nothing and leaves
    this alone. *)
 let widest ctx =
-  List.fold_left (fun ty (_, ty', _, _) ->
-      if Result.is_ok (subtype_of ctx ty ty') then ty' else ty)
+  List.fold_left (fun ty (_, ty', _, _) -> if Result.is_ok (subtype_of ctx ty ty') then ty' else ty)
 
 (* Pair each relation with the type to translate it at: that one, when the relation is about the
    same kind of number, so that a subterm two of them share gets the same variable; otherwise its
@@ -281,8 +279,7 @@ let rec get_posint tm =
   | Constr (name, dim, [ arg ]) when name = Constr.intern "suc" -> (
       match D.compare_zero dim with
       | Zero ->
-          Option.bind (get_constr_arg arg) (fun arg ->
-              Option.map (fun n -> n + 1) (get_posint arg))
+          Option.bind (get_constr_arg arg) (fun arg -> Option.map (fun n -> n + 1) (get_posint arg))
       | Pos _ -> None)
   | _ -> None
 
@@ -343,9 +340,7 @@ let get_funhead : mode head -> funhead option = function
 let is_natural ty =
   match Norm.view_term ty with
   | Neu { head = Const { name; ins }; args; _ } ->
-      Option.is_some (is_id_ins ins)
-      && get_args args = Some []
-      && Some name = Scope.lookup [ "ℕ" ]
+      Option.is_some (is_id_ins ins) && get_args args = Some [] && Some name = Scope.lookup [ "ℕ" ]
   | _ -> false
 
 (* State threaded through the translation of a term into a Z3 expression. *)
@@ -417,8 +412,13 @@ let get_poly ctx ty tm =
      'src' is the term to point at if an obligation can't be discharged. *)
   let rec power ty tm base e src =
     let n, d = (Q.num e, Q.den e) in
-    if not (Z.fits_int n && Z.fits_int d && Z.leq (Z.abs n) (Z.of_int max_exponent)
-            && Z.leq d (Z.of_int max_exponent)) then opaque ty tm
+    if
+      not
+        (Z.fits_int n
+        && Z.fits_int d
+        && Z.leq (Z.abs n) (Z.of_int max_exponent)
+        && Z.leq d (Z.of_int max_exponent))
+    then opaque ty tm
     else
       let n, d = (Z.to_int n, Z.to_int d) in
       (* base^n, with a negative n written as a reciprocal so the denominator obligation applies. *)
@@ -437,8 +437,7 @@ let get_poly ctx ty tm =
         let* () =
           if fresh then
             add_step
-              (Define
-                 ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
+              (Define ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
           else return () in
         return s
   (* A term the arithmetic doesn't interpret.  A numeral is the constant it names.  An application
@@ -455,17 +454,17 @@ let get_poly ctx ty tm =
         (* A neutral carries its own type, and that is the one that says whether it's a natural --
            not the kind of number the arithmetic around it is about, which a natural reaches by
            being contained in it. *)
-        | Neu { head; args; ty = tmty; _ } -> (
+        | Neu { head; args; ty = tmty; _ } ->
             let* v =
               (* The Eq is what says the head is at the ambient mode, so it can be one of ours. *)
               match get_head_args args with
-              | Some (Eq, ((_ :: _) as args)) when Option.is_some (get_funhead head) ->
+              | Some (Eq, (_ :: _ as args)) when Option.is_some (get_funhead head) ->
                   let hd = Option.get (get_funhead head) in
                   let* f = fun_for hd (List.length args) in
                   let* args = go_args ty args in
                   return (`App (f, args))
               | _ -> var ty tm in
-            natural (Lazy.force tmty) v)
+            natural (Lazy.force tmty) v
         | _ -> var ty tm)
   and var ty tm =
     let* v, _ = var_for ctx ty tm in
@@ -541,9 +540,10 @@ let get_poly ctx ty tm =
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }
       when Option.is_some (is_id_ins ins)
-           && (match get_args args with
-              | Some [ _ ] -> true
-              | _ -> false) -> (
+           &&
+           match get_args args with
+           | Some [ _ ] -> true
+           | _ -> false -> (
         let src =
           match get_args args with
           | Some [ x ] -> x.tm
@@ -603,38 +603,36 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      succeeds; it is how the types get to know that. *)
   match Modal.Mode.compare (Ctx.mode ctx) Omode.mode with
   | Neq -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm))))
-  | Eq ->
-  (* The two algebra blocks ask through constants of their own, so the question says which one is
+  | Eq -> (
+      (* The two algebra blocks ask through constants of their own, so the question says which one is
      asking: the "plus" block decides an absolute value, a minimum or a maximum itself, while the
      plain one requires the hypotheses to settle each of those first (see Cases below). *)
-  let oracle = Scope.lookup [ "oracle" ] in
-  let oracle_neq = Scope.lookup [ "oracle_neq" ] in
-  let oracle_plus = Scope.lookup [ "oracle_plus" ] in
-  let* block, givens, goal =
-    match Norm.view_term tm with
-    | Neu { head = Const { name; ins }; args; _ }
-      when Option.is_some (is_id_ins ins)
-           && (match get_args args with
-              | Some [ _; _; _ ] -> true
-              | _ -> false) ->
-        let givens, goal =
-          match get_args args with
-          | Some [ givens; _; goal ] -> (givens, goal)
-          | _ -> assert false in
-        if Some name = oracle then
-          return (`Alg, givens, goal)
-        else if Some name = oracle_plus then
-          return (`Algplus, givens, goal)
-        else if Some name = oracle_neq then
-          return (`Algneq, givens, goal)
-        else
-          Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm))))
-    | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm)))) in
-  (* The "plus" block is the one that splits a statement apart, and the one that decides an
+      let oracle = Scope.lookup [ "oracle" ] in
+      let oracle_neq = Scope.lookup [ "oracle_neq" ] in
+      let oracle_plus = Scope.lookup [ "oracle_plus" ] in
+      let* block, givens, goal =
+        match Norm.view_term tm with
+        | Neu { head = Const { name; ins }; args; _ }
+          when Option.is_some (is_id_ins ins)
+               &&
+               match get_args args with
+               | Some [ _; _; _ ] -> true
+               | _ -> false ->
+            let givens, goal =
+              match get_args args with
+              | Some [ givens; _; goal ] -> (givens, goal)
+              | _ -> assert false in
+            if Some name = oracle then return (`Alg, givens, goal)
+            else if Some name = oracle_plus then return (`Algplus, givens, goal)
+            else if Some name = oracle_neq then return (`Algneq, givens, goal)
+            else Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm))))
+        | _ -> Error (Code.Oracle_failed (Not_an_oracle_application (Printable.PVal (ctx, tm))))
+      in
+      (* The "plus" block is the one that splits a statement apart, and the one that decides an
      absolute value, a minimum or a maximum on its own (see Cases below). *)
-  let plus = block = `Algplus in
-  let allow_neq = block = `Algneq in
-  (* The goal is a list of clauses, each a disjunction to prove against all of the hypotheses (see
+      let plus = block = `Algplus in
+      let allow_neq = block = `Algneq in
+      (* The goal is a list of clauses, each a disjunction to prove against all of the hypotheses (see
      get_clauses).  They all go through one translation, so that the same subterm gets the same
      variable throughout.
 
@@ -643,65 +641,65 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      empty, and what we ask below is whether the hypotheses are inconsistent on their own.  (The
      goal is still reported as a whole, rather than by the part that isn't a relation, as the
      hypotheses are reported by the whole wire.) *)
-  let nonalgebraic_goal =
-    Code.Oracle_failed (Not_a_relation (block, Printable.PNormal (ctx, goal))) in
-  let* goals =
-    match get_clauses ~split:plus ~block ctx goal.tm with
-    | Ok goals -> Ok goals
-    | Error (Code.Oracle_failed (Not_a_relation _)) -> Ok []
-    | Error e -> Error e in
-  let* givens = get_givens ~split:plus ~block ctx givens.tm in
-  (* The kind of number the block is *about* -- which decides what shares variables with what, and
+      let nonalgebraic_goal =
+        Code.Oracle_failed (Not_a_relation (block, Printable.PNormal (ctx, goal))) in
+      let* goals =
+        match get_clauses ~split:plus ~block ctx goal.tm with
+        | Ok goals -> Ok goals
+        | Error (Code.Oracle_failed (Not_a_relation _)) -> Ok []
+        | Error e -> Error e in
+      let* givens = get_givens ~split:plus ~block ctx givens.tm in
+      (* The kind of number the block is *about* -- which decides what shares variables with what, and
      nothing else -- comes from the first of the goal's relations, as a single relation's type was
      taken from the goal itself; with no goal relation to read it off, the first hypothesis serves
      instead.  If there is neither, there is nothing that could be inconsistent, so a non-algebraic
      goal fails here rather than at a query with no facts in it. *)
-  let* ty =
-    match List.concat goals @ givens with
-    | (_, ty, _, _) :: _ -> Ok ty
-    | [] -> Error nonalgebraic_goal in
-  (* Both ends are tagged together, so that a hypothesis about a larger number system than the goal
+      let* ty =
+        match List.concat goals @ givens with
+        | (_, ty, _, _) :: _ -> Ok ty
+        | [] -> Error nonalgebraic_goal in
+      (* Both ends are tagged together, so that a hypothesis about a larger number system than the goal
      pulls the goal up to it rather than being translated down. *)
-  let ty = widest ctx ty (List.concat goals @ givens) in
-  let goals = List.map (relation_types ctx ty) goals in
-  let givens = relation_types ctx ty givens in
-  let (givens, goals), { steps; _ } =
-    (let open Monad.Ops (S) in
-     let poly (op, ty, (x : mode normal), (y : mode normal)) =
-       let* x = get_poly ctx ty x.tm in
-       let* y = get_poly ctx ty y.tm in
-       return (op, x, y) in
-     let rec polys = function
-       | [] -> return []
-       | g :: gs ->
-           let* g = poly g in
-           let* gs = polys gs in
-           return (g :: gs) in
-     let rec clauses = function
-       | [] -> return []
-       | c :: cs ->
-           let* c = polys c in
-           let* cs = clauses cs in
-           return (c :: cs) in
-     (* The goal before the hypotheses, so that the side conditions come out in the order they did
+      let ty = widest ctx ty (List.concat goals @ givens) in
+      let goals = List.map (relation_types ctx ty) goals in
+      let givens = relation_types ctx ty givens in
+      let (givens, goals), { steps; _ } =
+        (let open Monad.Ops (S) in
+         let poly (op, ty, (x : mode normal), (y : mode normal)) =
+           let* x = get_poly ctx ty x.tm in
+           let* y = get_poly ctx ty y.tm in
+           return (op, x, y) in
+         let rec polys = function
+           | [] -> return []
+           | g :: gs ->
+               let* g = poly g in
+               let* gs = polys gs in
+               return (g :: gs) in
+         let rec clauses = function
+           | [] -> return []
+           | c :: cs ->
+               let* c = polys c in
+               let* cs = clauses cs in
+               return (c :: cs) in
+         (* The goal before the hypotheses, so that the side conditions come out in the order they did
         when a goal was always a single relation. *)
-     let* goals = clauses goals in
-     let* givens = polys givens in
-     return (givens, goals))
-      { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
-  (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
+         let* goals = clauses goals in
+         let* givens = polys givens in
+         return (givens, goals))
+          { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
+      (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
      literals, like 0≠1, unless the `Neq flag is in effect.  A disequality with anything else in it is one we want the student to
      prove by contradiction -- as a disjunct of a goal as much as on its own, since a disjunction
      with the other sides ruled out is a proof of that disequality like any other. *)
-  let* () =
-    List.fold_left
-      (fun acc (op, lhs, rhs) ->
-        let* () = acc in
-        if op = `Neq && not allow_neq && not (is_literal lhs && is_literal rhs) then
-          Error (Code.Oracle_failed Disequality)
-        else Ok ())
-      (Ok ()) (List.concat goals) in
-  (* Encoding division faithfully means the goal query below is sound whatever the denominators
+      let* () =
+        List.fold_left
+          (fun acc (op, lhs, rhs) ->
+            let* () = acc in
+            if op = `Neq && (not allow_neq) && not (is_literal lhs && is_literal rhs) then
+              Error (Code.Oracle_failed Disequality)
+            else Ok ())
+          (Ok ()) (List.concat goals) in
+      (* Encoding division faithfully means the goal query below is sound whatever the denominators
      turn out to be, since a statement about a quotient by zero is then a statement about an
      unspecified value.  But answering such questions isn't what the student wants: writing a
      quotient whose denominator might vanish is a mistake, so we insist the hypotheses force each
@@ -719,52 +717,50 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
      obligation against the hypotheses and the definitions before it, and gathering the definitions
      for the goal query.  An obligation never sees its own definition: "s >= 0 and s*s = x" implies
      x >= 0 all by itself, so checking with that in hand would be no check at all. *)
-  let rec discharge facts = function
-    | [] -> Ok facts
-    | Define defs :: rest -> discharge (defs @ facts) rest
-    | Nonzero (den, src) :: rest ->
-        if unsat ((`Eq, den, `Const Q.zero) :: facts) then discharge facts rest
-        else
-          Error (Code.Oracle_failed (Zero_denominator (Printable.PVal (ctx, src))))
-    | Nonneg (base, src) :: rest ->
-        if unsat ((`Lt, base, `Const Q.zero) :: facts) then discharge facts rest
-        else
-          Error (Code.Oracle_failed (Negative_base (Printable.PVal (ctx, src))))
-    (* Z3 decides a conditional on its own, so for the "plus" block there is nothing to discharge.
+      let rec discharge facts = function
+        | [] -> Ok facts
+        | Define defs :: rest -> discharge (defs @ facts) rest
+        | Nonzero (den, src) :: rest ->
+            if unsat ((`Eq, den, `Const Q.zero) :: facts) then discharge facts rest
+            else Error (Code.Oracle_failed (Zero_denominator (Printable.PVal (ctx, src))))
+        | Nonneg (base, src) :: rest ->
+            if unsat ((`Lt, base, `Const Q.zero) :: facts) then discharge facts rest
+            else Error (Code.Oracle_failed (Negative_base (Printable.PVal (ctx, src))))
+        (* Z3 decides a conditional on its own, so for the "plus" block there is nothing to discharge.
        For the plain one the hypotheses have to settle the comparison -- "a ≤ b" or "b ≤ a", either
        will do -- which is what makes the student split into cases by hand. *)
-    | Cases (which, a, b, src) :: rest ->
-        if plus || unsat ((`Lt, b, a) :: facts) || unsat ((`Lt, a, b) :: facts) then
-          discharge facts rest
-        else
-          let err =
-            match which with
-            | `Sign -> Undecided_sign (Printable.PVal (ctx, src))
-            | `Order -> Undecided_order (Printable.PVal (ctx, src)) in
-          Error (Code.Oracle_failed err) in
-  let* facts = discharge givens (Bwd.to_list steps) in
-  (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
+        | Cases (which, a, b, src) :: rest ->
+            if plus || unsat ((`Lt, b, a) :: facts) || unsat ((`Lt, a, b) :: facts) then
+              discharge facts rest
+            else
+              let err =
+                match which with
+                | `Sign -> Undecided_sign (Printable.PVal (ctx, src))
+                | `Order -> Undecided_order (Printable.PVal (ctx, src)) in
+              Error (Code.Oracle_failed err) in
+      let* facts = discharge givens (Bwd.to_list steps) in
+      (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
      swapping the order of the arguments (although for a (dis)equality swapping does nothing).  A
      conjunct with several disjuncts is negated all at once: what makes the disjunction follow is
      that the hypotheses can't be had along with every one of its sides failing. *)
-  let negate (op, lhs, rhs) =
-    let neg_op =
-      match op with
-      | `Eq -> `Neq
-      | `Neq -> `Eq
-      | `Lt -> `Le
-      | `Le -> `Lt in
-    (neg_op, rhs, lhs) in
-  match goals with
-  (* A goal that isn't algebraic at all, which we prove only by the hypotheses being contradictory:
+      let negate (op, lhs, rhs) =
+        let neg_op =
+          match op with
+          | `Eq -> `Neq
+          | `Neq -> `Eq
+          | `Lt -> `Le
+          | `Le -> `Lt in
+        (neg_op, rhs, lhs) in
+      match goals with
+      (* A goal that isn't algebraic at all, which we prove only by the hypotheses being contradictory:
      from a contradiction anything follows, that statement included.  Where they aren't, the
      complaint is that the goal isn't a relation, not that it doesn't follow by algebra. *)
-  | [] -> if unsat facts then Ok () else Error nonalgebraic_goal
-  | _ ->
-      List.fold_left
-        (fun acc clause ->
-          let* () = acc in
-          if unsat (List.map negate clause @ facts) then Ok ()
-          else Error (Code.Oracle_failed Unprovable))
-        (Ok ()) goals
+      | [] -> if unsat facts then Ok () else Error nonalgebraic_goal
+      | _ ->
+          List.fold_left
+            (fun acc clause ->
+              let* () = acc in
+              if unsat (List.map negate clause @ facts) then Ok ()
+              else Error (Code.Oracle_failed Unprovable))
+            (Ok ()) goals)

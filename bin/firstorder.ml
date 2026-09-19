@@ -187,7 +187,8 @@ notation \"lim\" s \"↗∞\" ≔ seqdiv_posinf s
 
 (* Raw.App now takes a *check* function and an *optional* check argument; these helpers build an
    explicit application of a synthesizing head to a list of explicit (always-present) arguments. *)
-let some_arg (c : 'a Raw.check located) : 'a Raw.check option located = locate_opt c.loc (Some c.value)
+let some_arg (c : 'a Raw.check located) : 'a Raw.check option located =
+  locate_opt c.loc (Some c.value)
 
 let rec apps (fn : 'a Raw.check located) (args : 'a Raw.check located list) : 'a Raw.check located =
   match args with
@@ -301,9 +302,7 @@ let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
    as a pair of tokens with a term between them, and each has a constant of its own whose field or
    constructor carries the condition defining the set -- 0<x, or x<n -- alongside x itself.
    A set with a term inside it hands that term to its constant as a first argument. *)
-type special_set =
-  | Bare of Token.t
-  | Bracketed of Token.t * Token.t
+type special_set = Bare of Token.t | Bracketed of Token.t * Token.t
 
 let posreals = Bare (Token.Ident [ "ℝ₊" ])
 let below = Bracketed (Token.LBracket, Token.RBracket)
@@ -338,9 +337,11 @@ let times : (No.nonstrict opn, No.three, No.strict opn) notation = (Times, Infix
 let div : (No.nonstrict opn, No.three, No.strict opn) notation = (Div, Infixl No.three)
 let pow : (No.nonstrict opn, No.four, No.strict opn) notation = (Pow, Infixl No.four)
 let negate : (closed, No.three, No.nonstrict opn) notation = (Negate, Prefixr No.three)
+
 (* Tighter than · and −, so "√x·y" is (√x)·y, but loose enough to reach over a power or a
    superscript, so "√x²" is √(x²) as the radical sign's bar would have it. *)
 let sqrtn : (closed, No.four, No.nonstrict opn) notation = (Sqrt, Prefixr No.four)
+
 (* All three are outfix -- closed at both ends -- so they need no tightness of their own.  ∣x∣
    borrows the ∣ of divisibility: an infix notation that is a prefix of an outfix one is allowed to
    be ambiguous with it, and parsing resolves in favour of the infix, which is the reading that
@@ -376,26 +377,15 @@ type infixl = Wrap_infixl : (No.nonstrict opn, 'tight, No.strict opn) notation -
 let numbers = [ "ℕ"; "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
 let rings = [ "ℤ"; "ℚ"; "ℝ"; "𝕊" ]
 let fields = [ "ℚ"; "ℝ"; "𝕊" ]
+
 (* ℤ and ℚ aren't closed under square roots, so √ lands in the reals however it starts out. *)
 let reals = [ "ℝ"; "𝕊" ]
 
 let algebra =
   [
     ("+", [ Token.Op "+" ], Token.Op "+", Token.Op "+", Wrap_infixl plus, [ "plus" ], numbers);
-    ( "−",
-      [ Ident [ "−" ]; Op "-" ],
-      Ident [ "−" ],
-      Op "-",
-      Wrap_infixl minus,
-      [ "minus" ],
-      rings );
-    ( "·",
-      [ Ident [ "·" ]; Op "*" ],
-      Ident [ "·" ],
-      Op "*",
-      Wrap_infixl times,
-      [ "times" ],
-      numbers );
+    ("−", [ Ident [ "−" ]; Op "-" ], Ident [ "−" ], Op "-", Wrap_infixl minus, [ "minus" ], rings);
+    ("·", [ Ident [ "·" ]; Op "*" ], Ident [ "·" ], Op "*", Wrap_infixl times, [ "times" ], numbers);
     ("/", [ Op "/" ], Op "/", Op "/", Wrap_infixl div, [ "divide" ], fields);
     ("^", [ Op "**"; Op "^" ], Op "^", Op "^", Wrap_infixl pow, [ "pow" ], numbers);
   ]
@@ -649,7 +639,8 @@ let () =
    relation to state instead when the two sides have to be swapped -- see yterm below, where only
    the right-hand side synthesizes and so has to come first.  That is the relation *reversed*, not
    negated: "x = y" is "y = x". *)
-let equalities = [ ("=", Token.Op "=", equals, "eq", "eq"); ("≠", Ident [ "≠" ], neq, "neq", "neq") ]
+let equalities =
+  [ ("=", Token.Op "=", equals, "eq", "eq"); ("≠", Ident [ "≠" ], neq, "neq", "neq") ]
 
 (* The orderings, on the other hand, are relations on the number systems and nowhere else, so each
    number system has its own and there is no type argument to infer.  We pick between them the way
@@ -763,9 +754,7 @@ let () =
                                 ( `Any,
                                   sapp
                                     (locate_opt None
-                                       (sapp
-                                          (locate_opt loc (Const (get_const [ ty; str ])))
-                                          x))
+                                       (sapp (locate_opt loc (Const (get_const [ ty; str ]))) x))
                                     y,
                                   true ))
                               numbers,
@@ -843,7 +832,9 @@ let () =
                    (SFirst
                       ( List.map
                           (fun ty ->
-                            (`Any, sapp (locate_opt loc (Const (get_const [ ty; "negate" ]))) x, true))
+                            ( `Any,
+                              sapp (locate_opt loc (Const (get_const [ ty; "negate" ]))) x,
+                              true ))
                           rings,
                         None )))
           | _ -> Builtins.invalid "negate");
@@ -955,13 +946,13 @@ let () =
             Some
               (function
               | [
-               Token (_, (wsname, _));
-               Token (_, (wslp, _));
-               Term x;
-               Token (_, (wscomma, _));
-               Term y;
-               Token (_, (wsrp, _));
-              ] ->
+                  Token (_, (wsname, _));
+                  Token (_, (wslp, _));
+                  Term x;
+                  Token (_, (wscomma, _));
+                  Term y;
+                  Token (_, (wsrp, _));
+                ] ->
                   let px, wsx = pp_term x in
                   let py, wsy = pp_term y in
                   ( Token.pp (Ident [ name ])
@@ -998,7 +989,9 @@ let () =
                        (SFirst
                           ( List.map
                               (fun ty ->
-                                (`Any, sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x, true))
+                                ( `Any,
+                                  sapp (locate_opt loc (Const (get_const (ty :: ostr)))) x,
+                                  true ))
                               numbers,
                             None )))
               | _ -> Builtins.invalid name);
@@ -1234,7 +1227,6 @@ axiom ℚ.frac (x : ℚ) : exists ℤ (a ↦ exists ℤ (b ↦ land (ℤ.ge b 1)
 
 let load_secondary_startup () =
   let _ =
-    Top.Execute.load_string
-      ~init_visible:(Top.Execute.Loaded.get_scope ())
-      "secondary startup code" secondary_startup in
+    Top.Execute.load_string ~init_visible:(Top.Execute.Loaded.get_scope ()) "secondary startup code"
+      secondary_startup in
   Scope.set_visible (Top.Execute.Loaded.get_scope ())

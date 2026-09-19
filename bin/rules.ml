@@ -18,10 +18,7 @@ type rule =
      inputs can be wired up in either order: we try the natural reading first and the swapped one
      second, so a player who puts the proofs the other way round still gets a proof.  Only a tuple
      with exactly two inputs can be unordered. *)
-  | Tuple of {
-      inputs : (string option * string * (string * string list)) list;
-      unordered : bool;
-    }
+  | Tuple of { inputs : (string option * string * (string * string list)) list; unordered : bool }
   | Fields of { outputs : ((string * int list) * string) list }
   | Constr of { inputs : string list; constr : Constr.t }
   | Match of { branches : match_branch list; asc_pre : string option }
@@ -43,7 +40,7 @@ type rule =
   | Asc
   | Expr
   (* Algebra blocks, with flags.  If "plus" is on, then Z3 can decide an absolute value, a minimum or a maximum on its own; otherwise the hypotheses must settle each such case first.  If "neq" is on, then Z3 can solve inequalities as goals; otherwise it insists the user deal with them using proof by contradiction. *)
-  | Algebra of { sort: [ `None | `Plus | `Neq ] }
+  | Algebra of { sort : [ `None | `Plus | `Neq ] }
   | Var
   | Conclusion
   | User of {
@@ -118,13 +115,8 @@ let rules =
       ("orI2", Constr { inputs = [ "right" ]; constr = Constr.intern "right" });
       ("impE", App { field = Some ("implies", []); inputs = ("implication", [ "antecedent" ]) });
       ( "impI",
-        Abs
-          {
-            field = Some ("implies", []);
-            has_value = false;
-            extras = [];
-            implicit_post = None;
-          } );
+        Abs { field = Some ("implies", []); has_value = false; extras = []; implicit_post = None }
+      );
       ("iffE1", App { field = Some ("ltor", []); inputs = ("implication", [ "antecedent" ]) });
       ("iffE2", App { field = Some ("rtol", []); inputs = ("implication", [ "antecedent" ]) });
       ( "iffI",
@@ -171,8 +163,8 @@ let rules =
             outputs = [ (true, "element"); (false, "below"); (false, "property") ];
           } );
       ( "exbelowI",
-        Constr
-          { inputs = [ "element"; "below"; "property" ]; constr = Constr.intern "existsbelow" } );
+        Constr { inputs = [ "element"; "below"; "property" ]; constr = Constr.intern "existsbelow" }
+      );
       ( "allbelowE",
         App { field = Some ("forallbelow", []); inputs = ("universal", [ "element"; "below" ]) } );
       ( "allbelowI",
@@ -191,13 +183,8 @@ let rules =
             implicit_pre = "contradict";
           } );
       ( "negI",
-        Abs
-          {
-            field = Some ("negation", []);
-            has_value = false;
-            extras = [];
-            implicit_post = None;
-          } );
+        Abs { field = Some ("negation", []); has_value = false; extras = []; implicit_post = None }
+      );
       ( "cnegI",
         (* Classical proof-by-contradiction *)
         Abs
