@@ -2473,6 +2473,17 @@ export const LEVELS = [
                 },
             ],
           },
+          { name: "ind",
+            rules: [ "orE", "orI1", "orI2", "cnegI", "negE", "allE", "allI", "allbelowE", "allbelowI", "expr", "algplus", "asc", "natE", "natInd" ],
+            levels: [
+                {
+                    parameters: [ { name: "g", ty: "ℕ→ℕ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "g(0)=0" }, { ty: "∀n∈ℕ,(g(n+1)=g(n)+2·n+1)" } ],
+                    conclusion: { ty: "∀n∈ℕ,(g(n)=n²)" },
+                },
+            ],
+          },
       ],
     },
     { name: "Sequence world",
