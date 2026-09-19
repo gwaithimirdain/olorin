@@ -1943,13 +1943,14 @@ function addHintBubble(b, level, unlocked) {
 function renderLevelButton(b, name, states, level) {
     b.className = 'level';
     b.style.borderTop = '';
-    // A fully locked level (novice not yet unlocked) is shown disabled, with a lock in front --
+    // A fully locked level (novice not yet unlocked) is shown disabled, with a lock under it --
     // except in test mode, where every level is playable and every mark is a toggle, so all three
     // marks are shown (greyed) rather than the single summary padlock.
     if(states[0] === 'locked') {
         b.classList.add('level-locked');
         if(!TEST_MODE) {
-            b.innerHTML = '<span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span><span class="level-number">' + name + '</span>';
+            b.innerHTML = '<div class="level-number">' + name + '</div>' +
+                '<div class="level-marks"><span class="lvmark locked" style="color:#888">' + LOCK_SVG + '</span></div>';
             addHintBubble(b, level, false);
             return;
         }

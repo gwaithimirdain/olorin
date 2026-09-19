@@ -64,6 +64,10 @@ body {
     padding: 10px;
     box-sizing: border-box;
     width: 100px;
+    /* Never let the diagram's width: 100% squeeze the palette down to its content's min-content
+       width, which depends on the fonts and scrollbars of the browser: where that comes out a hair
+       too narrow, the palette sprouts a horizontal scrollbar. */
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     /* Guarantee a gap between the scrolling palette and the buttons below it. */
@@ -551,6 +555,7 @@ body {
     font-size: 15px;
     font-weight: bold;
     line-height: 1.1;
+    white-space: nowrap;
 }
 
 .level-marks {
@@ -582,20 +587,17 @@ body {
     opacity: 0.4;
 }
 
-/* A level whose easiest difficulty isn't unlocked yet: shown disabled. */
+/* A level whose easiest difficulty isn't unlocked yet: shown disabled, with one padlock under its
+   number.  (Not beside it: a number like 10-1-2 and a padlock don't both fit across the box.) */
 .level.level-locked {
-    flex-direction: row;
-    gap: 4px;
     background-color: #ededed;
     border-color: #aaaaaa;
     color: #999999;
     cursor: default;
 }
 /* In test mode a locked level keeps its three difficulty marks (each a completion toggle) instead
-   of collapsing to one padlock beside the number, so it keeps the normal stacked layout too. */
+   of collapsing to one padlock, and stays clickable. */
 .level.level-locked.level-toggles {
-    flex-direction: column;
-    gap: 1px;
     cursor: pointer;
 }
 
