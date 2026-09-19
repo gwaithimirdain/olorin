@@ -252,4 +252,8 @@ let explain : Code.t -> string option = function
         ("There is no variable called "
         ^ x
         ^ " here.  A variable introduced by a block is only in scope inside that block.")
+  | Choice_mismatch ty ->
+      Option.map
+        (fun ty -> "This block can't produce a proof of the needed statement" ^ display ty)
+        (printed ~sort:`Type ty)
   | _ -> None
