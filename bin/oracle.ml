@@ -721,6 +721,16 @@ let get_poly ctx ty tm =
         add_step
           (Define [ (`Eq, pow power (Z.to_int (Q.den e)), pow bp (Z.to_int (Q.num e))) ])
     | _ -> return ()
+  (* A power of an absolute value, said to be the absolute value of the power: ∣u∣^a is ∣u^a∣ for
+     a whole a, without which ∣x∣^(2·n) and (x²)^n would be unrelated symbols.  Said once for each
+     such power, and for a natural exponent, where it needs nothing of u. *)
+  and abs_tie power a nat =
+    let* st = S.get in
+    match power with
+    | `App (f, [ `Abs b; _ ]) when nat && not (Bwd.exists (fun x -> x = power) st.ties) ->
+        let* () = S.put { st with ties = Snoc (st.ties, power) } in
+        add_step (Define [ (`Eq, power, `Abs (`App (f, [ b; a ]))) ])
+    | _ -> return ()
   (* The base a power was taken of, which is where a root would be. *)
   and root_base_of = function
     | `App (_, [ b; _ ]) -> b
@@ -736,8 +746,24 @@ let get_poly ctx ty tm =
         let* p = if nat then natural (Lazy.force tmty) p else return p in
         let* () = sign base p nat nonneg in
         let* () = root_tie p a nat in
+        let* () = abs_tie p a nat in
         let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
         build_powers ty tmty base acc rest
+  (* Whether an exponent is an even whole number whatever its terms turn out to be, which is what
+     makes a power of it nonnegative: u^(2·k) is ∣u∣^(2·k).  Its terms have to be whole for the
+     coefficients to say anything, which is what 'factors' failing reports. *)
+  and even_poly ty (ms, k) =
+    let even z = Z.equal (Q.den z) Z.one && Z.equal (Z.erem (Q.num z) (Z.of_int 2)) Z.zero in
+    if not (even k) then return false
+    else
+      let rec walk = function
+        | [] -> return true
+        | (m, c) :: rest -> (
+            let* f = factors ty [] c true m in
+            match f with
+            | None -> return false
+            | Some (_, q, _) -> if even q then walk rest else return false) in
+      walk ms
   (* The factors a base really is a product of, each with the exponent it carries, when a power of
      it is taken apart.  (u·v)^E is u^E·v^E, (u/v)^E is u^E·v^(−E), and (u^f)^E is u^(f·E); a base
      that is none of those is itself, raised to E.  So a power is a product of powers of the terms
@@ -776,7 +802,16 @@ let get_poly ctx ty tm =
           | Some _, Some nat ->
               let* fs, nz, nonzero, cut = factor_base ty u q in
               return (fs, nz, nonzero || not nat, cut)
-          | _ -> leaf true)
+          | _ ->
+              (* An even inner exponent asks nothing of the base at all: u^(2·k) is ∣u∣^(2·k), and
+                 ∣u∣ is nonnegative whatever u is, so the exponents multiply out over it where
+                 they would not over u.  That is what makes (x^6)^(n+1/2) the ∣x∣^(6·n+3) it is
+                 for every x, rather than the x^(6·n+3) it is only for a positive one. *)
+              let* ev = even_poly ty inner in
+              if not ev then leaf true
+              else
+                let* b = go ty u in
+                return ([ (`Abs b, u, q) ], [], false, true))
     | `Product (u, v) -> (
         let* w = whole_poly ty p in
         match w with

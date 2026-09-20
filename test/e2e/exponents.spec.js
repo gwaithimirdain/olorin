@@ -22,7 +22,7 @@ const wireLabels = (page) => page.evaluate(() =>
 
 // State a level, prove it with a single algebra block fed by every hypothesis, and report whether
 // Olorin accepted it along with what it said if it didn't.
-async function algebra(olorin, { variables = '', hypotheses = [], conclusion }) {
+async function algebraWith(rule, olorin, { variables = '', hypotheses = [], conclusion }) {
     await olorin.buildCustom({
         parameters: '',
         variables,
@@ -30,7 +30,7 @@ async function algebra(olorin, { variables = '', hypotheses = [], conclusion }) 
         conclusion,
     });
     const nodes = await olorin.nodes();
-    const alg = await olorin.dragRule('alg', 600, 200);
+    const alg = await olorin.dragRule(rule, 600, 200);
     for (const n of nodes.filter((n) => n.rule === 'hypothesis')) {
         await olorin.connect({ vertex: n.id, sort: 'output' }, { vertex: alg, sort: 'input' });
     }
@@ -43,7 +43,13 @@ async function algebra(olorin, { variables = '', hypotheses = [], conclusion }) 
     };
 }
 
+const algebra = (olorin, level) => algebraWith('alg', olorin, level);
 const proves = async (olorin, level) => (await algebra(olorin, level)).proved;
+// An absolute value written into the statement is one the plain block asks the hypotheses to
+// decide the sign of, so the goals below that write one are proved with the block that decides it
+// itself.  The absolute value the translation introduces of its own accord is not such a case: it
+// stands for a nonnegative quantity and there is no split in it for anyone to make.
+const plusProves = async (olorin, level) => (await algebraWith('algplus', olorin, level)).proved;
 
 test.describe('Integer exponents', () => {
     test('still mean what they did, and stay in the number system they started in', async ({ page }) => {
@@ -541,6 +547,39 @@ test.describe('A variable exponent', () => {
         })).toBe(false);
     });
 
+    // An even exponent makes a base nonnegative whatever the base was -- u^(2·k) is ∣u∣^(2·k) --
+    // and ∣u∣ is nonnegative outright, so the exponents multiply out over it with nothing asked of
+    // the hypotheses at all.  (x^6)^(n+1/2) is ∣x∣^(6·n+3) for every x, where it is x^(6·n+3) only
+    // for a nonnegative one.
+    test('takes an even power of a base for the absolute value it is', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nn ∈ ℕ';
+        expect(await plusProves(olorin, {
+            variables: vars, conclusion: '(x^6)^(n+1/2) = ∣x∣^(6·n+3)',
+        })).toBe(true);
+        expect(await plusProves(olorin, {
+            variables: vars, conclusion: '(x^2)^(n+1/2) = ∣x∣^(2·n+1)',
+        })).toBe(true);
+        // Which also makes a power of an absolute value the absolute value of the power, without
+        // which ∣x∣^(2·n) and (x²)^n would be unrelated symbols.
+        expect(await plusProves(olorin, { variables: vars, conclusion: '(x²)^n = ∣x∣^(2·n)' })).toBe(true);
+        // Dropping the bars is then exactly as true as the base is nonnegative.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^2)^(n+1/2) = x^(2·n+1)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['x<0'], conclusion: '(x^2)^(n+1/2) = x^(2·n+1)',
+        })).toBe(false);
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x^2)^(n+1/2) = x^(2·n+1)',
+        })).toBe(false);
+        // An odd exponent says nothing of the sort, a negative base staying negative under it.
+        expect(await plusProves(olorin, {
+            variables: vars, conclusion: '(x^3)^(n+1/2) = ∣x∣^(3·n+3/2)',
+        })).toBe(false);
+    });
+
     // A base that is itself a power comes into the exponent: (u^e)^M is u^(e·M), so a tower of
     // powers is one power of the base at the bottom of it.  The named small powers are powers
     // like any other here, "(x²)^n" being the tower "(x^2)^n".
@@ -607,10 +646,10 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', hypotheses: ['0<x'], conclusion: '(x^q)^n = x^(q·n)',
         })).toBe(true);
-        // Positive, not merely nonnegative: a zero base has no negative powers to speak of, and
-        // the equation says nothing at all short of that, true though it happens to be at zero.
+        // Positive, not merely nonnegative: a zero base has no negative powers to speak of, and a
+        // rational exponent may well be one.
         expect(await proves(olorin, {
-            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^6)^(n+1/2) = x^(6·n+3)',
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', hypotheses: ['0≤x'], conclusion: '(x^q)^n = x^(q·n)',
         })).toBe(false);
     });
 
