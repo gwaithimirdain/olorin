@@ -250,7 +250,8 @@ test.describe('The √ symbol', () => {
 // itself stays an uninterpreted function of its base and its exponent, as it always was, but the
 // translation now reads the exponent as a polynomial first -- multiplying out what it has to --
 // and writes the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is
-// x^n·x^n, and x^((m+1)·(n+1)) is x^(m·n)·x^m·x^n·x.  So
+// x^n·x^n, and x^((m+1)·(n+1)) is x^(m·n)·x^m·x^n·x -- and a base that is itself a power brings
+// its own exponent into that, (x^m)^n being x^(m·n).  So
 // the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
 // this needs is that each term of the exponent that stays a term is a whole number:
 // b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a
@@ -429,13 +430,71 @@ test.describe('A variable exponent', () => {
         })).toBe(true);
     });
 
-    // Where it stops: a monomial is a term the base is raised to, never a power of the base
-    // itself, so nothing here relates x^(m·n) to x^m raised to n.
+    // A base that is itself a power comes into the exponent: (u^e)^M is u^(e·M), so a tower of
+    // powers is one power of the base at the bottom of it.  The named small powers are powers
+    // like any other here, "(x²)^n" being the tower "(x^2)^n".
+    test('takes in the exponents of a base that is a power itself', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ';
+        expect(await proves(olorin, { variables: vars, conclusion: 'x^(m·n) = (x^m)^n' })).toBe(true);
+        expect(await proves(olorin, { variables: vars, conclusion: '(x^m)^n = (x^n)^m' })).toBe(true);
+        expect(await proves(olorin, { variables: vars, conclusion: '((x^m)^n)² = x^(2·m·n)' })).toBe(true);
+        expect(await proves(olorin, { variables: vars, conclusion: '(x²)^n = (x^n)²' })).toBe(true);
+        // Which is the last of the iterated cases: the exponents multiply, and then the sum they
+        // multiply out to comes apart as any other does.
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x^(m+1))^(n+1) = x^(m·n)·x^m·x^n·x',
+        })).toBe(true);
+    });
+
+    // Both exponents have to be whole numbers for that, and not merely the product: (u^6)^(n+1/2)
+    // is u^(6·n)·∣u∣³, which is not u^(6·n+3) for a negative u, though the exponents 6 and n+1/2
+    // multiply out to a whole number between them.
+    test('but only where both of the exponents are whole numbers', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ';
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x^6)^(n+1/2) = x^(6·n+3)',
+        })).toBe(false);
+        // Which is not merely unproved but false, the hypotheses here being where it fails.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['x<0'], conclusion: '(x^6)^(n+1/2) = x^(6·n+3)',
+        })).toBe(false);
+        // A root of the base is the same thing the other way up: (x^(1/2))^(2·n) is not x^n, the
+        // one being ∣x∣^n and the other not.
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x^(1/2))^(2·n) = x^n',
+        })).toBe(false);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', conclusion: '(x^q)^n = x^(q·n)',
+        })).toBe(false);
+    });
+
+    // And where an inner exponent can be negative, the base has to be nonzero: two negative
+    // exponents cancel in the product, which would otherwise lose what each of them needed.
+    test('and asks for a nonzero base where an inner exponent can be negative', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ';
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['x≠0'], conclusion: '(x^(−m))^(−n) = x^(m·n)',
+        })).toBe(true);
+        const without = await algebra(olorin, {
+            variables: vars, conclusion: '(x^(−m))^(−n) = x^(m·n)',
+        });
+        expect(without.proved).toBe(false);
+        expect(without.said).toContain('is nonzero');
+    });
+
+    // Where it stops: a monomial is a term the base is raised to, and a base is taken apart only
+    // where it is a power itself, so nothing here relates x^(m·n) to anything else's n-th power.
     test('is only taken apart into powers of the base', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await proves(olorin, {
-            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n·m) = (x^n)^m',
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n·m) = (x·x)^(n·m)',
         })).toBe(false);
         // A fractional coefficient is no coefficient either: (x^n)^(1/2) would need x^n shown
         // nonnegative, which is not something the split can ask for.

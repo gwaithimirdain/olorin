@@ -397,16 +397,20 @@ let degree (monomials, off) = abs off + List.fold_left (fun s (_, c) -> s + abs 
    too big a one, is left a term of its own instead: that only ever means less is taken apart. *)
 let max_terms = 32
 
+let poly_scale c (ms, k) = (List.map (fun (m, d) -> (m, c * d)) ms, c * k)
+let poly_add (ms1, k1) (ms2, k2) = (ms1 @ ms2, k1 + k2)
+
+let poly_mul (ms1, k1) (ms2, k2) =
+  let cross = List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, c * d)) ms2) ms1 in
+  let left = if k2 = 0 then [] else List.map (fun (a, c) -> (a, c * k2)) ms1 in
+  let right = if k1 = 0 then [] else List.map (fun (b, d) -> (b, d * k1)) ms2 in
+  (cross @ left @ right, k1 * k2)
+
+let poly_ok (ms, k) = List.length ms <= max_terms && degree (ms, k) <= max_exponent
+
 let rec poly_form tm =
   let atom = ([ ([ tm ], 1) ], 0) in
-  let scale c (ms, k) = (List.map (fun (m, d) -> (m, c * d)) ms, c * k) in
-  let add (ms1, k1) (ms2, k2) = (ms1 @ ms2, k1 + k2) in
-  let mul (ms1, k1) (ms2, k2) =
-    let cross = List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, c * d)) ms2) ms1 in
-    let left = if k2 = 0 then [] else List.map (fun (a, c) -> (a, c * k2)) ms1 in
-    let right = if k1 = 0 then [] else List.map (fun (b, d) -> (b, d * k1)) ms2 in
-    (cross @ left @ right, k1 * k2) in
-  let ok (ms, k) = List.length ms <= max_terms && degree (ms, k) <= max_exponent in
+  let scale = poly_scale and add = poly_add and mul = poly_mul and ok = poly_ok in
   (* Stopping as soon as it is too big, rather than at the end, so that multiplying a big one out
      four times over doesn't build what it is about to throw away. *)
   let rec repeat a n =
@@ -442,6 +446,20 @@ let rec poly_form tm =
           | _ -> atom)
       | _ -> atom)
 
+
+(* The base of a power, and its exponent in polynomial form, if that is what a term is.  The named
+   small powers are powers like any other here, so that "(x²)^n" is the tower "(x^2)^n".  What this
+   is for is taking such a tower apart: see 'peel'. *)
+let pow_parts tm =
+  match Norm.view_term tm with
+  | Neu { head = Const { name; ins }; args; _ } when Option.is_some (is_id_ins ins) -> (
+      match (Firstorder.get_root name, get_args args) with
+      | "pow", Some [ x; y ] -> Some (x.tm, poly_form y.tm)
+      | "square", Some [ x ] -> Some (x.tm, ([], 2))
+      | "cube", Some [ x ] -> Some (x.tm, ([], 3))
+      | "fourth", Some [ x ] -> Some (x.tm, ([], 4))
+      | _ -> None)
+  | _ -> None
 
 (* Whether what's left of an exponent is a whole number, and if so whether it is a natural one.
    The term's own type says so, not the power's: ℝ's exponent is a ℚ whatever is written there, and
@@ -591,23 +609,64 @@ let get_poly ctx ty tm =
      Anything that can go negative makes the power a reciprocal and asks for a nonzero base, which
      is the obligation a written-out negative exponent already carries.  'tmty' is the type of the
      power itself and 'src' the base, to point at in an error. *)
-  and varpower ty tmty tm base exponent monomials off src =
-    (* The factors of one monomial, translated.  A factor that comes out a constant multiplies
-       into the coefficient instead, whatever its type -- the 1/2 in "x^(n+1/2)" is a constant like
-       any other -- and only a factor that stays a factor has to be a whole number.  One that
-       needn't be stops all of this: b^(a+c) = b^a·b^c is false for a fractional a and a negative
-       b, there being no real b^a to speak of there.  A monomial is a natural when every factor of
-       it is, a product of naturals being one. *)
-    let rec factors syms q nat = function
-      | [] -> return (Some (List.rev syms, q, nat))
-      | t :: ts -> (
-          let* a = go ty t in
-          match rational_of a with
-          | Some r -> factors syms (Q.mul q r) nat ts
-          | None -> (
-              match exponent_kind t with
-              | None -> return None
-              | Some n -> factors (a :: syms) q (nat && n) ts)) in
+  (* The factors of one monomial, translated.  A factor that comes out a constant multiplies into
+     the coefficient instead, whatever its type -- the 1/2 in "x^(n+1/2)" is a constant like any
+     other -- and only a factor that stays a factor has to be a whole number.  One that needn't be
+     stops all of this: b^(a+c) = b^a·b^c is false for a fractional a and a negative b, there
+     being no real b^a to speak of there.  A monomial is a natural when every factor of it is, a
+     product of naturals being one. *)
+  and factors ty syms q nat = function
+    | [] -> return (Some (List.rev syms, q, nat))
+    | t :: ts -> (
+        let* a = go ty t in
+        match rational_of a with
+        | Some r -> factors ty syms (Q.mul q r) nat ts
+        | None -> (
+            match exponent_kind t with
+            | None -> return None
+            | Some n -> factors ty (a :: syms) q (nat && n) ts))
+  (* Whether an exponent is a whole number whatever its terms turn out to be -- every monomial of
+     it with a whole coefficient and whole factors -- and if so whether it is a natural, which it
+     is when nothing in it can be negative.  This is what 'peel' asks of an inner exponent. *)
+  and whole_poly ty (ms, k) =
+    let rec walk nat = function
+      | [] -> return (Some nat)
+      | (m, c) :: rest -> (
+          let* f = factors ty [] (Q.of_int c) true m in
+          match f with
+          | None -> return None
+          | Some (syms, q, mnat) ->
+              if not (Z.equal (Q.den q) Z.one) then return None
+              else walk (nat && Q.geq q Q.zero && (syms = [] || mnat)) rest) in
+    walk (k >= 0) ms
+  (* A tower of powers, taken down to the base it is really a power of: (u^e)^M is u^(e·M), so an
+     exponent multiplied by the exponents of the powers its base is made of is the exponent of the
+     innermost base.  The law holds of every real u when e is a natural, and of a nonzero one when
+     e is any whole number -- but a merely whole e is no good here, since two negative exponents
+     would cancel in the product and lose the nonzero base that each of them needs, so what we ask
+     of an inner exponent that is merely whole is the nonzero base that each of its levels needs,
+     since the product alone no longer shows it: two negative exponents cancel there.  A natural
+     one asks for nothing, and the outer exponent's own negative coefficients carry their own
+     obligation as they always did (see varpower). *)
+  and peel ty basetm p =
+    let stop = return (basetm, p, None) in
+    match pow_parts basetm with
+    | None -> stop
+    | Some (u, inner) -> (
+        let q = poly_mul inner p in
+        if not (poly_ok q) then stop
+        else
+          (* Both exponents have to be whole numbers, and not merely the product of the two:
+             (u²)^(n+1/2) is u^(2·n)·∣u∣, which is not u^(2·n+1) for a negative u, though 2 and
+             n+1/2 multiply out to a whole number between them. *)
+          let* outer = whole_poly ty p in
+          let* w = whole_poly ty inner in
+          match (outer, w) with
+          | Some _, Some nat ->
+              let* u, q, inner_nonzero = peel ty u q in
+              return (u, q, Some ((not nat) || inner_nonzero = Some true))
+          | _ -> stop)
+  and varpower ty tmty tm base written nonzero monomials off src =
     (* The monomials of the exponent, with the ones that agree merged: they are compared as
        translated expressions rather than as terms, which is where two ways of writing the same
        thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
@@ -615,7 +674,7 @@ let get_poly ctx ty tm =
     let rec collect acc k = function
       | [] -> return (Some (acc, k))
       | (m, c) :: rest -> (
-          let* f = factors [] (Q.of_int c) true m in
+          let* f = factors ty [] (Q.of_int c) true m in
           match f with
           | None -> return None
           | Some ([], q, _) -> collect acc (Q.add k q) rest
@@ -652,10 +711,13 @@ let get_poly ctx ty tm =
             else
               (* Naturals with positive coefficients and a nonnegative offset ask nothing at all.
                  A term or a coefficient that can go negative makes the power a reciprocal and asks
-                 for a nonzero base; a fractional offset is a root of the base, and asks for
-                 whatever a written-out root of it would (see ratpow). *)
+                 for a nonzero base, as does a base this exponent was taken off a power of with an
+                 exponent that could be negative (see peel); a fractional offset is a root of the
+                 base, and asks for whatever a written-out root of it would (see ratpow). *)
               let whole =
-                Q.geq k Q.zero && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
+                (not nonzero)
+                && Q.geq k Q.zero
+                && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
               let* () = if whole then return () else add_step (Nonzero (base, src)) in
               let rec build acc = function
                 | [] -> return acc
@@ -685,9 +747,13 @@ let get_poly ctx ty tm =
                  x^((m+1)·(n+1)) against x^(m·n+m+n+1), whose exponents Z3 can see are equal, one
                  of which comes apart and the other of which doesn't.  Keeping the written form
                  and saying what it equals gives us both. *)
-              let* f = fun_for `Pow 2 in
-              let plain : Symbolic.t = `App (f, [ base; exponent ]) in
-              let* () = if plain = result then return () else stated plain result in
+              let* () =
+                match written with
+                | None -> return ()
+                | Some exponent ->
+                    let* f = fun_for `Pow 2 in
+                    let plain : Symbolic.t = `App (f, [ base; exponent ]) in
+                    if plain = result then return () else stated plain result in
               return result)
   (* What a power that came apart is equal to, said once however often it is written. *)
   and stated plain result =
@@ -796,19 +862,29 @@ let get_poly ctx ty tm =
                 | _ ->
                     let* () = add_step (Nonzero (py, y.tm)) in
                     return (`Div (px, py)))
-        | "pow" ->
-            binary (fun px py ->
-                match rational_of py with
-                | Some e -> power ty tm px e x.tm
-                (* A variable exponent comes apart into the terms making it up and is put back
-                   together as a product of powers.  How far that can go varpower decides, having
-                   the translated terms to look at; all that's asked here is that they won't build
-                   a polynomial too big to be worth handing to Z3 at all. *)
-                | None ->
-                    let monomials, off = poly_form y.tm in
-                    if degree (monomials, off) <= max_exponent then
-                      varpower ty tmty tm px py monomials off x.tm
-                    else opaque ty tm)
+        (* A power translates its exponent first, and its base only once it knows which base that
+           is: a variable exponent may take the base's own exponents into itself (see peel), and
+           translating a base we then drop would leave Z3 asked about a power that isn't there. *)
+        | "pow" -> (
+            let* py = go ty y.tm in
+            match rational_of py with
+            | Some e ->
+                let* px = go ty x.tm in
+                power ty tm px e x.tm
+            (* A variable exponent comes apart into the terms making it up and is put back together
+               as a product of powers.  How far that can go varpower decides, having the translated
+               terms to look at; all that's asked here is that they won't build a polynomial too
+               big to be worth handing to Z3 at all. *)
+            | None ->
+                let p = poly_form y.tm in
+                if not (poly_ok p) then opaque ty tm
+                else
+                  let* basetm, (monomials, off), peeled = peel ty x.tm p in
+                  let* px = go ty basetm in
+                  (* The power as written is a power of this base only if nothing came off it. *)
+                  let written = if peeled = None then Some py else None in
+                  let nonzero = peeled = Some true in
+                  varpower ty tmty tm px written nonzero monomials off basetm)
         | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }
