@@ -286,10 +286,17 @@ let rec get_posint tm =
 let rec pow p n = if n <= 0 then `Const Q.one else `Times (pow p (n - 1), p)
 
 (* Something already translated, multiplied by a base n times: x·b·b·…·b.  Written this way round
-   rather than as a product with 'pow' so that x·b^1 comes out as x·b, with no 1 in it -- which is
-   what makes the two sides of "x^(n+1) = x^n·x" the very same expression. *)
+   rather than as a product with 'pow', and starting from a 1 that drops out rather than one that
+   stays, so that a product of powers comes out with nothing extra in it -- which is what makes the
+   two sides of "x^(n+1) = x^n·x" the very same expression. *)
 let rec mulpow (x : Symbolic.t) (base : Symbolic.t) (n : int) : Symbolic.t =
-  if n <= 0 then x else mulpow (`Times (x, base)) base (n - 1)
+  if n <= 0 then x
+  else
+    let x : Symbolic.t =
+      match x with
+      | `Const q when Q.equal q Q.one -> base
+      | _ -> `Times (x, base) in
+    mulpow x base (n - 1)
 
 (* A translated expression read back as a rational literal, if it is one.  get_poly folds a numeral,
    and a quotient of numerals, into a constant, so the only other shape to allow for is a minus sign
@@ -366,33 +373,49 @@ let is_number_type sys ty =
 let is_natural ty = is_number_type "ℕ" ty
 let is_integer ty = is_number_type "ℤ" ty
 
-(* An exponent taken apart as a term plus an integer offset: "n+1" is n and 1, "n−2" is n and −2,
-   and an exponent with nothing to take off is itself and 0.  Only a numeral comes off, that being
-   what the translation can turn back into a product of copies of the base; anything else stays in
-   the term. *)
-let rec exponent_form tm =
-  match Norm.view_term tm with
-  | Neu { head = Const { name; ins }; args; _ }
-    when Option.is_some (is_id_ins ins) && two_args args <> None -> (
-      let x, y = Option.get (two_args args) in
-      match Firstorder.get_root name with
-      | "plus" -> (
-          match (get_posint x.tm, get_posint y.tm) with
-          | _, Some k ->
-              let a, j = exponent_form x.tm in
-              (a, j + k)
-          | Some k, None ->
-              let a, j = exponent_form y.tm in
-              (a, j + k)
-          | None, None -> (tm, 0))
-      | "minus" -> (
-          match get_posint y.tm with
-          | Some k ->
-              let a, j = exponent_form x.tm in
-              (a, j - k)
-          | None -> (tm, 0))
-      | _ -> (tm, 0))
-  | _ -> (tm, 0)
+(* An exponent in linear form: the terms it is made of, each with an integer coefficient, and an
+   integer offset.  "n+1" is n with coefficient 1 and offset 1, "2·n−m" is n with 2 and m with −1,
+   and an exponent with no arithmetic on the outside of it is itself with coefficient 1.  Only
+   numerals fold into the coefficients and the offset, those being what the translation can turn
+   back into a product of powers; anything else stays a term of its own.  Nothing compares the
+   terms here -- deciding when two of them are the same is the translation's business, and it has
+   already been settled there (see var_for) -- so "n+n" comes back as n twice over. *)
+let rec linear_form tm =
+  let scale c = List.map (fun (t, d) -> (t, c * d)) in
+  match get_posint tm with
+  | Some k -> ([], k)
+  | None -> (
+      match Norm.view_term tm with
+      | Neu { head = Const { name; ins }; args; _ } when Option.is_some (is_id_ins ins) -> (
+          match (Firstorder.get_root name, get_args args) with
+          | "plus", Some [ x; y ] ->
+              let ax, kx = linear_form x.tm in
+              let ay, ky = linear_form y.tm in
+              (ax @ ay, kx + ky)
+          | "minus", Some [ x; y ] ->
+              let ax, kx = linear_form x.tm in
+              let ay, ky = linear_form y.tm in
+              (ax @ scale (-1) ay, kx - ky)
+          | "negate", Some [ x ] ->
+              let ax, kx = linear_form x.tm in
+              (scale (-1) ax, -kx)
+          (* A product is a coefficient only when one side is a numeral; "n·m" is a term of its
+             own, there being no power of the base to raise to it. *)
+          | "times", Some [ x; y ] -> (
+              match (get_posint x.tm, get_posint y.tm) with
+              | Some c, _ ->
+                  let a, k = linear_form y.tm in
+                  (scale c a, c * k)
+              | _, Some c ->
+                  let a, k = linear_form x.tm in
+                  (scale c a, c * k)
+              | None, None -> ([ (tm, 1) ], 0))
+          | _ -> ([ (tm, 1) ], 0))
+      | _ -> ([ (tm, 1) ], 0))
+
+(* How big a polynomial an exponent in linear form would build: past this we give up and leave the
+   power opaque, as a written-out exponent that size already is. *)
+let degree (atoms, off) = abs off + List.fold_left (fun s (_, c) -> s + abs c) 0 atoms
 
 (* Whether what's left of an exponent is a whole number, and if so whether it is a natural one.
    The term's own type says so, not the power's: ℝ's exponent is a ℚ whatever is written there, and
@@ -505,39 +528,86 @@ let get_poly ctx ty tm =
               (Define ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
           else return () in
         return s
-  (* A power whose exponent isn't a literal: "x^(n+1)" and its kin.  The exponent is a whole number
-     n and an integer offset k, and the translation splits the power there, into x^n -- an
-     uninterpreted function of the two, as the whole power was before -- times the k copies of x
-     that multiplication can express.  That is what makes "x^(n+1) = x^n·x" hold on the nose: the
-     two sides become the same product and Z3 has nothing left to decide, and likewise for the
-     other laws of exponents that only move a literal around.
+  (* A power whose exponent isn't a literal: "x^(n+1)", "x^(n+m)", "x^(2·n)" and their kin.  The
+     exponent is a sum of terms with integer coefficients and an integer offset, and the power
+     becomes the matching product: x^(k + Σcᵢ·aᵢ) is x^k times each x^(aᵢ) multiplied in cᵢ times,
+     with x^(aᵢ) an uninterpreted function of base and exponent, as the whole power was before.
 
-     The law being used is b^(a+k) = b^a·b^k, which holds of every real b when a and k are natural
-     numbers -- b^0 being 1 throughout this translation, that case included -- so nothing has to be
-     shown there.  When either of them can be negative the power is a reciprocal and b has to be
-     nonzero, which is the same obligation a written-out negative exponent carries.  'tmty' is the
-     type of the power itself and 'src' the base, to point at in an error. *)
-  and varpower ty tmty tm base atomtm off nat src =
-    let* a = go ty atomtm in
-    match rational_of a with
-    (* What looked like a variable exponent was a literal after all, as in "x^(1+2)": what the
-       offset came off was itself a numeral, so there is nothing uninterpreted here and the
-       ordinary path applies, with the offset folded back in. *)
-    | Some q -> power ty tm base (Q.add q (Q.of_int off)) src
-    | None ->
-        let* f = fun_for `Pow 2 in
-        (* b^a lands in ℕ exactly when b^(a+k) does: ℕ.pow is the only power landing there, and it
-           takes naturals, so peeling a numeral off its exponent leaves a natural power of one. *)
-        let nonneg = is_natural (Lazy.force tmty) in
-        let* p = natural (Lazy.force tmty) (`App (f, [ base; a ])) in
-        let* () = if nat && off >= 0 then return () else add_step (Nonzero (base, src)) in
-        let* st = S.get in
-        let* () =
-          if Bwd.exists (fun x -> x = p) st.signs then return ()
-          else
-            let* () = S.put { st with signs = Snoc (st.signs, p) } in
-            add_step (Positive { base; power = p; nat; nonneg }) in
-        if off >= 0 then return (mulpow p base off) else return (`Div (p, pow base (-off)))
+     That is what makes the laws of exponents hold on the nose rather than by anything Z3 has to
+     decide: written this way, both sides of "x^(n+1) = x^n·x" and of "x^(n+m) = x^n·x^m" are the
+     very same product.  The laws being used are b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c, which
+     hold of every real b when the exponents are naturals and the coefficients positive -- b^0
+     being 1 throughout this translation, so a zero exponent and a zero base are no exception.
+     Anything that can go negative makes the power a reciprocal and asks for a nonzero base, which
+     is the obligation a written-out negative exponent already carries.  'tmty' is the type of the
+     power itself and 'src' the base, to point at in an error. *)
+  and varpower ty tmty tm base atoms off src =
+    (* The terms of the exponent, translated, with the ones that agree merged: they are compared
+       as translated expressions rather than as terms, which is where two ways of writing the same
+       thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
+       term that turns out to be a constant folds into the offset instead.  A term that needn't be
+       a whole number stops all of this: b^(a+c) = b^a·b^c is false for a fractional a and a
+       negative b, there being no real b^a to speak of there. *)
+    let rec collect acc k = function
+      | [] -> return (Some (acc, k))
+      | (t, c) :: rest -> (
+          match exponent_kind t with
+          | None -> return None
+          | Some nat -> (
+              let* a = go ty t in
+              match rational_of a with
+              | Some q -> collect acc (Q.add k (Q.mul (Q.of_int c) q)) rest
+              | None ->
+                  let acc =
+                    if List.exists (fun (b, _, _) -> b = a) acc then
+                      List.map
+                        (fun (b, d, m) -> if b = a then (b, d + c, m || nat) else (b, d, m))
+                        acc
+                    else acc @ [ (a, c, nat) ] in
+                  collect acc k rest)) in
+    let* collected = collect [] (Q.of_int off) atoms in
+    match collected with
+    | None -> opaque ty tm
+    | Some (atoms, k) -> (
+        (* Coefficients can cancel, and every term can fold away, in which case the exponent was a
+           literal after all -- "x^(1+2)", or "x^(n−n)" -- and the ordinary path applies. *)
+        match List.filter (fun (_, c, _) -> c <> 0) atoms with
+        | [] -> power ty tm base k src
+        | atoms ->
+            (* A fractional offset would need a root of the base, which is a definition keyed on a
+               term that isn't written anywhere here for us to key it on; and past a point the
+               product is too big to be worth building.  Either way the power stays opaque. *)
+            if not (Z.equal (Q.den k) Z.one && Z.fits_int (Q.num k)) then opaque ty tm
+            else
+              let k = Z.to_int (Q.num k) in
+              if degree (List.map (fun (a, c, _) -> (a, c)) atoms, k) > max_exponent then
+                opaque ty tm
+              else
+                let whole = k >= 0 && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
+                let* () = if whole then return () else add_step (Nonzero (base, src)) in
+                let rec build acc = function
+                  | [] -> return acc
+                  | (a, c, nat) :: rest ->
+                      let* f = fun_for `Pow 2 in
+                      let p : Symbolic.t = `App (f, [ base; a ]) in
+                      (* b^a lands in ℕ exactly when the whole power does: ℕ.pow is the only power
+                         landing there, and it takes naturals for both of its arguments. *)
+                      let nonneg = nat && is_natural (Lazy.force tmty) in
+                      let* p = if nat then natural (Lazy.force tmty) p else return p in
+                      let* () = sign base p nat nonneg in
+                      let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
+                      build acc rest in
+                let* acc = build (`Const Q.one) atoms in
+                return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k))))
+  (* The sign a power takes from its base, asked about once however often the power is written:
+     those questions go to Z3 (see Positive), and the two sides of an equation between powers
+     would otherwise ask the same ones twice. *)
+  and sign base p nat nonneg =
+    let* st = S.get in
+    if Bwd.exists (fun x -> x = p) st.signs then return ()
+    else
+      let* () = S.put { st with signs = Snoc (st.signs, p) } in
+      add_step (Positive { base; power = p; nat; nonneg })
   (* A term the arithmetic doesn't interpret.  A numeral is the constant it names.  An application
      of a bare constant or variable becomes an uninterpreted function symbol applied to the
      translations of its arguments: Z3 knows nothing about such a function beyond congruence, which
@@ -633,15 +703,15 @@ let get_poly ctx ty tm =
             binary (fun px py ->
                 match rational_of py with
                 | Some e -> power ty tm px e x.tm
-                (* A variable exponent is split at its offset when what's left of it is a whole
-                   number, and the power left opaque otherwise: b^(a+k) = b^a·b^k is false for a
-                   fractional a and a negative b, there being no real b^a to speak of there. *)
-                | None -> (
-                    let atomtm, off = exponent_form y.tm in
-                    match exponent_kind atomtm with
-                    | Some nat when abs off <= max_exponent ->
-                        varpower ty tmty tm px atomtm off nat x.tm
-                    | _ -> opaque ty tm))
+                (* A variable exponent comes apart into the terms making it up and is put back
+                   together as a product of powers.  How far that can go varpower decides, having
+                   the translated terms to look at; all that's asked here is that they won't build
+                   a polynomial too big to be worth handing to Z3 at all. *)
+                | None ->
+                    let atoms, off = linear_form y.tm in
+                    if degree (atoms, off) <= max_exponent then
+                      varpower ty tmty tm px atoms off x.tm
+                    else opaque ty tm)
         | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }

@@ -246,13 +246,15 @@ test.describe('The √ symbol', () => {
     });
 });
 
-// An exponent that isn't a literal at all: x^n, and x^(n+1) beside it.  The power itself stays an
-// uninterpreted function of its base and its exponent, as it always was, but the translation now
-// splits a numeral off the exponent first -- x^(n+1) becomes x^n·x -- so the laws that only move a
-// literal around hold on the nose, both sides of one becoming the very same product.  What the
-// split needs is that what's left of the exponent is a whole number: b^(a+k) = b^a·b^k is true of
-// every real b for natural a and k, and of a nonzero one for integers, but not of a negative base
-// and a fractional exponent, where there is no real b^a to speak of.
+// An exponent that isn't a literal at all: x^n, and x^(n+1) and x^(n+m) beside it.  The power
+// itself stays an uninterpreted function of its base and its exponent, as it always was, but the
+// translation now reads the exponent as a sum of terms with integer coefficients first, and writes
+// the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is x^n·x^n.  So
+// the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
+// this needs is that each term of the exponent is a whole number: b^(a+c) = b^a·b^c and
+// b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a nonzero one for
+// integers, but not of a negative base and a fractional exponent, where there is no real b^a to
+// speak of.
 test.describe('A variable exponent', () => {
     test('comes apart at a numeral, so the laws of exponents hold of it', async ({ page }) => {
         const olorin = new Olorin(page);
@@ -270,6 +272,32 @@ test.describe('A variable exponent', () => {
         // translation reading x^0 as 1 there as everywhere else.
         expect(await proves(olorin, {
             variables: 'n ∈ ℕ', conclusion: '2^(n+1) = 2·2^n',
+        })).toBe(true);
+    });
+
+    test('comes apart at a sum of terms, and at a coefficient', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n+m) = x^n·x^m',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n+m+1) = x^n·x^m·x',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(2·n) = x^n·x^n',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: '(x^n)² = x^(2·n)',
+        })).toBe(true);
+        // The terms are compared as the translation writes them, so the same one twice is one
+        // term with a coefficient of two.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n+n) = (x^n)²',
+        })).toBe(true);
+        // And terms that cancel leave a literal exponent, with nothing uninterpreted left in it.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n+m−n) = x^m',
         })).toBe(true);
     });
 
@@ -304,7 +332,7 @@ test.describe('A variable exponent', () => {
         })).toBe(true);
     });
 
-    test('is a reciprocal when the numeral takes it below zero, so the base must be nonzero', async ({ page }) => {
+    test('is a reciprocal where it can go below zero, so the base must be nonzero', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         // n−1 is an integer, not a natural, so this power may be a reciprocal.
@@ -316,6 +344,17 @@ test.describe('A variable exponent', () => {
         });
         expect(without.proved).toBe(false);
         expect(without.said).toContain('is nonzero');
+        // Likewise a term with a negative coefficient, where the nonzero base is what makes the
+        // power it divides by nonzero in its turn.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', hypotheses: ['x≠0'],
+            conclusion: 'x^(n−m)·x^m = x^n',
+        })).toBe(true);
+        const negcoeff = await algebra(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n−m)·x^m = x^n',
+        });
+        expect(negcoeff.proved).toBe(false);
+        expect(negcoeff.said).toContain('is nonzero');
     });
 
     test('stays opaque when it need not be a whole number', async ({ page }) => {
@@ -332,13 +371,18 @@ test.describe('A variable exponent', () => {
         })).toBe(false);
     });
 
-    // Two exponents that differ by anything but a literal are still two opaque powers: nothing
-    // relates x^(n+m) to x^n and x^m, since the split only ever takes off a numeral.
-    test('is only taken apart at a literal', async ({ page }) => {
+    // What comes apart is a sum with numerals in it and nothing else: a product of two terms is a
+    // term of its own, there being no power of the base to raise to it.
+    test('is only taken apart at a sum and a numeral', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await proves(olorin, {
-            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n+m) = x^n·x^m',
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n·m) = (x^n)^m',
+        })).toBe(false);
+        // A fractional coefficient is no coefficient either: (x^n)^(1/2) would need x^n shown
+        // nonnegative, which is not something the split can ask for.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['0<x'], conclusion: 'x^(n/2)·x^(n/2) = x^n',
         })).toBe(false);
         // Equal exponents do give equal powers, though, as they did before: that much is
         // congruence, which the uninterpreted symbol has always had.
