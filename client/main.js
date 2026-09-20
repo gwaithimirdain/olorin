@@ -296,6 +296,7 @@ var unlockData = [];
 const excludeFromAll = [
     "negI",   // Classical negation suffices
     "algneq", // This is a special gift to players before they get to negation world
+    "alg",    // When alg+ is available, there's no need to use alg
 ];
 
 // The rules of the blocks a level starts with, laid out by setLevel rather than added by the
