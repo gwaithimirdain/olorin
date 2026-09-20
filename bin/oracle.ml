@@ -283,17 +283,18 @@ let rec get_posint tm =
       | Pos _ -> None)
   | _ -> None
 
-let rec pow p n = if n <= 0 then `Const Q.one else `Times (pow p (n - 1), p)
-
-(* Something already translated, multiplied by a base n times: x·b·b·…·b.  Written this way round
-   rather than as a product with 'pow', and starting from a 1 that drops out rather than one that
-   stays, so that a product of powers comes out with nothing extra in it -- which is what makes the
+(* Two translated expressions multiplied, with a unit on either side dropping out, so that a
+   product built up a piece at a time comes out with nothing extra in it -- which is what makes the
    two sides of "x^(n+1) = x^n·x" the very same expression. *)
 let mulby (x : Symbolic.t) (y : Symbolic.t) : Symbolic.t =
-  match x with
-  | `Const q when Q.equal q Q.one -> y
+  match (x, y) with
+  | `Const q, _ when Q.equal q Q.one -> y
+  | _, `Const q when Q.equal q Q.one -> x
   | _ -> `Times (x, y)
 
+let rec pow p n = if n <= 0 then `Const Q.one else mulby (pow p (n - 1)) p
+
+(* Something already translated, multiplied by a base n times: x·b·b·…·b. *)
 let rec mulpow (x : Symbolic.t) (base : Symbolic.t) (n : int) : Symbolic.t =
   if n <= 0 then x else mulpow (mulby x base) base (n - 1)
 
@@ -374,7 +375,7 @@ let get_funhead : mode head -> funhead option = function
 (* Whether a type is one of the number systems named.  That it is ℕ says its elements are
    nonnegative, which to Z3 -- for whom they are opaque reals like any other -- is not a fact about
    them at all until we say so; that it is ℕ or ℤ says an exponent is a whole number, which is what
-   lets a power be taken apart (see exponent_form). *)
+   lets a power be taken apart (see poly_form). *)
 let is_number_type sys ty =
   match Norm.view_term ty with
   | Neu { head = Const { name; ins }; args; _ } ->
@@ -390,11 +391,13 @@ let degree (monomials, off) =
   List.fold_left (fun s (_, c) -> Q.add s (Q.abs c)) (Q.abs off) monomials
 
 (* An exponent in polynomial form: the monomials it is made of, each a list of terms multiplied
-   together with an integer coefficient, and an integer offset.  "n+1" is [n] with coefficient 1
-   and offset 1; "2·n−m" is [n] with 2 and [m] with −1; and "(m+1)·(n+1)" multiplies out to [m;n],
-   [m] and [n] with offset 1, which is what makes it the same exponent as "m·n+m+n+1".  Only
-   numerals fold into the coefficients and the offset, those being what the translation can turn
-   back into a product of powers; anything else stays a term inside a monomial.  Nothing compares
+   together with a rational coefficient, and a rational offset -- the exponents being a module over
+   ℚ, where clearing a denominator is taking that root of the base (see power_of).  "n+1" is [n]
+   with coefficient 1 and offset 1; "2·n−m" is [n] with 2 and [m] with −1; "n/2" is [n] with 1/2;
+   and "(m+1)·(n+1)" multiplies out to [m;n], [m] and [n] with offset 1, which is what makes it the
+   same exponent as "m·n+m+n+1".  Only numerals fold into the coefficients and the offset, those
+   being what the translation can turn back into a product of powers; anything else stays a term
+   inside a monomial.  Nothing compares
    the terms here -- deciding when two of them are the same is the translation's business, and it
    has already been settled there (see var_for) -- so "n+n" comes back as n twice over.
 
@@ -514,7 +517,7 @@ type translation = {
   (* Likewise the powers whose base we've already asked the sign of: those questions go to Z3, so
      a power written twice -- as it is on the two sides of "x^(n+1) = x^n·x" -- asks once. *)
   signs : Symbolic.t Bwd.t;
-  (* And the powers we've already said what the product they came apart into is (see varpower),
+  (* And the powers we've already said what the product they came apart into is (see 'stated'),
      so that too is said once. *)
   powers : Symbolic.t Bwd.t;
   (* Likewise the powers of a root we've tied back to powers of what it is a root of. *)
@@ -623,19 +626,6 @@ let get_poly ctx ty tm =
   (* The same, for an exponent that may be too big to build a polynomial from, where there is a
      term to fall back on leaving opaque. *)
   and power ty tm base e src = if fits_exponent e then ratpow base e src else opaque ty tm
-  (* A power whose exponent isn't a literal: "x^(n+1)", "x^(n+m)", "x^(2·n)" and their kin.  The
-     exponent is a sum of terms with integer coefficients and an integer offset, and the power
-     becomes the matching product: x^(k + Σcᵢ·aᵢ) is x^k times each x^(aᵢ) multiplied in cᵢ times,
-     with x^(aᵢ) an uninterpreted function of base and exponent, as the whole power was before.
-
-     That is what makes the laws of exponents hold on the nose rather than by anything Z3 has to
-     decide: written this way, both sides of "x^(n+1) = x^n·x" and of "x^(n+m) = x^n·x^m" are the
-     very same product.  The laws being used are b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c, which
-     hold of every real b when the exponents are naturals and the coefficients positive -- b^0
-     being 1 throughout this translation, so a zero exponent and a zero base are no exception.
-     Anything that can go negative makes the power a reciprocal and asks for a nonzero base, which
-     is the obligation a written-out negative exponent already carries.  'tmty' is the type of the
-     power itself and 'src' the base, to point at in an error. *)
   (* The factors of one monomial, translated.  A factor that comes out a constant multiplies into
      the coefficient instead, whatever its type -- the 1/2 in "x^(n+1/2)" is a constant like any
      other -- and only a factor that stays a factor has to be a whole number.  One that needn't be
@@ -654,7 +644,8 @@ let get_poly ctx ty tm =
             | Some n -> factors ty (a :: syms) q (nat && n) ts))
   (* Whether an exponent is a whole number whatever its terms turn out to be -- every monomial of
      it with a whole coefficient and whole factors -- and if so whether it is a natural, which it
-     is when nothing in it can be negative.  This is what 'peel' asks of an inner exponent. *)
+     is when nothing in it can be negative.  This is what factor_base asks of the exponent it
+     distributes over. *)
   and whole_poly ty (ms, k) =
     if not (Z.equal (Q.den k) Z.one) then return None
     else
@@ -696,9 +687,6 @@ let get_poly ctx ty tm =
                     acc
                 else acc @ [ (a, q, nat) ] in
               collect ty acc k rest)
-  (* The powers one monomial each, multiplied together.  Nothing is required of anything here: the
-     obligations that go with a negative coefficient or a fractional offset belong to the caller,
-     which knows whether they are called for. *)
   (* A power of a root, tied back to the power of what it is a root of: s being b^(p/q), s^a raised
      to the q is b^(p·a).  Without it a root's powers and the base's own would be unrelated symbols,
      and x^(n/2)·x^(n/2) would not be the x^n it plainly is.  It needs nothing of b that the root
@@ -706,7 +694,7 @@ let get_poly ctx ty tm =
      the case it is stated in. *)
   and root_tie power a nat =
     let* st = S.get in
-    match root_of st.vars (root_base_of power) with
+    match Option.bind (root_base_of power) (root_of st.vars) with
     | Some (b, e)
       when nat
            && (not (Bwd.exists (fun x -> x = power) st.ties))
@@ -733,10 +721,19 @@ let get_poly ctx ty tm =
     | _ -> return ()
   (* The base a power was taken of, which is where a root would be. *)
   and root_base_of = function
-    | `App (_, [ b; _ ]) -> b
-    | _ -> `Const Q.zero
-  and build_powers ty tmty base acc = function
+    | `App (_, [ b; _ ]) -> Some b
+    | _ -> None
+  (* The powers one monomial each, multiplied together, with what is known about each of them said
+     beside it.  Nothing is required of anything here: the obligations that go with a negative
+     coefficient or a fractional offset belong to the caller, which knows whether they are called
+     for.  A power of a root and a power of an absolute value each get their one fact, and those
+     two cases can't both be a given power's, so one list of powers already said about does for
+     both of them. *)
+  and build_powers tmty base acc = function
     | [] -> return acc
+    (* One to any power is one, which no uninterpreted symbol would say. *)
+    | _ :: rest when (match base with `Const q -> Q.equal q Q.one | _ -> false) ->
+        build_powers tmty base acc rest
     | (a, c, nat) :: rest ->
         let* f = fun_for `Pow 2 in
         let p : Symbolic.t = `App (f, [ base; a ]) in
@@ -748,7 +745,7 @@ let get_poly ctx ty tm =
         let* () = root_tie p a nat in
         let* () = abs_tie p a nat in
         let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
-        build_powers ty tmty base acc rest
+        build_powers tmty base acc rest
   (* Whether an exponent is an even whole number whatever its terms turn out to be, which is what
      makes a power of it nonnegative: u^(2·k) is ∣u∣^(2·k).  Its terms have to be whole for the
      coefficients to say anything, which is what 'factors' failing reports. *)
@@ -864,12 +861,14 @@ let get_poly ctx ty tm =
     else
       let d = Z.to_int d in
       let scale q = Q.mul q (Q.of_int d) in
-      let atoms =
-        List.map (fun (a, c, nat) -> (a, Z.to_int (Q.num (scale c)), nat)) atoms in
-      let k = scale k in
-      let size = List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms in
-      if (not (fits_exponent k)) || size + abs (Z.to_int (Q.num k)) > max_exponent then None
-      else Some (d, atoms, k)
+      let fits (_, c, _) = Z.fits_int (Q.num (scale c)) in
+      if not (List.for_all fits atoms) then None
+      else
+        let atoms = List.map (fun (a, c, nat) -> (a, Z.to_int (Q.num (scale c)), nat)) atoms in
+        let k = scale k in
+        let size = List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms in
+        if (not (fits_exponent k)) || size + abs (Z.to_int (Q.num k)) > max_exponent then None
+        else Some (d, atoms, k)
   (* Whether every factor's exponent is one that comes apart, which has to be settled before any of
      them is built: a factor that emitted an obligation and only then met one that can't be built
      would leave that obligation behind for a translation we didn't use. *)
@@ -913,7 +912,7 @@ let get_poly ctx ty tm =
                   && Q.geq k Q.zero
                   && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
                 let* () = if whole then return () else add_step (Nonzero (base, src)) in
-                let* acc = build_powers ty tmty base (`Const Q.one) atoms in
+                let* acc = build_powers tmty base (`Const Q.one) atoms in
                 (* An integer offset is copies of the base multiplied in, which keeps the product
                    free of anything Z3 has to work out; a fractional one is a root of it. *)
                 if Z.equal (Q.den k) Z.one then
@@ -969,7 +968,7 @@ let get_poly ctx ty tm =
                       if Q.equal c Q.zero then None else Some (a, Z.to_int (Q.num c), nat))
                     atoms in
                 let k = Z.to_int (Q.num k) in
-                let* acc = build_powers ty tmty base (`Const Q.one) atoms in
+                let* acc = build_powers tmty base (`Const Q.one) atoms in
                 return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k)))
             (* An exponent the translation can't turn into a product of powers -- a rational one,
                say -- is still an exponent, and the law is still the law: the factor is that one
@@ -1112,18 +1111,20 @@ let get_poly ctx ty tm =
                     let* () = add_step (Nonzero (py, y.tm)) in
                     return (`Div (px, py)))
         (* A power translates its exponent first, and its base only once it knows which base that
-           is: a variable exponent may take the base's own exponents into itself (see peel), and
-           translating a base we then drop would leave Z3 asked about a power that isn't there. *)
+           is: a variable exponent may take the base's own exponents into itself (see factor_base),
+           and translating a base we then drop would leave Z3 asked about a power that isn't
+           there. *)
         | "pow" -> (
             let* py = go ty y.tm in
             match rational_of py with
             | Some e ->
                 let* px = go ty x.tm in
                 power ty tm px e x.tm
-            (* A variable exponent comes apart into the terms making it up and is put back together
-               as a product of powers.  How far that can go varpower decides, having the translated
-               terms to look at; all that's asked here is that they won't build a polynomial too
-               big to be worth handing to Z3 at all. *)
+            (* A variable exponent comes apart into the terms making it up, and the base into the
+               terms at the bottom of it, and the power is put back together as the product of one
+               power of each.  How far that can go factor_base decides, having the translated terms
+               to look at; all that's asked here is that they won't build a polynomial too big to
+               be worth handing to Z3 at all. *)
             | None ->
                 let p = poly_form y.tm in
                 if not (poly_ok p) then opaque ty tm
@@ -1131,10 +1132,13 @@ let get_poly ctx ty tm =
                   let* factors, nonzeros, nonzero, cut = factor_base ty x.tm p in
                   (* Whether the base came apart at all, which is what says the power we built is
                      the written power of the written base. *)
+                  (* Whether the base came apart at all: where it didn't, the one factor's base is
+                     the written one, already translated, and the power we build of it is the
+                     written power. *)
                   let trivial =
                     match factors with
-                    | [ (_, btm, _) ] -> btm == x.tm
-                    | _ -> false in
+                    | [ (b, btm, _) ] when btm == x.tm -> Some b
+                    | _ -> None in
                   let* built = build_factors ty tmty nonzero factors in
                   let* result =
                     match built with
@@ -1153,12 +1157,12 @@ let get_poly ctx ty tm =
                            doesn't.  Keeping the written form and saying what it equals gives us
                            both. *)
                         let* () =
-                          if not trivial then return ()
-                          else
-                            let* b = go ty x.tm in
-                            let* f = fun_for `Pow 2 in
-                            let plain : Symbolic.t = `App (f, [ b; py ]) in
-                            if plain = result then return () else stated plain result in
+                          match trivial with
+                          | None -> return ()
+                          | Some b ->
+                              let* f = fun_for `Pow 2 in
+                              let plain : Symbolic.t = `App (f, [ b; py ]) in
+                              if plain = result then return () else stated plain result in
                         return result
                     (* An exponent that doesn't come apart at all leaves the power the opaque term
                        it always was -- which is still something to say the rest about. *)

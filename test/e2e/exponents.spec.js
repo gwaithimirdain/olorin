@@ -252,19 +252,22 @@ test.describe('The √ symbol', () => {
     });
 });
 
-// An exponent that isn't a literal at all: x^n, and x^(n+1) and x^(n+m) beside it.  The power
-// itself stays an uninterpreted function of its base and its exponent, as it always was, but the
-// translation now reads the exponent as a polynomial first -- multiplying out what it has to --
-// and writes the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is
-// x^n·x^n, and x^((m+1)·(n+1)) is x^(m·n)·x^m·x^n·x -- and a base that is itself a power brings
-// its own exponent into that, (x^m)^n being x^(m·n), and a base that is a product comes apart
-// into one power each, (x·y)^n being x^n·y^n.  So
-// the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
-// this needs is that each term of the exponent that stays a term is a whole number:
-// b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a
-// nonzero one for integers, but not of a negative base and a fractional exponent, where there is
-// no real b^a to speak of.  A term that comes out a constant is no such worry, and folds into the
-// offset -- which may then be a fraction, and a root of the base like any other.
+// An exponent that isn't a literal at all: x^n, and x^(n+1) and x^(n+m) beside it.  A power is
+// read as the product of powers it really is -- the exponent as a polynomial over ℚ, multiplied
+// out, and the base taken down to the terms at the bottom of it -- so that x^(n+1) is x^n·x,
+// x^(n+m) is x^n·x^m, (x·y)^n is x^n·y^n, (x^m)^n is x^(m·n), and x^((m+1)·(n+1)) is
+// x^(m·n)·x^m·x^n·x.  What is left at the end of that is one uninterpreted power for each term,
+// as the whole power was before, so the laws of exponents hold on the nose -- both sides of one
+// becoming the very same product -- rather than by anything Z3 is asked to work out.
+//
+// Every step of it needs the exponent it distributes over to be a whole number: b^(a+c) is b^a·b^c
+// and (b^a)^c is b^(a·c) for every real b when a and c are naturals, and for a nonzero one when
+// they are integers, but neither is so of a negative base and a fractional exponent, where there
+// is no real b^a to speak of.  A step that hasn't got that simply isn't taken, and the steps
+// around it still are -- or it is taken of the absolute value, where an even exponent makes one
+// available.  A fractional *coefficient* is another matter, being no obstacle at all: clearing its
+// denominator is taking that root of the base, which is the module's own way of saying that
+// x^(n/2) is (x^(1/2))^n.
 test.describe('A variable exponent', () => {
     test('comes apart at a numeral, so the laws of exponents hold of it', async ({ page }) => {
         const olorin = new Olorin(page);
@@ -458,6 +461,12 @@ test.describe('A variable exponent', () => {
             variables: vars, conclusion: '((x·y)^m)^n = x^(m·n)·y^(m·n)',
         })).toBe(true);
         expect(await proves(olorin, { variables: vars, conclusion: '(2·x)^n = 2^n·x^n' })).toBe(true);
+        // One to any power is one, which the uninterpreted symbol would not have said -- and
+        // without which a quotient coming apart would leave a 1^n standing in the way.
+        expect(await proves(olorin, { variables: vars, conclusion: '1^n = 1' })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['x≠0'], conclusion: '(1/x)^n = x^(−n)',
+        })).toBe(true);
     });
 
     // With the same conditions as everywhere else, now asked of each factor: nothing for a natural
@@ -564,6 +573,8 @@ test.describe('A variable exponent', () => {
         // Which also makes a power of an absolute value the absolute value of the power, without
         // which ∣x∣^(2·n) and (x²)^n would be unrelated symbols.
         expect(await plusProves(olorin, { variables: vars, conclusion: '(x²)^n = ∣x∣^(2·n)' })).toBe(true);
+        expect(await plusProves(olorin, { variables: vars, conclusion: '∣x^n∣ = ∣x∣^n' })).toBe(true);
+        expect(await plusProves(olorin, { variables: vars, conclusion: '∣x∣^(2·n) = x^(2·n)' })).toBe(true);
         // Dropping the bars is then exactly as true as the base is nonnegative.
         expect(await proves(olorin, {
             variables: vars, hypotheses: ['0≤x'], conclusion: '(x^2)^(n+1/2) = x^(2·n+1)',
@@ -669,12 +680,17 @@ test.describe('A variable exponent', () => {
     test('and asks for a nonzero base where an inner exponent can be negative', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        const vars = 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ';
         expect(await proves(olorin, {
-            variables: vars, hypotheses: ['x≠0'], conclusion: '(x^(−m))^(−n) = x^(m·n)',
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ', hypotheses: ['x≠0'],
+            conclusion: '(x^(−m))^(−n) = x^(m·n)',
         })).toBe(true);
+    });
+
+    test('and refuses it where the hypotheses leave the base able to be zero', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
         const without = await algebra(olorin, {
-            variables: vars, conclusion: '(x^(−m))^(−n) = x^(m·n)',
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ', conclusion: '(x^(−m))^(−n) = x^(m·n)',
         });
         expect(without.proved).toBe(false);
         expect(without.said).toContain('is nonzero');
