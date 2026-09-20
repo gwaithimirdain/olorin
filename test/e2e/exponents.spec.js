@@ -251,10 +251,11 @@ test.describe('The √ symbol', () => {
 // translation now reads the exponent as a sum of terms with integer coefficients first, and writes
 // the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is x^n·x^n.  So
 // the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
-// this needs is that each term of the exponent is a whole number: b^(a+c) = b^a·b^c and
-// b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a nonzero one for
-// integers, but not of a negative base and a fractional exponent, where there is no real b^a to
-// speak of.
+// this needs is that each term of the exponent that stays a term is a whole number:
+// b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a
+// nonzero one for integers, but not of a negative base and a fractional exponent, where there is
+// no real b^a to speak of.  A term that comes out a constant is no such worry, and folds into the
+// offset -- which may then be a fraction, and a root of the base like any other.
 test.describe('A variable exponent', () => {
     test('comes apart at a numeral, so the laws of exponents hold of it', async ({ page }) => {
         const olorin = new Olorin(page);
@@ -298,6 +299,27 @@ test.describe('A variable exponent', () => {
         // And terms that cancel leave a literal exponent, with nothing uninterpreted left in it.
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n+m−n) = x^m',
+        })).toBe(true);
+    });
+
+    // A fractional offset is a root of the base: the 1/2 in x^(n+1/2) folds into the offset like
+    // any other constant, and x^(1/2) is then a root the problem never writes down, identified by
+    // its base and its exponent as √x and x^(1/2) themselves are.
+    test('may leave a fraction behind, which is a root of the base', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['0≤x'], conclusion: 'x^(n+1/2) = x^n·√x',
+        })).toBe(true);
+        // An even root carries its obligation here as it does anywhere else.
+        const without = await algebra(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n+1/2) = x^n·√x',
+        });
+        expect(without.proved).toBe(false);
+        expect(without.said).toContain('is nonnegative');
+        // An odd one is total, and asks nothing.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n+1/3) = x^n·x^(1/3)',
         })).toBe(true);
     });
 

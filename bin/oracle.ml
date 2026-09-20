@@ -313,6 +313,13 @@ let is_literal x = Option.is_some (rational_of x)
    about it will be provable. *)
 let max_exponent = 1000
 
+let fits_exponent e =
+  let n, d = (Q.num e, Q.den e) in
+  Z.fits_int n
+  && Z.fits_int d
+  && Z.leq (Z.abs n) (Z.of_int max_exponent)
+  && Z.leq d (Z.of_int max_exponent)
+
 (* Something the translation turned up, recorded in the order it was met.  get_poly works bottom
    up, so a subterm's steps come before those of the term containing it, and 'ask' below walks them
    in that order. *)
@@ -428,14 +435,21 @@ let exponent_kind tm =
       if is_natural ty then Some true else if is_integer ty then Some false else None
   | _ -> None
 
+(* What an opaque variable stands for.  A subterm we can't interpret is identified by the term
+   itself, at the type it was met at.  A root is identified instead by the base as the translation
+   writes it and the exponent it is raised to: what makes such a variable mean anything is the
+   definition stated alongside it, "s >= 0 and s^q = base^p", and two roots with the same base and
+   the same exponent have the same definition however they were written.  So √x and x^(1/2) are one
+   variable rather than two that Z3 has to reconcile, and a root the problem never writes down at
+   all -- the x^(1/2) inside x^(n+1/2) -- has an identity like any other. *)
+type tvar = Term of mode normal | Root of Symbolic.t * Q.t
+
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
-  (* Subterms we can't interpret, each standing for an opaque variable.  A root's variable is one of
-     these, keyed by the power it came from, so that writing the same root twice gets the same
-     variable and states its definition once.  We record the type each was met at as well as the
-     term, since an argument of an uninterpreted function can be of any type at all, and asking
-     whether two terms agree only makes sense once we know they're of the same type. *)
-  vars : mode normal Bwd.t;
+  (* The variables we've made, oldest first, each identified as above.  A term records the type it
+     was met at as well, since an argument of an uninterpreted function can be of any type at all,
+     and asking whether two terms agree only makes sense once we know they're of the same type. *)
+  vars : tvar Bwd.t;
   count : int;
   (* Likewise the heads we've turned into uninterpreted function symbols, each paired with the
      number of arguments it was applied to.  Z3's functions have no partial application, so a head
@@ -463,13 +477,32 @@ end)
 let var_for ctx ty tm : (Symbolic.t * bool) S.t =
   let open Monad.Ops (S) in
   let* ({ vars; count; _ } as st) = S.get in
-  let same (x : mode normal) =
-    Result.is_ok (Equal.equal_val ctx ty (Lazy.force x.ty))
-    && Result.is_ok (Equal.equal_at ctx tm x.tm ty) in
+  let same = function
+    | Root _ -> false
+    | Term (x : mode normal) ->
+        Result.is_ok (Equal.equal_val ctx ty (Lazy.force x.ty))
+        && Result.is_ok (Equal.equal_at ctx tm x.tm ty) in
   match Bwd.find_index same vars with
   | None ->
       let* () =
-        S.put { st with vars = Snoc (vars, { tm; ty = Lazy.from_val ty }); count = count + 1 } in
+        S.put
+          { st with vars = Snoc (vars, Term { tm; ty = Lazy.from_val ty }); count = count + 1 } in
+      return (`Var count, true)
+  | Some i -> return (`Var (count - i - 1), false)
+
+(* Likewise the variable standing for a root of a base, and whether we have just made it -- so that
+   it states its definition once, however many ways the problem writes it.  The base is compared as
+   the translation writes it, which is where two ways of writing the same number have already been
+   made one. *)
+let root_for (base : Symbolic.t) (e : Q.t) : (Symbolic.t * bool) S.t =
+  let open Monad.Ops (S) in
+  let* ({ vars; count; _ } as st) = S.get in
+  let same = function
+    | Term _ -> false
+    | Root (b, f) -> b = base && Q.equal f e in
+  match Bwd.find_index same vars with
+  | None ->
+      let* () = S.put { st with vars = Snoc (vars, Root (base, e)); count = count + 1 } in
       return (`Var count, true)
   | Some i -> return (`Var (count - i - 1), false)
 
@@ -497,37 +530,32 @@ let get_poly ctx ty tm =
      by s^q = base^p.  For even q that leaves two candidates, so we pin s down as the nonnegative
      one -- and then the base itself has to be nonnegative, or "s >= 0 and s^q = base^p" has no
      solution at all and would prove anything.  Odd roots are total on the reals and need neither.
-     'src' is the term to point at if an obligation can't be discharged. *)
-  let rec power ty tm base e src =
-    let n, d = (Q.num e, Q.den e) in
-    if
-      not
-        (Z.fits_int n
-        && Z.fits_int d
-        && Z.leq (Z.abs n) (Z.of_int max_exponent)
-        && Z.leq d (Z.of_int max_exponent))
-    then opaque ty tm
-    else
-      let n, d = (Z.to_int n, Z.to_int d) in
-      (* base^n, with a negative n written as a reciprocal so the denominator obligation applies. *)
-      let numerator () =
-        if n >= 0 then return (pow base n)
-        else
-          let p = pow base (-n) in
-          let* () = add_step (Nonzero (p, src)) in
-          return (`Div (`Const Q.one, p)) in
-      if d = 1 then numerator ()
+     'src' is the term to point at if an obligation can't be discharged, and the exponent is one
+     the caller has already found small enough to build from (see fits_exponent). *)
+  let rec ratpow base e src =
+    let n, d = (Z.to_int (Q.num e), Z.to_int (Q.den e)) in
+    (* base^n, with a negative n written as a reciprocal so the denominator obligation applies. *)
+    let numerator () =
+      if n >= 0 then return (pow base n)
       else
-        let even = d mod 2 = 0 in
-        let* () = if even then add_step (Nonneg (base, src)) else return () in
-        let* rhs = numerator () in
-        let* s, fresh = var_for ctx ty tm in
-        let* () =
-          if fresh then
-            add_step
-              (Define ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
-          else return () in
-        return s
+        let p = pow base (-n) in
+        let* () = add_step (Nonzero (p, src)) in
+        return (`Div (`Const Q.one, p)) in
+    if d = 1 then numerator ()
+    else
+      let even = d mod 2 = 0 in
+      let* () = if even then add_step (Nonneg (base, src)) else return () in
+      let* rhs = numerator () in
+      let* s, fresh = root_for base e in
+      let* () =
+        if fresh then
+          add_step
+            (Define ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
+        else return () in
+      return s
+  (* The same, for an exponent that may be too big to build a polynomial from, where there is a
+     term to fall back on leaving opaque. *)
+  and power ty tm base e src = if fits_exponent e then ratpow base e src else opaque ty tm
   (* A power whose exponent isn't a literal: "x^(n+1)", "x^(n+m)", "x^(2·n)" and their kin.  The
      exponent is a sum of terms with integer coefficients and an integer offset, and the power
      becomes the matching product: x^(k + Σcᵢ·aᵢ) is x^k times each x^(aᵢ) multiplied in cᵢ times,
@@ -545,19 +573,20 @@ let get_poly ctx ty tm =
     (* The terms of the exponent, translated, with the ones that agree merged: they are compared
        as translated expressions rather than as terms, which is where two ways of writing the same
        thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
-       term that turns out to be a constant folds into the offset instead.  A term that needn't be
-       a whole number stops all of this: b^(a+c) = b^a·b^c is false for a fractional a and a
-       negative b, there being no real b^a to speak of there. *)
+       term that comes out a constant folds into the offset instead, whatever its type -- the 1/2
+       in "x^(n+1/2)" is a constant like any other -- and only a term that stays a term has to be
+       a whole number.  One that needn't be stops all of this: b^(a+c) = b^a·b^c is false for a
+       fractional a and a negative b, there being no real b^a to speak of there. *)
     let rec collect acc k = function
       | [] -> return (Some (acc, k))
       | (t, c) :: rest -> (
-          match exponent_kind t with
-          | None -> return None
-          | Some nat -> (
-              let* a = go ty t in
-              match rational_of a with
-              | Some q -> collect acc (Q.add k (Q.mul (Q.of_int c) q)) rest
-              | None ->
+          let* a = go ty t in
+          match rational_of a with
+          | Some q -> collect acc (Q.add k (Q.mul (Q.of_int c) q)) rest
+          | None -> (
+              match exponent_kind t with
+              | None -> return None
+              | Some nat ->
                   let acc =
                     if List.exists (fun (b, _, _) -> b = a) acc then
                       List.map
@@ -574,31 +603,40 @@ let get_poly ctx ty tm =
         match List.filter (fun (_, c, _) -> c <> 0) atoms with
         | [] -> power ty tm base k src
         | atoms ->
-            (* A fractional offset would need a root of the base, which is a definition keyed on a
-               term that isn't written anywhere here for us to key it on; and past a point the
-               product is too big to be worth building.  Either way the power stays opaque. *)
-            if not (Z.equal (Q.den k) Z.one && Z.fits_int (Q.num k)) then opaque ty tm
+            (* Past a point the product is too big to be worth building, and the power stays
+               opaque as a written-out exponent that size already would. *)
+            let coefficients = List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms in
+            if (not (fits_exponent k)) || coefficients + abs (Z.to_int (Q.num k)) > max_exponent
+            then opaque ty tm
             else
-              let k = Z.to_int (Q.num k) in
-              if degree (List.map (fun (a, c, _) -> (a, c)) atoms, k) > max_exponent then
-                opaque ty tm
+              (* Naturals with positive coefficients and a nonnegative offset ask nothing at all.
+                 A term or a coefficient that can go negative makes the power a reciprocal and asks
+                 for a nonzero base; a fractional offset is a root of the base, and asks for
+                 whatever a written-out root of it would (see ratpow). *)
+              let whole =
+                Q.geq k Q.zero && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
+              let* () = if whole then return () else add_step (Nonzero (base, src)) in
+              let rec build acc = function
+                | [] -> return acc
+                | (a, c, nat) :: rest ->
+                    let* f = fun_for `Pow 2 in
+                    let p : Symbolic.t = `App (f, [ base; a ]) in
+                    (* b^a lands in ℕ exactly when the whole power does: ℕ.pow is the only power
+                       landing there, and it takes naturals for both of its arguments. *)
+                    let nonneg = nat && is_natural (Lazy.force tmty) in
+                    let* p = if nat then natural (Lazy.force tmty) p else return p in
+                    let* () = sign base p nat nonneg in
+                    let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
+                    build acc rest in
+              let* acc = build (`Const Q.one) atoms in
+              (* An integer offset is copies of the base multiplied in, which keeps the product
+                 free of anything Z3 has to work out; a fractional one is a root of it. *)
+              if Z.equal (Q.den k) Z.one then
+                let k = Z.to_int (Q.num k) in
+                return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k)))
               else
-                let whole = k >= 0 && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
-                let* () = if whole then return () else add_step (Nonzero (base, src)) in
-                let rec build acc = function
-                  | [] -> return acc
-                  | (a, c, nat) :: rest ->
-                      let* f = fun_for `Pow 2 in
-                      let p : Symbolic.t = `App (f, [ base; a ]) in
-                      (* b^a lands in ℕ exactly when the whole power does: ℕ.pow is the only power
-                         landing there, and it takes naturals for both of its arguments. *)
-                      let nonneg = nat && is_natural (Lazy.force tmty) in
-                      let* p = if nat then natural (Lazy.force tmty) p else return p in
-                      let* () = sign base p nat nonneg in
-                      let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
-                      build acc rest in
-                let* acc = build (`Const Q.one) atoms in
-                return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k))))
+                let* s = ratpow base k src in
+                return (`Times (acc, s)))
   (* The sign a power takes from its base, asked about once however often the power is written:
      those questions go to Z3 (see Positive), and the two sides of an equation between powers
      would otherwise ask the same ones twice. *)
