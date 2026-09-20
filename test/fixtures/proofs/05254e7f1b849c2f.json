@@ -1,0 +1,85 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "∀k∈[0],⊥"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 2,
+    "paramCounter": 0,
+    "varCounter": 0,
+    "hypCounter": 0,
+    "conclCounter": 1
+  },
+  "nodes": [
+    {
+      "id": "concl0",
+      "rule": "conclusion",
+      "left": "1395px",
+      "top": "449px",
+      "value": "∀k∈[0],⊥"
+    },
+    {
+      "id": "rule0",
+      "rule": "allbelowI",
+      "left": "369px",
+      "top": "667px",
+      "names": [
+        "n"
+      ],
+      "width": "1007px",
+      "height": "70px"
+    },
+    {
+      "id": "rule1",
+      "rule": "algplus",
+      "left": "715px",
+      "top": "527px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl0",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "assumption",
+        "label": "below"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

@@ -945,9 +945,11 @@
         The final Peano axiom is induction.
         Part of induction (not all of it!) is that every natural number is either zero or a successor.
         We can't prove this with just algebra and logic; we need a new block.
+        Rather than state the axiom as an ∨ and require a separate case split, this block directly breaks the proof into cases based on whether the number is zero or a successor.
+        In the second case, we get a new natural number variable representing the predecessor.
       </div>
       <div id="belowHint" class="modal hint">
-        Before stating the rest of induction, we introduce the notation [<i>n</i>] for the set of natural numbers less than <i>n</i>.
+        We use the notation [<i>n</i>] for the set of natural numbers less than <i>n</i>.
         We have special blocks for proving and using quantifiers of this form.
       </div>
       <div id="inductionHint" class="modal hint">
@@ -957,7 +959,7 @@
         </p>
         <p>
           Phrased in this way, the rule is sometimes called <i>strong induction</i>.
-          We often combine it with the rule that every natural number <i>n</i> is either zero or a successor of some other natural number <i>m</i>, splitting the proof into a "base case" and an "inductive step", with the inductive hypothesis being used on <i>m</i> in the inductive step.
+          We often combine it with the "use ℕ" rule, splitting the proof into a "base case" and an "inductive step", with the inductive hypothesis being used in the inductive step on the predecessor.
           This special case is "weak" or "ordinary" induction.
         </p>
         <p>
