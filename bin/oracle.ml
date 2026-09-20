@@ -461,6 +461,9 @@ type translation = {
   (* Likewise the powers whose base we've already asked the sign of: those questions go to Z3, so
      a power written twice -- as it is on the two sides of "x^(n+1) = x^n·x" -- asks once. *)
   signs : Symbolic.t Bwd.t;
+  (* And the powers we've already said what the product they came apart into is (see varpower),
+     so that too is said once. *)
+  powers : Symbolic.t Bwd.t;
   (* The definitions and obligations met along the way, oldest first. *)
   steps : step Bwd.t;
 }
@@ -569,7 +572,7 @@ let get_poly ctx ty tm =
      Anything that can go negative makes the power a reciprocal and asks for a nonzero base, which
      is the obligation a written-out negative exponent already carries.  'tmty' is the type of the
      power itself and 'src' the base, to point at in an error. *)
-  and varpower ty tmty tm base atoms off src =
+  and varpower ty tmty tm base exponent atoms off src =
     (* The terms of the exponent, translated, with the ones that agree merged: they are compared
        as translated expressions rather than as terms, which is where two ways of writing the same
        thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
@@ -631,12 +634,30 @@ let get_poly ctx ty tm =
               let* acc = build (`Const Q.one) atoms in
               (* An integer offset is copies of the base multiplied in, which keeps the product
                  free of anything Z3 has to work out; a fractional one is a root of it. *)
-              if Z.equal (Q.den k) Z.one then
-                let k = Z.to_int (Q.num k) in
-                return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k)))
-              else
-                let* s = ratpow base k src in
-                return (`Times (acc, s)))
+              let* result =
+                if Z.equal (Q.den k) Z.one then
+                  let k = Z.to_int (Q.num k) in
+                  return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k)))
+                else
+                  let* s = ratpow base k src in
+                  return (`Times (acc, s)) in
+              (* And the power as it was written, said to equal that product.  Coming apart at the
+                 exponent is what proves the laws of exponents, but it also takes apart a term that
+                 congruence would have matched against another way of writing the same power --
+                 x^((m+1)·(n+1)) against x^(m·n+m+n+1), whose exponents Z3 can see are equal, one
+                 of which comes apart and the other of which doesn't.  Keeping the written form
+                 and saying what it equals gives us both. *)
+              let* f = fun_for `Pow 2 in
+              let plain : Symbolic.t = `App (f, [ base; exponent ]) in
+              let* () = if plain = result then return () else stated plain result in
+              return result)
+  (* What a power that came apart is equal to, said once however often it is written. *)
+  and stated plain result =
+    let* st = S.get in
+    if Bwd.exists (fun x -> x = plain) st.powers then return ()
+    else
+      let* () = S.put { st with powers = Snoc (st.powers, plain) } in
+      add_step (Define [ (`Eq, plain, result) ])
   (* The sign a power takes from its base, asked about once however often the power is written:
      those questions go to Z3 (see Positive), and the two sides of an equation between powers
      would otherwise ask the same ones twice. *)
@@ -748,7 +769,7 @@ let get_poly ctx ty tm =
                 | None ->
                     let atoms, off = linear_form y.tm in
                     if degree (atoms, off) <= max_exponent then
-                      varpower ty tmty tm px atoms off x.tm
+                      varpower ty tmty tm px py atoms off x.tm
                     else opaque ty tm)
         | _ -> opaque ty tm)
     (* Unary operation *)
@@ -907,6 +928,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
             funcount = 0;
             nonnegs = Emp;
             signs = Emp;
+            powers = Emp;
             steps = Emp;
           } in
       (* The quantifier eliminator can prove disequalities, but we only let it do so between rational

@@ -393,6 +393,21 @@ test.describe('A variable exponent', () => {
         })).toBe(false);
     });
 
+    // Coming apart mustn't cost what congruence already gave.  A power whose exponent is written
+    // as a product is a term of its own, and one written as a sum comes apart -- so the written
+    // form is kept alongside the product, and said to equal it, or two ways of writing the same
+    // power would no longer be the same power.
+    test('is still the power any other way of writing that exponent is', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ', conclusion: 'x^((m+1)·(n+1)) = x^(m·n+m+n+1)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ', hypotheses: ['m=n'], conclusion: 'x^(m+1) = x^(n+1)',
+        })).toBe(true);
+    });
+
     // What comes apart is a sum with numerals in it and nothing else: a product of two terms is a
     // term of its own, there being no power of the base to raise to it.
     test('is only taken apart at a sum and a numeral', async ({ page }) => {
@@ -400,6 +415,12 @@ test.describe('A variable exponent', () => {
         await olorin.open();
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n·m) = (x^n)^m',
+        })).toBe(false);
+        // Nor is a product multiplied out, so an exponent written as one doesn't come apart into
+        // the powers of the sum it would expand to.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ',
+            conclusion: 'x^((m+1)·(n+1)) = x^(m·n)·x^m·x^n·x',
         })).toBe(false);
         // A fractional coefficient is no coefficient either: (x^n)^(1/2) would need x^n shown
         // nonnegative, which is not something the split can ask for.
