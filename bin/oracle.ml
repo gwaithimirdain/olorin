@@ -386,7 +386,8 @@ let is_integer ty = is_number_type "ℤ" ty
 
 (* How big a polynomial an exponent would build: past this we give up and leave the power opaque,
    as a written-out exponent that size already is. *)
-let degree (monomials, off) = abs off + List.fold_left (fun s (_, c) -> s + abs c) 0 monomials
+let degree (monomials, off) =
+  List.fold_left (fun s (_, c) -> Q.add s (Q.abs c)) (Q.abs off) monomials
 
 (* An exponent in polynomial form: the monomials it is made of, each a list of terms multiplied
    together with an integer coefficient, and an integer offset.  "n+1" is [n] with coefficient 1
@@ -401,29 +402,31 @@ let degree (monomials, off) = abs off + List.fold_left (fun s (_, c) -> s + abs 
    too big a one, is left a term of its own instead: that only ever means less is taken apart. *)
 let max_terms = 32
 
-let poly_scale c (ms, k) = (List.map (fun (m, d) -> (m, c * d)) ms, c * k)
-let poly_add (ms1, k1) (ms2, k2) = (ms1 @ ms2, k1 + k2)
+let poly_scale c (ms, k) = (List.map (fun (m, d) -> (m, Q.mul c d)) ms, Q.mul c k)
+let poly_add (ms1, k1) (ms2, k2) = (ms1 @ ms2, Q.add k1 k2)
 
 let poly_mul (ms1, k1) (ms2, k2) =
-  let cross = List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, c * d)) ms2) ms1 in
-  let left = if k2 = 0 then [] else List.map (fun (a, c) -> (a, c * k2)) ms1 in
-  let right = if k1 = 0 then [] else List.map (fun (b, d) -> (b, d * k1)) ms2 in
-  (cross @ left @ right, k1 * k2)
+  let cross =
+    List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, Q.mul c d)) ms2) ms1 in
+  let left = if Q.equal k2 Q.zero then [] else List.map (fun (a, c) -> (a, Q.mul c k2)) ms1 in
+  let right = if Q.equal k1 Q.zero then [] else List.map (fun (b, d) -> (b, Q.mul d k1)) ms2 in
+  (cross @ left @ right, Q.mul k1 k2)
 
-let poly_ok (ms, k) = List.length ms <= max_terms && degree (ms, k) <= max_exponent
+let poly_ok (ms, k) =
+  List.length ms <= max_terms && Q.leq (degree (ms, k)) (Q.of_int max_exponent)
 
 let rec poly_form tm =
-  let atom = ([ ([ tm ], 1) ], 0) in
+  let atom = ([ ([ tm ], Q.one) ], Q.zero) in
   let scale = poly_scale and add = poly_add and mul = poly_mul and ok = poly_ok in
   (* Stopping as soon as it is too big, rather than at the end, so that multiplying a big one out
      four times over doesn't build what it is about to throw away. *)
   let rec repeat a n =
-    if n <= 0 then ([], 1)
+    if n <= 0 then ([], Q.one)
     else
       let r = repeat a (n - 1) in
       if ok r then mul r a else r in
   match get_posint tm with
-  | Some k -> ([], k)
+  | Some k -> ([], Q.of_int k)
   | None -> (
       let unary f x =
         let r = f (poly_form x) in
@@ -435,9 +438,16 @@ let rec poly_form tm =
       | Neu { head = Const { name; ins }; args; _ } when Option.is_some (is_id_ins ins) -> (
           match (Firstorder.get_root name, get_args args) with
           | "plus", Some [ x; y ] -> binary add x.tm y.tm
-          | "minus", Some [ x; y ] -> binary (fun a b -> add a (scale (-1) b)) x.tm y.tm
+          | "minus", Some [ x; y ] -> binary (fun a b -> add a (scale Q.minus_one b)) x.tm y.tm
           | "times", Some [ x; y ] -> binary mul x.tm y.tm
-          | "negate", Some [ x ] -> unary (scale (-1)) x.tm
+          | "negate", Some [ x ] -> unary (scale Q.minus_one) x.tm
+          (* Division by a numeral is a coefficient like any other, the exponents being a module
+             over ℚ and not just over ℤ: "n/2" is n with a coefficient of 1/2, which a power reads
+             as a root of its base (see power_of). *)
+          | "divide", Some [ x; y ] -> (
+              match get_posint y.tm with
+              | Some k when k <> 0 -> unary (scale (Q.of_ints 1 k)) x.tm
+              | _ -> atom)
           (* A small power in the exponent multiplies out like the product it is: "(m+1)²" has to
              be the same exponent as "(m+1)·(m+1)", and so as "m·m+2·m+1". *)
           | "square", Some [ x ] -> unary (fun a -> repeat a 2) x.tm
@@ -461,9 +471,9 @@ let base_shape tm =
       | "times", Some [ x; y ] -> `Product (x.tm, y.tm)
       | "divide", Some [ x; y ] -> `Quotient (x.tm, y.tm)
       | "pow", Some [ x; y ] -> `Power (x.tm, poly_form y.tm)
-      | "square", Some [ x ] -> `Power (x.tm, ([], 2))
-      | "cube", Some [ x ] -> `Power (x.tm, ([], 3))
-      | "fourth", Some [ x ] -> `Power (x.tm, ([], 4))
+      | "square", Some [ x ] -> `Power (x.tm, ([], Q.of_int 2))
+      | "cube", Some [ x ] -> `Power (x.tm, ([], Q.of_int 3))
+      | "fourth", Some [ x ] -> `Power (x.tm, ([], Q.of_int 4))
       | _ -> `Irreducible)
   | _ -> `Irreducible
 
@@ -507,6 +517,8 @@ type translation = {
   (* And the powers we've already said what the product they came apart into is (see varpower),
      so that too is said once. *)
   powers : Symbolic.t Bwd.t;
+  (* Likewise the powers of a root we've tied back to powers of what it is a root of. *)
+  ties : Symbolic.t Bwd.t;
   (* The definitions and obligations met along the way, oldest first. *)
   steps : step Bwd.t;
 }
@@ -535,6 +547,15 @@ let var_for ctx ty tm : (Symbolic.t * bool) S.t =
           { st with vars = Snoc (vars, Term { tm; ty = Lazy.from_val ty }); count = count + 1 } in
       return (`Var count, true)
   | Some i -> return (`Var (count - i - 1), false)
+
+(* What a variable was made to stand for, if it was made for a root.  Powers of a root are tied
+   back to powers of what it is a root of (see root_tie), which is what this is for. *)
+let root_of vars = function
+  | `Var i -> (
+      match List.nth_opt (Bwd.to_list vars) i with
+      | Some (Root (b, e)) -> Some (b, e)
+      | _ -> None)
+  | _ -> None
 
 (* Likewise the variable standing for a root of a base, and whether we have just made it -- so that
    it states its definition once, however many ways the problem writes it.  The base is compared as
@@ -635,16 +656,18 @@ let get_poly ctx ty tm =
      it with a whole coefficient and whole factors -- and if so whether it is a natural, which it
      is when nothing in it can be negative.  This is what 'peel' asks of an inner exponent. *)
   and whole_poly ty (ms, k) =
-    let rec walk nat = function
-      | [] -> return (Some nat)
-      | (m, c) :: rest -> (
-          let* f = factors ty [] (Q.of_int c) true m in
-          match f with
-          | None -> return None
-          | Some (syms, q, mnat) ->
-              if not (Z.equal (Q.den q) Z.one) then return None
-              else walk (nat && Q.geq q Q.zero && (syms = [] || mnat)) rest) in
-    walk (k >= 0) ms
+    if not (Z.equal (Q.den k) Z.one) then return None
+    else
+      let rec walk nat = function
+        | [] -> return (Some nat)
+        | (m, c) :: rest -> (
+            let* f = factors ty [] c true m in
+            match f with
+            | None -> return None
+            | Some (syms, q, mnat) ->
+                if not (Z.equal (Q.den q) Z.one) then return None
+                else walk (nat && Q.geq q Q.zero && (syms = [] || mnat)) rest) in
+      walk (Q.geq k Q.zero) ms
   (* The monomials of an exponent, with the ones that agree merged: they are compared as translated
      expressions rather than as terms, which is where two ways of writing the same thing have
      already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A monomial whose
@@ -652,28 +675,56 @@ let get_poly ctx ty tm =
   and collect ty acc k = function
     | [] -> return (Some (acc, k))
     | (m, c) :: rest -> (
-        let* f = factors ty [] (Q.of_int c) true m in
+        let* f = factors ty [] c true m in
         match f with
         | None -> return None
         | Some ([], q, _) -> collect ty acc (Q.add k q) rest
         | Some (syms, q, nat) ->
-            (* A monomial with a fractional coefficient would be a root of a power of the base,
-               which is not a definition this can write down. *)
-            if not (Z.equal (Q.den q) Z.one && Z.fits_int (Q.num q)) then return None
+            (* The coefficient stays a rational.  One that isn't whole is a root of the base rather
+               than a power of it -- x^(n/2) is (x^(1/2))^n -- which is a denominator to be cleared
+               rather than anything to refuse (see power_of). *)
+            if not (Z.fits_int (Q.num q) && Z.fits_int (Q.den q)) then return None
             else
-              let c = Z.to_int (Q.num q) in
               let a =
                 match syms with
                 | [] -> assert false
                 | first :: rest -> List.fold_left (fun acc x -> `Times (acc, x)) first rest in
               let acc =
                 if List.exists (fun (b, _, _) -> b = a) acc then
-                  List.map (fun (b, d, m) -> if b = a then (b, d + c, m || nat) else (b, d, m)) acc
-                else acc @ [ (a, c, nat) ] in
+                  List.map
+                    (fun (b, d, m) -> if b = a then (b, Q.add d q, m || nat) else (b, d, m))
+                    acc
+                else acc @ [ (a, q, nat) ] in
               collect ty acc k rest)
   (* The powers one monomial each, multiplied together.  Nothing is required of anything here: the
      obligations that go with a negative coefficient or a fractional offset belong to the caller,
      which knows whether they are called for. *)
+  (* A power of a root, tied back to the power of what it is a root of: s being b^(p/q), s^a raised
+     to the q is b^(p·a).  Without it a root's powers and the base's own would be unrelated symbols,
+     and x^(n/2)·x^(n/2) would not be the x^n it plainly is.  It needs nothing of b that the root
+     itself didn't, an exponent that is a natural and a root that is a positive power of b being
+     the case it is stated in. *)
+  and root_tie power a nat =
+    let* st = S.get in
+    match root_of st.vars (root_base_of power) with
+    | Some (b, e)
+      when nat
+           && (not (Bwd.exists (fun x -> x = power) st.ties))
+           && Z.fits_int (Q.num e)
+           && Z.fits_int (Q.den e)
+           && Z.gt (Q.num e) Z.zero
+           && Z.leq (Q.num e) (Z.of_int max_exponent)
+           && Z.leq (Q.den e) (Z.of_int max_exponent) ->
+        let* () = S.put { st with ties = Snoc (st.ties, power) } in
+        let* f = fun_for `Pow 2 in
+        let bp : Symbolic.t = `App (f, [ b; a ]) in
+        add_step
+          (Define [ (`Eq, pow power (Z.to_int (Q.den e)), pow bp (Z.to_int (Q.num e))) ])
+    | _ -> return ()
+  (* The base a power was taken of, which is where a root would be. *)
+  and root_base_of = function
+    | `App (_, [ b; _ ]) -> b
+    | _ -> `Const Q.zero
   and build_powers ty tmty base acc = function
     | [] -> return acc
     | (a, c, nat) :: rest ->
@@ -684,6 +735,7 @@ let get_poly ctx ty tm =
         let nonneg = nat && is_natural (Lazy.force tmty) in
         let* p = if nat then natural (Lazy.force tmty) p else return p in
         let* () = sign base p nat nonneg in
+        let* () = root_tie p a nat in
         let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
         build_powers ty tmty base acc rest
   (* The factors a base really is a product of, each with the exponent it carries, when a power of
@@ -692,68 +744,111 @@ let get_poly ctx ty tm =
      at the bottom of it, with the exponents multiplied out along the way -- which is the whole of
      what the laws of exponents say, once the exponents are read as the ℚ-module elements they are.
 
-     Every step of it needs the exponent it distributes over to be a whole number, or else a
-     positive base: (u·v)^(1/2) is not u^(1/2)·v^(1/2) for two negative factors, any more than
-     (u^2)^(1/2) is u.  Where the exponents are whole but can go negative, the bases they divide by
-     have to be nonzero, which is what 'Whole true' asks for; a natural exponent asks nothing.
+     Every step of it needs the exponent it distributes over to be a whole number: (u·v)^(1/2) is
+     not u^(1/2)·v^(1/2) for two negative factors, any more than (u^2)^(1/2) is u.  A step whose
+     exponent isn't whole simply isn't taken -- the base it was going to come apart stays a base of
+     its own -- so that the steps above and below it still are.  Where the exponents are whole but
+     can go negative, the bases they divide by have to be nonzero, which is what 'true' asks for;
+     a natural exponent asks nothing.  A positive base would do instead of any of this, but whether
+     the hypotheses make it positive isn't known here, so that is left to a fact conditional on it
+     (see factor_all and tower).
 
      A denominator is nonzero whatever the exponent does, as it had to be when it was written as a
      division, so those come back separately to be asked for on their own rather than through the
-     exponent. *)
+     exponent.  'cut' says whether any step was left untaken, which is what there is a conditional
+     fact to state about. *)
   and factor_base ty basetm p =
-    let leaf () =
+    let leaf cut =
       let* b = go ty basetm in
-      return ([ (b, basetm, p) ], [], `Nothing) in
-    (* What distributing over a product or a quotient needs of the exponent. *)
-    let distributing () =
-      let* w = whole_poly ty p in
-      return
-        (match w with
-        | Some nat -> `Whole (not nat)
-        | None -> `Pos) in
+      return ([ (b, basetm, p) ], [], false, cut) in
     match base_shape basetm with
-    | `Irreducible -> leaf ()
-    | `Power (u, inner) ->
+    | `Irreducible -> leaf false
+    | `Power (u, inner) -> (
         let q = poly_mul inner p in
-        if not (poly_ok q) then leaf ()
+        if not (poly_ok q) then leaf true
         else
           (* Both exponents have to be whole, and not merely the product of the two: (u²)^(n+1/2)
              is u^(2·n)·∣u∣, which is not u^(2·n+1) for a negative u, though 2 and n+1/2 multiply
              out to a whole number between them. *)
           let* outer = whole_poly ty p in
           let* w = whole_poly ty inner in
-          let here =
-            match (outer, w) with
-            | Some _, Some nat -> `Whole (not nat)
-            | _ -> `Pos in
-          let* fs, nz, s = factor_base ty u q in
-          return (fs, nz, combine here s)
+          match (outer, w) with
+          | Some _, Some nat ->
+              let* fs, nz, nonzero, cut = factor_base ty u q in
+              return (fs, nz, nonzero || not nat, cut)
+          | _ -> leaf true)
+    | `Product (u, v) -> (
+        let* w = whole_poly ty p in
+        match w with
+        | None -> leaf true
+        | Some nat ->
+            let* fu, nzu, zu, cu = factor_base ty u p in
+            let* fv, nzv, zv, cv = factor_base ty v p in
+            return (fu @ fv, nzu @ nzv, (not nat) || zu || zv, cu || cv))
+    | `Quotient (u, v) -> (
+        let* w = whole_poly ty p in
+        match w with
+        | None -> leaf true
+        | Some nat ->
+            let* fu, nzu, zu, cu = factor_base ty u p in
+            let* fv, nzv, zv, cv = factor_base ty v (poly_scale Q.minus_one p) in
+            let* d = go ty v in
+            return (fu @ fv, ((d, v) :: nzu) @ nzv, (not nat) || zu || zv, cu || cv))
+  (* The same, with every step taken whether or not the exponent it distributes over is whole:
+     what the power would come apart into if the terms at the bottom of it were positive, for which
+     nothing but their positivity is needed.  Where that differs from what we could do outright it
+     is a fact conditional on them (see tower). *)
+  and factor_all ty basetm p =
+    let leaf () =
+      let* b = go ty basetm in
+      return [ (b, basetm, p) ] in
+    match base_shape basetm with
+    | `Irreducible -> leaf ()
+    | `Power (u, inner) ->
+        let q = poly_mul inner p in
+        if not (poly_ok q) then leaf () else factor_all ty u q
     | `Product (u, v) ->
-        let* here = distributing () in
-        let* fu, nzu, su = factor_base ty u p in
-        let* fv, nzv, sv = factor_base ty v p in
-        return (fu @ fv, nzu @ nzv, combine here (combine su sv))
+        let* fu = factor_all ty u p in
+        let* fv = factor_all ty v p in
+        return (fu @ fv)
     | `Quotient (u, v) ->
-        let* here = distributing () in
-        let* fu, nzu, su = factor_base ty u p in
-        let* fv, nzv, sv = factor_base ty v (poly_scale (-1) p) in
-        let* d = go ty v in
-        return (fu @ fv, ((d, v) :: nzu) @ nzv, combine here (combine su sv))
+        let* fu = factor_all ty u p in
+        let* fv = factor_all ty v (poly_scale Q.minus_one p) in
+        return (fu @ fv)
+  (* What a collected exponent comes to once its coefficients are made whole: the denominator they
+     have in common, the terms with their coefficients multiplied by it, and what is left of the
+     offset.  x^(n/2) is (x^(1/2))^n, so clearing the denominator is taking the root of the base --
+     which is the ℚ-module's own way of saying it, and needs no more of the base than writing that
+     root would.  The offset is not cleared along with them: a fractional one is a root of the base
+     in its own right (see ratpow), and leaving it be keeps x^(n+1/2) the x^n·√x it has always
+     been rather than an (√x)^(2·n)·√x that nothing would recognize. *)
+  and cleared atoms k =
+    let den (_, c, _) = Q.den c in
+    let d = List.fold_left (fun acc a -> Z.lcm acc (den a)) Z.one atoms in
+    if not (Z.fits_int d && Z.leq d (Z.of_int max_exponent)) then None
+    else
+      let d = Z.to_int d in
+      let scale q = Q.mul q (Q.of_int d) in
+      let atoms =
+        List.map (fun (a, c, nat) -> (a, Z.to_int (Q.num (scale c)), nat)) atoms in
+      let k = scale k in
+      let size = List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms in
+      if (not (fits_exponent k)) || size + abs (Z.to_int (Q.num k)) > max_exponent then None
+      else Some (d, atoms, k)
   (* Whether every factor's exponent is one that comes apart, which has to be settled before any of
      them is built: a factor that emitted an obligation and only then met one that can't be built
      would leave that obligation behind for a translation we didn't use. *)
   and all_buildable ty = function
     | [] -> return true
     | (_, _, (monomials, off)) :: rest -> (
-        let* collected = collect ty [] (Q.of_int off) monomials in
+        let* collected = collect ty [] off monomials in
         match collected with
         | None -> return false
-        | Some (atoms, k) ->
-            let atoms = List.filter (fun (_, c, _) -> c <> 0) atoms in
-            let coefficients = List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms in
-            if (not (fits_exponent k)) || coefficients + abs (Z.to_int (Q.num k)) > max_exponent
-            then return false
-            else all_buildable ty rest)
+        | Some (atoms, k) -> (
+            let atoms = List.filter (fun (_, c, _) -> not (Q.equal c Q.zero)) atoms in
+            match cleared atoms k with
+            | None -> return false
+            | Some _ -> all_buildable ty rest))
   (* One factor raised to its exponent: the product of powers that exponent comes apart into.
      Naturals with positive coefficients and a nonnegative offset ask nothing at all.  A term or a
      coefficient that can go negative makes the power a reciprocal and asks for a nonzero base, as
@@ -761,33 +856,37 @@ let get_poly ctx ty tm =
      factor_base); a fractional offset is a root of the base, and asks for whatever a written-out
      root of it would (see ratpow). *)
   and power_of ty tmty nonzero (base, src, (monomials, off)) =
-    let* collected = collect ty [] (Q.of_int off) monomials in
+    let* collected = collect ty [] off monomials in
     match collected with
     | None -> return None
     | Some (atoms, k) -> (
-        match List.filter (fun (_, c, _) -> c <> 0) atoms with
-        (* Coefficients can cancel, and every term can fold away, in which case the exponent was a
-           literal after all -- "x^(1+2)", or "x^(n−n)". *)
-        | [] ->
-            if not (fits_exponent k) then return None
-            else
-              let* r = ratpow base k src in
-              return (Some r)
-        | atoms ->
-            let whole =
-              (not nonzero)
-              && Q.geq k Q.zero
-              && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
-            let* () = if whole then return () else add_step (Nonzero (base, src)) in
-            let* acc = build_powers ty tmty base (`Const Q.one) atoms in
-            (* An integer offset is copies of the base multiplied in, which keeps the product free
-               of anything Z3 has to work out; a fractional one is a root of it. *)
-            if Z.equal (Q.den k) Z.one then
-              let k = Z.to_int (Q.num k) in
-              return (Some (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k))))
-            else
-              let* s = ratpow base k src in
-              return (Some (`Times (acc, s))))
+        match cleared (List.filter (fun (_, c, _) -> not (Q.equal c Q.zero)) atoms) k with
+        | None -> return None
+        | Some (d, atoms, k) -> (
+            (* A common denominator in the coefficients is a root of the base: the base becomes
+               that root, and the exponents become whole. *)
+            let* base = if d = 1 then return base else ratpow base (Q.of_ints 1 d) src in
+            match atoms with
+            (* Coefficients can cancel, and every term can fold away, in which case the exponent
+               was a literal after all -- "x^(1+2)", or "x^(n−n)". *)
+            | [] ->
+                let* r = ratpow base k src in
+                return (Some r)
+            | atoms ->
+                let whole =
+                  (not nonzero)
+                  && Q.geq k Q.zero
+                  && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
+                let* () = if whole then return () else add_step (Nonzero (base, src)) in
+                let* acc = build_powers ty tmty base (`Const Q.one) atoms in
+                (* An integer offset is copies of the base multiplied in, which keeps the product
+                   free of anything Z3 has to work out; a fractional one is a root of it. *)
+                if Z.equal (Q.den k) Z.one then
+                  let k = Z.to_int (Q.num k) in
+                  return (Some (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k))))
+                else
+                  let* s = ratpow base k src in
+                  return (Some (`Times (acc, s)))))
   (* All of them, multiplied together, or nothing where any one of them doesn't come apart. *)
   and build_factors ty tmty nonzero factors =
     let* ok = all_buildable ty factors in
@@ -817,16 +916,23 @@ let get_poly ctx ty tm =
     let rec product acc = function
       | [] -> return acc
       | (base, _, (monomials, off)) :: rest ->
-          let* collected = collect ty [] (Q.of_int off) monomials in
+          let* collected = collect ty [] off monomials in
           let* piece =
             match collected with
             | Some (atoms, k)
               when Z.equal (Q.den k) Z.one
                    && Z.fits_int (Q.num k)
-                   && List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms
+                   && List.for_all (fun (_, c, _) -> Z.equal (Q.den c) Z.one) atoms
+                   && List.fold_left
+                        (fun s (_, c, _) -> s + abs (Z.to_int (Q.num c)))
+                        0 atoms
                       + abs (Z.to_int (Q.num k))
                       <= max_exponent ->
-                let atoms = List.filter (fun (_, c, _) -> c <> 0) atoms in
+                let atoms =
+                  List.filter_map
+                    (fun (a, c, nat) ->
+                      if Q.equal c Q.zero then None else Some (a, Z.to_int (Q.num c), nat))
+                    atoms in
                 let k = Z.to_int (Q.num k) in
                 let* acc = build_powers ty tmty base (`Const Q.one) atoms in
                 return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k)))
@@ -856,22 +962,13 @@ let get_poly ctx ty tm =
     let rec walk acc = function
       | [] -> return acc
       | (m, c) :: rest ->
-          let* p = monomial (`Const (Q.of_int c)) m in
+          let* p = monomial (`Const c) m in
           let acc : Symbolic.t =
             match acc with
             | `Const q when Q.equal q Q.zero -> p
             | _ -> `Plus (acc, p) in
           walk acc rest in
-    walk (`Const (Q.of_int k)) ms
-  (* What a tower needs, taking one level together with everything below it.  A level that needs
-     a positive base makes the whole tower need one; otherwise the nonzero bases they ask for add
-     up. *)
-  and combine here below =
-    match (here, below) with
-    | `Pos, _ | _, `Pos -> `Pos
-    | `Whole a, `Whole b -> `Whole (a || b)
-    | `Whole a, `Nothing -> `Whole a
-    | `Nothing, b -> b
+    walk (`Const k) ms
   (* What a power that came apart is equal to, said once however often it is written. *)
   and stated plain result =
     let* st = S.get in
@@ -992,18 +1089,27 @@ let get_poly ctx ty tm =
                as a product of powers.  How far that can go varpower decides, having the translated
                terms to look at; all that's asked here is that they won't build a polynomial too
                big to be worth handing to Z3 at all. *)
-            | None -> (
+            | None ->
                 let p = poly_form y.tm in
                 if not (poly_ok p) then opaque ty tm
                 else
-                  let* factors, nonzeros, status = factor_base ty x.tm p in
-                  (* The power translated as it stands, of the base as it was written, which is
-                     what we fall back on wherever the factors can't be used. *)
-                  let written b =
-                    let* built = build_factors ty tmty false [ (b, x.tm, p) ] in
+                  let* factors, nonzeros, nonzero, cut = factor_base ty x.tm p in
+                  (* Whether the base came apart at all, which is what says the power we built is
+                     the written power of the written base. *)
+                  let trivial =
+                    match factors with
+                    | [ (_, btm, _) ] -> btm == x.tm
+                    | _ -> false in
+                  let* built = build_factors ty tmty nonzero factors in
+                  let* result =
                     match built with
-                    | None -> return None
                     | Some result ->
+                        let rec denominators = function
+                          | [] -> return ()
+                          | (d, dtm) :: rest ->
+                              let* () = add_step (Nonzero (d, dtm)) in
+                              denominators rest in
+                        let* () = denominators nonzeros in
                         (* The power as written, said to equal that product.  Coming apart at the
                            exponent is what proves the laws of exponents, but it also takes apart a
                            term that congruence would have matched against another way of writing
@@ -1011,53 +1117,26 @@ let get_poly ctx ty tm =
                            Z3 can see are equal, one of which comes apart and the other of which
                            doesn't.  Keeping the written form and saying what it equals gives us
                            both. *)
-                        let* f = fun_for `Pow 2 in
-                        let plain : Symbolic.t = `App (f, [ b; py ]) in
                         let* () =
-                          if plain = result then return () else stated plain result in
-                        return (Some result) in
-                  match status with
-                  (* Nothing to take the base apart at, so this is that power of that base. *)
-                  | `Nothing -> (
-                      (* Nothing came off, so the base is the one factor, already translated. *)
-                      let* b =
-                        match factors with
-                        | [ (b, _, _) ] -> return b
-                        | _ -> go ty x.tm in
-                      let* r = written b in
-                      match r with
-                      | Some result -> return result
-                      | None -> opaque ty tm)
-                  (* Every step of it whole, so the power is the product of the powers of its
-                     factors, and nothing beyond their nonzero denominators is asked of it. *)
-                  | `Whole nonzero -> (
-                      let* built = build_factors ty tmty nonzero factors in
-                      match built with
-                      | Some result ->
-                          let rec denominators = function
-                            | [] -> return ()
-                            | (d, dtm) :: rest ->
-                                let* () = add_step (Nonzero (d, dtm)) in
-                                denominators rest in
-                          let* () = denominators nonzeros in
-                          return result
-                      | None -> (
-                          let* b = go ty x.tm in
-                          let* r = written b in
-                          match r with
-                          | Some result -> return result
-                          | None -> opaque ty tm))
-                  (* Only positive terms at the bottom would let us take it apart, which the
-                     hypotheses may or may not give: the power is translated as it stands, with
-                     what it would have come to stated beside it. *)
-                  | `Pos -> (
-                      let* b = go ty x.tm in
-                      let* r = written b in
-                      match r with
-                      | Some result ->
-                          let* () = tower ty tmty factors result in
-                          return result
-                      | None -> opaque ty tm)))
+                          if not trivial then return ()
+                          else
+                            let* b = go ty x.tm in
+                            let* f = fun_for `Pow 2 in
+                            let plain : Symbolic.t = `App (f, [ b; py ]) in
+                            if plain = result then return () else stated plain result in
+                        return result
+                    (* An exponent that doesn't come apart at all leaves the power the opaque term
+                       it always was -- which is still something to say the rest about. *)
+                    | None -> opaque ty tm in
+                  (* And what it would have come apart into where the terms at the bottom of it are
+                     positive, which is more than we could do outright wherever a step was left
+                     untaken. *)
+                  let* () =
+                    if not cut then return ()
+                    else
+                      let* full = factor_all ty x.tm p in
+                      tower ty tmty full result in
+                  return result)
         | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }
@@ -1216,6 +1295,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
             nonnegs = Emp;
             signs = Emp;
             powers = Emp;
+            ties = Emp;
             steps = Emp;
           } in
       (* The quantifier eliminator can prove disequalities, but we only let it do so between rational

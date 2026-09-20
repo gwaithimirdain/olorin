@@ -487,6 +487,60 @@ test.describe('A variable exponent', () => {
         })).toBe(false);
     });
 
+    // A fractional coefficient is a coefficient like any other, the exponents being a module over
+    // ℚ and not just over ℤ: clearing its denominator is taking that root of the base, x^(n/2)
+    // being (x^(1/2))^n.  So the root becomes the base, and powers of it are tied back to powers
+    // of what it is a root of, without which x^(n/2)·x^(n/2) and x^n would be unrelated terms.
+    test('has a fractional coefficient where its base has a root', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nn ∈ ℕ';
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0≤x'], conclusion: 'x^(n/2)·x^(n/2) = x^n',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^(1/2))^(2·n) = x^n',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^(1/2))^(n+1) = x^(n/2+1/2)',
+        })).toBe(true);
+        // An even root asks of its base exactly what a written-out one does, and no more.
+        const without = await algebra(olorin, {
+            variables: vars, conclusion: 'x^(n/2)·x^(n/2) = x^n',
+        });
+        expect(without.proved).toBe(false);
+        expect(without.said).toContain('is nonnegative');
+        // An odd one is total, and asks nothing at all.
+        expect(await proves(olorin, {
+            variables: vars, conclusion: 'x^(n/3)·x^(n/3)·x^(n/3) = x^n',
+        })).toBe(true);
+    });
+
+    // A step whose conditions don't hold isn't taken, and the steps around it still are: the base
+    // it was going to come apart stays a base of its own.  So a power of a product of roots comes
+    // apart at the product, and a root of a product doesn't come apart at all -- and the exponents
+    // still multiply out through both.
+    test('leaves untaken only the step whose conditions fail', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // The product comes apart, the root of x does not.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\ny ∈ ℝ\nn ∈ ℕ', hypotheses: ['0≤x'],
+            conclusion: '(x^(1/2)·y)^n = (x^(1/2))^n·y^n',
+        })).toBe(true);
+        // And here nothing may be said of u or v apart, u·v being what has the root -- so the
+        // product is left alone and the exponents multiplied out over it, which needs only what
+        // the root already needed.
+        expect(await proves(olorin, {
+            variables: 'u ∈ ℝ\nv ∈ ℝ\nn ∈ ℕ', hypotheses: ['u<0', 'v<0'],
+            conclusion: '((u·v)^(1/2))^(n+1) = (u·v)^(n/2+1/2)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'u ∈ ℝ\nv ∈ ℝ\nn ∈ ℕ',
+            conclusion: '((u·v)^(1/2))^(n+1) = (u·v)^(n/2+1/2)',
+        })).toBe(false);
+    });
+
     // A base that is itself a power comes into the exponent: (u^e)^M is u^(e·M), so a tower of
     // powers is one power of the base at the bottom of it.  The named small powers are powers
     // like any other here, "(x²)^n" being the tower "(x^2)^n".
@@ -553,9 +607,10 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', hypotheses: ['0<x'], conclusion: '(x^q)^n = x^(q·n)',
         })).toBe(true);
-        // Positive, not merely nonnegative: a zero base has no negative powers to speak of.
+        // Positive, not merely nonnegative: a zero base has no negative powers to speak of, and
+        // the equation says nothing at all short of that, true though it happens to be at zero.
         expect(await proves(olorin, {
-            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^(1/2))^(2·n) = x^n',
+            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^6)^(n+1/2) = x^(6·n+3)',
         })).toBe(false);
     });
 
@@ -593,11 +648,6 @@ test.describe('A variable exponent', () => {
         await olorin.open();
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n·m) = (x·x)^(n·m)',
-        })).toBe(false);
-        // A fractional coefficient is no coefficient either: (x^n)^(1/2) would need x^n shown
-        // nonnegative, which is not something the split can ask for.
-        expect(await proves(olorin, {
-            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['0<x'], conclusion: 'x^(n/2)·x^(n/2) = x^n',
         })).toBe(false);
         // Equal exponents do give equal powers, though, as they did before: that much is
         // congruence, which the uninterpreted symbol has always had.
