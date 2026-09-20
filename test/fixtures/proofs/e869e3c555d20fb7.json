@@ -1,0 +1,134 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "x",
+        "ty": "ℤ"
+      }
+    ],
+    "hypotheses": [
+      {
+        "ty": "x≥0"
+      }
+    ],
+    "conclusion": {
+      "ty": "∃n∈ℕ,(x=n)"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 18,
+    "paramCounter": 0,
+    "varCounter": 5,
+    "hypCounter": 5,
+    "conclCounter": 5
+  },
+  "nodes": [
+    {
+      "id": "var4",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "x",
+      "value": "ℤ"
+    },
+    {
+      "id": "hyp4",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "500px",
+      "value": "x≥0"
+    },
+    {
+      "id": "concl4",
+      "rule": "conclusion",
+      "left": "1377px",
+      "top": "449px",
+      "value": "∃n∈ℕ,(x=n)"
+    },
+    {
+      "id": "rule16",
+      "rule": "zton",
+      "left": "466px",
+      "top": "382px",
+      "names": [
+        "y"
+      ]
+    },
+    {
+      "id": "rule17",
+      "rule": "exI",
+      "left": "1058px",
+      "top": "335px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "var4",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule16",
+        "sort": "input",
+        "label": "x"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "hyp4",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule16",
+        "sort": "input",
+        "label": "nonneg"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule17",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl4",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule16",
+        "sort": "output",
+        "label": "element"
+      },
+      "target": {
+        "vertex": "rule17",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule16",
+        "sort": "output",
+        "label": "property"
+      },
+      "target": {
+        "vertex": "rule17",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

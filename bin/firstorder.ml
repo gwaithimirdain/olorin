@@ -93,6 +93,9 @@ def ℤ.ge (x y : ℤ) : Type ≔ ℤ.le y x
 axiom ℤ.deceq (x y : ℤ) : lor (eq ℤ x y) (neq ℤ x y)
 axiom ℤ.tord (x y : ℤ) : lor (ℤ.le x y) (ℤ.gt x y)
 
+axiom mod : ℤ → ℕ → ℤ
+notation(1) a \"mod\" n ≔ mod a n
+
 def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) ]
 axiom ℚ.plus : ℚ → ℚ → ℚ
 axiom ℚ.minus : ℚ → ℚ → ℚ
