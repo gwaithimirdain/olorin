@@ -153,7 +153,7 @@
         <div class="container rule" id="natInd" data-rule="natInd" title="Prove ∀n∈ℕ,P(n) by strong induction: assume a natural number n and that ∀k∈[n],P(k), then prove P(n)">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
-          <div class="singleright subgoal"><div class="subgoallabel">ind</div></div>
+          <div class="singleright subgoal"><div class="subgoallabel">∀ℕ</div></div>
           <div class="bottomleft"></div>
           <div class="bottomright"></div>
           <img src="resize-handle-right.svg" width="15" height="24" class="resize-image" style="right: -3px; bottom: -5px">
@@ -935,10 +935,35 @@
         The next Peano axiom says that 0 is not a successor.
         Note that this would be false if <i>n</i> were an integer instead of a natural number!
       </div>
+      <div id="ztonHint" class="modal hint">
+        Another way of describing the natural numbers is that they are the non-negative integers.
+        I will let you use a natural number when I expect an integer, and the algebra block knows that every integer thereby obtained is non-negative.
+        However, to use an integer where I expect a natural number, you have to give me a proof that it is non-negative.
+        The ℤ→ℕ block converts an integer <i>x</i> together with a proof of <i>x</i>≥0 to a natural number that is equal to <i>x</i>.
+      </div>
       <div id="peano3Hint" class="modal hint">
         The final Peano axiom is induction.
-        Part of induction is that every natural number is either zero or a successor.
+        Part of induction (not all of it!) is that every natural number is either zero or a successor.
         We can't prove this with just algebra and logic; we need a new block.
+      </div>
+      <div id="belowHint" class="modal hint">
+        Before stating the rest of induction, we introduce the notation [<i>n</i>] for the set of natural numbers less than <i>n</i>.
+        We have special blocks for proving and using quantifiers of this form.
+      </div>
+      <div id="inductionHint" class="modal hint">
+        <p>
+          The main part of the induction property is a rule similar to "prove ∀" for statements about all natural numbers, except that we also get to <i>assume</i> the statement we want is already known to be true about all smaller natural numbers.
+          This assumption is called the <i>inductive hypothesis</i>.
+        </p>
+        <p>
+          Phrased in this way, the rule is sometimes called <i>strong induction</i>.
+          We often combine it with the rule that every natural number <i>n</i> is either zero or a successor of some other natural number <i>m</i>, splitting the proof into a "base case" and an "inductive step", with the inductive hypothesis being used on <i>m</i> in the inductive step.
+          This special case is "weak" or "ordinary" induction.
+        </p>
+        <p>
+          Induction of all sorts is particularly useful when reasoning about a function that is defined by recursion.
+          Here we give the defining equations of a recursive function as hypothesized equations.
+        </p>
       </div>
       <div id="convergenceHint" class="modal hint" style="width: 600px">
         A sequence (of real numbers) is a function from natural numbers to real numbers.

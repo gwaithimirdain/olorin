@@ -1,0 +1,280 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "x",
+        "ty": "ℝ"
+      },
+      {
+        "name": "y",
+        "ty": "ℝ"
+      }
+    ],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "(x<y)∨((x=y)∨(x>y))"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 30,
+    "paramCounter": 26,
+    "varCounter": 28,
+    "hypCounter": 31,
+    "conclCounter": 29
+  },
+  "nodes": [
+    {
+      "id": "var26",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "x",
+      "value": "ℝ"
+    },
+    {
+      "id": "var27",
+      "rule": "variable",
+      "left": "50px",
+      "top": "62px",
+      "name": "y",
+      "value": "ℝ"
+    },
+    {
+      "id": "concl28",
+      "rule": "conclusion",
+      "left": "1321px",
+      "top": "449px",
+      "value": "(x<y)∨((x=y)∨(x>y))"
+    },
+    {
+      "id": "rule22",
+      "rule": "tord",
+      "left": "271.717px",
+      "top": "239px"
+    },
+    {
+      "id": "rule23",
+      "rule": "orE",
+      "left": "285.717px",
+      "top": "472px",
+      "width": "871px",
+      "height": "80px"
+    },
+    {
+      "id": "rule24",
+      "rule": "orI2",
+      "left": "953.717px",
+      "top": "605px"
+    },
+    {
+      "id": "rule25",
+      "rule": "orI2",
+      "left": "607.717px",
+      "top": "626px"
+    },
+    {
+      "id": "rule26",
+      "rule": "orE",
+      "left": "464px",
+      "top": "302px",
+      "width": "499px",
+      "height": "80px"
+    },
+    {
+      "id": "rule27",
+      "rule": "orI1",
+      "left": "689px",
+      "top": "209px"
+    },
+    {
+      "id": "rule28",
+      "rule": "orI2",
+      "left": "782px",
+      "top": "430px"
+    },
+    {
+      "id": "rule29",
+      "rule": "orI1",
+      "left": "558px",
+      "top": "433px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "var26",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule22",
+        "sort": "input",
+        "label": "x"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "var27",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule22",
+        "sort": "input",
+        "label": "y"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule22",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule23",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule23",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl28",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule24",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule23",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule25",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule24",
+        "sort": "input",
+        "label": "right"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule23",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule25",
+        "sort": "input",
+        "label": "right"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule23",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule26",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule26",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule23",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule26",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule27",
+        "sort": "input",
+        "label": "left"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule27",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule26",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule28",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule26",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule26",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule29",
+        "sort": "input",
+        "label": "left"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule28",
+        "sort": "input",
+        "label": "right"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

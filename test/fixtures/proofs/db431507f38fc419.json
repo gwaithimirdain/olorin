@@ -1,0 +1,131 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "x",
+        "ty": "ℝ"
+      }
+    ],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "x is finite"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 37,
+    "paramCounter": 26,
+    "varCounter": 66,
+    "hypCounter": 46,
+    "conclCounter": 47
+  },
+  "nodes": [
+    {
+      "id": "var65",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "x",
+      "value": "ℝ"
+    },
+    {
+      "id": "concl46",
+      "rule": "conclusion",
+      "left": "1402px",
+      "top": "449px",
+      "value": "x is finite"
+    },
+    {
+      "id": "rule33",
+      "rule": "exposI",
+      "left": "895.717px",
+      "top": "431px"
+    },
+    {
+      "id": "rule34",
+      "rule": "algplus",
+      "left": "530.717px",
+      "top": "371px"
+    },
+    {
+      "id": "rule35",
+      "rule": "expr",
+      "left": "500.717px",
+      "top": "182px",
+      "value": "∣x∣+1",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule36",
+      "rule": "algplus",
+      "left": "580.717px",
+      "top": "507px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule33",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl46",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "var65",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule35",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule35",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule33",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule34",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule33",
+        "sort": "input",
+        "label": "positive"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule36",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule33",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "x",
+        "ty": "𝕊"
+      }
+    ],
+    "hypotheses": [
+      {
+        "ty": "x is finite"
+      }
+    ],
+    "conclusion": {
+      "ty": "x+1 is finite"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 42,
+    "paramCounter": 26,
+    "varCounter": 72,
+    "hypCounter": 52,
+    "conclCounter": 51
+  },
+  "nodes": [
+    {
+      "id": "var71",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "x",
+      "value": "𝕊"
+    },
+    {
+      "id": "hyp51",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "500px",
+      "value": "x is finite"
+    },
+    {
+      "id": "concl50",
+      "rule": "conclusion",
+      "left": "1384px",
+      "top": "449px",
+      "value": "x+1 is finite"
+    },
+    {
+      "id": "rule37",
+      "rule": "exposI",
+      "left": "1140.72px",
+      "top": "472px"
+    },
+    {
+      "id": "rule38",
+      "rule": "exposE",
+      "left": "365.717px",
+      "top": "389px",
+      "names": [
+        "u"
+      ]
+    },
+    {
+      "id": "rule39",
+      "rule": "expr",
+      "left": "764.717px",
+      "top": "381px",
+      "value": "u+1",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule40",
+      "rule": "algplus",
+      "left": "765.717px",
+      "top": "493px"
+    },
+    {
+      "id": "rule41",
+      "rule": "algplus",
+      "left": "790.717px",
+      "top": "618px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule37",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl50",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "hyp51",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule38",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule38",
+        "sort": "output",
+        "label": "element"
+      },
+      "target": {
+        "vertex": "rule39",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule39",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule37",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule38",
+        "sort": "output",
+        "label": "positive"
+      },
+      "target": {
+        "vertex": "rule40",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule40",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule37",
+        "sort": "input",
+        "label": "positive"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule38",
+        "sort": "output",
+        "label": "property"
+      },
+      "target": {
+        "vertex": "rule41",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule41",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule37",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

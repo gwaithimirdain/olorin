@@ -60,6 +60,7 @@ axiom ℕ.pow : ℕ → ℕ → ℕ
 axiom ℕ.square : ℕ → ℕ
 axiom ℕ.cube : ℕ → ℕ
 axiom ℕ.fourth : ℕ → ℕ
+axiom ℕ.integral (x y : ℕ) : eq ℕ (ℕ.times x y) 0 → lor (eq ℕ x 0) (eq ℕ y 0)
 axiom ℕ.abs : ℕ → ℕ
 axiom ℕ.min : ℕ → ℕ → ℕ
 axiom ℕ.max : ℕ → ℕ → ℕ
@@ -67,6 +68,8 @@ axiom ℕ.lt : ℕ → ℕ → Type
 def ℕ.le (x y : ℕ) : Type ≔ data [ left. (_ : ℕ.lt x y) | right. (_ : eq ℕ x y) ]
 def ℕ.gt (x y : ℕ) : Type ≔ ℕ.lt y x
 def ℕ.ge (x y : ℕ) : Type ≔ ℕ.le y x
+axiom ℕ.deceq (x y : ℕ) : lor (eq ℕ x y) (neq ℕ x y)
+axiom ℕ.tord (x y : ℕ) : lor (ℕ.le x y) (ℕ.gt x y)
 axiom ℕ.cases (P : Type) (n : ℕ) (pz : eq ℕ n 0 → P) (ps : (k : ℕ) → eq ℕ n (ℕ.plus k 1) → P) : P
 
 def ℤ : Type ≔ data [ zero. | suc. (_:ℤ) ]
@@ -89,6 +92,9 @@ def ℤ.gt (x y : ℤ) : Type ≔ ℤ.lt y x
 def ℤ.ge (x y : ℤ) : Type ≔ ℤ.le y x
 axiom ℤ.deceq (x y : ℤ) : lor (eq ℤ x y) (neq ℤ x y)
 axiom ℤ.tord (x y : ℤ) : lor (ℤ.le x y) (ℤ.gt x y)
+
+axiom mod : ℤ → ℕ → ℤ
+notation(1) a \"mod\" n ≔ mod a n
 
 def ℚ : Type ≔ data [ zero. | suc. (_:ℚ) ]
 axiom ℚ.plus : ℚ → ℚ → ℚ

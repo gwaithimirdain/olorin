@@ -217,7 +217,13 @@ let rules =
         User
           {
             consts =
-              [ [ "ℤ"; "integral" ]; [ "ℚ"; "integral" ]; [ "ℝ"; "integral" ]; [ "𝕊"; "integral" ] ];
+              [
+                [ "ℕ"; "integral" ];
+                [ "ℤ"; "integral" ];
+                [ "ℚ"; "integral" ];
+                [ "ℝ"; "integral" ];
+                [ "𝕊"; "integral" ];
+              ];
             inputs = [ Arg "x"; Arg "y"; Arg "xy0" ];
             implicit_first = None;
             outputs = [];
@@ -225,7 +231,14 @@ let rules =
       ( "deceq",
         User
           {
-            consts = [ [ "ℤ"; "deceq" ]; [ "ℚ"; "deceq" ]; [ "ℝ"; "deceq" ]; [ "𝕊"; "deceq" ] ];
+            consts =
+              [
+                [ "ℕ"; "deceq" ];
+                [ "ℤ"; "deceq" ];
+                [ "ℚ"; "deceq" ];
+                [ "ℝ"; "deceq" ];
+                [ "𝕊"; "deceq" ];
+              ];
             inputs = [ Arg "x"; Arg "y" ];
             implicit_first = None;
             outputs = [];
@@ -233,7 +246,10 @@ let rules =
       ( "tord",
         User
           {
-            consts = [ [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ] ];
+            consts =
+              [
+                [ "ℕ"; "tord" ]; [ "ℤ"; "tord" ]; [ "ℚ"; "tord" ]; [ "ℝ"; "tord" ]; [ "𝕊"; "tord" ];
+              ];
             inputs = [ Arg "x"; Arg "y" ];
             implicit_first = None;
             outputs = [];

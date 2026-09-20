@@ -1,0 +1,98 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "n",
+        "ty": "ℕ"
+      }
+    ],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "∀k∈[n],(k²<n²)"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 92,
+    "paramCounter": 28,
+    "varCounter": 87,
+    "hypCounter": 65,
+    "conclCounter": 78
+  },
+  "nodes": [
+    {
+      "id": "var86",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "n",
+      "value": "ℕ"
+    },
+    {
+      "id": "concl77",
+      "rule": "conclusion",
+      "left": "1354px",
+      "top": "449px",
+      "value": "∀k∈[n],(k²<n²)"
+    },
+    {
+      "id": "rule90",
+      "rule": "allbelowI",
+      "left": "429px",
+      "top": "661px",
+      "names": [
+        "k"
+      ],
+      "width": "798px",
+      "height": "70px"
+    },
+    {
+      "id": "rule91",
+      "rule": "algplus",
+      "left": "790px",
+      "top": "560px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule90",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl77",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule90",
+        "sort": "assumption",
+        "label": "below"
+      },
+      "target": {
+        "vertex": "rule91",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule91",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule90",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

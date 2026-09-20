@@ -1,0 +1,191 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "x",
+        "ty": "ℝ"
+      },
+      {
+        "name": "y",
+        "ty": "ℝ"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "(x+y+2=x−y−2)∧(x+1=y+4)"
+      }
+    ],
+    "conclusion": {
+      "ty": "(x=1)∧(y=−2)"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 13,
+    "paramCounter": 15,
+    "varCounter": 2,
+    "hypCounter": 13,
+    "conclCounter": 9
+  },
+  "nodes": [
+    {
+      "id": "hyp12",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "474px",
+      "value": "(x+y+2=x−y−2)∧(x+1=y+4)"
+    },
+    {
+      "id": "concl8",
+      "rule": "conclusion",
+      "left": "1371px",
+      "top": "449px",
+      "value": "(x=1)∧(y=−2)"
+    },
+    {
+      "id": "rule7",
+      "rule": "andI",
+      "left": "991px",
+      "top": "333px"
+    },
+    {
+      "id": "rule8",
+      "rule": "andE",
+      "left": "406px",
+      "top": "282px"
+    },
+    {
+      "id": "rule9",
+      "rule": "alg",
+      "left": "627px",
+      "top": "416px"
+    },
+    {
+      "id": "rule10",
+      "rule": "alg",
+      "left": "825px",
+      "top": "235px"
+    },
+    {
+      "id": "rule12",
+      "rule": "asc",
+      "left": "486px",
+      "top": "99px",
+      "value": "x+y+2=x−y−2",
+      "width": "fit-content"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp12",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule8",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule9",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule9",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule9",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "input",
+        "label": "snd"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule10",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule10",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "input",
+        "label": "fst"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output",
+        "label": "fst"
+      },
+      "target": {
+        "vertex": "rule12",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule12",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule10",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule7",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl8",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

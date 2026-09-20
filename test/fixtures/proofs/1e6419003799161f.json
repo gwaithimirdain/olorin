@@ -1,0 +1,85 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "ω is positive infinite"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 62,
+    "paramCounter": 26,
+    "varCounter": 77,
+    "hypCounter": 57,
+    "conclCounter": 60
+  },
+  "nodes": [
+    {
+      "id": "concl59",
+      "rule": "conclusion",
+      "left": "1319px",
+      "top": "449px",
+      "value": "ω is positive infinite"
+    },
+    {
+      "id": "rule60",
+      "rule": "allI",
+      "left": "509.717px",
+      "top": "561px",
+      "names": [
+        "u"
+      ],
+      "width": "665px",
+      "height": "50px"
+    },
+    {
+      "id": "rule61",
+      "rule": "omega",
+      "left": "779.717px",
+      "top": "439px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule60",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl59",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule60",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule61",
+        "sort": "input",
+        "label": "x"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule61",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule60",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

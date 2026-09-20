@@ -1,0 +1,124 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "a",
+        "ty": "ℤ"
+      }
+    ],
+    "hypotheses": [
+      {
+        "ty": "∀x∈ℤ,(a·x=0)"
+      }
+    ],
+    "conclusion": {
+      "ty": "a=0"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 65,
+    "paramCounter": 26,
+    "varCounter": 79,
+    "hypCounter": 59,
+    "conclCounter": 62
+  },
+  "nodes": [
+    {
+      "id": "var78",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "a",
+      "value": "ℤ"
+    },
+    {
+      "id": "hyp58",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "500px",
+      "value": "∀x∈ℤ,(a·x=0)"
+    },
+    {
+      "id": "concl61",
+      "rule": "conclusion",
+      "left": "1430px",
+      "top": "449px",
+      "value": "a=0"
+    },
+    {
+      "id": "rule62",
+      "rule": "allE",
+      "left": "484.717px",
+      "top": "436px"
+    },
+    {
+      "id": "rule63",
+      "rule": "expr",
+      "left": "331.717px",
+      "top": "608px",
+      "value": "1",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule64",
+      "rule": "alg",
+      "left": "966.717px",
+      "top": "462px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule63",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule62",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "hyp58",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule62",
+        "sort": "input",
+        "label": "universal"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule62",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule64",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule64",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl61",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "0≠1"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 343,
+    "y": 13
+  },
+  "counters": {
+    "counter": 70,
+    "paramCounter": 26,
+    "varCounter": 79,
+    "hypCounter": 59,
+    "conclCounter": 66
+  },
+  "nodes": [
+    {
+      "id": "concl65",
+      "rule": "conclusion",
+      "left": "1430px",
+      "top": "449px",
+      "value": "0≠1"
+    },
+    {
+      "id": "rule69",
+      "rule": "alg",
+      "left": "764.717px",
+      "top": "491px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule69",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl65",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "x",
+        "ty": "ℝ"
+      },
+      {
+        "name": "y",
+        "ty": "ℝ"
+      }
+    ],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "(x≤y)∨(x>y)"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 22,
+    "paramCounter": 26,
+    "varCounter": 24,
+    "hypCounter": 31,
+    "conclCounter": 27
+  },
+  "nodes": [
+    {
+      "id": "var22",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "x",
+      "value": "ℝ"
+    },
+    {
+      "id": "var23",
+      "rule": "variable",
+      "left": "50px",
+      "top": "62px",
+      "name": "y",
+      "value": "ℝ"
+    },
+    {
+      "id": "concl26",
+      "rule": "conclusion",
+      "left": "1379px",
+      "top": "449px",
+      "value": "(x≤y)∨(x>y)"
+    },
+    {
+      "id": "rule21",
+      "rule": "tord",
+      "left": "798.717px",
+      "top": "365px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "var22",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule21",
+        "sort": "input",
+        "label": "x"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "var23",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule21",
+        "sort": "input",
+        "label": "y"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule21",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl26",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}
