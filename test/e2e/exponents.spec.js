@@ -251,8 +251,8 @@ test.describe('The √ symbol', () => {
 // translation now reads the exponent as a polynomial first -- multiplying out what it has to --
 // and writes the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is
 // x^n·x^n, and x^((m+1)·(n+1)) is x^(m·n)·x^m·x^n·x -- and a base that is itself a power brings
-// its own exponent into that, (x^m)^n being x^(m·n) -- or, where the hypotheses make the base
-// positive, x^(e·n) for any exponents at all.  So
+// its own exponent into that, (x^m)^n being x^(m·n), and a base that is a product comes apart
+// into one power each, (x·y)^n being x^n·y^n.  So
 // the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
 // this needs is that each term of the exponent that stays a term is a whole number:
 // b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a
@@ -429,6 +429,62 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ', conclusion: 'x^(m·n+n·m) = (x^(m·n))²',
         })).toBe(true);
+    });
+
+    // The base comes apart multiplicatively as the exponent comes apart additively: (u·v)^E is
+    // u^E·v^E and (u/v)^E is u^E·v^(−E), so a power is a product of powers of the terms at the
+    // bottom of it, with the exponents multiplied out along the way.
+    test('takes a base apart at its products and quotients', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\ny ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ';
+        expect(await proves(olorin, { variables: vars, conclusion: '(x·y)^n = x^n·y^n' })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x·y)^(n+1) = x^n·y^n·x·y',
+        })).toBe(true);
+        // A factor written twice is that power squared, the factors being collected like the
+        // terms of the exponent are.
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x·y·x)^n = (x^n)²·y^n',
+        })).toBe(true);
+        // And a base that is a product of powers gives both at once.
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '((x·y)^m)^n = x^(m·n)·y^(m·n)',
+        })).toBe(true);
+        expect(await proves(olorin, { variables: vars, conclusion: '(2·x)^n = 2^n·x^n' })).toBe(true);
+    });
+
+    // With the same conditions as everywhere else, now asked of each factor: nothing for a natural
+    // exponent, a nonzero factor where the exponent can go negative, and positive ones where it
+    // isn't whole -- two negative factors having a positive product, which is why the product and
+    // not the factors is what would otherwise be enough.
+    test('and asks of each factor what it asks of any base', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\ny ∈ ℝ\nn ∈ ℕ';
+        // A denominator is nonzero whatever the exponent does, as it was when it was written as a
+        // division.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['y≠0'], conclusion: '(x/y)^n = x^n/y^n',
+        })).toBe(true);
+        const nodiv = await algebra(olorin, { variables: vars, conclusion: '(x/y)^n = x^n/y^n' });
+        expect(nodiv.proved).toBe(false);
+        expect(nodiv.said).toContain('is nonzero');
+        // A negative exponent makes every factor a reciprocal.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['x≠0', 'y≠0'], conclusion: '(x·y)^(−n) = x^(−n)·y^(−n)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x·y)^(−n) = x^(−n)·y^(−n)',
+        })).toBe(false);
+        // An exponent that isn't whole needs them positive, one at a time.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0<x', '0<y'],
+            conclusion: '(x·y)^(n+1/2) = x^(n+1/2)·y^(n+1/2)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, conclusion: '(x·y)^(n+1/2) = x^(n+1/2)·y^(n+1/2)',
+        })).toBe(false);
     });
 
     // A base that is itself a power comes into the exponent: (u^e)^M is u^(e·M), so a tower of
