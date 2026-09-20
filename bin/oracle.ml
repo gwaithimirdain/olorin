@@ -380,49 +380,68 @@ let is_number_type sys ty =
 let is_natural ty = is_number_type "ℕ" ty
 let is_integer ty = is_number_type "ℤ" ty
 
-(* An exponent in linear form: the terms it is made of, each with an integer coefficient, and an
-   integer offset.  "n+1" is n with coefficient 1 and offset 1, "2·n−m" is n with 2 and m with −1,
-   and an exponent with no arithmetic on the outside of it is itself with coefficient 1.  Only
+(* How big a polynomial an exponent would build: past this we give up and leave the power opaque,
+   as a written-out exponent that size already is. *)
+let degree (monomials, off) = abs off + List.fold_left (fun s (_, c) -> s + abs c) 0 monomials
+
+(* An exponent in polynomial form: the monomials it is made of, each a list of terms multiplied
+   together with an integer coefficient, and an integer offset.  "n+1" is [n] with coefficient 1
+   and offset 1; "2·n−m" is [n] with 2 and [m] with −1; and "(m+1)·(n+1)" multiplies out to [m;n],
+   [m] and [n] with offset 1, which is what makes it the same exponent as "m·n+m+n+1".  Only
    numerals fold into the coefficients and the offset, those being what the translation can turn
-   back into a product of powers; anything else stays a term of its own.  Nothing compares the
-   terms here -- deciding when two of them are the same is the translation's business, and it has
-   already been settled there (see var_for) -- so "n+n" comes back as n twice over. *)
-let rec linear_form tm =
-  let scale c = List.map (fun (t, d) -> (t, c * d)) in
+   back into a product of powers; anything else stays a term inside a monomial.  Nothing compares
+   the terms here -- deciding when two of them are the same is the translation's business, and it
+   has already been settled there (see var_for) -- so "n+n" comes back as n twice over.
+
+   Multiplying out is what costs something, so a product that would make too many monomials, or
+   too big a one, is left a term of its own instead: that only ever means less is taken apart. *)
+let max_terms = 32
+
+let rec poly_form tm =
+  let atom = ([ ([ tm ], 1) ], 0) in
+  let scale c (ms, k) = (List.map (fun (m, d) -> (m, c * d)) ms, c * k) in
+  let add (ms1, k1) (ms2, k2) = (ms1 @ ms2, k1 + k2) in
+  let mul (ms1, k1) (ms2, k2) =
+    let cross = List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, c * d)) ms2) ms1 in
+    let left = if k2 = 0 then [] else List.map (fun (a, c) -> (a, c * k2)) ms1 in
+    let right = if k1 = 0 then [] else List.map (fun (b, d) -> (b, d * k1)) ms2 in
+    (cross @ left @ right, k1 * k2) in
+  let ok (ms, k) = List.length ms <= max_terms && degree (ms, k) <= max_exponent in
+  (* Stopping as soon as it is too big, rather than at the end, so that multiplying a big one out
+     four times over doesn't build what it is about to throw away. *)
+  let rec repeat a n =
+    if n <= 0 then ([], 1)
+    else
+      let r = repeat a (n - 1) in
+      if ok r then mul r a else r in
   match get_posint tm with
   | Some k -> ([], k)
   | None -> (
+      let unary f x =
+        let r = f (poly_form x) in
+        if ok r then r else atom in
+      let binary f x y =
+        let r = f (poly_form x) (poly_form y) in
+        if ok r then r else atom in
       match Norm.view_term tm with
       | Neu { head = Const { name; ins }; args; _ } when Option.is_some (is_id_ins ins) -> (
           match (Firstorder.get_root name, get_args args) with
-          | "plus", Some [ x; y ] ->
-              let ax, kx = linear_form x.tm in
-              let ay, ky = linear_form y.tm in
-              (ax @ ay, kx + ky)
-          | "minus", Some [ x; y ] ->
-              let ax, kx = linear_form x.tm in
-              let ay, ky = linear_form y.tm in
-              (ax @ scale (-1) ay, kx - ky)
-          | "negate", Some [ x ] ->
-              let ax, kx = linear_form x.tm in
-              (scale (-1) ax, -kx)
-          (* A product is a coefficient only when one side is a numeral; "n·m" is a term of its
-             own, there being no power of the base to raise to it. *)
-          | "times", Some [ x; y ] -> (
-              match (get_posint x.tm, get_posint y.tm) with
-              | Some c, _ ->
-                  let a, k = linear_form y.tm in
-                  (scale c a, c * k)
-              | _, Some c ->
-                  let a, k = linear_form x.tm in
-                  (scale c a, c * k)
-              | None, None -> ([ (tm, 1) ], 0))
-          | _ -> ([ (tm, 1) ], 0))
-      | _ -> ([ (tm, 1) ], 0))
+          | "plus", Some [ x; y ] -> binary add x.tm y.tm
+          | "minus", Some [ x; y ] -> binary (fun a b -> add a (scale (-1) b)) x.tm y.tm
+          | "times", Some [ x; y ] -> binary mul x.tm y.tm
+          | "negate", Some [ x ] -> unary (scale (-1)) x.tm
+          (* A small power in the exponent multiplies out like the product it is: "(m+1)²" has to
+             be the same exponent as "(m+1)·(m+1)", and so as "m·m+2·m+1". *)
+          | "square", Some [ x ] -> unary (fun a -> repeat a 2) x.tm
+          | "cube", Some [ x ] -> unary (fun a -> repeat a 3) x.tm
+          | "fourth", Some [ x ] -> unary (fun a -> repeat a 4) x.tm
+          | "pow", Some [ x; y ] -> (
+              match get_posint y.tm with
+              | Some k when k <= 4 -> unary (fun a -> repeat a k) x.tm
+              | _ -> atom)
+          | _ -> atom)
+      | _ -> atom)
 
-(* How big a polynomial an exponent in linear form would build: past this we give up and leave the
-   power opaque, as a written-out exponent that size already is. *)
-let degree (atoms, off) = abs off + List.fold_left (fun s (_, c) -> s + abs c) 0 atoms
 
 (* Whether what's left of an exponent is a whole number, and if so whether it is a natural one.
    The term's own type says so, not the power's: ℝ's exponent is a ℚ whatever is written there, and
@@ -572,32 +591,51 @@ let get_poly ctx ty tm =
      Anything that can go negative makes the power a reciprocal and asks for a nonzero base, which
      is the obligation a written-out negative exponent already carries.  'tmty' is the type of the
      power itself and 'src' the base, to point at in an error. *)
-  and varpower ty tmty tm base exponent atoms off src =
-    (* The terms of the exponent, translated, with the ones that agree merged: they are compared
-       as translated expressions rather than as terms, which is where two ways of writing the same
-       thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
-       term that comes out a constant folds into the offset instead, whatever its type -- the 1/2
-       in "x^(n+1/2)" is a constant like any other -- and only a term that stays a term has to be
-       a whole number.  One that needn't be stops all of this: b^(a+c) = b^a·b^c is false for a
-       fractional a and a negative b, there being no real b^a to speak of there. *)
-    let rec collect acc k = function
-      | [] -> return (Some (acc, k))
-      | (t, c) :: rest -> (
+  and varpower ty tmty tm base exponent monomials off src =
+    (* The factors of one monomial, translated.  A factor that comes out a constant multiplies
+       into the coefficient instead, whatever its type -- the 1/2 in "x^(n+1/2)" is a constant like
+       any other -- and only a factor that stays a factor has to be a whole number.  One that
+       needn't be stops all of this: b^(a+c) = b^a·b^c is false for a fractional a and a negative
+       b, there being no real b^a to speak of there.  A monomial is a natural when every factor of
+       it is, a product of naturals being one. *)
+    let rec factors syms q nat = function
+      | [] -> return (Some (List.rev syms, q, nat))
+      | t :: ts -> (
           let* a = go ty t in
           match rational_of a with
-          | Some q -> collect acc (Q.add k (Q.mul (Q.of_int c) q)) rest
+          | Some r -> factors syms (Q.mul q r) nat ts
           | None -> (
               match exponent_kind t with
               | None -> return None
-              | Some nat ->
-                  let acc =
-                    if List.exists (fun (b, _, _) -> b = a) acc then
-                      List.map
-                        (fun (b, d, m) -> if b = a then (b, d + c, m || nat) else (b, d, m))
-                        acc
-                    else acc @ [ (a, c, nat) ] in
-                  collect acc k rest)) in
-    let* collected = collect [] (Q.of_int off) atoms in
+              | Some n -> factors (a :: syms) q (nat && n) ts)) in
+    (* The monomials of the exponent, with the ones that agree merged: they are compared as
+       translated expressions rather than as terms, which is where two ways of writing the same
+       thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
+       monomial whose factors all fold away is a constant, and folds into the offset. *)
+    let rec collect acc k = function
+      | [] -> return (Some (acc, k))
+      | (m, c) :: rest -> (
+          let* f = factors [] (Q.of_int c) true m in
+          match f with
+          | None -> return None
+          | Some ([], q, _) -> collect acc (Q.add k q) rest
+          | Some (syms, q, nat) ->
+              (* A monomial with a fractional coefficient would be a root of a power of the base,
+                 which is not a definition this can write down. *)
+              if not (Z.equal (Q.den q) Z.one && Z.fits_int (Q.num q)) then return None
+              else
+                let c = Z.to_int (Q.num q) in
+                let a =
+                  match syms with
+                  | [] -> assert false
+                  | first :: rest ->
+                      List.fold_left (fun acc x -> `Times (acc, x)) first rest in
+                let acc =
+                  if List.exists (fun (b, _, _) -> b = a) acc then
+                    List.map (fun (b, d, m) -> if b = a then (b, d + c, m || nat) else (b, d, m)) acc
+                  else acc @ [ (a, c, nat) ] in
+                collect acc k rest) in
+    let* collected = collect [] (Q.of_int off) monomials in
     match collected with
     | None -> opaque ty tm
     | Some (atoms, k) -> (
@@ -767,9 +805,9 @@ let get_poly ctx ty tm =
                    the translated terms to look at; all that's asked here is that they won't build
                    a polynomial too big to be worth handing to Z3 at all. *)
                 | None ->
-                    let atoms, off = linear_form y.tm in
-                    if degree (atoms, off) <= max_exponent then
-                      varpower ty tmty tm px py atoms off x.tm
+                    let monomials, off = poly_form y.tm in
+                    if degree (monomials, off) <= max_exponent then
+                      varpower ty tmty tm px py monomials off x.tm
                     else opaque ty tm)
         | _ -> opaque ty tm)
     (* Unary operation *)

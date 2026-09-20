@@ -248,8 +248,9 @@ test.describe('The √ symbol', () => {
 
 // An exponent that isn't a literal at all: x^n, and x^(n+1) and x^(n+m) beside it.  The power
 // itself stays an uninterpreted function of its base and its exponent, as it always was, but the
-// translation now reads the exponent as a sum of terms with integer coefficients first, and writes
-// the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is x^n·x^n.  So
+// translation now reads the exponent as a polynomial first -- multiplying out what it has to --
+// and writes the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is
+// x^n·x^n, and x^((m+1)·(n+1)) is x^(m·n)·x^m·x^n·x.  So
 // the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
 // this needs is that each term of the exponent that stays a term is a whole number:
 // b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a
@@ -408,19 +409,33 @@ test.describe('A variable exponent', () => {
         })).toBe(true);
     });
 
-    // What comes apart is a sum with numerals in it and nothing else: a product of two terms is a
-    // term of its own, there being no power of the base to raise to it.
-    test('is only taken apart at a sum and a numeral', async ({ page }) => {
+    // A product of sums multiplies out, so an exponent written as one comes apart into the powers
+    // of the sum it expands to, and is the same exponent as that sum written directly.
+    test('multiplies out a product of sums', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ',
+            conclusion: 'x^((m+1)·(n+1)) = x^(m·n)·x^m·x^n·x',
+        })).toBe(true);
+        // A small power in the exponent is the product it stands for.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nm ∈ ℕ', conclusion: 'x^((m+1)²) = x^(m·m)·x^m·x^m·x',
+        })).toBe(true);
+        // The monomials are compared as the translation writes them, and Z3 sees m·n and n·m are
+        // the same number, so a monomial written both ways round is one power twice over.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ', conclusion: 'x^(m·n+n·m) = (x^(m·n))²',
+        })).toBe(true);
+    });
+
+    // Where it stops: a monomial is a term the base is raised to, never a power of the base
+    // itself, so nothing here relates x^(m·n) to x^m raised to n.
+    test('is only taken apart into powers of the base', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n·m) = (x^n)^m',
-        })).toBe(false);
-        // Nor is a product multiplied out, so an exponent written as one doesn't come apart into
-        // the powers of the sum it would expand to.
-        expect(await proves(olorin, {
-            variables: 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ',
-            conclusion: 'x^((m+1)·(n+1)) = x^(m·n)·x^m·x^n·x',
         })).toBe(false);
         // A fractional coefficient is no coefficient either: (x^n)^(1/2) would need x^n shown
         // nonnegative, which is not something the split can ask for.
