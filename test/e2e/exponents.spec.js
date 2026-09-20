@@ -245,3 +245,105 @@ test.describe('The √ symbol', () => {
         expect(await wireLabels(page)).toEqual(['√(x+1)=1']);
     });
 });
+
+// An exponent that isn't a literal at all: x^n, and x^(n+1) beside it.  The power itself stays an
+// uninterpreted function of its base and its exponent, as it always was, but the translation now
+// splits a numeral off the exponent first -- x^(n+1) becomes x^n·x -- so the laws that only move a
+// literal around hold on the nose, both sides of one becoming the very same product.  What the
+// split needs is that what's left of the exponent is a whole number: b^(a+k) = b^a·b^k is true of
+// every real b for natural a and k, and of a nonzero one for integers, but not of a negative base
+// and a fractional exponent, where there is no real b^a to speak of.
+test.describe('A variable exponent', () => {
+    test('comes apart at a numeral, so the laws of exponents hold of it', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n+1) = x^n·x',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n+2) = x^n·x²',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n+2) = x^(n+1)·x',
+        })).toBe(true);
+        // Nothing is assumed of the base: this is the one power law that holds at x = 0 too, the
+        // translation reading x^0 as 1 there as everywhere else.
+        expect(await proves(olorin, {
+            variables: 'n ∈ ℕ', conclusion: '2^(n+1) = 2·2^n',
+        })).toBe(true);
+    });
+
+    test('takes its sign from its base, which a power of an opaque symbol would not', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['0<x'], conclusion: '0 < x^(n+1)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['0≤x'], conclusion: '0 ≤ x^n·x',
+        })).toBe(true);
+        // A literal base answers for itself, with nothing asked of the hypotheses.
+        expect(await proves(olorin, { variables: 'n ∈ ℕ', conclusion: '0 < 2^n' })).toBe(true);
+        // A power of ℕ is a natural like any other term of that type.
+        expect(await proves(olorin, {
+            variables: 'n ∈ ℕ\nk ∈ ℕ', conclusion: '0 ≤ n^(k+1)',
+        })).toBe(true);
+        // But a base whose sign nothing settles gives the power no sign either.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: '0 ≤ x^(n+1)',
+        })).toBe(false);
+    });
+
+    // Which is the point of the whole thing: the step of an induction, with the inductive
+    // hypothesis about x^n in hand and the goal about x^(n+1), is now one algebra block.
+    test('lets the step of an induction be done by algebra', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['1≤x', '1≤x^n'], conclusion: '1 ≤ x^(n+1)',
+        })).toBe(true);
+    });
+
+    test('is a reciprocal when the numeral takes it below zero, so the base must be nonzero', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // n−1 is an integer, not a natural, so this power may be a reciprocal.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['x≠0'], conclusion: 'x^(n−1)·x = x^n',
+        })).toBe(true);
+        const without = await algebra(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', conclusion: 'x^(n−1)·x = x^n',
+        });
+        expect(without.proved).toBe(false);
+        expect(without.said).toContain('is nonzero');
+    });
+
+    test('stays opaque when it need not be a whole number', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        // q could be 1/2 and x could be negative, where there is no law to apply.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nq ∈ ℚ', conclusion: 'x^(q+1) = x^q·x',
+        })).toBe(false);
+        // Even a nonnegative base doesn't bring this one back: the split is refused outright
+        // rather than carrying an obligation.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nq ∈ ℚ', hypotheses: ['0<x'], conclusion: 'x^(q+1) = x^q·x',
+        })).toBe(false);
+    });
+
+    // Two exponents that differ by anything but a literal are still two opaque powers: nothing
+    // relates x^(n+m) to x^n and x^m, since the split only ever takes off a numeral.
+    test('is only taken apart at a literal', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', conclusion: 'x^(n+m) = x^n·x^m',
+        })).toBe(false);
+        // Equal exponents do give equal powers, though, as they did before: that much is
+        // congruence, which the uninterpreted symbol has always had.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ', hypotheses: ['n=m'], conclusion: 'x^n = x^m',
+        })).toBe(true);
+    });
+});

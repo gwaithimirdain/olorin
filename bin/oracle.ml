@@ -285,6 +285,12 @@ let rec get_posint tm =
 
 let rec pow p n = if n <= 0 then `Const Q.one else `Times (pow p (n - 1), p)
 
+(* Something already translated, multiplied by a base n times: x·b·b·…·b.  Written this way round
+   rather than as a product with 'pow' so that x·b^1 comes out as x·b, with no 1 in it -- which is
+   what makes the two sides of "x^(n+1) = x^n·x" the very same expression. *)
+let rec mulpow (x : Symbolic.t) (base : Symbolic.t) (n : int) : Symbolic.t =
+  if n <= 0 then x else mulpow (`Times (x, base)) base (n - 1)
+
 (* A translated expression read back as a rational literal, if it is one.  get_poly folds a numeral,
    and a quotient of numerals, into a constant, so the only other shape to allow for is a minus sign
    in front. *)
@@ -323,25 +329,81 @@ type step =
      "a ≤ b" and "b < a", and each of those is one of these two.  The tag says which message to
      give when nothing settles it, and the value is the term to point at there. *)
   | Cases of [ `Sign | `Order ] * Symbolic.t * Symbolic.t * (mode, kinetic) value
+  (* What a power with a variable exponent inherits from the sign of its base, which is a fact
+     about it that no amount of algebra on the opaque symbol would give.  Unlike the obligations
+     above nothing has to be shown here: the hypotheses either decide the base's sign, in which
+     case the power gets the corresponding fact, or they don't, in which case it gets none and the
+     goal may or may not still follow.  'nat' says whether the exponent is a natural, since a base
+     of zero is only ruled out for the integer ones, and 'nonneg' that the power is already known
+     to be nonnegative by its type, which saves asking about that one. *)
+  | Positive of { base : Symbolic.t; power : Symbolic.t; nat : bool; nonneg : bool }
 
 (* The head of an application we can hand to Z3 as a function symbol.  A constant or a variable,
    and only a bare one: a degeneracy or a nonidentity insertion on it makes a different term, so
    rather than deciding when two of those agree we leave such a term opaque. *)
-type funhead = [ `Const of Constant.t | `Var of level ]
+type funhead = [ `Const of Constant.t | `Var of level | `Pow ]
 
 let get_funhead : mode head -> funhead option = function
-  | Const { name; ins } when Option.is_some (is_id_ins ins) -> Some (`Const name)
+  (* Every number system's power is one function symbol, the way its plus and times are one
+     operation: the systems agree wherever they overlap, which is what the translation assumes of
+     all of them, so "2^n" written at ℕ and at ℝ is one term to Z3 rather than two. *)
+  | Const { name; ins } when Option.is_some (is_id_ins ins) ->
+      Some (if Firstorder.get_root name = "pow" then `Pow else `Const name)
   (* Olorin's mode theory is trivial, so a variable's modal key is always the identity. *)
   | Var { level; deg; key = _ } when Option.is_some (is_id_deg deg) -> Some (`Var level)
   | _ -> None
 
-(* Whether a type is ℕ.  Its elements are nonnegative, which to Z3 -- for whom they are opaque
-   reals like any other -- is not a fact about them at all until we say so. *)
-let is_natural ty =
+(* Whether a type is one of the number systems named.  That it is ℕ says its elements are
+   nonnegative, which to Z3 -- for whom they are opaque reals like any other -- is not a fact about
+   them at all until we say so; that it is ℕ or ℤ says an exponent is a whole number, which is what
+   lets a power be taken apart (see exponent_form). *)
+let is_number_type sys ty =
   match Norm.view_term ty with
   | Neu { head = Const { name; ins }; args; _ } ->
-      Option.is_some (is_id_ins ins) && get_args args = Some [] && Some name = Scope.lookup [ "ℕ" ]
+      Option.is_some (is_id_ins ins) && get_args args = Some [] && Some name = Scope.lookup [ sys ]
   | _ -> false
+
+let is_natural ty = is_number_type "ℕ" ty
+let is_integer ty = is_number_type "ℤ" ty
+
+(* An exponent taken apart as a term plus an integer offset: "n+1" is n and 1, "n−2" is n and −2,
+   and an exponent with nothing to take off is itself and 0.  Only a numeral comes off, that being
+   what the translation can turn back into a product of copies of the base; anything else stays in
+   the term. *)
+let rec exponent_form tm =
+  match Norm.view_term tm with
+  | Neu { head = Const { name; ins }; args; _ }
+    when Option.is_some (is_id_ins ins) && two_args args <> None -> (
+      let x, y = Option.get (two_args args) in
+      match Firstorder.get_root name with
+      | "plus" -> (
+          match (get_posint x.tm, get_posint y.tm) with
+          | _, Some k ->
+              let a, j = exponent_form x.tm in
+              (a, j + k)
+          | Some k, None ->
+              let a, j = exponent_form y.tm in
+              (a, j + k)
+          | None, None -> (tm, 0))
+      | "minus" -> (
+          match get_posint y.tm with
+          | Some k ->
+              let a, j = exponent_form x.tm in
+              (a, j - k)
+          | None -> (tm, 0))
+      | _ -> (tm, 0))
+  | _ -> (tm, 0)
+
+(* Whether what's left of an exponent is a whole number, and if so whether it is a natural one.
+   The term's own type says so, not the power's: ℝ's exponent is a ℚ whatever is written there, and
+   a ℕ or a ℤ written in it is one by being contained in ℚ.  Anything else -- a genuine rational,
+   or a term whose type we can't read -- is not something to take apart. *)
+let exponent_kind tm =
+  match Norm.view_term tm with
+  | Neu { ty; _ } ->
+      let ty = Lazy.force ty in
+      if is_natural ty then Some true else if is_integer ty then Some false else None
+  | _ -> None
 
 (* State threaded through the translation of a term into a Z3 expression. *)
 type translation = {
@@ -359,6 +421,9 @@ type translation = {
   funcount : int;
   (* The symbols we've already said are nonnegative, so a natural written twice says it once. *)
   nonnegs : Symbolic.t Bwd.t;
+  (* Likewise the powers whose base we've already asked the sign of: those questions go to Z3, so
+     a power written twice -- as it is on the two sides of "x^(n+1) = x^n·x" -- asks once. *)
+  signs : Symbolic.t Bwd.t;
   (* The definitions and obligations met along the way, oldest first. *)
   steps : step Bwd.t;
 }
@@ -440,6 +505,39 @@ let get_poly ctx ty tm =
               (Define ((if even then [ (`Le, `Const Q.zero, s) ] else []) @ [ (`Eq, pow s d, rhs) ]))
           else return () in
         return s
+  (* A power whose exponent isn't a literal: "x^(n+1)" and its kin.  The exponent is a whole number
+     n and an integer offset k, and the translation splits the power there, into x^n -- an
+     uninterpreted function of the two, as the whole power was before -- times the k copies of x
+     that multiplication can express.  That is what makes "x^(n+1) = x^n·x" hold on the nose: the
+     two sides become the same product and Z3 has nothing left to decide, and likewise for the
+     other laws of exponents that only move a literal around.
+
+     The law being used is b^(a+k) = b^a·b^k, which holds of every real b when a and k are natural
+     numbers -- b^0 being 1 throughout this translation, that case included -- so nothing has to be
+     shown there.  When either of them can be negative the power is a reciprocal and b has to be
+     nonzero, which is the same obligation a written-out negative exponent carries.  'tmty' is the
+     type of the power itself and 'src' the base, to point at in an error. *)
+  and varpower ty tmty tm base atomtm off nat src =
+    let* a = go ty atomtm in
+    match rational_of a with
+    (* What looked like a variable exponent was a literal after all, as in "x^(1+2)": what the
+       offset came off was itself a numeral, so there is nothing uninterpreted here and the
+       ordinary path applies, with the offset folded back in. *)
+    | Some q -> power ty tm base (Q.add q (Q.of_int off)) src
+    | None ->
+        let* f = fun_for `Pow 2 in
+        (* b^a lands in ℕ exactly when b^(a+k) does: ℕ.pow is the only power landing there, and it
+           takes naturals, so peeling a numeral off its exponent leaves a natural power of one. *)
+        let nonneg = is_natural (Lazy.force tmty) in
+        let* p = natural (Lazy.force tmty) (`App (f, [ base; a ])) in
+        let* () = if nat && off >= 0 then return () else add_step (Nonzero (base, src)) in
+        let* st = S.get in
+        let* () =
+          if Bwd.exists (fun x -> x = p) st.signs then return ()
+          else
+            let* () = S.put { st with signs = Snoc (st.signs, p) } in
+            add_step (Positive { base; power = p; nat; nonneg }) in
+        if off >= 0 then return (mulpow p base off) else return (`Div (p, pow base (-off)))
   (* A term the arithmetic doesn't interpret.  A numeral is the constant it names.  An application
      of a bare constant or variable becomes an uninterpreted function symbol applied to the
      translations of its arguments: Z3 knows nothing about such a function beyond congruence, which
@@ -499,7 +597,7 @@ let get_poly ctx ty tm =
     (* Binary operation.  The arguments are translated inside each branch rather than before the
        match, so that a head that isn't one of these doesn't translate them twice -- once here and
        again as the arguments of its function symbol. *)
-    | Neu { head = Const { name; ins }; args; _ }
+    | Neu { head = Const { name; ins }; args; ty = tmty; _ }
       when Option.is_some (is_id_ins ins) && two_args args <> None -> (
         let x, y = Option.get (two_args args) in
         let binary k =
@@ -535,7 +633,15 @@ let get_poly ctx ty tm =
             binary (fun px py ->
                 match rational_of py with
                 | Some e -> power ty tm px e x.tm
-                | None -> opaque ty tm)
+                (* A variable exponent is split at its offset when what's left of it is a whole
+                   number, and the power left opaque otherwise: b^(a+k) = b^a·b^k is false for a
+                   fractional a and a negative b, there being no real b^a to speak of there. *)
+                | None -> (
+                    let atomtm, off = exponent_form y.tm in
+                    match exponent_kind atomtm with
+                    | Some nat when abs off <= max_exponent ->
+                        varpower ty tmty tm px atomtm off nat x.tm
+                    | _ -> opaque ty tm))
         | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }
@@ -686,7 +792,15 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
          let* goals = clauses goals in
          let* givens = polys givens in
          return (givens, goals))
-          { vars = Emp; count = 0; funs = Emp; funcount = 0; nonnegs = Emp; steps = Emp } in
+          {
+            vars = Emp;
+            count = 0;
+            funs = Emp;
+            funcount = 0;
+            nonnegs = Emp;
+            signs = Emp;
+            steps = Emp;
+          } in
       (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
      literals, like 0≠1, unless the `Neq flag is in effect.  A disequality with anything else in it is one we want the student to
      prove by contradiction -- as a disjunct of a goal as much as on its own, since a disjunction
@@ -737,7 +851,33 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
                 match which with
                 | `Sign -> Undecided_sign (Printable.PVal (ctx, src))
                 | `Order -> Undecided_order (Printable.PVal (ctx, src)) in
-              Error (Code.Oracle_failed err) in
+              Error (Code.Oracle_failed err)
+        (* What the base's sign gives the power.  A positive base makes every power of it positive;
+           a base that is merely nonzero makes them nonzero, a negative power being a reciprocal;
+           and a nonnegative base makes a *natural* power nonnegative, 0^a being 0 or 1.  Nothing
+           is required of the hypotheses here -- a power of a base whose sign they leave open just
+           gets no such fact -- so these only ever add to what we know.  A literal base answers for
+           itself, which saves asking Z3 about the likes of 2^n at all. *)
+        | Positive { base; power = p; nat; nonneg } :: rest ->
+            let ispos = (`Lt, `Const Q.zero, p) and isnonneg = (`Le, `Const Q.zero, p) in
+            let isnonzero = (`Neq, p, `Const Q.zero) in
+            let facts =
+              match rational_of base with
+              | Some q ->
+                  if Q.gt q Q.zero then ispos :: facts
+                  else if Q.lt q Q.zero then isnonzero :: facts
+                  else if nat && not nonneg then isnonneg :: facts
+                  else facts
+              | None ->
+                  if unsat ((`Le, base, `Const Q.zero) :: facts) then ispos :: facts
+                  else
+                    let facts =
+                      if unsat ((`Eq, base, `Const Q.zero) :: facts) then isnonzero :: facts
+                      else facts in
+                    if nat && (not nonneg) && unsat ((`Lt, base, `Const Q.zero) :: facts) then
+                      isnonneg :: facts
+                    else facts in
+            discharge facts rest in
       let* facts = discharge givens (Bwd.to_list steps) in
       (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
