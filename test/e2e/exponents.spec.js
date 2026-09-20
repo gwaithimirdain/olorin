@@ -251,7 +251,8 @@ test.describe('The √ symbol', () => {
 // translation now reads the exponent as a polynomial first -- multiplying out what it has to --
 // and writes the power as the matching product: x^(n+1) is x^n·x, x^(n+m) is x^n·x^m, x^(2·n) is
 // x^n·x^n, and x^((m+1)·(n+1)) is x^(m·n)·x^m·x^n·x -- and a base that is itself a power brings
-// its own exponent into that, (x^m)^n being x^(m·n).  So
+// its own exponent into that, (x^m)^n being x^(m·n) -- or, where the hypotheses make the base
+// positive, x^(e·n) for any exponents at all.  So
 // the laws of exponents hold on the nose, both sides of one becoming the very same product.  What
 // this needs is that each term of the exponent that stays a term is a whole number:
 // b^(a+c) = b^a·b^c and b^(c·a) = (b^a)^c are true of every real b for natural a and c, and of a
@@ -448,7 +449,8 @@ test.describe('A variable exponent', () => {
         })).toBe(true);
     });
 
-    // Both exponents have to be whole numbers for that, and not merely the product: (u^6)^(n+1/2)
+    // Both exponents have to be whole numbers for that to hold of every base, and not merely the
+    // product of the two: (u^6)^(n+1/2)
     // is u^(6·n)·∣u∣³, which is not u^(6·n+3) for a negative u, though the exponents 6 and n+1/2
     // multiply out to a whole number between them.
     test('but only where both of the exponents are whole numbers', async ({ page }) => {
@@ -470,6 +472,46 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', conclusion: '(x^q)^n = x^(q·n)',
         })).toBe(false);
+    });
+
+    // Unless the base is positive, where (u^e)^M is u^(e·M) for every real e and M and nothing
+    // need be whole at all.  Whether the hypotheses make it positive is not something the
+    // translation can ask -- they have not been translated when it runs -- so the tower is
+    // translated as it stands, and what it would have come to is said beside it, conditional on
+    // that positivity.  Where the hypotheses give it, the equation is there to be used.
+    test('or the base is positive, which asks nothing of the exponents', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nm ∈ ℕ\nn ∈ ℕ';
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0<x'], conclusion: '(x^6)^(n+1/2) = x^(6·n+3)',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0<x'], conclusion: '(x^(1/2))^(2·n) = x^n',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0<x'], conclusion: '(x²)^(n+1/2) = x^(2·n+1)',
+        })).toBe(true);
+        // Including an exponent that is no product of powers at all: the tower is then the one
+        // power of the base that it is, with the exponents multiplied out as arithmetic.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', hypotheses: ['0<x'], conclusion: '(x^q)^n = x^(q·n)',
+        })).toBe(true);
+        // Positive, not merely nonnegative: a zero base has no negative powers to speak of.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['0≤x'], conclusion: '(x^(1/2))^(2·n) = x^n',
+        })).toBe(false);
+    });
+
+    // And nothing is refused for want of that positivity that wasn't refused before it: what the
+    // tower would come to is a fact to be had where it holds, never a condition to be met.
+    test('and a tower nothing is known about is the term it always was', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ\nq ∈ ℚ', hypotheses: ['(x^q)^n = 5'],
+            conclusion: '(x^q)^n+1 = 6',
+        })).toBe(true);
     });
 
     // And where an inner exponent can be negative, the base has to be nonzero: two negative

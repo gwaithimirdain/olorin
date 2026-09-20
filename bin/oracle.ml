@@ -351,6 +351,11 @@ type step =
      of zero is only ruled out for the integer ones, and 'nonneg' that the power is already known
      to be nonnegative by its type, which saves asking about that one. *)
   | Positive of { base : Symbolic.t; power : Symbolic.t; nat : bool; nonneg : bool }
+  (* What a tower of powers comes to where its base is positive: (u^e)^M is u^(e·M) for every real
+     e and M when u > 0, whether or not either of them is a whole number.  Like Positive this asks
+     nothing -- the hypotheses either make the base positive, and the equation is there to be used,
+     or they don't and it isn't. *)
+  | Tower of { base : Symbolic.t; written : Symbolic.t; product : Symbolic.t }
 
 (* The head of an application we can hand to Z3 as a function symbol.  A constant or a variable,
    and only a bare one: a degeneracy or a nonidentity insertion on it makes a different term, so
@@ -649,52 +654,70 @@ let get_poly ctx ty tm =
      one asks for nothing, and the outer exponent's own negative coefficients carry their own
      obligation as they always did (see varpower). *)
   and peel ty basetm p =
-    let stop = return (basetm, p, None) in
+    let stop = return (basetm, p, `Nothing) in
     match pow_parts basetm with
     | None -> stop
-    | Some (u, inner) -> (
+    | Some (u, inner) ->
         let q = poly_mul inner p in
         if not (poly_ok q) then stop
         else
-          (* Both exponents have to be whole numbers, and not merely the product of the two:
-             (u²)^(n+1/2) is u^(2·n)·∣u∣, which is not u^(2·n+1) for a negative u, though 2 and
-             n+1/2 multiply out to a whole number between them. *)
+          (* Both exponents have to be whole numbers for this to hold of every base, and not merely
+             the product of the two: (u²)^(n+1/2) is u^(2·n)·∣u∣, which is not u^(2·n+1) for a
+             negative u, though 2 and n+1/2 multiply out to a whole number between them.  Where one
+             of them isn't whole the level is still taken, but only a positive base will do for it,
+             and the tower says so (see 'tower'). *)
           let* outer = whole_poly ty p in
           let* w = whole_poly ty inner in
-          match (outer, w) with
-          | Some _, Some nat ->
-              let* u, q, inner_nonzero = peel ty u q in
-              return (u, q, Some ((not nat) || inner_nonzero = Some true))
-          | _ -> stop)
+          let here =
+            match (outer, w) with
+            | Some _, Some nat -> `Whole (not nat)
+            | _ -> `Pos in
+          let* u, q, below = peel ty u q in
+          return (u, q, combine here below)
+  (* The monomials of an exponent, with the ones that agree merged: they are compared as translated
+     expressions rather than as terms, which is where two ways of writing the same thing have
+     already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A monomial whose
+     factors all fold away is a constant, and folds into the offset. *)
+  and collect ty acc k = function
+    | [] -> return (Some (acc, k))
+    | (m, c) :: rest -> (
+        let* f = factors ty [] (Q.of_int c) true m in
+        match f with
+        | None -> return None
+        | Some ([], q, _) -> collect ty acc (Q.add k q) rest
+        | Some (syms, q, nat) ->
+            (* A monomial with a fractional coefficient would be a root of a power of the base,
+               which is not a definition this can write down. *)
+            if not (Z.equal (Q.den q) Z.one && Z.fits_int (Q.num q)) then return None
+            else
+              let c = Z.to_int (Q.num q) in
+              let a =
+                match syms with
+                | [] -> assert false
+                | first :: rest -> List.fold_left (fun acc x -> `Times (acc, x)) first rest in
+              let acc =
+                if List.exists (fun (b, _, _) -> b = a) acc then
+                  List.map (fun (b, d, m) -> if b = a then (b, d + c, m || nat) else (b, d, m)) acc
+                else acc @ [ (a, c, nat) ] in
+              collect ty acc k rest)
+  (* The product of the powers one monomial each, which is what a power with a variable exponent
+     comes apart into.  Nothing is required of anything here: the obligations that go with a
+     negative coefficient or a fractional offset belong to the caller, which knows whether they
+     are called for. *)
+  and build_powers ty tmty base acc = function
+    | [] -> return acc
+    | (a, c, nat) :: rest ->
+        let* f = fun_for `Pow 2 in
+        let p : Symbolic.t = `App (f, [ base; a ]) in
+        (* b^a lands in ℕ exactly when the whole power does: ℕ.pow is the only power landing
+           there, and it takes naturals for both of its arguments. *)
+        let nonneg = nat && is_natural (Lazy.force tmty) in
+        let* p = if nat then natural (Lazy.force tmty) p else return p in
+        let* () = sign base p nat nonneg in
+        let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
+        build_powers ty tmty base acc rest
   and varpower ty tmty tm base written nonzero monomials off src =
-    (* The monomials of the exponent, with the ones that agree merged: they are compared as
-       translated expressions rather than as terms, which is where two ways of writing the same
-       thing have already been made one, so "x^(n+n)" is x^n·x^n either way it was written.  A
-       monomial whose factors all fold away is a constant, and folds into the offset. *)
-    let rec collect acc k = function
-      | [] -> return (Some (acc, k))
-      | (m, c) :: rest -> (
-          let* f = factors ty [] (Q.of_int c) true m in
-          match f with
-          | None -> return None
-          | Some ([], q, _) -> collect acc (Q.add k q) rest
-          | Some (syms, q, nat) ->
-              (* A monomial with a fractional coefficient would be a root of a power of the base,
-                 which is not a definition this can write down. *)
-              if not (Z.equal (Q.den q) Z.one && Z.fits_int (Q.num q)) then return None
-              else
-                let c = Z.to_int (Q.num q) in
-                let a =
-                  match syms with
-                  | [] -> assert false
-                  | first :: rest ->
-                      List.fold_left (fun acc x -> `Times (acc, x)) first rest in
-                let acc =
-                  if List.exists (fun (b, _, _) -> b = a) acc then
-                    List.map (fun (b, d, m) -> if b = a then (b, d + c, m || nat) else (b, d, m)) acc
-                  else acc @ [ (a, c, nat) ] in
-                collect acc k rest) in
-    let* collected = collect [] (Q.of_int off) monomials in
+    let* collected = collect ty [] (Q.of_int off) monomials in
     match collected with
     | None -> opaque ty tm
     | Some (atoms, k) -> (
@@ -719,19 +742,7 @@ let get_poly ctx ty tm =
                 && Q.geq k Q.zero
                 && List.for_all (fun (_, c, nat) -> c > 0 && nat) atoms in
               let* () = if whole then return () else add_step (Nonzero (base, src)) in
-              let rec build acc = function
-                | [] -> return acc
-                | (a, c, nat) :: rest ->
-                    let* f = fun_for `Pow 2 in
-                    let p : Symbolic.t = `App (f, [ base; a ]) in
-                    (* b^a lands in ℕ exactly when the whole power does: ℕ.pow is the only power
-                       landing there, and it takes naturals for both of its arguments. *)
-                    let nonneg = nat && is_natural (Lazy.force tmty) in
-                    let* p = if nat then natural (Lazy.force tmty) p else return p in
-                    let* () = sign base p nat nonneg in
-                    let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
-                    build acc rest in
-              let* acc = build (`Const Q.one) atoms in
+              let* acc = build_powers ty tmty base (`Const Q.one) atoms in
               (* An integer offset is copies of the base multiplied in, which keeps the product
                  free of anything Z3 has to work out; a fractional one is a root of it. *)
               let* result =
@@ -755,6 +766,73 @@ let get_poly ctx ty tm =
                     let plain : Symbolic.t = `App (f, [ base; exponent ]) in
                     if plain = result then return () else stated plain result in
               return result)
+  (* What a tower of powers would come to if its base were positive, said as a fact conditional on
+     that.  Whether the hypotheses make the base positive isn't something we can ask here -- they
+     have not been translated yet -- so rather than translating the tower that way and finding out
+     too late that we shouldn't have, we translate it as it stands and say, beside it, what it
+     would have come to.  Nothing is refused that wasn't refused before, and where the hypotheses
+     do force the base positive the equation is there to be used.
+
+     The product is built with no obligations of its own: a negative coefficient divides by a power
+     of the base, which is sound whatever that comes to, and the equation only says anything at all
+     where the base is positive, which is where those powers are what they should be.  A fractional
+     offset is the exception, being a root that has to be *defined* -- and a definition that holds
+     only where the base is positive is not one this can state -- so that one is left alone. *)
+  and tower ty tmty basetm (monomials, off) written =
+    let* base = go ty basetm in
+    let* collected = collect ty [] (Q.of_int off) monomials in
+    let* product =
+      match collected with
+      | Some (atoms, k)
+        when Z.equal (Q.den k) Z.one
+             && Z.fits_int (Q.num k)
+             && List.fold_left (fun s (_, c, _) -> s + abs c) 0 atoms
+                + abs (Z.to_int (Q.num k))
+                <= max_exponent ->
+          let atoms = List.filter (fun (_, c, _) -> c <> 0) atoms in
+          let k = Z.to_int (Q.num k) in
+          let* acc = build_powers ty tmty base (`Const Q.one) atoms in
+          return (if k >= 0 then mulpow acc base k else `Div (acc, pow base (-k)))
+      (* An exponent the translation can't turn into a product of powers -- a rational one, say --
+         is still an exponent, and the law is still the law: the tower is that one power of the
+         base, with the two exponents multiplied out as the arithmetic they are. *)
+      | _ ->
+          let* e = poly_symbolic ty (monomials, off) in
+          let* f = fun_for `Pow 2 in
+          return (`App (f, [ base; e ])) in
+    add_step (Tower { base; written; product })
+  (* An exponent in polynomial form, written out as the arithmetic it is.  Nothing in it has to be
+     a whole number here: this is an exponent to hand to Z3 as the argument of a power, not one to
+     take a power apart at. *)
+  and poly_symbolic ty (ms, k) =
+    let rec monomial acc = function
+      | [] -> return acc
+      | t :: ts ->
+          let* a = go ty t in
+          let acc : Symbolic.t =
+            match acc with
+            | `Const q when Q.equal q Q.one -> a
+            | _ -> `Times (acc, a) in
+          monomial acc ts in
+    let rec walk acc = function
+      | [] -> return acc
+      | (m, c) :: rest ->
+          let* p = monomial (`Const (Q.of_int c)) m in
+          let acc : Symbolic.t =
+            match acc with
+            | `Const q when Q.equal q Q.zero -> p
+            | _ -> `Plus (acc, p) in
+          walk acc rest in
+    walk (`Const (Q.of_int k)) ms
+  (* What a tower needs, taking one level together with everything below it.  A level that needs
+     a positive base makes the whole tower need one; otherwise the nonzero bases they ask for add
+     up. *)
+  and combine here below =
+    match (here, below) with
+    | `Pos, _ | _, `Pos -> `Pos
+    | `Whole a, `Whole b -> `Whole (a || b)
+    | `Whole a, `Nothing -> `Whole a
+    | `Nothing, b -> b
   (* What a power that came apart is equal to, said once however often it is written. *)
   and stated plain result =
     let* st = S.get in
@@ -875,16 +953,25 @@ let get_poly ctx ty tm =
                as a product of powers.  How far that can go varpower decides, having the translated
                terms to look at; all that's asked here is that they won't build a polynomial too
                big to be worth handing to Z3 at all. *)
-            | None ->
+            | None -> (
                 let p = poly_form y.tm in
                 if not (poly_ok p) then opaque ty tm
                 else
-                  let* basetm, (monomials, off), peeled = peel ty x.tm p in
-                  let* px = go ty basetm in
-                  (* The power as written is a power of this base only if nothing came off it. *)
-                  let written = if peeled = None then Some py else None in
-                  let nonzero = peeled = Some true in
-                  varpower ty tmty tm px written nonzero monomials off basetm)
+                  let* basetm, q, peeled = peel ty x.tm p in
+                  match peeled with
+                  (* Every level whole, so the tower is that power of that base and nothing more
+                     is asked of it. *)
+                  | `Whole nonzero ->
+                      let* px = go ty basetm in
+                      varpower ty tmty tm px None nonzero (fst q) (snd q) basetm
+                  (* Nothing to take, or something that only a positive base would let us take.
+                     Either way the power is translated as it stands -- and in the second case
+                     what it would have come to is stated beside it. *)
+                  | `Nothing | `Pos ->
+                      let* px = go ty x.tm in
+                      let* v = varpower ty tmty tm px (Some py) false (fst p) (snd p) x.tm in
+                      let* () = if peeled = `Pos then tower ty tmty basetm q v else return () in
+                      return v))
         | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }
@@ -1102,6 +1189,12 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            is required of the hypotheses here -- a power of a base whose sign they leave open just
            gets no such fact -- so these only ever add to what we know.  A literal base answers for
            itself, which saves asking Z3 about the likes of 2^n at all. *)
+        (* What the tower of powers comes to, where the hypotheses make its base positive. *)
+        | Tower { base; written; product } :: rest ->
+            let facts =
+              if unsat ((`Le, base, `Const Q.zero) :: facts) then (`Eq, written, product) :: facts
+              else facts in
+            discharge facts rest
         | Positive { base; power = p; nat; nonneg } :: rest ->
             let ispos = (`Lt, `Const Q.zero, p) and isnonneg = (`Le, `Const Q.zero, p) in
             let isnonzero = (`Neq, p, `Const Q.zero) in
