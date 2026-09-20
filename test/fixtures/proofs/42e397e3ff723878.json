@@ -1,0 +1,133 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "1/ω is infinitesimal"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 50,
+    "paramCounter": 26,
+    "varCounter": 74,
+    "hypCounter": 54,
+    "conclCounter": 55
+  },
+  "nodes": [
+    {
+      "id": "concl54",
+      "rule": "conclusion",
+      "left": "1328px",
+      "top": "449px",
+      "value": "1/ω is infinitesimal"
+    },
+    {
+      "id": "rule46",
+      "rule": "allposI",
+      "left": "421px",
+      "top": "558px",
+      "names": [
+        "u"
+      ],
+      "width": "744px",
+      "height": "70px"
+    },
+    {
+      "id": "rule47",
+      "rule": "omega",
+      "left": "789px",
+      "top": "319px"
+    },
+    {
+      "id": "rule48",
+      "rule": "expr",
+      "left": "631px",
+      "top": "410px",
+      "value": "1/u",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule49",
+      "rule": "algplus",
+      "left": "972.717px",
+      "top": "457px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule46",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl54",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule48",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule47",
+        "sort": "input",
+        "label": "x"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule46",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule48",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule47",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule49",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule49",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule46",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule46",
+        "sort": "assumption",
+        "label": "positive"
+      },
+      "target": {
+        "vertex": "rule49",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

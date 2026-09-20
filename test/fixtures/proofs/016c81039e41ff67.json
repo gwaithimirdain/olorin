@@ -1,0 +1,102 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [
+      {
+        "name": "a",
+        "ty": "ℤ"
+      }
+    ],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "a ∣ 0"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 33,
+    "paramCounter": 26,
+    "varCounter": 35,
+    "hypCounter": 33,
+    "conclCounter": 35
+  },
+  "nodes": [
+    {
+      "id": "var34",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "a",
+      "value": "ℤ"
+    },
+    {
+      "id": "concl34",
+      "rule": "conclusion",
+      "left": "1430px",
+      "top": "449px",
+      "value": "a ∣ 0"
+    },
+    {
+      "id": "rule30",
+      "rule": "exI",
+      "left": "1063.72px",
+      "top": "408px"
+    },
+    {
+      "id": "rule31",
+      "rule": "expr",
+      "left": "792.717px",
+      "top": "291px",
+      "value": "0",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule32",
+      "rule": "alg",
+      "left": "815.717px",
+      "top": "508px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule30",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl34",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule31",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule32",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}
