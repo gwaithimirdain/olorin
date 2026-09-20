@@ -502,6 +502,46 @@ test.describe('A variable exponent', () => {
         })).toBe(false);
     });
 
+    // A power whose exponent the hypotheses settle is that many copies of its base, which the
+    // uninterpreted symbol does not say for itself: "x^0" is 1 only because the translation sees
+    // the 0 and folds it, and there is no such 0 to see in "x^n" under a hypothesis that n is 0.
+    // Which is the base case of an induction over powers, so it is worth having.
+    test('is its base multiplied out where the hypotheses settle its exponent', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ';
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=0'], conclusion: 'x^n = 1',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=1'], conclusion: 'x^n = x',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=2'], conclusion: 'x^n = x²',
+        })).toBe(true);
+        // And it is that inside a power that came apart, as anywhere else.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=0'], conclusion: 'x^(n+1) = x',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=2'], conclusion: 'x^(n+1) = x³',
+        })).toBe(true);
+    });
+
+    // The hypotheses have to say what the exponent is, or leave it forced to one of the two a
+    // power degenerates at; an equation it takes arithmetic to solve is not read.
+    test('where they say what it is, or force it to nothing or one', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['2·n=4'], conclusion: 'x^n = x²',
+        })).toBe(false);
+        // A negative one is a reciprocal, which is a definition to make and not a fact to state.
+        expect(await proves(olorin, {
+            variables: 'x ∈ ℝ\nz ∈ ℤ', hypotheses: ['z=−1', 'x≠0'], conclusion: 'x^z = 1/x',
+        })).toBe(false);
+    });
+
     // A fractional coefficient is a coefficient like any other, the exponents being a module over
     // ℚ and not just over ℤ: clearing its denominator is taking that root of the base, x^(n/2)
     // being (x^(1/2))^n.  So the root becomes the base, and powers of it are tied back to powers

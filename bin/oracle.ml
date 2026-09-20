@@ -356,6 +356,12 @@ type step =
      nothing -- the hypotheses either make the base positive, and the equation is there to be used,
      or they don't and it isn't. *)
   | Tower of { bases : Symbolic.t list; written : Symbolic.t; product : Symbolic.t }
+  (* What a power comes to where the hypotheses settle its exponent at a whole number: b^c is c
+     copies of b, which an uninterpreted symbol doesn't say for itself.  "x^0" is 1 only because
+     the translation sees the 0 and folds it, and there is no such 0 to see in "x^n" under a
+     hypothesis that n is 0 -- which is the base case of an induction, so it is worth having.  Like
+     Positive this asks nothing: an exponent the hypotheses leave open gets no such fact. *)
+  | Degenerate of { base : Symbolic.t; power : Symbolic.t; exponent : Symbolic.t }
 
 (* The head of an application we can hand to Z3 as a function symbol.  A constant or a variable,
    and only a bare one: a degeneracy or a nonidentity insertion on it makes a different term, so
@@ -741,7 +747,7 @@ let get_poly ctx ty tm =
            and it takes naturals for both of its arguments. *)
         let nonneg = nat && is_natural (Lazy.force tmty) in
         let* p = if nat then natural (Lazy.force tmty) p else return p in
-        let* () = sign base p nat nonneg in
+        let* () = sign base p a nat nonneg in
         let* () = root_tie p a nat in
         let* () = abs_tie p a nat in
         let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
@@ -1013,12 +1019,13 @@ let get_poly ctx ty tm =
   (* The sign a power takes from its base, asked about once however often the power is written:
      those questions go to Z3 (see Positive), and the two sides of an equation between powers
      would otherwise ask the same ones twice. *)
-  and sign base p nat nonneg =
+  and sign base p a nat nonneg =
     let* st = S.get in
     if Bwd.exists (fun x -> x = p) st.signs then return ()
     else
       let* () = S.put { st with signs = Snoc (st.signs, p) } in
-      add_step (Positive { base; power = p; nat; nonneg })
+      let* () = add_step (Positive { base; power = p; nat; nonneg }) in
+      add_step (Degenerate { base; power = p; exponent = a })
   (* A term the arithmetic doesn't interpret.  A numeral is the constant it names.  An application
      of a bare constant or variable becomes an uninterpreted function symbol applied to the
      translations of its arguments: Z3 knows nothing about such a function beyond congruence, which
@@ -1399,6 +1406,38 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
             let positive =
               List.for_all (fun b -> unsat ((`Le, b, `Const Q.zero) :: facts)) bases in
             let facts = if positive then (`Eq, written, product) :: facts else facts in
+            discharge facts rest
+        (* What the power is where the hypotheses pin its exponent down to a whole number.  A
+           hypothesis that says so outright is the commonest way of it and costs nothing to read
+           off; failing that we ask after the two an exponent is likeliest to be pinned to, which
+           are also the two a power degenerates at. *)
+        | Degenerate { base; power; exponent } :: rest ->
+            let stated =
+              List.find_map
+                (fun (op, lhs, rhs) ->
+                  if op <> `Eq then None
+                  else if lhs = exponent then rational_of rhs
+                  else if rhs = exponent then rational_of lhs
+                  else None)
+                facts in
+            let value =
+              match stated with
+              | Some _ -> stated
+              | None ->
+                  if unsat ((`Neq, exponent, `Const Q.zero) :: facts) then Some Q.zero
+                  else if unsat ((`Neq, exponent, `Const Q.one) :: facts) then Some Q.one
+                  else None in
+            let facts =
+              match value with
+              (* Only a nonnegative whole one: a negative or fractional exponent is a reciprocal or
+                 a root, which is a definition to make rather than a fact to state, and there is no
+                 making one here. *)
+              | Some q
+                when Z.equal (Q.den q) Z.one
+                     && Z.geq (Q.num q) Z.zero
+                     && Z.leq (Q.num q) (Z.of_int max_exponent) ->
+                  (`Eq, power, pow base (Z.to_int (Q.num q))) :: facts
+              | _ -> facts in
             discharge facts rest
         | Positive { base; power = p; nat; nonneg } :: rest ->
             let ispos = (`Lt, `Const Q.zero, p) and isnonneg = (`Le, `Const Q.zero, p) in
