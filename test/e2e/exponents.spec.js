@@ -526,17 +526,42 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: vars, hypotheses: ['n=2'], conclusion: 'x^(n+1) = x³',
         })).toBe(true);
+        // Including where the problem writes no literal power at all, which is the one thing
+        // congruence has nothing to work from.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=2'], conclusion: 'x^n = x·x',
+        })).toBe(true);
     });
 
-    // The hypotheses have to say what the exponent is, or leave it forced to one of the two a
-    // power degenerates at; an equation it takes arithmetic to solve is not read.
-    test('where they say what it is, or force it to nothing or one', async ({ page }) => {
+    // They needn't say it outright, either.  The power is an uninterpreted symbol, so the symbol's
+    // value is stated at every literal exponent the problem writes down -- x^0 is 1, x^1 is x, and
+    // x^2 is x·x wherever an x² appears -- and congruence carries across whatever Z3 can work the
+    // exponent out to be, which is more than reading an equation off the hypotheses would give.
+    test('and wherever Z3 can work that exponent out for itself', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
+        const vars = 'x ∈ ℝ\nn ∈ ℕ\nm ∈ ℕ';
         expect(await proves(olorin, {
-            variables: 'x ∈ ℝ\nn ∈ ℕ', hypotheses: ['2·n=4'], conclusion: 'x^n = x²',
-        })).toBe(false);
-        // A negative one is a reciprocal, which is a definition to make and not a fact to state.
+            variables: vars, hypotheses: ['2·n=4'], conclusion: 'x^n = x²',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n+1=3'], conclusion: 'x^n = x²',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['2·n=m', 'm=4'], conclusion: 'x^n = x²',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=5'], conclusion: 'x^n = x^5',
+        })).toBe(true);
+        // Where nothing settles the exponent there is nothing to carry across.
+        expect(await proves(olorin, { variables: vars, conclusion: 'x^n = x²' })).toBe(false);
+    });
+
+    // A negative one is a reciprocal, which is a definition to make and not a fact to state, and
+    // there is no making one where these are said.
+    test('but not to a negative exponent, which is a definition and not a fact', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
         expect(await proves(olorin, {
             variables: 'x ∈ ℝ\nz ∈ ℤ', hypotheses: ['z=−1', 'x≠0'], conclusion: 'x^z = 1/x',
         })).toBe(false);

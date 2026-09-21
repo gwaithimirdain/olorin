@@ -356,11 +356,11 @@ type step =
      nothing -- the hypotheses either make the base positive, and the equation is there to be used,
      or they don't and it isn't. *)
   | Tower of { bases : Symbolic.t list; written : Symbolic.t; product : Symbolic.t }
-  (* What a power comes to where the hypotheses settle its exponent at a whole number: b^c is c
-     copies of b, which an uninterpreted symbol doesn't say for itself.  "x^0" is 1 only because
-     the translation sees the 0 and folds it, and there is no such 0 to see in "x^n" under a
-     hypothesis that n is 0 -- which is the base case of an induction, so it is worth having.  Like
-     Positive this asks nothing: an exponent the hypotheses leave open gets no such fact. *)
+  (* What a power comes to where a hypothesis says outright what its exponent is: b^c is c copies
+     of b.  Congruence gets this too wherever the problem writes that power of that base down
+     somewhere (see anchor_base), but not where it never writes one -- "n=2 ⊢ x^n = x·x" has no
+     literal power in it at all -- and reading an equation off the facts costs nothing.  Like
+     Positive this asks nothing of the hypotheses: an exponent they leave open gets no such fact. *)
   | Degenerate of { base : Symbolic.t; power : Symbolic.t; exponent : Symbolic.t }
 
 (* The head of an application we can hand to Z3 as a function symbol.  A constant or a variable,
@@ -528,6 +528,12 @@ type translation = {
   powers : Symbolic.t Bwd.t;
   (* Likewise the powers of a root we've tied back to powers of what it is a root of. *)
   ties : Symbolic.t Bwd.t;
+  (* The bases we've taken an uninterpreted power of, and the literal powers we've folded into
+     products, each with what it folded to.  Where a base has both, the symbol is said to agree
+     with the product at that exponent, which is what lets congruence carry a settled exponent
+     across (see anchor). *)
+  powbases : Symbolic.t Bwd.t;
+  litpows : (Symbolic.t * int * Symbolic.t) Bwd.t;
   (* The definitions and obligations met along the way, oldest first. *)
   steps : step Bwd.t;
 }
@@ -612,7 +618,7 @@ let get_poly ctx ty tm =
     let n, d = (Z.to_int (Q.num e), Z.to_int (Q.den e)) in
     (* base^n, with a negative n written as a reciprocal so the denominator obligation applies. *)
     let numerator () =
-      if n >= 0 then return (pow base n)
+      if n >= 0 then anchor_literal base n (pow base n)
       else
         let p = pow base (-n) in
         let* () = add_step (Nonzero (p, src)) in
@@ -693,6 +699,43 @@ let get_poly ctx ty tm =
                     acc
                 else acc @ [ (a, q, nat) ] in
               collect ty acc k rest)
+  (* What the uninterpreted power symbol is at the exponents the translation writes out in full.
+     b^0 is 1 and b^1 is b, and b^c is c copies of b wherever the problem takes that power of that
+     base -- which is what the translation folded away, leaving no such term for congruence to
+     work with.  With them, an exponent the hypotheses settle carries across on its own: from
+     2·n=4 Z3 has n=2, and from n=2 congruence has b^n = b^2, which these say is b·b.
+
+     Only for a base that has an uninterpreted power of it somewhere, since otherwise there is
+     nothing for any of it to be about.  The two lists are each deduplicated, so each pairing of a
+     base with an exponent is said once, whichever of the two the translation meets last. *)
+  and anchor_base base =
+    let* st = S.get in
+    if Bwd.exists (fun b -> b = base) st.powbases then return ()
+    else
+      let* () = S.put { st with powbases = Snoc (st.powbases, base) } in
+      let* f = fun_for `Pow 2 in
+      let at c : Symbolic.t = `App (f, [ base; `Const (Q.of_int c) ]) in
+      let* () = add_step (Define [ (`Eq, at 0, `Const Q.one); (`Eq, at 1, base) ]) in
+      let rec bridge = function
+        | [] -> return ()
+        | (b, c, v) :: rest ->
+            let* () =
+              if b = base && c > 1 then add_step (Define [ (`Eq, at c, v) ]) else return () in
+            bridge rest in
+      bridge (Bwd.to_list st.litpows)
+  (* Likewise a literal power as it is folded: where its base already has an uninterpreted power,
+     the symbol is said to agree with the product here too. *)
+  and anchor_literal base c v =
+    let* st = S.get in
+    if c < 0 || c > max_exponent || Bwd.exists (fun (b, d, _) -> b = base && d = c) st.litpows then
+      return v
+    else
+      let* () = S.put { st with litpows = Snoc (st.litpows, (base, c, v)) } in
+      if c > 1 && Bwd.exists (fun b -> b = base) st.powbases then
+        let* f = fun_for `Pow 2 in
+        let* () = add_step (Define [ (`Eq, `App (f, [ base; `Const (Q.of_int c) ]), v) ]) in
+        return v
+      else return v
   (* A power of a root, tied back to the power of what it is a root of: s being b^(p/q), s^a raised
      to the q is b^(p·a).  Without it a root's powers and the base's own would be unrelated symbols,
      and x^(n/2)·x^(n/2) would not be the x^n it plainly is.  It needs nothing of b that the root
@@ -748,6 +791,7 @@ let get_poly ctx ty tm =
         let nonneg = nat && is_natural (Lazy.force tmty) in
         let* p = if nat then natural (Lazy.force tmty) p else return p in
         let* () = sign base p a nat nonneg in
+        let* () = anchor_base base in
         let* () = root_tie p a nat in
         let* () = abs_tie p a nat in
         let acc = if c > 0 then mulpow acc p c else `Div (acc, pow p (-c)) in
@@ -1209,9 +1253,10 @@ let get_poly ctx ty tm =
                 match rational_of x with
                 | Some q -> return (`Const (Q.neg q))
                 | None -> return (`Neg x))
-        | "square" -> unary (fun x -> return (`Times (x, x)))
-        | "cube" -> unary (fun x -> return (`Times (`Times (x, x), x)))
-        | "fourth" -> unary (fun x -> return (`Times (`Times (x, x), `Times (x, x))))
+        | "square" -> unary (fun x -> anchor_literal x 2 (`Times (x, x)))
+        | "cube" -> unary (fun x -> anchor_literal x 3 (`Times (`Times (x, x), x)))
+        | "fourth" ->
+            unary (fun x -> anchor_literal x 4 (`Times (`Times (x, x), `Times (x, x))))
         | _ -> opaque ty tm)
     | _ -> opaque ty tm in
   go ty tm
@@ -1342,6 +1387,8 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
             signs = Emp;
             powers = Emp;
             ties = Emp;
+            powbases = Emp;
+            litpows = Emp;
             steps = Emp;
           } in
       (* The quantifier eliminator can prove disequalities, but we only let it do so between rational
@@ -1407,10 +1454,10 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
               List.for_all (fun b -> unsat ((`Le, b, `Const Q.zero) :: facts)) bases in
             let facts = if positive then (`Eq, written, product) :: facts else facts in
             discharge facts rest
-        (* What the power is where the hypotheses pin its exponent down to a whole number.  A
-           hypothesis that says so outright is the commonest way of it and costs nothing to read
-           off; failing that we ask after the two an exponent is likeliest to be pinned to, which
-           are also the two a power degenerates at. *)
+        (* What the power is where a hypothesis says outright what its exponent is, which costs
+           nothing to read off the facts.  An exponent settled any less directly than that is left
+           to congruence, which has the symbol's value at every literal the problem writes to work
+           with (see anchor_base) and gets there by itself. *)
         | Degenerate { base; power; exponent } :: rest ->
             let stated =
               List.find_map
@@ -1420,15 +1467,8 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
                   else if rhs = exponent then rational_of lhs
                   else None)
                 facts in
-            let value =
-              match stated with
-              | Some _ -> stated
-              | None ->
-                  if unsat ((`Neq, exponent, `Const Q.zero) :: facts) then Some Q.zero
-                  else if unsat ((`Neq, exponent, `Const Q.one) :: facts) then Some Q.one
-                  else None in
             let facts =
-              match value with
+              match stated with
               (* Only a nonnegative whole one: a negative or fractional exponent is a reciprocal or
                  a root, which is a definition to make rather than a fact to state, and there is no
                  making one here. *)
