@@ -308,22 +308,16 @@ let rules =
             implicit_first = None;
             outputs = [];
           } );
-      (* Proof by cases on a natural number n: it is either 0 or the successor of some k.  The
-         axiom's conclusion is whatever the goal is, so it takes that implicitly from the goal, and
-         each case is a bracket proving that same goal: the upper one assuming n=0, and the lower
-         one binding k, on a value port, and assuming n=k+1. *)
+      (* Proof by cases on a natural number n: it is either 0 or the successor of some k. *)
       ( "natE",
-        User
+        Match
           {
-            consts = [ [ "ℕ"; "cases" ] ];
-            inputs =
+            branches =
               [
-                Arg "n";
-                Bracket { assumptions = [ (false, "zero") ]; subgoal = "zero" };
-                Bracket { assumptions = [ (true, "pred"); (false, "succ") ]; subgoal = "succ" };
+                Branch { assumptions = []; constr = Constr.intern "zero"; subgoal = "zero" };
+                Branch { assumptions = [ "pred" ]; constr = Constr.intern "suc"; subgoal = "suc" };
               ];
-            implicit_first = Some `Goal;
-            outputs = [];
+            asc_pre = Some "ℕ";
           } );
       (* Strong induction on the natural numbers: to prove ∀n∈ℕ,P(n), prove P(n) for a natural
          number n assuming ∀k∈[n],P(k).  The axiom's first argument is the P of the goal

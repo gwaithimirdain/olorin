@@ -901,27 +901,21 @@ function addEndpointsForRule(box, id, restore) {
         box.style.height = '80px';
         makeResizable(box);
     } else if (id === 'natE') {
-        // Proof by cases on a natural number n, shaped like ∨-elimination: n comes in on the left,
-        // and each case is a bracket proving the same goal as the block.  The upper one assumes
-        // n=0.  The lower one binds a variable k, on a value port, and assumes n=k+1 on a port
-        // below it, so that half of the box is taller.  (The User rule "natE" in bin/rules.ml.)
         instance.addEndpoint(box, {
             anchor: "Left",
             target: true,
             parameters: { sort: "input", label: "n", hasValue: true },
             paintStyle: { fill: VALUECOLOR },
         });
-        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, -30], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "zero", side: "upper"} });
         instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -30], target: true, parameters: {sort: "subgoal", label: "zero", side: "upper"} });
         instance.addEndpoint(box, {
-            anchor: [0, 0.5, 1, 0, 22, 20],
+            anchor: [0, 0.5, 1, 0, 22, 25],
             source: true, maxConnections: -1,
             parameters: { sort: "assumption", label: "pred", hasValue: true, side: "lower" },
             paintStyle: { fill: VALUECOLOR },
             connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 },
         });
-        instance.addEndpoint(box, { anchor: [0, 0.5, 1, 0, 22, 42], source: true, maxConnections: -1, parameters: {sort: "assumption", label: "succ", side: "lower"} });
-        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, 31], target: true, parameters: {sort: "subgoal", label: "succ", side: "lower"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, 31], target: true, parameters: {sort: "subgoal", label: "suc", side: "lower"} });
         instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
         box.style.width = '200px';
         box.style.height = '110px';
