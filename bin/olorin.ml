@@ -832,19 +832,26 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                            (Named.Synth (Const (Scope.lookup [ asc_ty ] <||> "asc_pre not found")))
                        )),
                   tm.value.bindables ) in
-          let branches, bindables, variables =
+          let branches, bindables, variables, _ =
             List.fold_left
-              (fun (brs, bindables, variables) (Branch { assumptions; constr; subgoal }) ->
+              (fun (brs, bindables, variables, names) (Branch { assumptions; constr; subgoal }) ->
                 let body, newvariables =
                   check_of_input_port ~seen vertices graph
                     { source with sort = Subgoal; label = Some subgoal } in
-                let newvars, assumptions =
+                (* The variables a branch binds are named by the player, as those a destructuring
+                   block hands out are: the names the vertex was given are taken in order, and a
+                   branch that binds more than there are names left gets anonymous ones. *)
+                let newvars, (assumptions, names) =
                   vec_map_state
-                    (fun label assumptions ->
+                    (fun label (assumptions, names) ->
                       let assumption = { source with sort = Assumption; label = Some label } in
-                      ( ({ name = None; port = Some assumption } : name),
-                        PortSet.add assumption assumptions ))
-                    assumptions PortSet.empty in
+                      let name, names =
+                        match names with
+                        | n :: rest -> (Some n, rest)
+                        | [] -> (None, []) in
+                      ( ({ name; port = Some assumption } : name),
+                        (PortSet.add assumption assumptions, names) ))
+                    assumptions (PortSet.empty, names) in
                 (* As with an abstraction, we bind all the bindables in the body that involve any of the assumption variables, and pass the rest on as bindables for the abstraction. *)
                 let body, newbindables = bind_some assumptions body in
                 (* We remove the local assumptions from the variable dependence. *)
@@ -853,8 +860,10 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
                 let xs = locate_opt (Loc.non_annotating tm.loc) (namevec_of_vec newvars) in
                 ( Snoc (brs, (constr, Named.Branch (xs, `Normal None, body))),
                   Bindables.union bindables newbindables,
-                  PortSet.union variables newvariables ))
-              (Emp, bindables, variables) branches in
+                  PortSet.union variables newvariables,
+                  names ))
+              (Emp, bindables, variables, source_vertex.names)
+              branches in
           ( {
               bindables;
               term =

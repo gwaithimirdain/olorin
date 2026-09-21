@@ -1225,6 +1225,17 @@ let get_poly ctx ty tm =
                       tower ty tmty full result in
                   return result)
         | _ -> opaque ty tm)
+    (* A successor.  This is the constructor a match on a natural refines to -- proof by cases
+       gives a branch about "suc x" where the arithmetic says x+1 -- and it is that number, so we
+       read it as that.  A numeral is folded to a constant by 'opaque' as it always was, and only
+       reaches here with something other than a numeral inside it. *)
+    | Constr (name, dim, [ arg ])
+      when name = Constr.intern "suc" && Option.is_none (get_posint tm) -> (
+        match (D.compare_zero dim, get_constr_arg arg) with
+        | Zero, Some a ->
+            let* pa = go ty a in
+            return (`Plus (pa, `Const Q.one))
+        | _ -> opaque ty tm)
     (* Unary operation *)
     | Neu { head = Const { name; ins }; args; _ }
       when Option.is_some (is_id_ins ins)
