@@ -534,9 +534,9 @@ test.describe('A variable exponent', () => {
     });
 
     // They needn't say it outright, either.  The power is an uninterpreted symbol, so the symbol's
-    // value is stated at the small exponents outright and at every other literal power the problem
-    // writes, and congruence carries across whatever Z3 can work the exponent out to be -- which
-    // is more than reading an equation off the hypotheses would give.
+    // value is stated at the exponents the problem makes worth stating it at, and congruence
+    // carries across whatever Z3 can work the exponent out to be -- which is more than reading an
+    // equation off the hypotheses would give.
     test('and wherever Z3 can work that exponent out for itself', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
@@ -553,8 +553,7 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: vars, hypotheses: ['n=5'], conclusion: 'x^n = x^5',
         })).toBe(true);
-        // And none of it turns on how the other side is written, the small exponents being said
-        // about whether or not the problem writes a power at them.
+        // And none of it turns on how the other side is written.
         expect(await proves(olorin, {
             variables: vars, hypotheses: ['2·n=4'], conclusion: 'x^n = x·x',
         })).toBe(true);
@@ -565,25 +564,30 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, { variables: vars, conclusion: 'x^n = x²' })).toBe(false);
     });
 
-    // Past the small ones the power has to be written somewhere for congruence to have a term, or
-    // the exponent said outright for it to be read: an exponent pinned indirectly to a large value
-    // with no such power anywhere in the problem is where all of it runs out.
-    test('past the exponents it says itself about, one or the other is needed', async ({ page }) => {
+    // Which exponents those are is the problem's own question, and nothing is fixed in advance: a
+    // product of c terms is the only thing b^c could ever meet, so the lengths of the products the
+    // problem builds are the exponents worth saying anything at -- and a long product says it at
+    // every length along the way, a chain of seven being a chain of two inside a chain of three
+    // and so on.  A problem that multiplies nothing gets 0 and 1 and no more.
+    test('at whatever exponents its own products make worth saying', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         const vars = 'x ∈ ℝ\nn ∈ ℕ';
-        // Written as a power, so there is a term saying what x^7 is.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['2·n=14'], conclusion: 'x^n = x·x·x·x·x·x·x',
+        })).toBe(true);
         expect(await proves(olorin, {
             variables: vars, hypotheses: ['2·n=14'], conclusion: 'x^n = x^7',
         })).toBe(true);
-        // Said outright, so the exponent is read off the hypotheses.
+        // The exponent needed here is 5, which no product is written at -- but the six the x^6 is
+        // built from is a chain of five inside a chain of six.
         expect(await proves(olorin, {
-            variables: vars, hypotheses: ['n=7'], conclusion: 'x^n = x·x·x·x·x·x·x',
+            variables: vars, hypotheses: ['2·n=10'], conclusion: 'x^n·x = x^6',
         })).toBe(true);
-        // Neither.
+        // And here it is 2, from the 2·n of the hypothesis, which is a product like any other.
         expect(await proves(olorin, {
-            variables: vars, hypotheses: ['2·n=14'], conclusion: 'x^n = x·x·x·x·x·x·x',
-        })).toBe(false);
+            variables: vars, hypotheses: ['x=2', '2·n=4'], conclusion: 'x^n = 4',
+        })).toBe(true);
     });
 
     // A negative one is a reciprocal, which is a definition to make and not a fact to state, and

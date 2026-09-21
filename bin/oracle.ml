@@ -411,13 +411,24 @@ let degree (monomials, off) =
    too big a one, is left a term of its own instead: that only ever means less is taken apart. *)
 let max_terms = 32
 
-(* The exponents an uninterpreted power says its own value at whatever the problem writes: the ones
-   the language has a name for, and the two a power degenerates at.  An exponent the hypotheses pin
-   to one of these is then carried across by congruence, however indirectly they pin it and however
-   the other side of the statement is written -- "2·n=4 ⊢ x^n = x·x" has neither a literal power in
-   it nor an equation saying what n is.  Past this a power is only said about where the problem
-   writes that power of that base, which is where saying it can do any good. *)
-let max_named_power = 4
+(* How many terms a product multiplies together, and every such count in an expression.  This is
+   what says which exponents an uninterpreted power is worth saying its own value at: b^c can only
+   ever meet something of degree c, and a product of c terms is what that looks like, so a problem
+   that never multiplies more than two together can do nothing with b^3.  Saying it at every
+   exponent up to the longest product instead would be worse than useless -- the ones in between
+   meet nothing, and each is a polynomial equation of its own degree for Z3 to carry. *)
+let rec product_length : Symbolic.t -> int = function
+  | `Times (x, y) -> product_length x + product_length y
+  | _ -> 1
+
+let rec product_lengths (t : Symbolic.t) : int list =
+  let sub = List.concat_map product_lengths in
+  match t with
+  | `Times (x, y) -> product_length t :: sub [ x; y ]
+  | `Plus (x, y) | `Minus (x, y) | `Div (x, y) | `Min (x, y) | `Max (x, y) -> sub [ x; y ]
+  | `Neg x | `Abs x -> sub [ x ]
+  | `App (_, args) -> sub args
+  | `Var _ | `Const _ -> []
 
 let poly_scale c (ms, k) = (List.map (fun (m, d) -> (m, Q.mul c d)) ms, Q.mul c k)
 let poly_add (ms1, k1) (ms2, k2) = (ms1 @ ms2, Q.add k1 k2)
@@ -707,49 +718,21 @@ let get_poly ctx ty tm =
                     acc
                 else acc @ [ (a, q, nat) ] in
               collect ty acc k rest)
-  (* What the uninterpreted power symbol is at the exponents worth saying it at: the small ones
-     outright (see max_named_power), and any other the problem writes that power of that base --
-     which the translation folded into a product, leaving no such term for congruence to work with.
-     With them, an exponent the hypotheses settle carries across on its own: from 2·n=4 Z3 has
-     n=2, and from n=2 congruence has b^n = b^2, which these say is b·b.
-
-     Only for a base that has an uninterpreted power of it somewhere, since otherwise there is
-     nothing for any of it to be about.  The two lists are each deduplicated, so each pairing of a
-     base with an exponent is said once, whichever of the two the translation meets last. *)
+  (* A base we've taken an uninterpreted power of, and a literal power as it is folded into a
+     product: both are noted here and said about once the whole problem has been translated, since
+     how far it is worth saying anything is a question about the problem as a whole (see
+     anchors). *)
   and anchor_base base =
     let* st = S.get in
     if Bwd.exists (fun b -> b = base) st.powbases then return ()
-    else
-      let* () = S.put { st with powbases = Snoc (st.powbases, base) } in
-      let* f = fun_for `Pow 2 in
-      let at c : Symbolic.t = `App (f, [ base; `Const (Q.of_int c) ]) in
-      let rec small c =
-        if c > max_named_power then return ()
-        else
-          let* () = add_step (Define [ (`Eq, at c, pow base c) ]) in
-          small (c + 1) in
-      let* () = small 0 in
-      let rec bridge = function
-        | [] -> return ()
-        | (b, c, v) :: rest ->
-            let* () =
-              if b = base && c > max_named_power then add_step (Define [ (`Eq, at c, v) ])
-              else return () in
-            bridge rest in
-      bridge (Bwd.to_list st.litpows)
-  (* Likewise a literal power as it is folded: where its base already has an uninterpreted power,
-     the symbol is said to agree with the product here too. *)
+    else S.put { st with powbases = Snoc (st.powbases, base) }
   and anchor_literal base c v =
     let* st = S.get in
     if c < 0 || c > max_exponent || Bwd.exists (fun (b, d, _) -> b = base && d = c) st.litpows then
       return v
     else
       let* () = S.put { st with litpows = Snoc (st.litpows, (base, c, v)) } in
-      if c > max_named_power && Bwd.exists (fun b -> b = base) st.powbases then
-        let* f = fun_for `Pow 2 in
-        let* () = add_step (Define [ (`Eq, `App (f, [ base; `Const (Q.of_int c) ]), v) ]) in
-        return v
-      else return v
+      return v
   (* A power of a root, tied back to the power of what it is a root of: s being b^(p/q), s^a raised
      to the q is b^(p·a).  Without it a root's powers and the base's own would be unrelated symbols,
      and x^(n/2)·x^(n/2) would not be the x^n it plainly is.  It needs nothing of b that the root
@@ -1289,6 +1272,40 @@ let vars_of_ctx : type a b. (mode, a, b) Ctx.t -> string Bwd.t = function
             | `Anon _ -> vars_of_ctx ctx) in
       vars_of_ctx ctx
 
+(* What the uninterpreted power symbol is, at the exponents worth saying it at.  b^c is c copies of
+   b, which the symbol doesn't say for itself: a literal power is folded into a product as it is
+   translated, so the symbol never appears at that exponent and congruence has no term to work
+   with.  With these, an exponent the hypotheses settle carries across on its own -- from 2·n=4 Z3
+   has n=2, and from n=2 congruence has b^n = b^2, which these say is b·b.
+
+   Which exponents those are is the problem's own question: a power written as a power is said
+   about exactly, wherever it is written, and otherwise the exponents are the lengths of the
+   products the problem builds, those being the only things a power could meet.  0 and 1 are always
+   among them, a power meeting a bare 1 or the base itself being no product at all.  Only for a
+   base that has an uninterpreted power of it somewhere, since otherwise there is nothing for any
+   of it to be about. *)
+let anchors funs funcount powbases litpows relations =
+  match Bwd.find_index (fun x -> x = (`Pow, 2)) funs with
+  | None -> []
+  | Some i ->
+      let f = funcount - i - 1 in
+      let lengths =
+        List.sort_uniq compare
+          (0 :: 1
+           :: List.concat_map
+                (fun (_, lhs, rhs) -> product_lengths lhs @ product_lengths rhs)
+                relations) in
+      let lengths = List.filter (fun c -> c <= max_exponent) lengths in
+      List.concat_map
+        (fun b ->
+          let at c : Symbolic.t = `App (f, [ b; `Const (Q.of_int c) ]) in
+          List.map (fun c -> (`Eq, at c, pow b c)) lengths
+          @ List.filter_map
+              (fun (b', c, v) ->
+                if b' = b && not (List.mem c lengths) then Some (`Eq, at c, v) else None)
+              (Bwd.to_list litpows))
+        (Bwd.to_list powbases)
+
 (* We memorize the results of calls to reduce, so we don't have to re-make them every time. *)
 let answers : (Relation.t list, bool) Hashtbl.t = Hashtbl.create 20
 
@@ -1369,7 +1386,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
       let ty = widest ctx ty (List.concat goals @ givens) in
       let goals = List.map (relation_types ctx ty) goals in
       let givens = relation_types ctx ty givens in
-      let (givens, goals), { steps; _ } =
+      let (givens, goals), { steps; funs; funcount; powbases; litpows; _ } =
         (let open Monad.Ops (S) in
          let poly (op, ty, (x : mode normal), (y : mode normal)) =
            let* x = get_poly ctx ty x.tm in
@@ -1513,7 +1530,18 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
                       isnonneg :: facts
                     else facts in
             discharge facts rest in
-      let* facts = discharge givens (Bwd.to_list steps) in
+      (* What the power symbol is at the exponents this problem makes it worth saying (see
+         anchors), which is settled once the whole of it has been translated. *)
+      let defined =
+        List.filter_map
+          (function
+            | Define defs -> Some defs
+            | _ -> None)
+          (Bwd.to_list steps) in
+      let anchors =
+        anchors funs funcount powbases litpows
+          (List.concat goals @ givens @ List.concat defined) in
+      let* facts = discharge (anchors @ givens) (Bwd.to_list steps) in
       (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
      swapping the order of the arguments (although for a (dis)equality swapping does nothing).  A
