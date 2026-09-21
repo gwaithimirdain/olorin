@@ -534,9 +534,9 @@ test.describe('A variable exponent', () => {
     });
 
     // They needn't say it outright, either.  The power is an uninterpreted symbol, so the symbol's
-    // value is stated at every literal exponent the problem writes down -- x^0 is 1, x^1 is x, and
-    // x^2 is x·x wherever an x² appears -- and congruence carries across whatever Z3 can work the
-    // exponent out to be, which is more than reading an equation off the hypotheses would give.
+    // value is stated at the small exponents outright and at every other literal power the problem
+    // writes, and congruence carries across whatever Z3 can work the exponent out to be -- which
+    // is more than reading an equation off the hypotheses would give.
     test('and wherever Z3 can work that exponent out for itself', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
@@ -553,8 +553,37 @@ test.describe('A variable exponent', () => {
         expect(await proves(olorin, {
             variables: vars, hypotheses: ['n=5'], conclusion: 'x^n = x^5',
         })).toBe(true);
+        // And none of it turns on how the other side is written, the small exponents being said
+        // about whether or not the problem writes a power at them.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['2·n=4'], conclusion: 'x^n = x·x',
+        })).toBe(true);
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n+1=3'], conclusion: 'x^n = x·x',
+        })).toBe(true);
         // Where nothing settles the exponent there is nothing to carry across.
         expect(await proves(olorin, { variables: vars, conclusion: 'x^n = x²' })).toBe(false);
+    });
+
+    // Past the small ones the power has to be written somewhere for congruence to have a term, or
+    // the exponent said outright for it to be read: an exponent pinned indirectly to a large value
+    // with no such power anywhere in the problem is where all of it runs out.
+    test('past the exponents it says itself about, one or the other is needed', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const vars = 'x ∈ ℝ\nn ∈ ℕ';
+        // Written as a power, so there is a term saying what x^7 is.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['2·n=14'], conclusion: 'x^n = x^7',
+        })).toBe(true);
+        // Said outright, so the exponent is read off the hypotheses.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['n=7'], conclusion: 'x^n = x·x·x·x·x·x·x',
+        })).toBe(true);
+        // Neither.
+        expect(await proves(olorin, {
+            variables: vars, hypotheses: ['2·n=14'], conclusion: 'x^n = x·x·x·x·x·x·x',
+        })).toBe(false);
     });
 
     // A negative one is a reciprocal, which is a definition to make and not a fact to state, and

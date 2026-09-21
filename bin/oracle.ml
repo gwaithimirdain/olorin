@@ -411,6 +411,14 @@ let degree (monomials, off) =
    too big a one, is left a term of its own instead: that only ever means less is taken apart. *)
 let max_terms = 32
 
+(* The exponents an uninterpreted power says its own value at whatever the problem writes: the ones
+   the language has a name for, and the two a power degenerates at.  An exponent the hypotheses pin
+   to one of these is then carried across by congruence, however indirectly they pin it and however
+   the other side of the statement is written -- "2·n=4 ⊢ x^n = x·x" has neither a literal power in
+   it nor an equation saying what n is.  Past this a power is only said about where the problem
+   writes that power of that base, which is where saying it can do any good. *)
+let max_named_power = 4
+
 let poly_scale c (ms, k) = (List.map (fun (m, d) -> (m, Q.mul c d)) ms, Q.mul c k)
 let poly_add (ms1, k1) (ms2, k2) = (ms1 @ ms2, Q.add k1 k2)
 
@@ -699,11 +707,11 @@ let get_poly ctx ty tm =
                     acc
                 else acc @ [ (a, q, nat) ] in
               collect ty acc k rest)
-  (* What the uninterpreted power symbol is at the exponents the translation writes out in full.
-     b^0 is 1 and b^1 is b, and b^c is c copies of b wherever the problem takes that power of that
-     base -- which is what the translation folded away, leaving no such term for congruence to
-     work with.  With them, an exponent the hypotheses settle carries across on its own: from
-     2·n=4 Z3 has n=2, and from n=2 congruence has b^n = b^2, which these say is b·b.
+  (* What the uninterpreted power symbol is at the exponents worth saying it at: the small ones
+     outright (see max_named_power), and any other the problem writes that power of that base --
+     which the translation folded into a product, leaving no such term for congruence to work with.
+     With them, an exponent the hypotheses settle carries across on its own: from 2·n=4 Z3 has
+     n=2, and from n=2 congruence has b^n = b^2, which these say is b·b.
 
      Only for a base that has an uninterpreted power of it somewhere, since otherwise there is
      nothing for any of it to be about.  The two lists are each deduplicated, so each pairing of a
@@ -715,12 +723,18 @@ let get_poly ctx ty tm =
       let* () = S.put { st with powbases = Snoc (st.powbases, base) } in
       let* f = fun_for `Pow 2 in
       let at c : Symbolic.t = `App (f, [ base; `Const (Q.of_int c) ]) in
-      let* () = add_step (Define [ (`Eq, at 0, `Const Q.one); (`Eq, at 1, base) ]) in
+      let rec small c =
+        if c > max_named_power then return ()
+        else
+          let* () = add_step (Define [ (`Eq, at c, pow base c) ]) in
+          small (c + 1) in
+      let* () = small 0 in
       let rec bridge = function
         | [] -> return ()
         | (b, c, v) :: rest ->
             let* () =
-              if b = base && c > 1 then add_step (Define [ (`Eq, at c, v) ]) else return () in
+              if b = base && c > max_named_power then add_step (Define [ (`Eq, at c, v) ])
+              else return () in
             bridge rest in
       bridge (Bwd.to_list st.litpows)
   (* Likewise a literal power as it is folded: where its base already has an uninterpreted power,
@@ -731,7 +745,7 @@ let get_poly ctx ty tm =
       return v
     else
       let* () = S.put { st with litpows = Snoc (st.litpows, (base, c, v)) } in
-      if c > 1 && Bwd.exists (fun b -> b = base) st.powbases then
+      if c > max_named_power && Bwd.exists (fun b -> b = base) st.powbases then
         let* f = fun_for `Pow 2 in
         let* () = add_step (Define [ (`Eq, `App (f, [ base; `Const (Q.of_int c) ]), v) ]) in
         return v
