@@ -815,9 +815,16 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             check_of_input_port ~seen vertices graph { source with sort = Input; label = None }
           in
           let tm, bindables =
-            match asc_pre with
-            | None -> ensure_synth tm "match discriminee"
-            | Some asc_ty ->
+            match (tm.value.term, asc_pre) with
+            (* A term that synthesizes is left exactly as it is.  That matters for a discriminee
+               that is a variable: Narya refines the goal and the context in each branch only when
+               it is matching against a free variable, and an ascription around one is no longer a
+               variable, so wrapping it would quietly cost us the refinement (see
+               check_implicit_match in narya/lib/core/check.ml). *)
+            | Synth _, _ | _, None -> ensure_synth tm "match discriminee"
+            (* One that doesn't is ascribed the type the rule says it has, so that it synthesizes.
+               Nothing is refined on it, there being no variable to refine on. *)
+            | _, Some asc_ty ->
                 ( locate_opt tm.loc
                     (Named.Asc
                        ( locate_opt tm.loc tm.value.term,

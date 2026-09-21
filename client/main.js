@@ -901,10 +901,13 @@ function addEndpointsForRule(box, id, restore) {
         box.style.height = '80px';
         makeResizable(box);
     } else if (id === 'natE') {
+        // The discriminee goes on the unlabeled input, which is the port a Match rule reads
+        // (bin/rules.ml); a label here would leave that port unconnected and the match would have
+        // nothing to refine on.
         instance.addEndpoint(box, {
             anchor: "Left",
             target: true,
-            parameters: { sort: "input", label: "n", hasValue: true },
+            parameters: { sort: "input", hasValue: true, primary: "ℕ" },
             paintStyle: { fill: VALUECOLOR },
         });
         instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, -30], target: true, parameters: {sort: "subgoal", label: "zero", side: "upper"} });
