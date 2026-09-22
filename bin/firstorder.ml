@@ -289,9 +289,6 @@ type (_, _, _) identity +=
   | Fourth : (No.strict opn, No.four, closed) identity
   | Divisible : (No.strict opn, No.zero, No.strict opn) identity
   | Congruent : (No.strict opn, No.zero, closed) identity
-  (* A successor, printed as "x+1".  It binds as + does, so that "suc x" inside a product comes out
-     parenthesized the way "x+1" would. *)
-  | Suc : (No.nonstrict opn, No.two, closed) identity
 
 let forall : (closed, No.zero, No.strict opn) notation = (Forall, Prefix No.zero)
 let exists : (closed, No.zero, No.strict opn) notation = (Exists, Prefix No.zero)
@@ -366,12 +363,6 @@ let cube : (No.strict opn, No.four, closed) notation = (Cube, Postfix No.four)
 let fourth : (No.strict opn, No.four, closed) notation = (Fourth, Postfix No.four)
 let divisible : (No.strict opn, No.zero, No.strict opn) notation = (Divisible, Infix No.zero)
 let congruent : (No.strict opn, No.zero, closed) notation = (Congruent, Postfix No.zero)
-let sucn : (No.nonstrict opn, No.two, closed) notation = (Suc, Postfixl No.two)
-
-(* The token this notation is keyed on is one the lexer cannot produce: an identifier cannot have a
-   "+" in it.  That makes the notation unreachable for parsing, which is what we want -- "x+1" is
-   ℕ.plus and must stay so -- while leaving it available for printing, which is what it is for. *)
-let suctok = Token.Ident [ "+1" ]
 
 type infix = Wrap_infix : (No.strict opn, 'tight, No.strict opn) notation -> infix
 
@@ -1028,29 +1019,6 @@ let () =
         })
     powers
 
-(* The successor constructor, printed as the number it is.  A match on a natural refines the goal
-   in each branch to talk about "suc x", which is x+1; without this it prints as the raw constructor
-   "suc.(x)", which is not something to show a student.  This only says how to print it: nothing
-   parses to it (see suctok), so writing "x+1" still means ℕ.plus as it always did. *)
-let make_suc_notation () =
-  make sucn
-    {
-      name = "+1";
-      tree = Open_entry (eop suctok (done_open sucn));
-      processor = (fun _ _ _ -> Builtins.invalid "+1");
-      print_term =
-        Some
-          (fun obs ->
-            match obs with
-            | [ Term x; Token (_, (wsop, _)) ] ->
-                let px, wsx = pp_term x in
-                (px ^^ pp_ws `None wsx ^^ Token.pp suctok, wsop)
-            | _ -> Builtins.invalid "+1");
-      print_case = None;
-      pattern = (fun _ loc -> fatal ?loc (Invalid_notation_pattern "+1"));
-      is_case = (fun _ -> false);
-    }
-
 let rec add_subtypes = function
   | [] | [ _ ] -> ()
   | subtype :: supertypes ->
@@ -1060,15 +1028,6 @@ let rec add_subtypes = function
 (* Finally, here is a function that installs these notations into the current Situation.  This must be run inside the Pauser. *)
 
 let install_notations () =
-  make_suc_notation ();
-  Scope.Situation.add_with_print
-    {
-      keys = [ `Constr (Constr.intern "suc", 1) ];
-      notn = Wrap sucn;
-      pat_vars = [ "x" ];
-      val_vars = [ "x" ];
-      inner_symbols = `Single suctok;
-    };
   List.iter
     (fun (oname, Wrap_infix onotn, ostr) ->
       Scope.Situation.add_with_print
@@ -1144,14 +1103,20 @@ let install_notations () =
     orderings;
   List.iter
     (fun (_, _, usym, asym, Wrap_infixl onotn, ostr, tys) ->
-      Scope.Situation.add_with_print
+      let notn : User.notation =
         {
           keys = List.map (fun ty -> `Constant (get_const (ty :: ostr))) tys;
           notn = Wrap onotn;
           pat_vars = [ "x"; "y" ];
           val_vars = [ "x"; "y" ];
           inner_symbols = `Single (if Display.chars () = `Unicode then usym else asym);
-        })
+        } in
+      Scope.Situation.add_with_print notn;
+      (* Iterated successors of something that isn't a numeral are written with +, so that "suc. k"
+         is k+1 and "suc. (suc. k)" is k+2.  A match on a natural refines each of its branches to
+         talk about successors, which is arithmetic and should read as arithmetic rather than as the
+         constructor it is.  This says only how to print them: "k+1" parses as ℕ.plus as ever. *)
+      if ostr = [ "plus" ] then Scope.Situation.set_successor notn)
     algebra;
   List.iter
     (fun (_, sym, _, onotn, ostr) ->
