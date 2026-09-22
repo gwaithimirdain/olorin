@@ -4246,7 +4246,7 @@ function labelObstacles() {
     nodes.forEach(function (x) { add(x.node); });
     document.querySelectorAll('#canvas .lowerOutputLabel, #canvas .upperOutputLabel, ' +
                               '#canvas .lowerInputLabel, #canvas .middleInputLabel, ' +
-                              '#canvas .upperInputLabel').forEach(add);
+                              '#canvas .upperInputLabel, #canvas .caselabel').forEach(add);
     return fixed;
 }
 
@@ -4386,6 +4386,30 @@ function continue_typechecking(nodes, edges, connections, result) {
                 const key = portKey(label.loc);
                 if(!portLabels[key]) { portLabels[key] = label; }
             }
+        });
+        // Write each case of a "natE" on the block itself: the upper half is where the discriminee
+        // is 0, the lower where it is one more than the variable the block binds.  The match
+        // refines the goal and the context of each branch without handing out an equation to wire
+        // up (the Match rule "natE" in bin/rules.ml), so this is the only place that equation
+        // appears -- and it is what lets a wire whose label turns from [n] into [k+1] on its way
+        // into the lower branch be read as the same statement rather than a different one.
+        nodes.forEach(function (x) {
+            if(x.rule !== 'natE') { return; }
+            const upper = x.node.querySelector('.caselabel.upper');
+            const lower = x.node.querySelector('.caselabel.lower');
+            if(!upper || !lower) { return; }
+            // The discriminee as it is written on the wire coming into the unlabeled input, and the
+            // name the player gave the predecessor.  Without both there is no equation to write.
+            const edge = edges.find(function (e) {
+                return e.target.vertex === x.id && e.target.sort === 'input' && !e.target.label;
+            });
+            const wire = edge && labels.find(function (l) {
+                return l.loc.isEdge && l.loc.id === edge.id;
+            });
+            const tm = wire && wire.tm;
+            const name = boundNames(x.id)[0];
+            upper.innerText = (tm && name) ? tm + '=0' : '';
+            lower.innerText = (tm && name) ? tm + '=' + name + '+1' : '';
         });
         // Whether a wire gets a type label without the player asking: on novice difficulty, always;
         // otherwise only if it starts at a given or ends at the goal, or carries a value.  (It

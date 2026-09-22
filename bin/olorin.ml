@@ -1296,7 +1296,29 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     @@ fun () -> check_of_output_port ~seen:IdSet.empty vertices bwd_graph ~edge:None p in
   (* A cyclic term is invalid in any scope, and cutting an out-of-scope wire wouldn't help. *)
   if !cyclic then `No_scope (scoping_diagnostics, [])
-  else (* Now we recurse through the supplied contexts/scopes. *)
+  else
+    (* An assumption port is a variable some block hands out, and the type it hands out is the one
+       it has where it is *bound*.  That context is one we have: it is the first one recorded whose
+       scope ends with this very port, recorded when Narya went under the binder and before any
+       branch of a match inside it refined anything.  Looking it up directly beats searching for a
+       context that works, which would settle on whichever refinement was recorded last -- the
+       inductive hypothesis of a natInd is in scope both inside a case analysis on the induction
+       variable and outside it, and what the block hands out is the type that holds for both.
+       Anything else, and anything this doesn't find a binder for, searches as it always did. *)
+    let binder_first contexts =
+      if p.sort <> Assumption then contexts
+      else
+        let binds (Context (_, _, scope)) =
+          match Bwv.to_list scope with
+          | [] -> false
+          | entries -> (
+              match (List.nth_opt entries (List.length entries - 1) : name option) with
+              | Some { port = Some q; _ } -> q = p
+              | _ -> false) in
+        match List.rev (List.filter binds contexts) with
+        | binder :: _ -> binder :: contexts
+        | [] -> contexts in
+    let contexts = binder_first contexts in
     let rec look_for_scope contexts =
       match contexts with
       | [] ->

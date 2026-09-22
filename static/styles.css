@@ -222,6 +222,29 @@ body {
     width: 100%;
 }
 
+/* The case a branch of a "natE" is about, written on the block itself: "n=0" on the upper half and
+   "n=k+1" on the lower one.  The match refines each branch without handing out an equation to wire
+   up, so this is where that equation is written down. */
+.caselabel {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 11px;
+    color: #555555;
+    pointer-events: none;
+}
+
+/* Just inside each half from the bar between them, which is the part of the block a wire label is
+   least likely to want: the wires run to the ports at the corners. */
+.caselabel.upper {
+    bottom: calc(50% + 4px);
+}
+
+.caselabel.lower {
+    top: calc(50% + 4px);
+}
+
 .assumptionlabel {
     position: absolute;
     top: 20%;
