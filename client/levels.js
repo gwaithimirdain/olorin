@@ -2519,6 +2519,12 @@ export const LEVELS = [
                     conclusion: { ty: "∀n∈ℕ,(h(n)=1/(n+1))" },
                 },
                 {
+                    parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "f(0)=2" }, { ty: "∀n∈ℕ,(f(n+1)=2·f(n)−1)" } ],
+                    conclusion: { ty: "∀n∈ℕ,(f(n)=2^n+1)" },
+                },
+                {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
