@@ -705,28 +705,35 @@ let () =
                             true );
                         ]
                     | _ -> [] in
-                  (* If neither side synthesizes -- "0≠1", where both sides are numerals -- there is
-                     nothing to read the number system off, so we try them in order, as the
-                     arithmetic operations do, and take the first (smallest) one that works. *)
+                  (* Naming the number system outright, which is what keeps the sides in the order
+                     they were written.  It is needed when neither side synthesizes -- "0≠1", where
+                     both sides are numerals -- and also when the left side synthesizes a system too
+                     narrow for the right one, "a=2·b−1" with a and b naturals: there the relation
+                     does hold, at ℤ, and without this the only alternative left would be the
+                     reversed one.  We try them in order, as the arithmetic operations do, and take
+                     the first (smallest) one that works. *)
                   let numterms =
-                    match (xterm, yterm) with
-                    | [], [] ->
-                        List.map
-                          (fun ty ->
-                            ( `Any,
-                              sapp
-                                (locate_opt loc
-                                   (sapp
-                                      (locate_opt loc
-                                         (sapp
-                                            (locate_opt loc (Const (get_const [ str ])))
-                                            (locate_opt loc (Synth (Const (get_const [ ty ]))))))
-                                      x))
-                                y,
-                              true ))
-                          numbers
-                    | _ -> [] in
-                  locate_opt loc (Synth (SFirst (xterm @ yterm @ numterms, None)))
+                    List.map
+                      (fun ty ->
+                        ( `Any,
+                          sapp
+                            (locate_opt loc
+                               (sapp
+                                  (locate_opt loc
+                                     (sapp
+                                        (locate_opt loc (Const (get_const [ str ])))
+                                        (locate_opt loc (Synth (Const (get_const [ ty ]))))))
+                                  x))
+                            y,
+                          true ))
+                      numbers in
+                  (* The reversed relation is the last resort, for sides that aren't numbers at
+                     all: it states "y = x" where "x = y" was written, which reads differently even
+                     though it says the same thing.  Naming the system comes first so that a
+                     relation between numbers keeps the sides in the order the player wrote them --
+                     including "0=x", which used to come out "x=0" for want of anywhere else to
+                     read the implicit type from. *)
+                  locate_opt loc (Synth (SFirst (xterm @ numterms @ yterm, None)))
               | _ -> Builtins.invalid name);
           print_term =
             Some
