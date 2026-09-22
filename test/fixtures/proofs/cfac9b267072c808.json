@@ -14,22 +14,22 @@
     "y": 0
   },
   "counters": {
-    "counter": 117,
-    "paramCounter": 30,
-    "varCounter": 87,
-    "hypCounter": 69,
-    "conclCounter": 82
+    "counter": 47,
+    "paramCounter": 6,
+    "varCounter": 2,
+    "hypCounter": 14,
+    "conclCounter": 10
   },
   "nodes": [
     {
-      "id": "concl81",
+      "id": "concl9",
       "rule": "conclusion",
       "left": "1295px",
       "top": "868px",
       "value": "∀n∈ℕ,((2∣n)∨(2∣(n+1)))"
     },
     {
-      "id": "rule99",
+      "id": "rule29",
       "rule": "natInd",
       "left": "67px",
       "top": "675.75px",
@@ -40,7 +40,7 @@
       "height": "70px"
     },
     {
-      "id": "rule100",
+      "id": "rule30",
       "rule": "natE",
       "left": "112px",
       "top": "104.75px",
@@ -51,19 +51,19 @@
       "height": "110px"
     },
     {
-      "id": "rule101",
+      "id": "rule31",
       "rule": "orI1",
       "left": "946px",
       "top": "45px"
     },
     {
-      "id": "rule102",
+      "id": "rule32",
       "rule": "exI",
       "left": "709px",
       "top": "50px"
     },
     {
-      "id": "rule103",
+      "id": "rule33",
       "rule": "expr",
       "left": "427px",
       "top": "16px",
@@ -71,25 +71,25 @@
       "width": "fit-content"
     },
     {
-      "id": "rule104",
+      "id": "rule34",
       "rule": "algplus",
       "left": "429px",
       "top": "94px"
     },
     {
-      "id": "rule105",
+      "id": "rule35",
       "rule": "allbelowE",
       "left": "317px",
       "top": "239px"
     },
     {
-      "id": "rule106",
+      "id": "rule36",
       "rule": "algplus",
       "left": "144px",
       "top": "308px"
     },
     {
-      "id": "rule107",
+      "id": "rule37",
       "rule": "orE",
       "left": "375px",
       "top": "395px",
@@ -97,19 +97,19 @@
       "height": "80px"
     },
     {
-      "id": "rule108",
+      "id": "rule38",
       "rule": "orI2",
       "left": "1007px",
       "top": "230px"
     },
     {
-      "id": "rule109",
+      "id": "rule39",
       "rule": "orI1",
       "left": "1058px",
       "top": "561px"
     },
     {
-      "id": "rule110",
+      "id": "rule40",
       "rule": "exE",
       "left": "529px",
       "top": "261px",
@@ -118,13 +118,13 @@
       ]
     },
     {
-      "id": "rule111",
+      "id": "rule41",
       "rule": "exI",
       "left": "853px",
       "top": "326px"
     },
     {
-      "id": "rule112",
+      "id": "rule42",
       "rule": "expr",
       "left": "713px",
       "top": "222px",
@@ -132,19 +132,19 @@
       "width": "fit-content"
     },
     {
-      "id": "rule113",
+      "id": "rule43",
       "rule": "algplus",
       "left": "664px",
       "top": "352px"
     },
     {
-      "id": "rule114",
+      "id": "rule44",
       "rule": "exI",
       "left": "921px",
       "top": "643px"
     },
     {
-      "id": "rule115",
+      "id": "rule45",
       "rule": "exE",
       "left": "418px",
       "top": "562px",
@@ -153,7 +153,7 @@
       ]
     },
     {
-      "id": "rule116",
+      "id": "rule46",
       "rule": "algplus",
       "left": "578px",
       "top": "653px"
@@ -162,35 +162,22 @@
   "connections": [
     {
       "source": {
-        "vertex": "rule99",
+        "vertex": "rule29",
         "sort": "output"
       },
       "target": {
-        "vertex": "concl81",
+        "vertex": "concl9",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule99",
-        "sort": "assumption",
-        "label": "n"
-      },
-      "target": {
-        "vertex": "rule100",
-        "sort": "input",
-        "label": "n"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule100",
+        "vertex": "rule30",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule99",
+        "vertex": "rule29",
         "sort": "subgoal",
         "label": "step"
       },
@@ -198,11 +185,11 @@
     },
     {
       "source": {
-        "vertex": "rule101",
+        "vertex": "rule31",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule100",
+        "vertex": "rule30",
         "sort": "subgoal",
         "label": "zero"
       },
@@ -210,11 +197,11 @@
     },
     {
       "source": {
-        "vertex": "rule102",
+        "vertex": "rule32",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule101",
+        "vertex": "rule31",
         "sort": "input",
         "label": "left"
       },
@@ -222,11 +209,11 @@
     },
     {
       "source": {
-        "vertex": "rule103",
+        "vertex": "rule33",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule102",
+        "vertex": "rule32",
         "sort": "input",
         "label": "element"
       },
@@ -234,23 +221,11 @@
     },
     {
       "source": {
-        "vertex": "rule100",
-        "sort": "assumption",
-        "label": "zero"
-      },
-      "target": {
-        "vertex": "rule104",
-        "sort": "input"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule104",
+        "vertex": "rule34",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule102",
+        "vertex": "rule32",
         "sort": "input",
         "label": "property"
       },
@@ -258,25 +233,12 @@
     },
     {
       "source": {
-        "vertex": "rule99",
-        "sort": "assumption",
-        "label": "IH"
-      },
-      "target": {
-        "vertex": "rule105",
-        "sort": "input",
-        "label": "universal"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule100",
+        "vertex": "rule30",
         "sort": "assumption",
         "label": "pred"
       },
       "target": {
-        "vertex": "rule105",
+        "vertex": "rule35",
         "sort": "input",
         "label": "element"
       },
@@ -284,23 +246,11 @@
     },
     {
       "source": {
-        "vertex": "rule100",
-        "sort": "assumption",
-        "label": "succ"
-      },
-      "target": {
-        "vertex": "rule106",
-        "sort": "input"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule106",
+        "vertex": "rule36",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule105",
+        "vertex": "rule35",
         "sort": "input",
         "label": "below"
       },
@@ -308,34 +258,22 @@
     },
     {
       "source": {
-        "vertex": "rule105",
+        "vertex": "rule35",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule107",
+        "vertex": "rule37",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule107",
+        "vertex": "rule38",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule100",
-        "sort": "subgoal",
-        "label": "succ"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule108",
-        "sort": "output"
-      },
-      "target": {
-        "vertex": "rule107",
+        "vertex": "rule37",
         "sort": "subgoal",
         "label": "left"
       },
@@ -343,11 +281,11 @@
     },
     {
       "source": {
-        "vertex": "rule109",
+        "vertex": "rule39",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule107",
+        "vertex": "rule37",
         "sort": "subgoal",
         "label": "right"
       },
@@ -355,23 +293,23 @@
     },
     {
       "source": {
-        "vertex": "rule107",
+        "vertex": "rule37",
         "sort": "assumption",
         "label": "left"
       },
       "target": {
-        "vertex": "rule110",
+        "vertex": "rule40",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule111",
+        "vertex": "rule41",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule108",
+        "vertex": "rule38",
         "sort": "input",
         "label": "right"
       },
@@ -379,23 +317,23 @@
     },
     {
       "source": {
-        "vertex": "rule110",
+        "vertex": "rule40",
         "sort": "output",
         "label": "element"
       },
       "target": {
-        "vertex": "rule112",
+        "vertex": "rule42",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule112",
+        "vertex": "rule42",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule111",
+        "vertex": "rule41",
         "sort": "input",
         "label": "element"
       },
@@ -403,35 +341,23 @@
     },
     {
       "source": {
-        "vertex": "rule110",
+        "vertex": "rule40",
         "sort": "output",
         "label": "property"
       },
       "target": {
-        "vertex": "rule113",
+        "vertex": "rule43",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule100",
-        "sort": "assumption",
-        "label": "succ"
-      },
-      "target": {
-        "vertex": "rule113",
-        "sort": "input"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule113",
+        "vertex": "rule43",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule111",
+        "vertex": "rule41",
         "sort": "input",
         "label": "property"
       },
@@ -439,11 +365,11 @@
     },
     {
       "source": {
-        "vertex": "rule114",
+        "vertex": "rule44",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule109",
+        "vertex": "rule39",
         "sort": "input",
         "label": "left"
       },
@@ -451,24 +377,24 @@
     },
     {
       "source": {
-        "vertex": "rule107",
+        "vertex": "rule37",
         "sort": "assumption",
         "label": "right"
       },
       "target": {
-        "vertex": "rule115",
+        "vertex": "rule45",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule115",
+        "vertex": "rule45",
         "sort": "output",
         "label": "element"
       },
       "target": {
-        "vertex": "rule114",
+        "vertex": "rule44",
         "sort": "input",
         "label": "element"
       },
@@ -476,37 +402,62 @@
     },
     {
       "source": {
-        "vertex": "rule115",
+        "vertex": "rule45",
         "sort": "output",
         "label": "property"
       },
       "target": {
-        "vertex": "rule116",
+        "vertex": "rule46",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule100",
-        "sort": "assumption",
-        "label": "succ"
-      },
-      "target": {
-        "vertex": "rule116",
-        "sort": "input"
-      },
-      "connector": "Bezier"
-    },
-    {
-      "source": {
-        "vertex": "rule116",
+        "vertex": "rule46",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule114",
+        "vertex": "rule44",
         "sort": "input",
         "label": "property"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "assumption",
+        "label": "n"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule37",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule30",
+        "sort": "subgoal",
+        "label": "suc"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule29",
+        "sort": "assumption",
+        "label": "IH"
+      },
+      "target": {
+        "vertex": "rule35",
+        "sort": "input",
+        "label": "universal"
       },
       "connector": "Bezier"
     }
