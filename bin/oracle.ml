@@ -486,6 +486,14 @@ let rec poly_form tm =
               | Some k when k <= 4 -> unary (fun a -> repeat a k) x.tm
               | _ -> atom)
           | _ -> atom)
+      (* A successor, which is that number plus one (as 'go' also reads it).  A match on a natural
+         refines an exponent written "n" to the constructor "suc m", and it has to normalize to the
+         same m+1 that writing "m+1" there would, or 2^(m+1) would be a power of an exponent with
+         nothing to do with the m in 2^m. *)
+      | Constr (name, dim, [ arg ]) when name = Constr.intern "suc" -> (
+          match (D.compare_zero dim, get_constr_arg arg) with
+          | Zero, Some a -> unary (fun p -> add p ([], Q.one)) a
+          | _ -> atom)
       | _ -> atom)
 
 

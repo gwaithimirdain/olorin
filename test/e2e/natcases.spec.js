@@ -84,6 +84,42 @@ test.describe('The "natE" block', () => {
         expect(await casesProves(olorin, { swapped: true })).toBe(false);
     });
 
+    // What the refinement writes into a branch is the "suc" constructor, and the arithmetic has to
+    // read it as the number it is wherever it lands -- including inside an exponent, where a power
+    // of it is only a power of m+1 if the exponent normalizes to m+1 (see poly_form in
+    // bin/oracle.ml).  Without that, 2^n refined to 2^(m+1) is a power of something opaque, with
+    // nothing to do with the 2^m the same branch is talking about.
+    test('refines an exponent into arithmetic the algebra block can use', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: '', variables: 'n ∈ ℕ', hypotheses: '',
+            conclusion: '(n=0)∨(∃k∈ℕ,(2^n=2·2^k))',
+        });
+        const cases = await dragBinder(olorin, 'natE', 250, 100, 'm');
+        const zeroalg = await olorin.dragRule('alg', 700, 60);
+        const left = await olorin.dragRule('orI1', 500, 60);
+        const sucalg = await olorin.dragRule('alg', 700, 300);
+        const intro = await olorin.dragRule('exI', 450, 300);
+        const right = await olorin.dragRule('orI2', 550, 300);
+        const nodes = await olorin.nodes();
+        const varn = nodes.find((v) => v.rule === 'variable' && v.name === 'n').id;
+        const concl = nodes.find((n) => n.rule === 'conclusion').id;
+        await olorin.connect({ vertex: varn, sort: 'output' }, { vertex: cases, sort: 'input' });
+        await olorin.connect({ vertex: zeroalg, sort: 'output' }, { vertex: left, sort: 'input', label: 'left' });
+        await olorin.connect({ vertex: left, sort: 'output' }, { vertex: cases, sort: 'subgoal', label: 'zero' });
+        await olorin.connect({ vertex: cases, sort: 'assumption', label: 'pred' },
+                             { vertex: intro, sort: 'input', label: 'element' });
+        // 2^(m+1) = 2·2^m, which is the whole point: both sides are powers of the same base at
+        // exponents the arithmetic can tell apart by one.
+        await olorin.connect({ vertex: sucalg, sort: 'output' }, { vertex: intro, sort: 'input', label: 'property' });
+        await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: right, sort: 'input', label: 'right' });
+        await olorin.connect({ vertex: right, sort: 'output' }, { vertex: cases, sort: 'subgoal', label: 'suc' });
+        await olorin.connect({ vertex: cases, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
+    });
+
     test('writes the equation each case stands for on the block', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
