@@ -76,7 +76,7 @@
     },
     {
       "id": "rule53",
-      "rule": "allposE",
+      "rule": "allE",
       "left": "594px",
       "top": "617px"
     },
@@ -96,7 +96,7 @@
     },
     {
       "id": "rule56",
-      "rule": "allposE",
+      "rule": "allE",
       "left": "729px",
       "top": "100px"
     },
@@ -201,7 +201,7 @@
       "target": {
         "vertex": "rule53",
         "sort": "input",
-        "label": "positive"
+        "label": "condition"
       },
       "connector": "Bezier"
     },
@@ -320,7 +320,7 @@
       "target": {
         "vertex": "rule56",
         "sort": "input",
-        "label": "positive"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

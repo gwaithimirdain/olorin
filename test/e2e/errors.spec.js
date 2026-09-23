@@ -60,26 +60,6 @@ test.describe('Error explanations', () => {
         expect(e).toContain('\n    P\n');
     });
 
-    // An ordinary ∀-introduction proves {forall = ...}, and a bounded-∀ goal (∀x∈ℝ₊ or ∀x∈[n])
-    // is a record with a *different* single field (forallpos/forallbelow) -- still a record, so
-    // this is Missing_field_in_tuple rather than the goal-isn't-a-record-at-all case above.
-    test('an ordinary ∀-introduction wired to a bounded ∀ goal names the shape it should have proved',
-        async ({ page }) => {
-            const olorin = new Olorin(page);
-            await olorin.open();
-            await mistake(olorin, { parameters: 'P : ℝ → Type', conclusion: '∀x∈ℝ₊,P x' },
-                async (o, hyps, concl) => {
-                    const intro = await o.dragRule('allI', 300, 150);
-                    await o.page.waitForSelector('#variableBG', { state: 'visible' });
-                    await o.page.fill('#newvar', 'z');
-                    await o.page.click('#submitVariable');
-                    await o.dismissHints();
-                    await o.connect({ vertex: intro, sort: 'output' }, { vertex: concl, sort: 'input' });
-                });
-            const e = await explanationFor(olorin, 'E0902');
-            expect(e).toContain('a universal statement about positive reals (∀x∈ℝ₊,…)');
-        });
-
     test('an elimination block fed the wrong shape names the shape it wanted', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();

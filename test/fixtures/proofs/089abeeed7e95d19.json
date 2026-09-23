@@ -96,7 +96,7 @@
     },
     {
       "id": "rule27",
-      "rule": "allbelowE",
+      "rule": "allE",
       "left": "736px",
       "top": "576px"
     },
@@ -223,7 +223,7 @@
       "target": {
         "vertex": "rule27",
         "sort": "input",
-        "label": "below"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

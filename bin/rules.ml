@@ -12,6 +12,15 @@ type match_branch =
     }
       -> match_branch
 
+(* An input port of a block, by its label.  An optional one may be left empty when all it asks for
+   is ⊤, which the block then supplies itself.  That is the condition on the variable of a plain ∀ or
+   ∃: every quantifier carries one (see firstorder.ml), but a plain one ranges over a whole type, so
+   there is nothing to say about its variable and the player never sees that port. *)
+type input = Required of string | Optional of string
+
+let input_label = function
+  | Required label | Optional label -> label
+
 (* This is the type of abstract rules.  The string arguments are the labels of the corresponding ports.  When there is only one input port, or only one output port, it doesn't have a label. *)
 type rule =
   (* A tuple assembles its inputs into the fields of a record.  If it is 'unordered', its two
@@ -20,19 +29,19 @@ type rule =
      with exactly two inputs can be unordered. *)
   | Tuple of { inputs : (string option * string * (string * string list)) list; unordered : bool }
   | Fields of { outputs : ((string * int list) * string) list }
-  | Constr of { inputs : string list; constr : Constr.t }
+  | Constr of { inputs : input list; constr : Constr.t }
   | Match of { branches : match_branch list; asc_pre : string option }
   | Coconstr of { constr : Constr.t; outputs : (bool * string) list }
   (* Application and abstraction include an optional field because ⇒, ∀, and ¬ are actually records, so for Narya's internals we need to tuple and project in addition to applying and abstracting. *)
   (* The inputs of an application are the port carrying the function and then one port per argument
-     it is applied to, in order: ∀x∈ℝ₊ takes the positivity of x as a second argument alongside x. *)
-  | App of { field : (string * int list) option; inputs : string * string list }
+     it is applied to, in order: ∀ takes the condition on x as a second argument alongside x. *)
+  | App of { field : (string * int list) option; inputs : string * input list }
   | Neg of { field : string * int list; inputs : string * string; implicit_pre : string }
   | Abs of {
       field : (string * string list) option;
       has_value : bool;
-      (* Assumptions bound after the main (unlabeled) one, as further nested lambdas: ∀x∈ℝ₊ binds
-         the positivity of x alongside x itself, on a labeled port of its own. *)
+      (* Assumptions bound after the main (unlabeled) one, as further nested lambdas: ∀ binds the
+         condition on x alongside x itself, on a labeled port of its own. *)
       extras : string list;
       (* Allow testing for the presence of a field in the goal type, and if it isn't there, insert a specified function (with implicit first argument).  The intended example is so that a single rule can be both proof-of-negation and proof-by-contradiction. *)
       implicit_post : (string * string) option;
@@ -75,15 +84,16 @@ and user_input =
 
 (* One step of that.  A datatype with a single constructor -- an ∃ -- comes apart by matching it,
    which binds a variable for each of its components; the flag says which of them carry a value the
-   player names, and those take the block's bound variable names in order.  A record -- a ∧ -- comes
-   apart by projecting out its fields, which binds nothing: each such port simply carries that
-   projection of what the steps before it left. *)
+   player names, and those take the block's bound variable names in order.  A component with no
+   label is bound but not handed out at all: the trivial condition of a plain ∃.  A record -- a ∧ --
+   comes apart by projecting out its fields, which binds nothing: each such port simply carries
+   that projection of what the steps before it left. *)
 and destructure =
-  | Open of Constr.t * (bool * string) list
+  | Open of Constr.t * (bool * string option) list
   | Project of ((string * int list) * string) list
 
 let labels_of = function
-  | Open (_, outs) -> List.map snd outs
+  | Open (_, outs) -> List.filter_map snd outs
   | Project flds -> List.map snd flds
 
 (* The output ports such a block shows the player: every component of every step, except the last
@@ -123,68 +133,51 @@ let rules =
               ];
             asc_pre = None;
           } );
-      ("orI1", Constr { inputs = [ "left" ]; constr = Constr.intern "left" });
-      ("orI2", Constr { inputs = [ "right" ]; constr = Constr.intern "right" });
-      ("impE", App { field = Some ("implies", []); inputs = ("implication", [ "antecedent" ]) });
+      ("orI1", Constr { inputs = [ Required "left" ]; constr = Constr.intern "left" });
+      ("orI2", Constr { inputs = [ Required "right" ]; constr = Constr.intern "right" });
+      ( "impE",
+        App { field = Some ("implies", []); inputs = ("implication", [ Required "antecedent" ]) } );
       ( "impI",
         Abs { field = Some ("implies", []); has_value = false; extras = []; implicit_post = None }
       );
-      ("iffE1", App { field = Some ("ltor", []); inputs = ("implication", [ "antecedent" ]) });
-      ("iffE2", App { field = Some ("rtol", []); inputs = ("implication", [ "antecedent" ]) });
+      ( "iffE1",
+        App { field = Some ("ltor", []); inputs = ("implication", [ Required "antecedent" ]) } );
+      ( "iffE2",
+        App { field = Some ("rtol", []); inputs = ("implication", [ Required "antecedent" ]) } );
       ( "iffI",
         Tuple
           {
             inputs = [ (Some "ltor", "ltor", ("ltor", [])); (Some "rtol", "rtol", ("rtol", [])) ];
             unordered = false;
           } );
+      (* The quantifiers.  Each of them carries a condition on its variable alongside the variable
+         itself -- 0<x for ∀x∈ℝ₊, x<n for ∀x∈[n], and the trivial ⊤ for a plain ∀x∈A -- so the same
+         four blocks work for all of them, with a port for the condition that the player sees only
+         when there is something to it. *)
       ( "exE",
         Coconstr
-          { constr = Constr.intern "exists"; outputs = [ (true, "element"); (false, "property") ] }
-      );
-      ("exI", Constr { inputs = [ "element"; "property" ]; constr = Constr.intern "exists" });
-      ("allE", App { field = Some ("forall", []); inputs = ("universal", [ "element" ]) });
-      ( "allI",
-        Abs { field = Some ("forall", []); has_value = true; extras = []; implicit_post = None } );
-      (* The quantifiers over the special sets ℝ₊ and [n].  Each carries the condition defining its
-         set -- 0<x, or x<n -- on a port of its own alongside the value port for x: the
-         field of "forallpos" and "forallbelow" takes it as a second argument, and the constructor
-         of "existspos" and "existsbelow" as a second component. *)
-      ( "exposE",
-        Coconstr
           {
-            constr = Constr.intern "existspos";
-            outputs = [ (true, "element"); (false, "positive"); (false, "property") ];
+            constr = Constr.intern "exists";
+            outputs = [ (true, "element"); (false, "condition"); (false, "property") ];
           } );
-      ( "exposI",
+      ( "exI",
         Constr
-          { inputs = [ "element"; "positive"; "property" ]; constr = Constr.intern "existspos" } );
-      ( "allposE",
-        App { field = Some ("forallpos", []); inputs = ("universal", [ "element"; "positive" ]) } );
-      ( "allposI",
+          {
+            inputs = [ Required "element"; Optional "condition"; Required "property" ];
+            constr = Constr.intern "exists";
+          } );
+      ( "allE",
+        App
+          {
+            field = Some ("forall", []);
+            inputs = ("universal", [ Required "element"; Optional "condition" ]);
+          } );
+      ( "allI",
         Abs
           {
-            field = Some ("forallpos", []);
+            field = Some ("forall", []);
             has_value = true;
-            extras = [ "positive" ];
-            implicit_post = None;
-          } );
-      ( "exbelowE",
-        Coconstr
-          {
-            constr = Constr.intern "existsbelow";
-            outputs = [ (true, "element"); (false, "below"); (false, "property") ];
-          } );
-      ( "exbelowI",
-        Constr { inputs = [ "element"; "below"; "property" ]; constr = Constr.intern "existsbelow" }
-      );
-      ( "allbelowE",
-        App { field = Some ("forallbelow", []); inputs = ("universal", [ "element"; "below" ]) } );
-      ( "allbelowI",
-        Abs
-          {
-            field = Some ("forallbelow", []);
-            has_value = true;
-            extras = [ "below" ];
+            extras = [ "condition" ];
             implicit_post = None;
           } );
       ( "negE",
@@ -264,7 +257,12 @@ let rules =
             consts = [ [ "ℝ"; "archimedean" ] ];
             inputs = [ Arg "x" ];
             implicit_first = None;
-            outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
+            outputs =
+              [
+                Open
+                  ( Constr.intern "exists",
+                    [ (true, Some "element"); (false, None); (false, Some "property") ] );
+              ];
           } );
       (* An integer that is at least zero is a natural number.  The proof that it is nonnegative is
          an input of its own, alongside the integer; what comes out is that natural number and the
@@ -275,7 +273,12 @@ let rules =
             consts = [ [ "ℤ"; "tonat" ] ];
             inputs = [ Arg "x"; Arg "nonneg" ];
             implicit_first = None;
-            outputs = [ Open (Constr.intern "exists", [ (true, "element"); (false, "property") ]) ];
+            outputs =
+              [
+                Open
+                  ( Constr.intern "exists",
+                    [ (true, Some "element"); (false, None); (false, Some "property") ] );
+              ];
           } );
       (* Every rational is a fraction in lowest terms.  Its axiom concludes two nested ∃s, one for
          each side of the fraction, and then a ∧ of the three things that hold of the two of them,
@@ -292,8 +295,12 @@ let rules =
             implicit_first = None;
             outputs =
               [
-                Open (Constr.intern "exists", [ (true, "numerator"); (false, "rest") ]);
-                Open (Constr.intern "exists", [ (true, "denominator"); (false, "conjunction") ]);
+                Open
+                  ( Constr.intern "exists",
+                    [ (true, Some "numerator"); (false, None); (false, Some "rest") ] );
+                Open
+                  ( Constr.intern "exists",
+                    [ (true, Some "denominator"); (false, None); (false, Some "conjunction") ] );
                 Project [ (("fst", []), "atleastone"); (("snd", []), "others") ];
                 Project [ (("fst", []), "fraction"); (("snd", []), "lowest") ];
               ];

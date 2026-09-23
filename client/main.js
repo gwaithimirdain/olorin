@@ -768,21 +768,98 @@ ready(() => {
     }
 });
 
-// The quantifiers over a set that isn't a type of its own: ℝ₊, the positive reals, and [n], the
-// whole numbers below n.  Each of their four blocks carries the condition defining that set --
-// 0<x, or (0≤x)∧(x<n) -- on a port of its own alongside the value port for x, so the blocks of one
-// such quantifier differ from those of another only in that port's label and in how the set is
-// written in the placeholder types their ports show while empty.
-const SPECIALQUANT = {
-    allposI:   { condition: "positive", set: "ℝ₊" },
-    allposE:   { condition: "positive", set: "ℝ₊" },
-    exposI:    { condition: "positive", set: "ℝ₊" },
-    exposE:    { condition: "positive", set: "ℝ₊" },
-    allbelowI: { condition: "below", set: "[?]" },
-    allbelowE: { condition: "below", set: "[?]" },
-    exbelowI:  { condition: "below", set: "[?]" },
-    exbelowE:  { condition: "below", set: "[?]" },
+// Every quantifier carries a condition on the variable it binds, alongside the variable itself: the
+// one defining the set it ranges over when that isn't a type of its own -- 0<x for ℝ₊, the positive
+// reals, and x<n for [n], the whole numbers below n -- and the trivial ⊤ when it ranges over a whole
+// type (see bin/firstorder.ml).  So each ∀ and ∃ block has a port for the condition, but the player
+// sees it only when there is something to it: when the last typecheck says the condition isn't ⊤,
+// or when something is wired to it anyway.  These are where each block's ports go, keyed by their
+// sort and label, without the condition port and with it.
+const QUANTIFIER_LAYOUTS = {
+    allI: {
+        plain: { height: '50px', ports: {
+            "assumption:": { anchor: [0, 0.5, 1, 0, 22, -12], side: "upper" },
+            "subgoal:": { anchor: [1, 0.5, -1, 0, -21, -12], side: "upper" },
+        } },
+        shown: { height: '70px', ports: {
+            "assumption:": { anchor: [0, 0.5, 1, 0, 22, -22], side: "upper" },
+            "assumption:condition": { anchor: [0, 0.5, 1, 0, 22, 2], side: "upper" },
+            "subgoal:": { anchor: [1, 0.5, -1, 0, -21, -22], side: "upper" },
+        } },
+    },
+    allE: {
+        plain: { ports: {
+            "input:universal": { anchor: [0, 0.2, -1, 0], side: "upper" },
+            "input:element": { anchor: [0, 0.8, -1, 0], side: "lower" },
+        } },
+        shown: { ports: {
+            "input:universal": { anchor: [0, 0.1, -1, 0], side: "upper" },
+            "input:element": { anchor: [0, 0.5, -1, 0], side: "middle" },
+            "input:condition": { anchor: [0, 0.9, -1, 0], side: "lower" },
+        } },
+    },
+    exI: {
+        plain: { ports: {
+            "input:element": { anchor: [0, 0.2, -1, 0], side: "upper" },
+            "input:property": { anchor: [0, 0.8, -1, 0], side: "lower" },
+        } },
+        shown: { ports: {
+            "input:element": { anchor: [0, 0.1, -1, 0], side: "upper" },
+            "input:condition": { anchor: [0, 0.5, -1, 0], side: "middle" },
+            "input:property": { anchor: [0, 0.9, -1, 0], side: "lower" },
+        } },
+    },
+    exE: {
+        plain: { ports: {
+            "output:element": { anchor: [1, 0.2, 1, 0], side: "upper" },
+            "output:property": { anchor: [1, 0.8, 1, 0], side: "lower" },
+        } },
+        shown: { ports: {
+            "output:element": { anchor: [1, 0.1, 1, 0], side: "upper" },
+            "output:condition": { anchor: [1, 0.5, 1, 0], side: "middle" },
+            "output:property": { anchor: [1, 0.9, 1, 0], side: "lower" },
+        } },
+    },
 };
+
+// Show or hide the condition port of a quantifier block, moving its other ports to make room.
+function showCondition(entry, shown) {
+    const layout = QUANTIFIER_LAYOUTS[entry.rule];
+    if(!layout || entry.conditionShown === shown) { return; }
+    entry.conditionShown = shown;
+    const spec = shown ? layout.shown : layout.plain;
+    instance.getEndpoints(entry.node).forEach(function (ep) {
+        if(ep.parameters.label === "condition") {
+            ep.parameters.hidden = !shown;
+            // A hidden port keeps no label either.
+            if(!shown && ep.getOverlay("customLabel")) { ep.removeOverlay("customLabel"); }
+            ep.setVisible(shown, true);
+        }
+        const place = spec.ports[ep.parameters.sort + ":" + (ep.parameters.label || "")];
+        if(place) {
+            ep.setAnchor(place.anchor);
+            ep.parameters.side = place.side;
+        }
+    });
+    if(spec.height) { entry.node.style.height = spec.height; }
+    instance.revalidate(entry.node);
+}
+
+// After a typecheck, show the condition port of each quantifier block if it has something to it.
+function showConditions(labels) {
+    nodes.forEach(function (x) {
+        if(!QUANTIFIER_LAYOUTS[x.rule]) { return; }
+        const port = instance.getEndpoints(x.node).find(function (ep) {
+            return ep.parameters.label === "condition";
+        });
+        if(!port) { return; }
+        const typed = labels.find(function (l) {
+            return !l.loc.isEdge && l.loc.id === x.id && l.loc.sort === port.parameters.sort
+                && l.loc.label === "condition";
+        });
+        showCondition(x, port.connections.length > 0 || (!!typed && typed.ty !== "⊤"));
+    });
+}
 
 // The variables a block binds, in the order its value ports hand them out -- which is the order
 // the variable dialog asks for them, and the order Olorin's OCaml side hands the names to the
@@ -849,13 +926,11 @@ function addEndpointsForRule(box, id, restore) {
     } else if (id === 'orI2') {
         instance.addEndpoint(box, { anchor: "Left", target: true, parameters: { sort: "input", label: "right" } });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: { sort: "output", primary: "?∨?" } });
-    } else if (id === 'impI' || id === 'allI' || id === 'allposI' || id === 'allbelowI' || id === 'negI' || id === 'cnegI' ) {
-        // Every ∀ block binds a variable, so its assumption port carries a value.  The ones that
-        // quantify over a special set bind the condition defining it too, on a second port below
-        // that one, so their variable port sits higher up a taller box to leave room.
-        const q = SPECIALQUANT[id];
-        const binds = (id === 'allI' || !!q);
-        const dy = (q ? -22 : -12);
+    } else if (id === 'impI' || id === 'allI' || id === 'negI' || id === 'cnegI' ) {
+        // The ∀ block binds a variable, so its assumption port carries a value, and the condition
+        // on it on a second port below that one (see QUANTIFIER_LAYOUTS).
+        const binds = (id === 'allI');
+        const dy = -12;
         if(binds) {
             instance.addEndpoint(box, {
                 anchor: [0, 0.5, 1, 0, 22, dy],
@@ -871,18 +946,18 @@ function addEndpointsForRule(box, id, restore) {
                 parameters: {sort: "assumption", side: "upper"},
             });
         }
-        if(q) {
+        if(binds) {
             instance.addEndpoint(box, {
                 anchor: [0, 0.5, 1, 0, 22, 2],
                 source: true, maxConnections: -1,
-                parameters: {sort: "assumption", label: q.condition, side: "upper"},
+                parameters: {sort: "assumption", label: "condition", side: "upper"},
             });
         }
         instance.addEndpoint(box, { anchor: [1, 0.5, -1, 0, -21, dy], target: true, parameters: {sort: "subgoal", side: "upper"} });
-        const primary = (id === 'impI' ? "?⇒?" : (id === 'allI' ? "∀?∈?,?" : (q ? "∀?∈" + q.set + ",?" : (id === 'cnegI' ? "?" : "¬?"))));
+        const primary = (id === 'impI' ? "?⇒?" : (id === 'allI' ? "∀?∈?,?" : (id === 'cnegI' ? "?" : "¬?")));
         instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0, 3], source: true, maxConnections: -1, parameters: {sort: "output", primary: primary} });
         box.style.width = '200px';
-        box.style.height = (q ? '70px' : '50px');
+        box.style.height = '50px';
         makeResizable(box);
         if(binds) {
             // Double-clicking the box re-opens the dialog to rename the variable it binds.
@@ -967,6 +1042,7 @@ function addEndpointsForRule(box, id, restore) {
             paintStyle: { fill: VALUECOLOR },
             connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
         });
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "condition", side: "middle"} });
         instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
         // Double-clicking the box re-opens the dialog to rename the variable it binds.
         box.addEventListener('dblclick', function () { editVariable(box); });
@@ -979,6 +1055,7 @@ function addEndpointsForRule(box, id, restore) {
             parameters: {sort: "input", label: "element", hasValue: true, side: "upper"},
             paintStyle: { fill: VALUECOLOR },
         });
+        instance.addEndpoint(box, { anchor: [0, 0.5, -1, 0], target: true, parameters: {sort: "input", label: "condition", side: "middle"} });
         instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "property", side: "lower"} });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "∃?∈?,?"} });
     } else if (id === 'allE') {
@@ -989,44 +1066,7 @@ function addEndpointsForRule(box, id, restore) {
             parameters: {sort: "input", label: "element", hasValue: true, side: "lower"},
             paintStyle: { fill: VALUECOLOR },
         });
-        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-    } else if (id === 'exposE' || id === 'exbelowE') {
-        const q = SPECIALQUANT[id];
-        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "∃?∈" + q.set + ",?"} });
-        instance.addEndpoint(box, {
-            anchor: [1, 0.1, 1, 0],
-            source: true, maxConnections: -1,
-            parameters: { sort: "output", label: "element", hasValue: true, side: "upper"},
-            paintStyle: { fill: VALUECOLOR },
-            connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
-        });
-        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: q.condition, side: "middle"} });
-        instance.addEndpoint(box, { anchor: [1, 0.9, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
-        // Double-clicking the box re-opens the dialog to rename the variable it binds.
-        box.addEventListener('dblclick', function () { editVariable(box); });
-        if(!restore) { getVariable(box.id); }
-        typecheck_now = false;
-    } else if (id === 'exposI' || id === 'exbelowI') {
-        const q = SPECIALQUANT[id];
-        instance.addEndpoint(box, {
-            anchor: [0, 0.1, -1, 0],
-            target: true,
-            parameters: {sort: "input", label: "element", hasValue: true, side: "upper"},
-            paintStyle: { fill: VALUECOLOR },
-        });
-        instance.addEndpoint(box, { anchor: [0, 0.5, -1, 0], target: true, parameters: {sort: "input", label: q.condition, side: "middle"} });
-        instance.addEndpoint(box, { anchor: [0, 0.9, -1, 0], target: true, parameters: {sort: "input", label: "property", side: "lower"} });
-        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "∃?∈" + q.set + ",?"} });
-    } else if (id === 'allposE' || id === 'allbelowE') {
-        const q = SPECIALQUANT[id];
-        instance.addEndpoint(box, { anchor: [0, 0.1, -1, 0], target: true, parameters: {sort: "input", label: "universal", side: "upper", primary: "∀?∈" + q.set + ",?"} });
-        instance.addEndpoint(box, {
-            anchor: [0, 0.5, -1, 0],
-            target: true,
-            parameters: {sort: "input", label: "element", hasValue: true, side: "middle"},
-            paintStyle: { fill: VALUECOLOR },
-        });
-        instance.addEndpoint(box, { anchor: [0, 0.9, -1, 0], target: true, parameters: {sort: "input", label: q.condition, side: "lower"} });
+        instance.addEndpoint(box, { anchor: [0, 0.9, -1, 0], target: true, parameters: {sort: "input", label: "condition", side: "lower"} });
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
     } else if (id === 'negE') {
         instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "negation", side: "upper", primary: "¬?"} });
@@ -1202,6 +1242,9 @@ function addEndpointsForRule(box, id, restore) {
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
     }
+    // A quantifier block starts out without its condition port, until a typecheck says what it is.
+    const entry = nodes.find(function (x) { return x.id === box.id; });
+    if(entry) { showCondition(entry, false); }
     return typecheck_now;
 }
 
@@ -2442,10 +2485,36 @@ function findEndpoint(el, sort, label) {
     });
 }
 
+// The quantifiers over ℝ₊ and [n] used to have blocks of their own, whose condition ports were
+// labeled by what the condition said.  A proof saved then is read as using the blocks every
+// quantifier shares now, with their condition ports.
+const LEGACY_QUANTIFIER_RULES = {
+    allposI: "allI", allposE: "allE", exposI: "exI", exposE: "exE",
+    allbelowI: "allI", allbelowE: "allE", exbelowI: "exI", exbelowE: "exE",
+};
+function modernizeProof(state) {
+    const renamed = {};
+    const nodes = (state.nodes || []).map(function (n) {
+        const rule = LEGACY_QUANTIFIER_RULES[n.rule];
+        if(!rule) { return n; }
+        renamed[n.id] = true;
+        return Object.assign({}, n, { rule: rule });
+    });
+    const port = function (p) {
+        return (p && renamed[p.vertex] && (p.label === "positive" || p.label === "below"))
+            ? Object.assign({}, p, { label: "condition" }) : p;
+    };
+    const connections = (state.connections || []).map(function (c) {
+        return Object.assign({}, c, { source: port(c.source), target: port(c.target) });
+    });
+    return Object.assign({}, state, { nodes: nodes, connections: connections });
+}
+
 // Rebuild the proof from a snapshot object (as produced by serializeProof), into the given
 // level (defaulting to the current one).  Shared by "Load" (from localStorage) and "Import"
 // (from pasted JSON).
 function restoreProof(state, level, countAsCompletion) {
+    state = modernizeProof(state);
     // Reset to a clean slate: re-select the target level (an explicit built-in level for an Import,
     // otherwise whatever is currently open, built-in or custom), recreating its fixed nodes and
     // Narya.  Skip the saved-proof prompt here: we're restoring a specific proof on purpose.
@@ -2721,6 +2790,8 @@ if (TEST_MODE) {
                 return {
                     vertex: n.id, sort: ep.parameters.sort, label: ep.parameters.label,
                     type: shown || n.node.dataset["label:" + ep.parameters.sort + ":" + ep.parameters.label],
+                    // A quantifier block's condition port is hidden while it has nothing to it.
+                    hidden: !!ep.parameters.hidden,
                 };
             })),
         // The localStorage key a level's completion is recorded under, by name.
@@ -4387,6 +4458,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                 if(!portLabels[key]) { portLabels[key] = label; }
             }
         });
+        // Each quantifier block shows its condition port if the condition has something to it.
+        showConditions(labels);
         // Write each case of a "natE" on the block itself: the upper half is where the discriminee
         // is 0, the lower where it is one more than the variable the block binds.  The match
         // refines the goal and the context of each branch without handing out an equation to wire
@@ -4465,7 +4538,7 @@ function continue_typechecking(nodes, edges, connections, result) {
                     // For output and assumption ports, we set the connector overlay for the port, so that new edges created will already drag out with the correct type.
                     const node = document.getElementById(label.loc.id);
                     instance.getEndpoints(node).forEach(function(endpoint) {
-                        if(endpoint.parameters.sort === label.loc.sort && endpoint.parameters.label === label.loc.label) {
+                        if(endpoint.parameters.sort === label.loc.sort && endpoint.parameters.label === label.loc.label && !endpoint.parameters.hidden) {
                             var cssClass = "connLabel";
                             var lbl = label.ty;
                             if(endpoint.parameters.hasValue && label.tm) { // or label.loc.hasValue?
@@ -4619,7 +4692,7 @@ function continue_typechecking(nodes, edges, connections, result) {
                             const node = document.getElementById(loc.id);
                             var ty = node.dataset["label:" + loc.sort + ":" + loc.label] || "?";
                             instance.getEndpoints(node).forEach(function (endpoint) {
-                                if(endpoint.parameters.sort === loc.sort && endpoint.parameters.label === loc.label) {
+                                if(endpoint.parameters.sort === loc.sort && endpoint.parameters.label === loc.label && !endpoint.parameters.hidden) {
                                     // Don't label ports that have an edge connected to them (that edge should get labeled instead)
                                     var hasEdge = false;
                                     instance.getConnections({target : node}).forEach(function(e) {

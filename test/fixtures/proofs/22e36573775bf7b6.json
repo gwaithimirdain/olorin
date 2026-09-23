@@ -103,7 +103,7 @@
     },
     {
       "id": "rule56",
-      "rule": "allbelowE",
+      "rule": "allE",
       "left": "377px",
       "top": "491px"
     },
@@ -273,7 +273,7 @@
       "target": {
         "vertex": "rule56",
         "sort": "input",
-        "label": "below"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

@@ -54,13 +54,13 @@
     },
     {
       "id": "rule37",
-      "rule": "exposI",
+      "rule": "exI",
       "left": "1140.72px",
       "top": "472px"
     },
     {
       "id": "rule38",
-      "rule": "exposE",
+      "rule": "exE",
       "left": "365.717px",
       "top": "389px",
       "names": [
@@ -139,7 +139,7 @@
       "source": {
         "vertex": "rule38",
         "sort": "output",
-        "label": "positive"
+        "label": "condition"
       },
       "target": {
         "vertex": "rule40",
@@ -155,7 +155,7 @@
       "target": {
         "vertex": "rule37",
         "sort": "input",
-        "label": "positive"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

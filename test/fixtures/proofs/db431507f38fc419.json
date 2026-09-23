@@ -43,7 +43,7 @@
     },
     {
       "id": "rule33",
-      "rule": "exposI",
+      "rule": "exI",
       "left": "895.717px",
       "top": "431px"
     },
@@ -111,7 +111,7 @@
       "target": {
         "vertex": "rule33",
         "sort": "input",
-        "label": "positive"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

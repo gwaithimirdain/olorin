@@ -30,7 +30,7 @@
     },
     {
       "id": "rule0",
-      "rule": "allbelowI",
+      "rule": "allI",
       "left": "369px",
       "top": "667px",
       "names": [
@@ -62,7 +62,7 @@
       "source": {
         "vertex": "rule0",
         "sort": "assumption",
-        "label": "below"
+        "label": "condition"
       },
       "target": {
         "vertex": "rule1",

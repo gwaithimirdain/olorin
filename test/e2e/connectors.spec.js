@@ -87,17 +87,11 @@ test.describe('A wire from a block back to itself', () => {
         expect(connectors(await olorin.serialize())).toEqual(['Straight']);
     });
 
-    test('is drawn straight from the condition port of a ∀x∈[n] block too', async ({ page }) => {
-        // That port has a label of its own ("below"), while the subgoal it reaches has none, so
+    test('is drawn straight from the condition port of a ∀ block too', async ({ page }) => {
+        // That port has a label of its own ("condition"), while the subgoal it reaches has none, so
         // matching the two labels isn't what says they belong together.
-        const allI = await dragBinder(page, 'allbelowI', 300, 100, 'z');
-        await olorin.connect({ vertex: allI, sort: 'assumption', label: 'below' }, { vertex: allI, sort: 'subgoal' });
-        expect(connectors(await olorin.serialize())).toEqual(['Straight']);
-    });
-
-    test('and from the condition port of a ∀x∈ℝ₊ block', async ({ page }) => {
-        const allI = await dragBinder(page, 'allposI', 300, 100, 'z');
-        await olorin.connect({ vertex: allI, sort: 'assumption', label: 'positive' }, { vertex: allI, sort: 'subgoal' });
+        const allI = await dragBinder(page, 'allI', 300, 100, 'z');
+        await olorin.connect({ vertex: allI, sort: 'assumption', label: 'condition' }, { vertex: allI, sort: 'subgoal' });
         expect(connectors(await olorin.serialize())).toEqual(['Straight']);
     });
 

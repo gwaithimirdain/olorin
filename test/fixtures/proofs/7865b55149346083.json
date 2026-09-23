@@ -43,7 +43,7 @@
     },
     {
       "id": "rule90",
-      "rule": "allbelowI",
+      "rule": "allI",
       "left": "429px",
       "top": "661px",
       "names": [
@@ -75,7 +75,7 @@
       "source": {
         "vertex": "rule90",
         "sort": "assumption",
-        "label": "below"
+        "label": "condition"
       },
       "target": {
         "vertex": "rule91",

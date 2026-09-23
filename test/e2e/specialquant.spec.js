@@ -1,9 +1,9 @@
 // The quantifiers over a set that isn't a type of its own: ∀x∈ℝ₊ / ∃x∈ℝ₊ over the positive reals,
-// and ∀x∈[n] / ∃x∈[n] over the whole numbers below n.  Their blocks carry the condition defining
-// the set -- 0<x, or x<n -- on a port of its own alongside the value port for x.  [n]'s elements
-// are naturals, so being at least 0 comes with the element rather than with the condition.  No
-// built-in level offers them yet, so these drive them on custom levels, whose palette holds every
-// rule.
+// and ∀x∈[n] / ∃x∈[n] over the whole numbers below n.  They use the same blocks as the plain
+// quantifiers, which carry the condition defining the set -- 0<x, or x<n -- on a port of its own
+// alongside the value port for x, shown only when the quantifier has such a condition.  [n]'s
+// elements are naturals, so being at least 0 comes with the element rather than with the
+// condition.  These drive them on custom levels, whose palette holds every rule.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -14,9 +14,9 @@ const FAMILIES = [
         parameters: 'P : ℝ → Type',
         variables: '',
         elementSet: 'ℝ',
-        condition: 'positive',
+        condition: 'condition',
         conditionOn: (v) => `0<${v}`,
-        rules: { allI: 'allposI', allE: 'allposE', exI: 'exposI', exE: 'exposE' },
+        rules: { allI: 'allI', allE: 'allE', exI: 'exI', exE: 'exE' },
         // A goal the algebra block can reach from the condition alone, to pin that the bound
         // variable is a number you can compute with.  `split` says the condition is a conjunction,
         // so it needs ∧-elimination before the algebra block, which takes only relations.
@@ -36,9 +36,9 @@ const FAMILIES = [
         parameters: 'P : ℕ → Type',
         variables: 'n ∈ ℕ',
         elementSet: 'ℕ',
-        condition: 'below',
+        condition: 'condition',
         conditionOn: (v) => `${v}<n`,
-        rules: { allI: 'allbelowI', allE: 'allbelowE', exI: 'exbelowI', exE: 'exbelowE' },
+        rules: { allI: 'allI', allE: 'allE', exI: 'exI', exE: 'exE' },
         // x < n forces 0 < n, using the condition and the 0 ≤ x that comes of x being a natural --
         // which the block is told, and which used to have to be half of the condition.
         arithmetic: { conclusion: '∀x∈[n],(0<n)' },
@@ -66,6 +66,13 @@ function portLabels(olorin) {
     return olorin.page.evaluate(() => Array.from(document.querySelectorAll(
         '#canvas .upperOutputLabel, #canvas .middleOutputLabel, #canvas .lowerOutputLabel'))
         .map((e) => e.innerText));
+}
+
+// The condition port of a block, as the diagram currently has it.
+async function conditionPort(olorin, vertex) {
+    await olorin.waitForTypecheck();
+    return (await olorin.page.evaluate(() => window.__olorin.ports()))
+        .find((p) => p.vertex === vertex && p.label === 'condition');
 }
 
 for (const f of FAMILIES) {
@@ -193,6 +200,58 @@ for (const f of FAMILIES) {
             expect(await olorin.isComplete()).toBe(true);
         });
 
+        test('show the condition port of a ∀ block once it is wired to such a goal', async ({ page }) => {
+            const olorin = new Olorin(page);
+            await olorin.open();
+            await olorin.buildCustom({
+                parameters: f.parameters,
+                variables: f.variables,
+                hypotheses: '',
+                conclusion: `∀y∈${f.set},P y`,
+            });
+            const intro = await dragBinder(olorin, allI, 500, 120, 'z');
+            // Until then, nothing says what the block quantifies over.
+            expect(await conditionPort(olorin, intro)).toMatchObject({ hidden: true });
+            await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+            expect(await conditionPort(olorin, intro)).toMatchObject({ hidden: false, type: f.conditionOn('z') });
+        });
+
+        test('and leaving the condition of an elimination empty is an unfinished proof', async ({ page }) => {
+            const olorin = new Olorin(page);
+            await olorin.open();
+            const { intro, elim } = await universalLevel(olorin);
+            await olorin.connect({ vertex: intro, sort: 'assumption' }, { vertex: elim, sort: 'input', label: 'element' });
+            await olorin.connect({ vertex: elim, sort: 'output' }, { vertex: intro, sort: 'subgoal' });
+            expect(await olorin.isComplete()).toBe(false);
+            expect(await conditionPort(olorin, elim)).toMatchObject({ hidden: false });
+            // The empty port is what's said to be missing.
+            const holes = (await olorin.diagnostics()).flatMap((d) => d.locs)
+                .filter((l) => !l.isEdge && l.id === elim && l.label === 'condition');
+            expect(holes.length).toBeGreaterThan(0);
+        });
+
+        test('load a proof saved when they had blocks of their own', async ({ page }) => {
+            const olorin = new Olorin(page);
+            await olorin.open();
+            const boxes = await universalLevel(olorin);
+            await wireUniversal(olorin, boxes);
+            const state = await olorin.serialize();
+            // What the proof looked like then: blocks named for the set, with the condition port
+            // named for what it said.
+            const old = f.set === 'ℝ₊'
+                ? { rules: { allI: 'allposI', allE: 'allposE' }, label: 'positive' }
+                : { rules: { allI: 'allbelowI', allE: 'allbelowE' }, label: 'below' };
+            state.nodes.forEach((n) => { n.rule = old.rules[n.rule] || n.rule; });
+            state.connections.forEach((c) => {
+                for (const end of [c.source, c.target]) {
+                    if (end.label === 'condition') { end.label = old.label; }
+                }
+            });
+            await olorin.restore(state);
+            expect(await olorin.isComplete()).toBe(true);
+            expect((await olorin.nodes()).map((n) => n.rule)).toEqual(expect.arrayContaining(['allI', 'allE']));
+        });
+
         test('survive a save and restore, keeping the variable each block binds', async ({ page }) => {
             const olorin = new Olorin(page);
             await olorin.open();
@@ -235,4 +294,71 @@ test('and padding it does not smuggle it past that check', async ({ page }) => {
     expect(await check(' 9')).toBe(false);
     // Padding an ordinary name is just padding, though: the name it spells is a fine one.
     expect(await check(' z ')).toBe(true);
+});
+
+// A plain quantifier ranges over a whole type, so its condition is the trivial ⊤: the blocks never
+// show the port for it, and the proof goes through without it.
+test.describe('Quantifiers over a type', () => {
+    test('∀ needs no condition, and its blocks show no port for one', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: 'P : ℝ → Type',
+            variables: '',
+            hypotheses: '∀x∈ℝ,P x',
+            conclusion: '∀y∈ℝ,P y',
+        });
+        const intro = await dragBinder(olorin, 'allI', 500, 120, 'z');
+        const elim = await olorin.dragRule('allE', 250, 350);
+        await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: elim, sort: 'input', label: 'universal' });
+        await olorin.connect({ vertex: intro, sort: 'assumption' }, { vertex: elim, sort: 'input', label: 'element' });
+        await olorin.connect({ vertex: elim, sort: 'output' }, { vertex: intro, sort: 'subgoal' });
+        expect(await olorin.isComplete()).toBe(true);
+        expect(await conditionPort(olorin, intro)).toMatchObject({ hidden: true });
+        expect(await conditionPort(olorin, elim)).toMatchObject({ hidden: true });
+    });
+
+    test('nor does ∃', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: 'P : ℝ → Type',
+            variables: '',
+            hypotheses: '∃x∈ℝ,P x',
+            conclusion: '∃y∈ℝ,P y',
+        });
+        const elim = await dragBinder(olorin, 'exE', 250, 100, 'e');
+        const intro = await olorin.dragRule('exI', 550, 300);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: elim, sort: 'input' });
+        await olorin.connect({ vertex: elim, sort: 'output', label: 'element' }, { vertex: intro, sort: 'input', label: 'element' });
+        await olorin.connect({ vertex: elim, sort: 'output', label: 'property' }, { vertex: intro, sort: 'input', label: 'property' });
+        await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        expect(await olorin.isComplete()).toBe(true);
+        expect(await conditionPort(olorin, elim)).toMatchObject({ hidden: true });
+        expect(await conditionPort(olorin, intro)).toMatchObject({ hidden: true });
+    });
+
+    test('and a ∀-introduction wired straight into a ∀-elimination needs none either', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        await olorin.buildCustom({
+            parameters: 'P : ℝ → Type',
+            variables: 'a ∈ ℝ',
+            hypotheses: '∀x∈ℝ,P x',
+            conclusion: 'P a',
+        });
+        const nodes = await olorin.nodes();
+        const a = nodes.find((n) => n.name === 'a').id;
+        const intro = await dragBinder(olorin, 'allI', 500, 120, 'z');
+        const inner = await olorin.dragRule('allE', 300, 350);
+        const outer = await olorin.dragRule('allE', 700, 350);
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: inner, sort: 'input', label: 'universal' });
+        await olorin.connect({ vertex: intro, sort: 'assumption' }, { vertex: inner, sort: 'input', label: 'element' });
+        await olorin.connect({ vertex: inner, sort: 'output' }, { vertex: intro, sort: 'subgoal' });
+        await olorin.connect({ vertex: intro, sort: 'output' }, { vertex: outer, sort: 'input', label: 'universal' });
+        await olorin.connect({ vertex: a, sort: 'output' }, { vertex: outer, sort: 'input', label: 'element' });
+        await olorin.connect({ vertex: outer, sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        expect(await olorin.isComplete()).toBe(true);
+    });
 });

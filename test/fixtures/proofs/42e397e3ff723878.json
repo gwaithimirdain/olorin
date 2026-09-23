@@ -30,7 +30,7 @@
     },
     {
       "id": "rule46",
-      "rule": "allposI",
+      "rule": "allI",
       "left": "421px",
       "top": "558px",
       "names": [
@@ -121,7 +121,7 @@
       "source": {
         "vertex": "rule46",
         "sort": "assumption",
-        "label": "positive"
+        "label": "condition"
       },
       "target": {
         "vertex": "rule49",

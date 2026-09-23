@@ -78,7 +78,7 @@
     },
     {
       "id": "rule35",
-      "rule": "allbelowE",
+      "rule": "allE",
       "left": "317px",
       "top": "239px"
     },
@@ -252,7 +252,7 @@
       "target": {
         "vertex": "rule35",
         "sort": "input",
-        "label": "below"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

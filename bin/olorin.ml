@@ -149,6 +149,23 @@ end
 
 module RequireScoping = Algaeff.Reader.Make (Scoping)
 
+(* An empty optional input port (see Rules.input) is a hole only if what it asks for turns out not
+   to be ⊤, and that isn't known until the term is typechecked.  So unlike the hole in an empty
+   required port, which is reported as soon as it is put in the term, this one is reported only if
+   typechecking actually reached it: Narya numbers a hole when it checks one, so each such hole is
+   collected here with a number that starts out invalid, to be reported by report_optional_holes
+   once the term containing it has been checked.  Whoever builds a term supplies the list to collect
+   into. *)
+module Optional_holes = Algaeff.Reader.Make (struct
+  type t = (int ref * Asai.Range.t) list ref
+end)
+
+let report_optional_holes (holes : (int ref * Asai.Range.t) list ref) =
+  (* Each is reported once, however many times its term is checked. *)
+  let reached, unreached = List.partition (fun (num, _) -> !num >= 0) !holes in
+  holes := unreached;
+  List.iter (fun (_, loc) -> emit ~loc (No_holes_allowed (`File "graphical proof"))) reached
+
 (* Record a port the resolver couldn't place, in whichever list the caller is collecting into. *)
 let note_ill_scoped (ill_scoped : Port.t list ref) (x : index) =
   match x with
@@ -415,14 +432,21 @@ let take_name (named : bool) (names : string list) : string option * string list
    the names left over are returned for the step after this one.  'used' is what the term being
    matched depends on, which is what decides when the match has to be wrapped around a body. *)
 let destruct_step (source : Port.t) (names : string list) (constr : Constr.t)
-    (outputs : (bool * string) list) (tm : unit Named.synth located) ~(used : PortSet.t)
+    (outputs : (bool * string option) list) (tm : unit Named.synth located) ~(used : PortSet.t)
     (bindables : Bindables.t) (variables : PortSet.t) :
     string list * name list * Bindables.t * PortSet.t =
   let leftover, ports =
     List.fold_left_map
       (fun names (named, label) : (string list * name) ->
         let name, names = take_name named names in
-        (names, { name; port = Some { source with sort = Output; label = Some label } }))
+        ( names,
+          {
+            name;
+            port =
+              Option.map
+                (fun label : Port.t -> { source with sort = Output; label = Some label })
+                label;
+          } ))
       names outputs in
   let (Wrap vars) = Vec.of_list ports in
   let vars = namevec_of_vec vars in
@@ -624,10 +648,14 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
       | Constr { inputs; constr } ->
           let bindables, variables, args =
             List.fold_right
-              (fun label (bindables, variables, args) ->
+              (fun input (bindables, variables, args) ->
                 let tm, newvars =
                   check_of_input_port ~seen vertices graph
-                    { source with sort = Input; label = Some label } in
+                    ~optional:
+                      (match input with
+                      | Optional _ -> `Check
+                      | Required _ -> `No)
+                    { source with sort = Input; label = Some (input_label input) } in
                 ( Bindables.union bindables tm.value.bindables,
                   PortSet.union variables newvars,
                   locate_opt tm.loc tm.value.term :: args ))
@@ -643,32 +671,41 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
              project_struct.  Either way we don't use the head's locations for annotations, because
              we don't want wires to be labeled by types like P→Q instead of P⇒Q -- but we do keep
              them for errors, so that a wire carrying the wrong sort of thing is colored. *)
-          let head, fn_bindables =
+          let redex, head, fn_bindables =
             match
               Option.bind field (fun (fld, pbij) ->
                   if pbij = [] then project_struct fld (locate_opt fn.loc fn.value.term) else None)
             with
             | Some body ->
                 let newlocs, _ = Loc.locs_and_content false fn.loc in
-                (Loc.append_to_loc ~annote:false body newlocs, fn.value.bindables)
+                (true, Loc.append_to_loc ~annote:false body newlocs, fn.value.bindables)
             | None -> (
                 let fn, fn_bindables = ensure_synth fn "function" in
                 match field with
                 (* We locate the projected function, so that we can locate errors like when the wire connected to the function port isn't a function. *)
                 | Some fld ->
-                    ( named_synth
+                    ( false,
+                      named_synth
                         (locate_opt (Loc.non_annotating fn.loc) (Named.Field (fn, `Name fld, None))),
                       fn_bindables )
-                | None -> (named_synth fn, fn_bindables)) in
-          (* Apply it to each argument port in turn. *)
+                | None -> (false, named_synth fn, fn_bindables)) in
+          (* Apply it to each argument port in turn.  An empty optional one is ⊤ if that's what the
+             function wants.  But in a redex the arguments must synthesize, since they are all
+             there is to say what the variables of the abstraction are, so there it is ⊤ outright:
+             a player who meant the abstraction to have a condition to it will have wired one in. *)
           let bindables, variables, tm =
             List.fold_left
-              (fun (bindables, variables, (tm : unit Named.check located)) label ->
+              (fun (bindables, variables, (tm : unit Named.check located)) input ->
                 let ( ({ value = { bindables = arg_bindables; term = argtm }; loc = argloc } :
                         term_with_bindables located),
                       arg_variables ) =
                   check_of_input_port ~seen vertices graph
-                    { source with sort = Input; label = Some label } in
+                    ~optional:
+                      (match (input, redex) with
+                      | Optional _, false -> `Check
+                      | Optional _, true -> `Synth
+                      | Required _, _ -> `No)
+                    { source with sort = Input; label = Some (input_label input) } in
                 ( Bindables.union bindables arg_bindables,
                   PortSet.union variables arg_variables,
                   locate_opt None
@@ -885,7 +922,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           in
           let tm, bindables = ensure_synth tm "coconstr input" in
           destruct_constr source source_vertex.names
-            [ Open (constr, outputs) ]
+            [ Open (constr, List.map (fun (named, label) -> (named, Some label)) outputs) ]
             tm bindables variables
       | Asc ->
           let tm, variables =
@@ -1096,8 +1133,8 @@ and vars_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : 
   go Bindables.empty PortSet.empty (Option.value (TargetMap.find_opt port graph) ~default:[])
 
 (* If we're given an input port instead of an output one, we follow the edge attached to it, if any. *)
-and check_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : bwd_graph)
-    (port : Port.t) : term_with_bindables located * PortSet.t =
+and check_of_input_port ?(optional = `No) ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t)
+    (graph : bwd_graph) (port : Port.t) : term_with_bindables located * PortSet.t =
   match TargetMap.find_opt port graph with
   | Some [ e ] ->
       (* If there is an edge, we get a term from its source port. *)
@@ -1108,6 +1145,40 @@ and check_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph :
       let tm = ascribe_with_user_label tm e in
       (tm, variables)
   | Some _ -> raise (Jserror "unexpected multiple edges")
+  (* An empty optional port supplies ⊤ itself (see Rules.input): as the element of ⊤ where that is
+     what's wanted, and otherwise the hole of an empty port, reported only if it is reached; or, where
+     the term has to synthesize, as the element of ⊤ with its type ascribed. *)
+  | None when optional <> `No ->
+      let loc = Loc.make [ `Port port ] in
+      let top = Named.Struct (Eta, Emp) in
+      let term =
+        match optional with
+        | `Synth ->
+            Named.Synth
+              (Named.Asc
+                 ( locate_opt None top,
+                   locate_opt None (Named.Synth (Const (Scope.lookup [ "⊤" ] <||> "⊤ not found")))
+                 ))
+        | _ ->
+            let num = ref (-1) in
+            let holes = Optional_holes.read () in
+            holes := (num, loc) :: !holes;
+            Named.First
+              [
+                (`Codata [], top, true);
+                ( `Any,
+                  Realize
+                    (Hole
+                       {
+                         scope = ();
+                         loc;
+                         li = Interval No.Interval.entire;
+                         ri = Interval No.Interval.entire;
+                         num;
+                       }),
+                  false );
+              ] in
+      (locate loc (without_bindables term), PortSet.empty)
   | None ->
       (* If there isn't an edge, then we return a hole.  We force it to be a leaf of the case tree, so it will be displayed as ? rather than an _UNNAMED_CONSTANT. *)
       let loc = Loc.make [ `Port port ] in
@@ -1266,6 +1337,7 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
      accumulate fresh scopes/contexts, and trying every one of those against every port on every
      pass blows up super-exponentially and freezes the browser. *)
   let cyclic = ref false in
+  let optional_holes = ref [] in
   (* Which ports were out of scope in every scope we tried (`None` until the first attempt): a port
      that some scope did resolve isn't what's holding this fragment up, so it isn't one to cut. *)
   let always_ill_scoped : Port.t list option ref = ref None in
@@ -1293,7 +1365,9 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
             cyclic := true;
             Diagnostic.add scoping_diagnostics true d
         | _ -> emit_diagnostic d)
-    @@ fun () -> check_of_output_port ~seen:IdSet.empty vertices bwd_graph ~edge:None p in
+    @@ fun () ->
+    Optional_holes.run ~env:optional_holes @@ fun () ->
+    check_of_output_port ~seen:IdSet.empty vertices bwd_graph ~edge:None p in
   (* A cyclic term is invalid in any scope, and cutting an out-of-scope wire wouldn't help. *)
   if !cyclic then `No_scope (scoping_diagnostics, [])
   else
@@ -1436,6 +1510,7 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
           ( run @@ fun () ->
             let _ = Check.synth status ctx stm in
             () );
+          report_optional_holes optional_holes;
           (* And we report scoping success, along with any hole diagnostics created. *)
           true
       (* If parsing succeeds but does not produce a synthesizing term, we still report success, since the wires may be connected correctly but we just don't have enough information to typecheck. *)
@@ -1839,13 +1914,16 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
            the whole check: the disconnected fragments below still get synthesized, so their ports
            and wires keep their labels.  Emitted (non-fatal) diagnostics pass on out to the handler
            installed above. *)
+        let optional_holes = ref [] in
         let fatal_error =
           Reporter.try_with ~fatal:(fun d ->
               Diagnostic.add diagnostics true d;
               true)
           @@ fun () ->
           (* Starting from the conclusion, turn the graph into a raw term with named variables. *)
-          let conclusion_ntm = bind (check_of_graph vertices bwd_graph) in
+          let conclusion_ntm =
+            Optional_holes.run ~env:optional_holes @@ fun () ->
+            bind (check_of_graph vertices bwd_graph) in
           (* Then resolve it into one with De Bruijn indices. *)
           let conclusion_tm =
             RequireScoping.run ~env:{ bail_out = false; ill_scoped = ref [] } @@ fun () ->
@@ -1859,6 +1937,8 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
             () );
           (* Therefore, if checking "succeeded", but produced holes, we consider it a fatal error because the term is not complete. *)
           Global.unsolved_holes () > 0 in
+        (* Whether or not it went through, the empty optional ports that checking reached are holes. *)
+        report_optional_holes optional_holes;
         (* We go through the port list repeatedly until no more progress is made, bounded to one pass
            per port as a termination safeguard (see synth_output_ports). *)
         let ports =

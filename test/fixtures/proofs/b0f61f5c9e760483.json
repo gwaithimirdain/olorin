@@ -84,7 +84,7 @@
     },
     {
       "id": "rule19",
-      "rule": "allbelowE",
+      "rule": "allE",
       "left": "733px",
       "top": "613px"
     },
@@ -133,7 +133,7 @@
       "target": {
         "vertex": "rule19",
         "sort": "input",
-        "label": "below"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

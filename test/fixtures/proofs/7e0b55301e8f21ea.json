@@ -129,7 +129,7 @@
     },
     {
       "id": "rule8",
-      "rule": "allbelowE",
+      "rule": "allE",
       "left": "1010px",
       "top": "261px"
     },
@@ -457,7 +457,7 @@
       "target": {
         "vertex": "rule8",
         "sort": "input",
-        "label": "below"
+        "label": "condition"
       },
       "connector": "Bezier"
     },

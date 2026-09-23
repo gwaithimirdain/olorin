@@ -16,7 +16,7 @@ open Objects
 
 let carp str = Js_of_ocaml.Console.console##log (Js.string str)
 
-(* Olorin is designed to look to the user like first-order logic.  This file sets up the definitions and notations to maintain that illusion.  Here is Narya code that defines the basic operations of first-order logic, using untruncated propositions-as-types.  This will be the startup code.  We define implication, negation, and universal quantification to be records rather than simple function-types so that we can distinguish them (e.g. so that the prove-if-then rule can't also be used to prove-forall) and given them distinct notations.  Definitions that can't be checked here, because they depend on something that install_notations sets up (such as the subtyping relations between the number types), go in secondary_startup at the bottom of this file instead.  *)
+(* Olorin is designed to look to the user like first-order logic.  This file sets up the definitions and notations to maintain that illusion.  Here is Narya code that defines the basic operations of first-order logic, using untruncated propositions-as-types.  This will be the startup code.  We define implication, negation, and universal quantification to be records rather than simple function-types so that we can distinguish them (e.g. so that the prove-if-then rule can't also be used to prove-forall) and given them distinct notations.  Every quantifier carries a condition on the variable it binds, alongside the variable itself: the one defining the set it quantifies over, for the sets that aren't types of their own (see forallpos below), and the trivial ⊤ for a plain ∀ or ∃, which ranges over a whole type.  That way all the quantifiers have the same shape, with the same field or constructor, so one block works for all of them.  Definitions that can't be checked here, because they depend on something that install_notations sets up (such as the subtyping relations between the number types), go in secondary_startup at the bottom of this file instead.  *)
 
 let startup =
   "def land (P Q : Type) : Type ≔ sig ( fst : P, snd : Q )
@@ -27,8 +27,8 @@ def ⊤ : Type ≔ sig ( )
 def ⊥ : Type ≔ data [ ]
 def neg (P : Type) : Type ≔ sig ( negation : P → ⊥ )
 def contradict (P : Type) (p : P) (np : neg P) : ⊥ ≔ np .negation p
-def forall (A : Type) (P : A → Type) : Type ≔ sig ( forall : (x : A) → P x )
-def exists (A : Type) (P : A → Type) : Type ≔ data [ exists. (element : A) (property : P element) ]
+def forall (A : Type) (P : A → Type) : Type ≔ sig ( forall : (x : A) → ⊤ → P x )
+def exists (A : Type) (P : A → Type) : Type ≔ data [ exists. (element : A) (condition : ⊤) (property : P element) ]
 def prod (A B : Type) : Type ≔ sig ( fst : A, snd : B )
 def coprod (A B : Type) : Type ≔ data [ left. (_:A) | right. (_:B) ]
 axiom negneg (P : Type) : neg (neg P) → P
@@ -168,17 +168,18 @@ axiom 𝕊.sqrt : 𝕊 → 𝕊
 
 {` Quantification over the positive reals.  R+ is not a type of its own -- it is a token of the
 notations for its quantifiers -- so these get constants of their own, taking only the predicate.
-Their field and constructor carry the defining condition 0<x alongside x itself, which is what the
-positive quantifier blocks put on a port of their own. `}
-def forallpos (P : ℝ → Type) : Type ≔ sig ( forallpos : (x : ℝ) → ℝ.lt 0 x → P x )
-def existspos (P : ℝ → Type) : Type ≔ data [ existspos. (element : ℝ) (positive : ℝ.lt 0 element) (property : P element) ]
+Their field and constructor are those of the plain quantifiers, with the defining condition 0<x in
+place of the trivial one, so the quantifier blocks work on them unchanged and put it on their
+condition port. `}
+def forallpos (P : ℝ → Type) : Type ≔ sig ( forall : (x : ℝ) → ℝ.lt 0 x → P x )
+def existspos (P : ℝ → Type) : Type ≔ data [ exists. (element : ℝ) (condition : ℝ.lt 0 element) (property : P element) ]
 
 {` Likewise quantification over [n], the whole numbers below some n, which n is written out of and
 so is a parameter of these definitions as well as of their notations.  Their elements are naturals,
 cut down by (x<n) alone: being a natural is already being at least 0, and says so to an algebra
 block without being carried around as half of the condition. `}
-def forallbelow (n : ℕ) (P : ℕ → Type) : Type ≔ sig ( forallbelow : (x : ℕ) → ℕ.lt x n → P x )
-def existsbelow (n : ℕ) (P : ℕ → Type) : Type ≔ data [ existsbelow. (element : ℕ) (below : ℕ.lt element n) (property : P element) ]
+def forallbelow (n : ℕ) (P : ℕ → Type) : Type ≔ sig ( forall : (x : ℕ) → ℕ.lt x n → P x )
+def existsbelow (n : ℕ) (P : ℕ → Type) : Type ≔ data [ exists. (element : ℕ) (condition : ℕ.lt element n) (property : P element) ]
 
 axiom ℕ.induction (P : ℕ → Type) (step : (n : ℕ) (IH : forallbelow n (k ↦ P k)) → P n) : forall ℕ P
 
@@ -309,7 +310,8 @@ let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
    are worth quantifying over aren't types of their own: ℝ₊, the positive reals, and [n], the whole
    numbers below n.  These are written as part of the notation instead, either as a bare token or
    as a pair of tokens with a term between them, and each has a constant of its own whose field or
-   constructor carries the condition defining the set -- 0<x, or x<n -- alongside x itself.
+   constructor -- the same one as the plain quantifier's -- carries the condition defining the set,
+   0<x or x<n, where the plain quantifier's carries the trivial ⊤.
    A set with a term inside it hands that term to its constant as a first argument. *)
 type special_set = Bare of Token.t | Bracketed of Token.t * Token.t
 
