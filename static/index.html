@@ -101,7 +101,7 @@
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr" title="Write an arithmetic expression for a blue value port: wire it to every variable the expression uses, and double-click to change it">expr</div>
         <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg" title="Prove an equation or inequality by algebra, from the ones wired into it">alg</div>
         <div class="basic logical rule" style="text-align: center" id="algneq" data-rule="algneq" title="Prove an equation, inequality, or disequality by algebra, from the ones wired into it">alg</div>
-        <div class="basic logical rule" style="text-align: center" id="algplus" data-rule="algplus" title="Prove an equation, inequality, or conjunction (∧) and disjunction (∨) of such, by algebra, from the equations, inequalities, or conjunctions of such wired into it.  Handles absolute value, min, and max without explicit case analysis.">alg+</div>
+        <div class="basic logical rule" style="text-align: center" id="algplus" data-rule="algplus" title="Prove an equation, inequality, or conjunction (∧) and disjunction (∨) of such, by algebra, from the equations, inequalities, or conjunctions of such wired into it.  Handles absolute value, min, and max without explicit case analysis.">alg</div>
         <div class="basic logical rule" style="text-align: center; font-size: 12px" id="integral" data-rule="integral" title="Use x·y=0: give two numbers and a proof that their product is zero, and get that one of them is zero">?·?=0</div>
         <div class="basic logical rule" style="text-align: center" id="deceq" data-rule="deceq" title="Split into cases on two numbers x and y: get that either x=y or x≠y">=∨≠</div>
         <div class="basic logical rule" style="text-align: center" id="tord" data-rule="tord" title="Split into cases on two numbers x and y: get that either x≤y or y&lt;x">≤∨&gt;</div>
@@ -699,12 +699,12 @@
           We say a surreal number is "finite" if its absolute value is less than some real number.
         </p>
         <p>
-          For convenience, we introduce here an enhanced algebra block "alg+" which can automatically deal with absolute values.
-          When "alg+" is available, there's no need to manually break up into cases in order to draw conclusions about absolute values.
+          For convenience, we enhance the algebra block to automatically deal with absolute values.
+          Thus, there's now no need to manually break up into cases in order to draw conclusions about absolute values.
           But you should continue to write out all the necessary algebra steps on paper!
         </p>
         <p>
-          The "alg+" block can also automatically handle ∧s in its inputs and outputs, and ∨s in its outputs.
+          The enhanced algebra block can also automatically handle ∧s in its inputs and outputs, and ∨s in its outputs.
           In particular, it subsumes the blocks "=∨≠", "?·?=0", and "≤∨>", all of which simply provide "algebraic facts" involving ∨.
         </p>
       </div>
@@ -731,12 +731,13 @@
         </p>
         <p>
           We write ℝ₊ to mean the set of positive real numbers.
-          For convenience, when the ∀ and ∃ blocks quantify over ℝ₊, they require or supply a proof of positivity along with the real number, on a port of its own.  We also introduce an enhanced algebra block "alg+" which can automatically deal with absolute values.
-          When "alg+" is available, there's no need to manually break up into cases in order to draw conclusions about absolute values.
+          For convenience, when the ∀ and ∃ blocks quantify over ℝ₊, they require or supply a proof of positivity along with the real number, on a port of its own.
+          We also enhance the algebra block so it can automatically deal with absolute values.
+          Thus, there's now no need to manually break up into cases in order to draw conclusions about absolute values.
           But you should continue to write out all the necessary algebra steps on paper!
         </p>
         <p>
-          The "alg+" block can also automatically handle ∧s in its inputs and outputs, and ∨s in its outputs.
+          The enhanced algebra block can also automatically handle ∧s in its inputs and outputs, and ∨s in its outputs.
           In particular, it subsumes the blocks "=∨≠", "?·?=0", and "≤∨>", all of which simply provide "algebraic facts" involving ∨.
         </p>
       </div>
@@ -947,7 +948,7 @@
       </div>
       <div id="archimedeanHint" class="modal hint" style="width: 600px">
         The block "Arch" supplies the "Archimedean property": that for any real number there is a natural number greater than it.
-        Remember also that the "alg+" block can automatically prove equations and inequalities involving absolute values.
+        Remember also that the enhanced algebra block can automatically prove equations and inequalities involving absolute values.
         (Although, as always, you should write out the algebra parts of your proofs explicitly on paper.)
       </div>
       <div id="divergenceHint" class="modal hint" style="width: 600px">
