@@ -434,14 +434,12 @@ let poly_scale c (ms, k) = (List.map (fun (m, d) -> (m, Q.mul c d)) ms, Q.mul c 
 let poly_add (ms1, k1) (ms2, k2) = (ms1 @ ms2, Q.add k1 k2)
 
 let poly_mul (ms1, k1) (ms2, k2) =
-  let cross =
-    List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, Q.mul c d)) ms2) ms1 in
+  let cross = List.concat_map (fun (a, c) -> List.map (fun (b, d) -> (a @ b, Q.mul c d)) ms2) ms1 in
   let left = if Q.equal k2 Q.zero then [] else List.map (fun (a, c) -> (a, Q.mul c k2)) ms1 in
   let right = if Q.equal k1 Q.zero then [] else List.map (fun (b, d) -> (b, Q.mul d k1)) ms2 in
   (cross @ left @ right, Q.mul k1 k2)
 
-let poly_ok (ms, k) =
-  List.length ms <= max_terms && Q.leq (degree (ms, k)) (Q.of_int max_exponent)
+let poly_ok (ms, k) = List.length ms <= max_terms && Q.leq (degree (ms, k)) (Q.of_int max_exponent)
 
 let rec poly_form tm =
   let atom = ([ ([ tm ], Q.one) ], Q.zero) in
@@ -495,7 +493,6 @@ let rec poly_form tm =
           | Zero, Some a -> unary (fun p -> add p ([], Q.one)) a
           | _ -> atom)
       | _ -> atom)
-
 
 (* How a base is built up multiplicatively, which is what says how a power of it comes apart (see
    factor_base).  The named small powers are powers like any other here, so that "(x²)^n" is the
@@ -585,8 +582,8 @@ let var_for ctx ty tm : (Symbolic.t * bool) S.t =
   match Bwd.find_index same vars with
   | None ->
       let* () =
-        S.put
-          { st with vars = Snoc (vars, Term { tm; ty = Lazy.from_val ty }); count = count + 1 } in
+        S.put { st with vars = Snoc (vars, Term { tm; ty = Lazy.from_val ty }); count = count + 1 }
+      in
       return (`Var count, true)
   | Some i -> return (`Var (count - i - 1), false)
 
@@ -760,8 +757,7 @@ let get_poly ctx ty tm =
         let* () = S.put { st with ties = Snoc (st.ties, power) } in
         let* f = fun_for `Pow 2 in
         let bp : Symbolic.t = `App (f, [ b; a ]) in
-        add_step
-          (Define [ (`Eq, pow power (Z.to_int (Q.den e)), pow bp (Z.to_int (Q.num e))) ])
+        add_step (Define [ (`Eq, pow power (Z.to_int (Q.den e)), pow bp (Z.to_int (Q.num e))) ])
     | _ -> return ()
   (* A power of an absolute value, said to be the absolute value of the power: ∣u∣^a is ∣u^a∣ for
      a whole a, without which ∣x∣^(2·n) and (x²)^n would be unrelated symbols.  Said once for each
@@ -786,8 +782,10 @@ let get_poly ctx ty tm =
   and build_powers tmty base acc = function
     | [] -> return acc
     (* One to any power is one, which no uninterpreted symbol would say. *)
-    | _ :: rest when (match base with `Const q -> Q.equal q Q.one | _ -> false) ->
-        build_powers tmty base acc rest
+    | _ :: rest
+      when match base with
+           | `Const q -> Q.equal q Q.one
+           | _ -> false -> build_powers tmty base acc rest
     | (a, c, nat) :: rest ->
         let* f = fun_for `Pow 2 in
         let p : Symbolic.t = `App (f, [ base; a ]) in
@@ -1012,9 +1010,7 @@ let get_poly ctx ty tm =
               when Z.equal (Q.den k) Z.one
                    && Z.fits_int (Q.num k)
                    && List.for_all (fun (_, c, _) -> Z.equal (Q.den c) Z.one) atoms
-                   && List.fold_left
-                        (fun s (_, c, _) -> s + abs (Z.to_int (Q.num c)))
-                        0 atoms
+                   && List.fold_left (fun s (_, c, _) -> s + abs (Z.to_int (Q.num c))) 0 atoms
                       + abs (Z.to_int (Q.num k))
                       <= max_exponent ->
                 let atoms =
@@ -1237,8 +1233,8 @@ let get_poly ctx ty tm =
        gives a branch about "suc x" where the arithmetic says x+1 -- and it is that number, so we
        read it as that.  A numeral is folded to a constant by 'opaque' as it always was, and only
        reaches here with something other than a numeral inside it. *)
-    | Constr (name, dim, [ arg ])
-      when name = Constr.intern "suc" && Option.is_none (get_posint tm) -> (
+    | Constr (name, dim, [ arg ]) when name = Constr.intern "suc" && Option.is_none (get_posint tm)
+      -> (
         match (D.compare_zero dim, get_constr_arg arg) with
         | Zero, Some a ->
             let* pa = go ty a in
@@ -1271,8 +1267,7 @@ let get_poly ctx ty tm =
                 | None -> return (`Neg x))
         | "square" -> unary (fun x -> anchor_literal x 2 (`Times (x, x)))
         | "cube" -> unary (fun x -> anchor_literal x 3 (`Times (`Times (x, x), x)))
-        | "fourth" ->
-            unary (fun x -> anchor_literal x 4 (`Times (`Times (x, x), `Times (x, x))))
+        | "fourth" -> unary (fun x -> anchor_literal x 4 (`Times (`Times (x, x), `Times (x, x))))
         | _ -> opaque ty tm)
     | _ -> opaque ty tm in
   go ty tm
@@ -1310,10 +1305,11 @@ let anchors funs funcount powbases litpows relations =
       let f = funcount - i - 1 in
       let lengths =
         List.sort_uniq compare
-          (0 :: 1
-           :: List.concat_map
-                (fun (_, lhs, rhs) -> product_lengths lhs @ product_lengths rhs)
-                relations) in
+          (0
+          :: 1
+          :: List.concat_map
+               (fun (_, lhs, rhs) -> product_lengths lhs @ product_lengths rhs)
+               relations) in
       let lengths = List.filter (fun c -> c <= max_exponent) lengths in
       List.concat_map
         (fun b ->
@@ -1500,8 +1496,7 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
            itself, which saves asking Z3 about the likes of 2^n at all. *)
         (* What the tower of powers comes to, where the hypotheses make its base positive. *)
         | Tower { bases; written; product } :: rest ->
-            let positive =
-              List.for_all (fun b -> unsat ((`Le, b, `Const Q.zero) :: facts)) bases in
+            let positive = List.for_all (fun b -> unsat ((`Le, b, `Const Q.zero) :: facts)) bases in
             let facts = if positive then (`Eq, written, product) :: facts else facts in
             discharge facts rest
         (* What the power is where a hypothesis says outright what its exponent is, which costs
@@ -1558,8 +1553,8 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
             | _ -> None)
           (Bwd.to_list steps) in
       let anchors =
-        anchors funs funcount powbases litpows
-          (List.concat goals @ givens @ List.concat defined) in
+        anchors funs funcount powbases litpows (List.concat goals @ givens @ List.concat defined)
+      in
       let* facts = discharge (anchors @ givens) (Bwd.to_list steps) in
       (* Each conjunct of the goal is then a question of its own, asked against all the hypotheses.  We
      negate it, since Z3 checks for satisfiability; that means negating the operator and also
