@@ -1,0 +1,267 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "h",
+        "ty": "ℕ→ℕ"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "h(0)=1"
+      },
+      {
+        "ty": "∀n∈ℕ,(h(n+1)=h(n)·(n+1)/(n+2))"
+      }
+    ],
+    "conclusion": {
+      "ty": "∀n∈ℕ,(h(n)=1/(n+1))"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 13,
+    "paramCounter": 3,
+    "varCounter": 0,
+    "hypCounter": 6,
+    "conclCounter": 3
+  },
+  "nodes": [
+    {
+      "id": "hyp4",
+      "rule": "hypothesis",
+      "left": "175px",
+      "top": "21px",
+      "value": "h(0)=1"
+    },
+    {
+      "id": "hyp5",
+      "rule": "hypothesis",
+      "left": "35px",
+      "top": "278px",
+      "value": "∀n∈ℕ,(h(n+1)=h(n)·(n+1)/(n+2))"
+    },
+    {
+      "id": "concl2",
+      "rule": "conclusion",
+      "left": "1285px",
+      "top": "852px",
+      "value": "∀n∈ℕ,(h(n)=1/(n+1))"
+    },
+    {
+      "id": "rule6",
+      "rule": "natInd",
+      "left": "189px",
+      "top": "717px",
+      "names": [
+        "n"
+      ],
+      "width": "1223px",
+      "height": "70px"
+    },
+    {
+      "id": "rule7",
+      "rule": "natE",
+      "left": "427px",
+      "top": "138px",
+      "names": [
+        "m"
+      ],
+      "width": "944px",
+      "height": "110px"
+    },
+    {
+      "id": "rule8",
+      "rule": "algplus",
+      "left": "742px",
+      "top": "80px"
+    },
+    {
+      "id": "rule9",
+      "rule": "allE",
+      "left": "843px",
+      "top": "294px"
+    },
+    {
+      "id": "rule10",
+      "rule": "allE",
+      "left": "725px",
+      "top": "505px"
+    },
+    {
+      "id": "rule11",
+      "rule": "algplus",
+      "left": "585px",
+      "top": "679px"
+    },
+    {
+      "id": "rule12",
+      "rule": "algplus",
+      "left": "1048px",
+      "top": "417px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl2",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "assumption",
+        "label": "n"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule7",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule6",
+        "sort": "subgoal",
+        "label": "step"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "hyp4",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule8",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "subgoal",
+        "label": "zero"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "hyp5",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule9",
+        "sort": "input",
+        "label": "universal"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule7",
+        "sort": "assumption",
+        "label": "pred"
+      },
+      "target": {
+        "vertex": "rule9",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "assumption",
+        "label": "IH"
+      },
+      "target": {
+        "vertex": "rule10",
+        "sort": "input",
+        "label": "universal"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule7",
+        "sort": "assumption",
+        "label": "pred"
+      },
+      "target": {
+        "vertex": "rule10",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule11",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule10",
+        "sort": "input",
+        "label": "condition"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule9",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule12",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule10",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule12",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule12",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "subgoal",
+        "label": "suc"
+      },
+      "connector": "Flowchart"
+    }
+  ]
+}
