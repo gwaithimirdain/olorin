@@ -37,8 +37,12 @@ axiom eq (A : Type) (x y : A) : Type
 def neq (A : Type) (x y : A) : Type ≔ sig ( negation : eq A x y → ⊥ )
 axiom Nil_eqs : Type
 axiom nil_eqs : Nil_eqs
-axiom Cons_eqs (x_eq_y : Type) (_ : x_eq_y) (rest : Type) (_ : rest) : Type
-axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs x_eq_y H rest r
+{` The type of a list of hypotheses records their statements and nothing else, which is all the
+algebra oracle reads from it.  It mustn't mention the proofs or the rest of the list itself: the
+type of the rest mentions the rest of *that*, and so on, so a type with both the rest and its type
+in it doubles in size with each hypothesis. `}
+axiom Cons_eqs (x_eq_y : Type) (rest : Type) : Type
+axiom cons_eqs (x_eq_y : Type) (H : x_eq_y) (rest : Type) (r : rest) : Cons_eqs x_eq_y rest
 axiom oracle (A : Type) (x : A) (C : Type) : C
 axiom oracle_plus (A : Type) (x : A) (C : Type) : C
 axiom oracle_neq (A : Type) (x : A) (C : Type) : C

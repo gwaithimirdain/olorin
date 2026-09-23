@@ -232,11 +232,11 @@ let widest ctx =
 let relation_types ctx ty =
   List.map (fun (op, ty', x, y) -> (op, (if comparable ctx ty ty' then ty else ty'), x, y))
 
-(* The statement and the rest, out of a hypothesis list's four arguments. *)
+(* The statement and the rest, out of a hypothesis list's two arguments. *)
 let cons_args : type hmode any. (hmode, mode, any) apps -> (mode normal * mode normal) option =
  fun args ->
   match get_args args with
-  | Some [ eqty; _; rest; _ ] -> Some (eqty, rest)
+  | Some [ eqty; rest ] -> Some (eqty, rest)
   | _ -> None
 
 let rec get_givens ~split ~block ctx givens =
