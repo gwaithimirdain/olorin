@@ -244,6 +244,13 @@ var suppressChecking = false;
 // arriving mid-round is noted here and checked once the round it interrupted has landed.
 var typecheckPending = false;
 var typecheckAgain = false;
+// Whether the player has cancelled the round in flight.  The round can't simply be abandoned (see
+// above), so it runs to the end, with Z3 interrupted and every question it asks from then on
+// answered "unknown" -- which Narya reports on each algebra block as having given up.
+var typecheckCancelled = false;
+// How to answer the Z3 question the round is waiting on right now, if it is waiting on one.  Cancel
+// uses it to resume the round at once, rather than trusting Z3 to notice the interrupt and return.
+var answerPendingQuestion = null;
 
 // Dynamic variable set while restoring a saved proof, to suppress the wire-label prompt and typechecking that normally fire when a connection is created.
 var restoring = false;
@@ -560,8 +567,14 @@ var Solver;
 var Real;
 var If;
 var Func;
+// The Z3 context, kept so that a check can be interrupted.
+var z3ctx;
+// How long Z3 gets on any one question before we take its answer as "unknown".  The questions the
+// levels ask take well under a second; this is only there so a hard one can't hang the game.
+const Z3_TIMEOUT_MS = 10000;
 init().then((z3) => {
     const ctx = new z3.Context('main');
+    z3ctx = ctx;
     Solver = ctx.Solver;
     Real = ctx.Real;
     If = ctx.If;
@@ -2478,6 +2491,17 @@ document.getElementById("discardSavedProof").onclick = function() {
     }
 };
 
+// Cancel the round of typechecking in flight: interrupt whatever Z3 is working on, and have the rest
+// of the round's questions answered "unknown" (see typecheckCancelled).
+document.getElementById("cancelTypecheck").onclick = function() {
+    if(!typecheckPending) { return; }
+    typecheckCancelled = true;
+    this.disabled = true;
+    this.innerText = "Cancelling...";
+    if(z3ctx) { z3ctx.interrupt(); }
+    if(answerPendingQuestion) { answerPendingQuestion("unknown"); }
+};
+
 // Find the endpoint on a node element matching a saved connection's sort and label.
 function findEndpoint(el, sort, label) {
     return instance.getEndpoints(el).find(function (ep) {
@@ -4103,6 +4127,9 @@ function typecheck() {
     typecheckPending = true;
     typecheckAgain = false;
 
+    const cancel = document.getElementById("cancelTypecheck");
+    cancel.disabled = false;
+    cancel.innerText = "Cancel";
     document.getElementById("typecheckingBG").style.display = 'flex';
     hideWireTooltip();
 
@@ -4232,6 +4259,7 @@ function symbolic_to_z3(sym, decls) {
 
 function callback_to_z3(callback) {
     const solver = new Solver();
+    solver.set('timeout', Z3_TIMEOUT_MS);
     const decls = new Map();
     callback.forEach(function (rel) {
         const lhs = symbolic_to_z3(rel.lhs, decls);
@@ -4418,10 +4446,27 @@ function portKey(port) {
 
 function continue_typechecking(nodes, edges, connections, result) {
     // If a callback string was supplied, we pass it off to Z3 and wait for a response.
+    // Z3 answers "unsat", "sat" or "unknown" (having timed out or been interrupted), and Narya takes
+    // the answer as it comes.  A check that fails outright counts as giving up too: the round has
+    // to be resumed one way or another, or it never lands.
     if(result.callback) {
+        if(typecheckCancelled) {
+            continue_typechecking(nodes, edges, connections, Narya.reenter("unknown"));
+            return;
+        }
+        // Whichever comes first -- Z3's answer or a cancel -- resumes the round, and only that one.
+        var answered = false;
+        const answer = function (a) {
+            if(answered) { return; }
+            answered = true;
+            answerPendingQuestion = null;
+            continue_typechecking(nodes, edges, connections, Narya.reenter(a));
+        };
+        answerPendingQuestion = answer;
         const solver = callback_to_z3(result.callback);
-        solver.check().then(function (answer) {
-            continue_typechecking(nodes, edges, connections, Narya.reenter(answer === 'unsat'));
+        solver.check().then(answer, function (err) {
+            console.log(err);
+            answer("unknown");
         });
         // For now, we abort this function; we'll come back to it when the response arrives.
         return;
@@ -4431,6 +4476,7 @@ function continue_typechecking(nodes, edges, connections, result) {
     // were waiting, this answer is about a proof that no longer exists: check the current one
     // instead of drawing a stale result and saving it.
     typecheckPending = false;
+    typecheckCancelled = false;
     if(typecheckAgain) { typecheck(); return; }
 
     lastDiagnostics = result.diagnostics || [];

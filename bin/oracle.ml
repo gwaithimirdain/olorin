@@ -15,11 +15,15 @@ open Js_of_ocaml
 module Callback = struct
   open Effect.Deep
 
-  type _ Effect.t += Callback : Relation.t list -> bool Effect.t
+  (* What Z3 made of a question: the relations can't all hold, they can, or it gave up before
+     finding out -- because it ran out of time, or the player cancelled the check. *)
+  type answer = Unsat | Sat | Unknown
+
+  type _ Effect.t += Callback : Relation.t list -> answer Effect.t
 
   exception Halt
 
-  let cont : (bool, js_checked Js.t) continuation option ref = ref None
+  let cont : (answer, js_checked Js.t) continuation option ref = ref None
 
   let effc : type b. b Effect.t -> ((b, js_checked Js.t) continuation -> js_checked Js.t) option =
     function
@@ -1324,17 +1328,26 @@ let anchors funs funcount powbases litpows relations =
 (* We memorize the results of calls to reduce, so we don't have to re-make them every time. *)
 let answers : (Relation.t list, bool) Hashtbl.t = Hashtbl.create 20
 
+(* Z3 gave up on a question.  That settles nothing either way -- not even a side condition, whose
+   failure would blame the player for a denominator or a base that may well be fine -- so it abandons
+   the whole block, which ask reports as such. *)
+exception Solver_gave_up
+
 (* Ask Z3 whether a conjunction of relations is unsatisfiable, i.e. whether its negation is
-   provable.  Each question is asked at most once. *)
+   provable.  Each question is asked at most once, except one Z3 gave up on: that was a matter of
+   time rather than of the question, so it's asked afresh the next time it comes up. *)
 let unsat (command : Relation.t list) =
   match Hashtbl.find_opt answers command with
   | Some result -> result
-  | None ->
-      let result = Effect.perform (Callback.Callback command) in
-      Hashtbl.add answers command result;
-      result
+  | None -> (
+      match Effect.perform (Callback.Callback command) with
+      | Unknown -> raise Solver_gave_up
+      | (Unsat | Sat) as answer ->
+          let result = answer = Unsat in
+          Hashtbl.add answers command result;
+          result)
 
-let ask (Ask (ctx, tm) : Check.OracleData.question) =
+let ask_solver (Ask (ctx, tm) : Check.OracleData.question) =
   let open Monad.Ops (E) in
   (* Narya's question is existential in the mode it was asked at, while everything here is written
      at Olorin's own one (see Omode).  There is only one mode in the process, so this always
@@ -1581,3 +1594,6 @@ let ask (Ask (ctx, tm) : Check.OracleData.question) =
               if unsat (List.map negate clause @ facts) then Ok ()
               else Error (Code.Oracle_failed Unprovable))
             (Ok ()) goals)
+
+let ask (question : Check.OracleData.question) =
+  try ask_solver question with Solver_gave_up -> Error (Code.Oracle_failed Gave_up)

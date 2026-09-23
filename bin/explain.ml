@@ -21,6 +21,9 @@ module Oracle = struct
   type Reporter.oracle_error +=
     | (* The goal doesn't follow from the hypotheses by algebra. *)
         Unprovable
+    | (* Z3 gave up before settling the goal or one of its side conditions: it ran out of time, or
+       the player cancelled the check. *)
+        Gave_up
     | (* A denominator that isn't provably nonzero, or an even root whose base isn't provably
        nonnegative: the term in question. *)
         Zero_denominator of
@@ -87,6 +90,9 @@ let oracle_failed : Reporter.oracle_error -> string option =
   | Unprovable ->
       Some
         "I couldn't prove this from the inputs to the algebra block.  Either it doesn't follow from them by algebra alone, or a hypothesis it needs isn't connected."
+  | Gave_up ->
+      Some
+        "I gave up trying to prove this: it took too long, or the check was cancelled.  It may still be true; try breaking it into smaller steps, or connecting only the inputs it needs."
   | Zero_denominator p ->
       Option.map
         (fun den ->

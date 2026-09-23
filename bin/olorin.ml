@@ -1987,7 +1987,14 @@ let _ =
         Oracle.Callback.halt ();
         Oracle.Callback.run @@ fun () -> check vertices edges
 
-      method reenter (response : bool Js.t) = Oracle.Callback.reenter (Js.to_bool response)
+      (* Z3's answer to the question a round was suspended on, as its check reports it: "unsat",
+         "sat" or "unknown". *)
+      method reenter (response : Js.js_string Js.t) =
+        Oracle.Callback.reenter
+          (match Js.to_string response with
+          | "unsat" -> Unsat
+          | "sat" -> Sat
+          | _ -> Unknown)
 
       (* Check validity of a new local variable name.  We do this in OCaml rather than JavaScript so that we can actually call the lexer, ensuring it remains as consistent as possible with Narya. *)
       method checkVariable (str : Js.js_string Js.t) =

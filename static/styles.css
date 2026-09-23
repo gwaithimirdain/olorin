@@ -1003,3 +1003,16 @@ body {
 .about {
     font-size: 18px;
 }
+
+/* Most checks are over in a moment, so the Cancel button only turns up once one has taken a while,
+   rather than flashing up with every change.  The animation restarts each time the overlay is
+   shown, since it is hidden with display: none in between. */
+#cancelTypecheck {
+    margin-top: 12px;
+    font-size: 16px;
+    visibility: hidden;
+    animation: showCancelTypecheck 0s 2s forwards;
+}
+@keyframes showCancelTypecheck {
+    to { visibility: visible; }
+}
