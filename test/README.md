@@ -19,11 +19,14 @@ test/
   generate-fixtures.js    # Auto-solve levels and write verified proof fixtures
   add-fixture.js          # File a hand-made proof (an exported JSON) as a fixture
   fixtures/proofs/        # One <statement-hash>.json per covered level (a correct proof)
+  fixtures/rejected/      # Proofs that must be rejected (see rejected.spec.js for why each one)
   e2e/                    # Test specs
     levels.spec.js        # One test per level: load its fixture proof, assert it's complete
                           #   and that its blocks are all in that level's palette
     autosave.spec.js      # autosave + reload/discard-prompt tests
     exportimport.spec.js  # Export/Import (incl. cross-level switch) tests
+    rejected.spec.js      # Each proof in fixtures/rejected/ fails with the expected error,
+                          #   and is accepted once the wires that fix it are added
 ```
 
 ## Per-level proof fixtures

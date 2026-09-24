@@ -944,17 +944,17 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
             variables )
       | Expr ->
           let e = source_vertex.value <||> "missing expression" in
-          (* Get all the bindables and variables from all the input wires connected to this rule. *)
-          let bindables, variables =
+          (* Get all the bindables and variables from all the input wires connected to this rule, and which of those variables are wired to it directly. *)
+          let bindables, variables, direct =
             vars_of_input_port ~seen vertices graph { source with sort = Input; label = None } in
           (* See remark about locations in Asc above *)
           let eloc = Loc.make ~content:e ~annotate:false locables in
-          (* Now we insist that only those variables can be used. *)
+          (* Now we insist that only the variables wired directly to it can be used, not the ones its inputs merely depend on (such as the value at which a ∀ was instantiated to produce an ∃ whose witness is an input). *)
           let e =
             Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
             (* TODO: It would be nice to notice when the expression entered is synthesizing, and label the output port of the expr box in that case. *)
-            Named.Embed
-              (Some variables, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc))) in
+            Named.Embed (Some direct, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc)))
+          in
           ({ bindables; term = e }, variables)
       | Algebra { sort } ->
           let nil_eqs = Named.Const (Parser.Scope.lookup [ "nil_eqs" ] <||> "nil_eqs not found") in
@@ -1118,19 +1118,26 @@ and lam_of_output_port ~seen vertices graph assumptions subgoal =
   let variables = PortSet.diff variables ports in
   (bindables, lam.value, variables)
 
+(* All the bindables and variables of the wires connected to an input port, together with the variables that are the sources of those wires themselves. *)
 and vars_of_input_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (graph : bwd_graph)
-    (port : Port.t) : Bindables.t * PortSet.t =
-  let rec go bindables variables edges =
+    (port : Port.t) : Bindables.t * PortSet.t * PortSet.t =
+  let rec go bindables variables direct edges =
     match edges with
-    | [] -> (bindables, variables)
+    | [] -> (bindables, variables, direct)
     | (e : Edge.t) :: edges ->
         let ( ({ value = { bindables = new_bindables; term = _ }; loc = _ } :
                 term_with_bindables Range.located),
               new_variables ) =
           check_of_output_port ~seen vertices graph ~edge:(Some e) e.source in
-        go (Bindables.union bindables new_bindables) (PortSet.union variables new_variables) edges
-  in
-  go Bindables.empty PortSet.empty (Option.value (TargetMap.find_opt port graph) ~default:[])
+        (* A wire's source is a variable exactly when it is among the variables its term depends on. *)
+        let direct =
+          if PortSet.mem e.source new_variables then PortSet.add e.source direct else direct in
+        go
+          (Bindables.union bindables new_bindables)
+          (PortSet.union variables new_variables)
+          direct edges in
+  go Bindables.empty PortSet.empty PortSet.empty
+    (Option.value (TargetMap.find_opt port graph) ~default:[])
 
 (* If we're given an input port instead of an output one, we follow the edge attached to it, if any. *)
 and check_of_input_port ?(optional = `No) ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t)
