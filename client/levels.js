@@ -2653,15 +2653,10 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "s", ty: "ℕ → ℝ" } ],
                     variables: [ { name: "L", ty: "ℝ" } ],
-                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" } ],
-                    conclusion: { ty: "lim (n ↦ s(n) − L) = 0" },
+                    hypotheses: [ ],
+                    conclusion: { ty: "(lim (n ↦ s(n)) = L) ⇔ (lim (n ↦ s(n)−L) = 0)" },
+                    extrarules: [ "iffI", "iffE1", "iffE2" ],
                 },
-                // {
-                //     parameters: [ { name: "s", ty: "ℕ → ℝ" } ],
-                //     variables: [ { name: "L", ty: "ℝ" } ],
-                //     hypotheses: [ { ty: "lim (n ↦ s(n) − L) = 0" } ],
-                //     conclusion: { ty: "lim s = L" },
-                // },
                 {
                     parameters: [ { name: "s", ty: "ℕ → ℝ" } ],
                     variables: [ { name: "L", ty: "ℝ" } ],
