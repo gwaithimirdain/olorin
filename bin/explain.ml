@@ -49,6 +49,34 @@ module Oracle = struct
     | Not_an_oracle_application of printable
 end
 
+(* Olorin's own errors, which arise from how it builds terms out of the diagram rather than from
+   anything Narya checks, extending the tag that Narya's Extern code carries.  Narya displays each
+   with the code and text that 'code' gives it here -- the code as a suffix to Narya's own code for
+   extern errors, so "01" is shown as E3100-01 -- so every tag needs a case there as well as an
+   explanation below. *)
+module Extern = struct
+  type Reporter.extern_error +=
+    | (* A wire that leads into a term somewhere its source isn't in scope. *)
+        Ill_scoped_connection
+    | (* An assumption wired out of a block that nothing elaborates. *)
+        Unattached_assumption
+    | (* Wires that lead out of a block and back into it. *)
+        Cyclic_term
+    | (* A variable that is in scope at an expr block, but not wired into it. *)
+        Unwired_variable of
+        string
+
+  let code (error : Reporter.extern_error) : Code.t =
+    let code, text =
+      match error with
+      | Ill_scoped_connection -> ("01", "ill-scoped connection")
+      | Unattached_assumption -> ("02", "assumption of an unattached block")
+      | Cyclic_term -> ("03", "cycle in graphical term")
+      | Unwired_variable x -> ("04", "variable not wired in: " ^ x)
+      | _ -> ("00", "unknown olorin error") in
+    Extern { code; text; error }
+end
+
 (* Print a term or type, or nothing if unparsing raises (as it sometimes does). *)
 let printed ?(sort = `Other) (pr : printable) : string option =
   try_with ~fatal:(fun _ -> None) @@ fun () ->
@@ -243,18 +271,18 @@ let explain : Code.t -> string option = function
       Some
         "I can't tell what statement belongs here.  Connect a wire to this input, or use a label block to say what it should be."
   (* Wires that lead out of a block and back into it. *)
-  | Cyclic_term ->
+  | Extern { error = Extern.Cyclic_term; _ } ->
       Some
         "These wires run in a circle: following them out of a block leads back into that same block, so one of these steps would end up justifying itself.  A proof has to build up from what is already known, so the wires can't loop."
   (* An assumption or bound variable wired out of the block that introduced it. *)
-  | Ill_scoped_connection ->
+  | Extern { error = Extern.Ill_scoped_connection; _ } ->
       Some
         "This wire carries an assumption, or a variable, out of the block that introduced it.  Such a thing only exists inside its own block, so it can only be used on the way to that block's subgoal."
   (* An assumption wired into a fragment that leads nowhere, out of a block that nothing ever
      elaborates: its output is dangling, or leads only somewhere that dangles.  Nothing is being
      carried anywhere, and there is no scope to escape from yet, so the message above would point at
      the wrong thing. *)
-  | Unattached_assumption ->
+  | Extern { error = Extern.Unattached_assumption; _ } ->
       Some
         "This wire carries an assumption, or a variable, out of a block whose own output isn't wired into the proof yet.  Until it is, I can't tell what that block is proving, so I don't know what this assumption says either: connect the block's output on the way to the goal."
   | Unbound_variable (x, _) ->
@@ -262,6 +290,16 @@ let explain : Code.t -> string option = function
         ("There is no variable called "
         ^ x
         ^ " here.  A variable introduced by a block is only in scope inside that block.")
+  (* A variable that is in scope at an expr block, but not wired into it. *)
+  | Extern { error = Extern.Unwired_variable x; _ } ->
+      Some
+        ("This expression uses "
+        ^ x
+        ^ ", but "
+        ^ x
+        ^ " isn't wired into it.  An expression block can only use the variables whose wires lead into it, so connect a wire from "
+        ^ x
+        ^ " to this block.")
   (* A block whose axiom takes the predicate it proves from the goal, wired to a goal it can't take
      that predicate from: either the goal isn't of the shape the block proves at all, or it is that
      shape but about the wrong set. *)

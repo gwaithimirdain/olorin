@@ -24,7 +24,7 @@ const REJECTED = {
     // the witness of an ∃ that came from instantiating the induction hypothesis at m -- so the term
     // on k's wire depends on m, but that doesn't make m available to the expression.
     'expr-uses-unwired-variable.json': {
-        code: 'E0300',
+        code: 'E3100-04',
         vertex: 'rule9',
         repair: [
             {

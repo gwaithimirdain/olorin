@@ -94,7 +94,7 @@ test.describe('Error explanations', () => {
             const r = await o.dragRule('impI', 300, 150);
             await o.connect({ vertex: r, sort: 'assumption' }, { vertex: concl, sort: 'input' });
         });
-        const e = await explanationFor(olorin, 'E0303');
+        const e = await explanationFor(olorin, 'E3100-01');
         expect(e).toContain('out of the block that introduced it');
 
         // And out of one case of a ∨-elimination into the other case's subgoal.
@@ -106,7 +106,7 @@ test.describe('Error explanations', () => {
                 await o.connect({ vertex: r, sort: 'assumption', label: 'left' },
                                 { vertex: r, sort: 'subgoal', label: 'right' });
             });
-        expect(await explanationFor(olorin, 'E0303')).toEqual(e);
+        expect(await explanationFor(olorin, 'E3100-01')).toEqual(e);
     });
 
     // But a wire that goes nowhere near the goal takes the assumption nowhere.  If nothing ever
@@ -121,7 +121,7 @@ test.describe('Error explanations', () => {
             const and = await o.dragRule('andE', 600, 600);
             await o.connect({ vertex: imp, sort: 'assumption' }, { vertex: and, sort: 'input' });
         });
-        const e = await explanationFor(olorin, 'E0304');
+        const e = await explanationFor(olorin, 'E3100-02');
         expect(e).toContain("isn't wired into the proof");
         expect(await olorin.wireErrors()).toContain(e);
 
@@ -135,7 +135,7 @@ test.describe('Error explanations', () => {
                             { vertex: or1, sort: 'input', label: 'left' });
             await o.connect({ vertex: imp, sort: 'assumption' }, { vertex: and, sort: 'input' });
         });
-        expect(await explanationFor(olorin, 'E0304')).toEqual(e);
+        expect(await explanationFor(olorin, 'E3100-02')).toEqual(e);
         expect(await olorin.wireErrors()).toContain(e);
     });
 
@@ -148,7 +148,7 @@ test.describe('Error explanations', () => {
             await o.connect({ vertex: r, sort: 'output' }, { vertex: r, sort: 'input' });
             await o.connect({ vertex: r, sort: 'output' }, { vertex: concl, sort: 'input' });
         });
-        expect(await explanationFor(olorin, 'E0280')).toContain('run in a circle');
+        expect(await explanationFor(olorin, 'E3100-03')).toContain('run in a circle');
         expect((await olorin.wireErrors()).join('')).toContain('run in a circle');
     });
 

@@ -64,8 +64,11 @@ module NameIndices = struct
   type 'a suc = 'a
   type 'a scope = unit
 
-  (* We allow optional specification of only a limited set of variables that can be used in parsing. *)
-  type 'a embed = PortSet.t option * Parser.Notation.wrapped_parse
+  (* Which variables in scope an embedded term may use: all of them (a wire label or an ascription),
+     or only those wired into it (an expr block, which is the one place a player can wire in a
+     variable that's missing, and hence the one place to tell them so). *)
+  type allowed = All | Wired of PortSet.t
+  type 'a embed = allowed * Parser.Notation.wrapped_parse
 end
 
 module Named = Raw.Make (NameIndices)
@@ -194,7 +197,8 @@ module Resolver = struct
     | None ->
         let ({ bail_out; ill_scoped } : Scoping.t) = RequireScoping.read () in
         note_ill_scoped ill_scoped x;
-        Error (if bail_out then fatal Code.Ill_scoped_connection else Code.Ill_scoped_connection)
+        let err = Explain.Extern.(code Ill_scoped_connection) in
+        Error (if bail_out then fatal err else err)
 
   let rename _scope (x : name) = x.name
   let rescope scope () = Bwv.map (fun (x : name) -> x.name) scope
@@ -252,12 +256,23 @@ module Resolver = struct
 
   let embed : ('a1, 'a2) scope -> 'a1 I1.embed -> ('a1 T1.check, 'a2 T2.check) Either.t =
    fun ctx (variables, Notation.Wrap tm) ->
-    Reporter.try_with ~fatal:(fun d -> Either.Right (Raw.Indexed.Synth (Fail d.message)))
+    (* A variable that is in scope but unusable only because it isn't wired into an expr block gets
+       its own error, since the fix is to wire it in rather than that it doesn't exist. *)
+    let unwired x =
+      match variables with
+      | Wired _ -> List.exists (fun (y : name) -> y.name = Some x) (Bwv.to_list ctx)
+      | All -> false in
+    Reporter.try_with ~fatal:(fun d ->
+        let message =
+          match d.message with
+          | Unbound_variable (x, _) when unwired x -> Explain.Extern.(code (Unwired_variable x))
+          | message -> message in
+        Either.Right (Raw.Indexed.Synth (Fail message)))
     @@ fun () ->
     (* If a set of allowed variables was supplied, we un-name all the variables that aren't in it or in the global parameters. *)
     let allowed_ctx =
       match variables with
-      | Some variables ->
+      | Wired variables ->
           Bwv.map
             (fun (x : name) ->
               match x.port with
@@ -265,7 +280,7 @@ module Resolver = struct
               | Some p ->
                   if PortSet.mem p variables || PortSet.mem p !parameter_ports then x.name else None)
             ctx
-      | None -> Bwv.map (fun (x : name) -> x.name) ctx in
+      | All -> Bwv.map (fun (x : name) -> x.name) ctx in
     let tm = Unresolve.check ctx (Postprocess.process allowed_ctx tm) in
     Left tm.value
 end
@@ -299,8 +314,10 @@ let bound_ports () : PortSet.t =
    assumption doesn't exist yet at all rather than existing somewhere this wire can't reach, and
    blaming scope would send the player looking for the wrong mistake. *)
 let scope_error_code (bound : PortSet.t) (p : Port.t) : Code.t =
-  if p.sort = Assumption && not (PortSet.mem p bound) then Unattached_assumption
-  else Ill_scoped_connection
+  Explain.Extern.(
+    code
+      (if p.sort = Assumption && not (PortSet.mem p bound) then Unattached_assumption
+       else Ill_scoped_connection))
 
 (* Map over a vector, left to right, threading a state through -- the assumptions of a match branch
    are named and collected into a set that way. *)
@@ -555,8 +572,9 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
        synth_output_port); on the conclusion path it is reported again when the failure is checked,
        which is harmless (the wire is simply red). *)
   else if IdSet.mem source.vertex oldseen then (
-    emit ~loc:!loc Cyclic_term;
-    (locate !loc (without_bindables (Synth (Fail Cyclic_term))), PortSet.empty))
+    let cyclic = Explain.Extern.(code Cyclic_term) in
+    emit ~loc:!loc cyclic;
+    (locate !loc (without_bindables (Synth (Fail cyclic))), PortSet.empty))
   else
     let source_vertex =
       IdMap.find_opt source.vertex vertices
@@ -931,12 +949,10 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let ty = source_vertex.value <||> "missing ascription type" in
           (* Output ports don't get red-colored with errors, so we also include the output wire -- non-annotating so it doesn't get labeled with an *input* type.  Ideally, we would report errors on the *input* wires when they have the wrong type, but that would require overriding the locations that variables in the parsed term acquire from their parsing.  *)
           let tyloc = Loc.make ~content:ty ~annotate:false locables in
-          (* We insist that only variables appearing in the inputs can be used. *)
+          (* Like a wire label, the type can use any variable in scope. *)
           let ty =
             Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
-            Named.Embed
-              (Some variables, Parse.Term.final (Parse.Term.parse (Asai.Range.source tyloc))) in
-          (* We don't currently give the user the option to use variables in the ascription type that don't appear in the input.  If this turns out to be useful, we could supply an extra hasValue input port to Asc that would accept an arbitrary number of wires with variable labels, and then do vars_of_input_port on them and merge the bindables and variables with those of the term, as we do with Expr below. *)
+            Named.Embed (All, Parse.Term.final (Parse.Term.parse (Asai.Range.source tyloc))) in
           ( {
               bindables = tm.value.bindables;
               term = Named.Synth (Asc (locate_opt tm.loc tm.value.term, locate tyloc ty));
@@ -953,7 +969,7 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
           let e =
             Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
             (* TODO: It would be nice to notice when the expression entered is synthesizing, and label the output port of the expr box in that case. *)
-            Named.Embed (Some direct, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc)))
+            Named.Embed (Wired direct, Parse.Term.final (Parse.Term.parse (Asai.Range.source eloc)))
           in
           ({ bindables; term = e }, variables)
       | Algebra { sort } ->
@@ -1213,7 +1229,7 @@ and ascribe_with_user_label tm e =
       let tyloc = Loc.make ~content:ty [ `Edge e.id ] in
       let ty =
         Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
-        Named.Embed (None, Parse.Term.final (Parse.Term.parse (Asai.Range.source tyloc))) in
+        Named.Embed (All, Parse.Term.final (Parse.Term.parse (Asai.Range.source tyloc))) in
       locate_opt tm.loc
         {
           tm.value with
@@ -1368,7 +1384,7 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     Reporter.try_with ~emit:(fun d ->
         match d.message with
         | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
-        | Cyclic_term ->
+        | Extern { error = Explain.Extern.Cyclic_term; _ } ->
             cyclic := true;
             Diagnostic.add scoping_diagnostics true d
         | _ -> emit_diagnostic d)
@@ -1422,7 +1438,8 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
           with
           | Some { rule; _ }, Some _ when rule != Var ->
               (* If there is a cycle, report it, skip this scope and go on to the next one. *)
-              Diagnostic.add scoping_diagnostics true (Reporter.diagnostic Cyclic_term);
+              Diagnostic.add scoping_diagnostics true
+                (Reporter.diagnostic Explain.Extern.(code Cyclic_term));
               look_for_scope contexts
           (* If resolution has already failed in this scope, it fails the same way again, so we
            report what it reported then and move on without checking anything. *)
@@ -1495,7 +1512,7 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
               | _ -> Diagnostic.add diagnostics true d)
             ~fatal:(fun d ->
               match d.message with
-              | Ill_scoped_connection | Cyclic_term ->
+              | Extern { error = Explain.Extern.(Ill_scoped_connection | Cyclic_term); _ } ->
                   (* But we do record the scoping diagnostic to the *overall* outside one, to be saved. *)
                   Diagnostic.add scoping_diagnostics true d;
                   false
