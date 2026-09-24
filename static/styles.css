@@ -666,6 +666,10 @@ body.arranging { cursor: progress; }
     text-align: center;
 }
 
+#arrangeProof {
+    font-size: 15px;
+}
+
 #currentLevelAndDifficulty {
     position: absolute;
     top: 10px;
