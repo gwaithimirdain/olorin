@@ -62,7 +62,7 @@ module Extern = struct
         Unattached_assumption
     | (* Wires that lead out of a block and back into it. *)
         Cyclic_term
-    | (* A variable that is in scope at an expr block, but not wired into it. *)
+    | (* A name in an expr block that isn't one of the variables wired into it. *)
         Unwired_variable of
         string
 
@@ -290,14 +290,14 @@ let explain : Code.t -> string option = function
         ("There is no variable called "
         ^ x
         ^ " here.  A variable introduced by a block is only in scope inside that block.")
-  (* A variable that is in scope at an expr block, but not wired into it. *)
+  (* A name in an expr block that isn't one of the variables wired into it. *)
   | Extern { error = Extern.Unwired_variable x; _ } ->
       Some
         ("This expression uses "
         ^ x
-        ^ ", but "
+        ^ ", but no variable called "
         ^ x
-        ^ " isn't wired into it.  An expression block can only use the variables whose wires lead into it, so connect a wire from "
+        ^ " is wired into it.  An expression block can only use the variables whose wires lead into it, so connect a wire from "
         ^ x
         ^ " to this block.")
   (* A block whose axiom takes the predicate it proves from the goal, wired to a goal it can't take

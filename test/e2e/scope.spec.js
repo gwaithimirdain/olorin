@@ -6,8 +6,12 @@
 // Now the wires that no scope can resolve are reported on themselves, and the fragment is
 // synthesized again without them, so the rest of it keeps its labels.
 
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
+const { allLevels } = require('../lib/levels');
+const { statementHash } = require('../lib/fixtures');
 
 // A partial proof of ¬∀x∈A,P(x) ⊢ ∃x∈A,¬P(x), with a ∀-introduction binding "chez".
 const STATE = {
@@ -282,5 +286,62 @@ test.describe('An out-of-scope connection', () => {
         const labels = (await olorin.labelRects()).map((l) => l.text);
         expect(labels).toEqual(expect.arrayContaining(
             ['¬∀x∈A,P(x)', '∀x∈A,P(x)', '∃x∈A,¬P(x)', '⊥']));
+    });
+});
+
+// A partial proof (of "x infinitesimal ⇒ 1/x infinite") with a dangling fragment: an expr block
+// "1/(∣u∣+1)" wired to the variable u of a ∀-introduction, feeding a ∀-elimination whose output is
+// labeled "∣x∣<1/(∣u∣+1)" and goes into an algebra block wired to nothing.  The fragment only makes
+// sense inside that ∀-introduction, so that's the scope the search for one has to find.  It used
+// to settle on the first scope it tried, because the expression, which names u rather than wiring
+// it into the term, failed there as an unbound variable rather than as an ill-scoped wire.
+const FRAGMENT = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'fixtures', 'scope', 'expr-in-dangling-fragment.json'), 'utf8'));
+
+// Restore the fragment proof on its level, with the block whose value is `from` given `to` instead.
+async function restoreFragment(page, from, to) {
+    const state = JSON.parse(JSON.stringify(FRAGMENT));
+    if (from) state.nodes.find((n) => n.value === from).value = to;
+    const hash = statementHash(state.level);
+    const level = allLevels().find((l) => statementHash(l) === hash);
+    expect(level, 'no level states what this proof proves').toBeTruthy();
+    const olorin = new Olorin(page);
+    await olorin.open();
+    await olorin.selectLevel(level.name);
+    await olorin.restore(state);
+    return olorin;
+}
+
+// The diagnostics other than for the parts of the proof that aren't connected yet.
+const HOLE = 'E2002';
+async function mistakes(olorin) {
+    return (await olorin.diagnostics()).filter((d) => d.code !== HOLE);
+}
+
+// The block, as restored, whose value is `value`.
+async function blockWith(olorin, value) {
+    return (await olorin.nodes()).find((n) => n.value === value).id;
+}
+
+test.describe('A dangling fragment using a bound variable', () => {
+    test('is placed inside the block that binds it', async ({ page }) => {
+        const olorin = await restoreFragment(page);
+        expect(await mistakes(olorin)).toEqual([]);
+    });
+
+    test('says an expr naming a variable that is not wired in should have it wired in', async ({ page }) => {
+        const olorin = await restoreFragment(page, '1/(∣u∣+1)', '1/(∣w∣+1)');
+        const expr = await blockWith(olorin, '1/(∣w∣+1)');
+        const errors = await mistakes(olorin);
+        expect(errors.map((d) => d.code)).toEqual(['E3100-04']);
+        expect(errors[0].locs.map((l) => l.id)).toContain(expr);
+    });
+
+    test('says once that a label naming a variable no scope has does not exist', async ({ page }) => {
+        const olorin = await restoreFragment(page, '∣x∣<1/(∣u∣+1)', '∣x∣<1/(∣w∣+1)');
+        const asc = await blockWith(olorin, '∣x∣<1/(∣w∣+1)');
+        const errors = await mistakes(olorin);
+        expect(errors.map((d) => d.code)).toEqual(['E0300']);
+        expect(errors[0].locs.map((l) => l.id)).toContain(asc);
     });
 });
