@@ -194,6 +194,10 @@ def seqconv (s : ℕ → ℝ) (L : ℝ) : Type ≔
   forallpos (ε ↦ exists ℕ (N ↦ forall ℕ (n ↦ imp (ℕ.le N n) (ℝ.lt (ℝ.abs (ℝ.minus (s n) L)) ε))))
 notation(0) \"lim\" s \"=\" L ≔ seqconv s L
 
+def seqcauchy (s : ℕ → ℝ) : Type ≔
+  forallpos (ε ↦ exists ℕ (N ↦ forall ℕ (m ↦ forall ℕ (n ↦ imp (land (ℕ.le N m) (ℕ.le N n)) (ℝ.lt (ℝ.abs (ℝ.minus (s m) (s n))) ε)))))
+notation(0) s \"is\" \"Cauchy\" ≔ seqcauchy s
+
 def seqdiv_posinf (s : ℕ → ℝ) : Type ≔
   forall ℝ (M ↦ exists ℕ (N ↦ forall ℕ (n ↦ imp (ℕ.le N n) (ℝ.ge (s n) M))))
 notation \"lim\" s \"↗∞\" ≔ seqdiv_posinf s

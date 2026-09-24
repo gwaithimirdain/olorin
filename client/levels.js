@@ -2801,6 +2801,23 @@ export const LEVELS = [
                 },
             ],
           },
+          { name: "Cauchy",
+            rules: [ "andE", "andI", "impE", "impI", "allE", "allI", "exE", "exI", "expr", "algplus", "asc", "arch" ],
+            levels: [
+                {
+                    parameters: [ ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(n ↦ 1/(n+1)) is Cauchy" },
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "s", ty: "ℕ → ℝ" }, { name: "L", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "lim (n ↦ s(n)) = L" } ],
+                    conclusion: { ty: "(n ↦ s(n)) is Cauchy" },
+                },
+            ],
+          },
       ],
     },
 ]
