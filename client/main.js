@@ -615,6 +615,7 @@ ready(() => {
                         closebutton.addEventListener('click', function () {
                             if(pinnedConnectionId === conn.id) { unpinConnection(); }
                             instance.deleteConnection(conn);
+                            syncAllVariadicInputs();
                             typecheck();
                         });
                         connectionCloseButtons[conn.id] = { button: closebutton };
@@ -717,6 +718,9 @@ ready(() => {
     // to itself, which is drawn in a shape of its own, or stopped being one.
     instance.bind(EVENT_CONNECTION_MOVED, function (p) {
         styleConnection(p.connection);
+        // A wire moved off a variadic block's port leaves it empty, and one moved onto its empty
+        // port fills it.
+        syncAllVariadicInputs();
         typecheck();
     });
     // We've forbidden connections from being detached by dropping, since it appears to be kind of broken, e.g. EVENT_CONNECTION_DETACHED fires *before* it's detached.  Instead the user removes connections with the close button.
@@ -886,6 +890,54 @@ function boundVariables(rule) { return BOUND_VARIABLES[rule] || [""]; }
 function boundNames(id) {
     const entry = nodes.find(function (x) { return x.id === id; });
     return (entry && entry.names) || [];
+}
+
+// Blocks that take any number of inputs: an alg block, whatever equations it reasons from, and an
+// expr block, the values of the variables its expression uses.  To the typechecker these all go
+// into the one unlabeled input port, but on the diagram each wire gets a port of its own, and there
+// is always one empty port below them to wire the next input to.  So a new block starts with a
+// single port, one more appears whenever the empty one is wired, and a port whose wire goes away
+// goes with it.  The box grows to fit the ports.
+const VARIADIC_RULES = { alg: {}, algplus: {}, algneq: {}, expr: { hasValue: true } };
+// How far apart (in pixels) a variadic block's input ports are spaced.
+const VARIADIC_PORT_SPACING = 20;
+
+function variadicInputs(box) {
+    return instance.getEndpoints(box).filter(function (ep) { return ep.parameters.sort === "input"; });
+}
+
+// Give a variadic block exactly one empty input port, after the connected ones, and lay them all
+// out down its left side.
+function syncVariadicInputs(box) {
+    const spec = VARIADIC_RULES[box.dataset.rule];
+    if(!spec) { return; }
+    const ports = variadicInputs(box);
+    const empty = ports.filter(function (ep) { return ep.connections.length === 0; });
+    empty.slice(1).forEach(function (ep) { instance.deleteEndpoint(ep); });
+    if(empty.length === 0) {
+        const port = { anchor: "Left", target: true, parameters: { sort: "input" } };
+        if(spec.hasValue) {
+            port.parameters.hasValue = true;
+            port.paintStyle = { fill: VALUECOLOR };
+        }
+        instance.addEndpoint(box, port);
+    }
+    // The empty port goes last, below all the wired ones.
+    const laidOut = variadicInputs(box).sort(function (a, b) {
+        return (a.connections.length === 0) - (b.connections.length === 0);
+    });
+    const n = laidOut.length;
+    laidOut.forEach(function (ep, i) { ep.setAnchor([0, (i + 0.5) / n, -1, 0]); });
+    // Past two ports the box has to get taller.  (A min-height, so it isn't saved with the proof:
+    // it comes back by itself as the wires are restored.)
+    const tall = n > 2 ? n * VARIADIC_PORT_SPACING : 0;
+    box.style.minHeight = tall ? tall + 'px' : '';
+    box.style.lineHeight = tall ? (tall - 5) + 'px' : '';
+    instance.revalidate(box);
+}
+
+function syncAllVariadicInputs() {
+    nodes.forEach(function (x) { syncVariadicInputs(x.node); });
 }
 
 // Clone the palette rule `id` into a new diagram node: position it, register it in the
@@ -1104,16 +1156,10 @@ function addEndpointsForRule(box, id, restore) {
         }
         typecheck_now = false;
     } else if (id === 'alg' || id === 'algplus' || id === 'algneq') {
-        instance.addEndpoint(box, { anchor: "Left", target: true, maxConnections: -1, parameters: {sort: "input"} });
+        syncVariadicInputs(box);
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
     } else if (id === 'expr') {
-        instance.addEndpoint(box, {
-            anchor: "Left",
-            target: true,
-            maxConnections: -1,
-            parameters: { sort: "input", hasValue: true },
-            paintStyle: { fill: VALUECOLOR },
-        });
+        syncVariadicInputs(box);
         instance.addEndpoint(box, {
             anchor: "Right",
             source: true,
@@ -2507,10 +2553,13 @@ document.getElementById("cancelTypecheck").onclick = function() {
 };
 
 // Find the endpoint on a node element matching a saved connection's sort and label.
+// A variadic block has several such endpoints (see VARIADIC_RULES), and a new wire goes to the
+// empty one.
 function findEndpoint(el, sort, label) {
-    return instance.getEndpoints(el).find(function (ep) {
+    const matches = instance.getEndpoints(el).filter(function (ep) {
         return ep.parameters.sort === sort && ep.parameters.label === label;
     });
+    return matches.find(function (ep) { return ep.connections.length === 0; }) || matches[0];
 }
 
 // The quantifiers over ℝ₊ and [n] used to have blocks of their own, whose condition ports were
@@ -3376,6 +3425,8 @@ function deleteRule(box) {
     instance.deleteConnectionsForElement(box);
     instance.removeAllEndpoints(box);
     box.remove();
+    // Wires from the block to a variadic one took their ports with them.
+    syncAllVariadicInputs();
     // Removing a far-out node may let the canvas shrink back toward the viewport.
     resizeCanvas();
     suppressChecking = false;
@@ -3696,6 +3747,7 @@ function cancelWireLabel() {
     const editing = (document.getElementById('wire').dataset.editing === "true");
     if(!editing) {
         wireLabelConnections().forEach(function (edge) { instance.deleteConnection(edge); });
+        syncAllVariadicInputs();
     }
     closeWireLabel();
     if(!editing) {
@@ -4103,6 +4155,8 @@ const styleConnection = (edge) => setConnector(edge, forcedConnector(edge) || se
 
 function addConnection(params) {
     const edge = params.connection;
+    // Wiring a variadic block's empty port gives it a new one.
+    syncVariadicInputs(edge.target);
     // While restoring a saved proof, we set the wire labels ourselves and typecheck once at the end, so we skip the prompt/typecheck here (but still apply the connector styling below).
     if(!restoring) {
         // If we're on novice difficulty, or the wire connects to a hypothesis or conclusion, or carries a value, we just go ahead and typecheck.
