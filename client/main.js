@@ -357,6 +357,11 @@ function resizeCanvas(scrollX, scrollY) {
 // whether anything moved.
 function shiftWorld(dx, dy, frozen) {
     if(!dx && !dy) { return false; }
+    // Sliding the whole diagram along changes nothing about how it's laid out, so an arrangement can
+    // still be undone afterwards, only with everything it puts back slid along too.  (Not when a
+    // drag is holding some of the boxes still: then they aren't all moving together.)
+    const undoable = !(frozen && frozen.size > 0) && arrangeUndo
+          && JSON.stringify(blockPlacements()) === JSON.stringify(arrangeUndo.after);
     var moved = false;
     nodes.forEach((x) => {
         const el = x.node;
@@ -369,6 +374,11 @@ function shiftWorld(dx, dy, frozen) {
         instance.setElementPosition(el, left, top);
         moved = true;
     });
+    if(undoable) {
+        arrangeUndo.dx += dx;
+        arrangeUndo.dy += dy;
+        arrangeUndo.after = blockPlacements();
+    }
     return moved;
 }
 
@@ -519,10 +529,7 @@ document.addEventListener('mouseup', function() {
     // resizes the canvas itself), and otherwise trim the surface to what we ended up needing.
     const shifted = normalizeOrigin();
     if(!shifted) { resizeCanvas(); }
-    if(moved || shifted) {
-        forgetArrange();
-        autosave();
-    }
+    if(moved || shifted) { autosave(); }
 });
 
 // Scrolling changes no part of the proof, but it does change where the player is looking, which a
@@ -4601,7 +4608,8 @@ function blockPlacements() {
 }
 
 // What undoing the last arrangement would put back (see blockPlacements), or null if there's
-// nothing to undo, and where the arrangement left everything, so we can tell if it has changed.
+// nothing to undo, and where the arrangement left everything, so we can tell if it has changed;
+// and (dx, dy), how far the whole diagram has been slid along since (see shiftWorld).
 var arrangeUndo = null;
 // The animation in progress, if any.
 var arrangeFrame = null;
@@ -4709,17 +4717,20 @@ function forgetArrange() {
 // Slide the blocks to the given places ({ id: { left, top, width } }, as numbers of pixels or as
 // CSS lengths, which they end up set to exactly; a missing width is left alone), then call `done`.
 // The wires follow them all the way.
+// How many pixels a CSS length (or a number of them) comes to for a box's left, top or width, found by
+// trying it.
+function cssPixels(el, prop, v) {
+    if(typeof v === 'number') { return v; }
+    const was = el.style[prop];
+    el.style[prop] = v;
+    const px = prop === 'left' ? el.offsetLeft : prop === 'top' ? el.offsetTop : el.offsetWidth;
+    el.style[prop] = was;
+    return px;
+}
+
 function slideBlocks(targets, done) {
     const css = (v) => (typeof v === 'number' ? v + 'px' : v);
-    // How many pixels a CSS length comes to for this box, found by trying it.
-    const pixels = function (el, prop, v) {
-        if(typeof v === 'number') { return v; }
-        const was = el.style[prop];
-        el.style[prop] = v;
-        const px = prop === 'left' ? el.offsetLeft : prop === 'top' ? el.offsetTop : el.offsetWidth;
-        el.style[prop] = was;
-        return px;
-    };
+    const pixels = cssPixels;
     const moves = [];
     nodes.forEach(function (x) {
         const t = targets[x.id];
@@ -4800,7 +4811,16 @@ function arrangeProof() {
         forgetArrange();
     }
     if(arrangeUndo) {
-        const back = arrangeUndo.before;
+        // Where everything was, slid along as far as the whole diagram has been since (see
+        // shiftWorld) -- exactly as it was, if it hasn't.
+        const { dx, dy } = arrangeUndo;
+        const back = {};
+        Object.keys(arrangeUndo.before).forEach(function (id) {
+            const b = arrangeUndo.before[id], el = document.getElementById(id);
+            back[id] = (!dx && !dy) || !el ? b : Object.assign({}, b, {
+                left: cssPixels(el, 'left', b.left) + dx, top: cssPixels(el, 'top', b.top) + dy,
+            });
+        });
         arrangeUndo = null;
         slideBlocks(back, function () {
             settleArrangement();
@@ -4819,7 +4839,7 @@ function arrangeProof() {
         // Nor if it failed, or the diagram has changed after all (a key can still delete blocks).
         if(result === null || diagramSignature() !== signature) { return; }
         slideBlocks(arrangementTargets(result), function () {
-            arrangeUndo = { before: before, after: settleArrangement() };
+            arrangeUndo = { before: before, after: settleArrangement(), dx: 0, dy: 0 };
             updateArrangeButton();
         });
     });

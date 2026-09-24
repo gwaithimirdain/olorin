@@ -138,6 +138,35 @@ test.describe('Arrange', () => {
         expect(await olorin.nodes()).not.toEqual(placed);
     });
 
+    test('panning around the diagram leaves an arrangement undoable', async ({ page }) => {
+        const olorin = new Olorin(page);
+        const c = arrangeCases().find((x) => x.name === 'vertical-brackets');
+        await olorin.open({ code: c.level.code });
+        await loadCase(olorin, c);
+        const px = (v) => parseFloat(v);
+        const placed = await olorin.nodes();
+        await olorin.arrange();
+        const arranged = await olorin.nodes();
+
+        // Dragging the background down and to the right, with the view at the top left, has
+        // nowhere to scroll to, so it slides the whole diagram along instead.
+        const d = await page.locator('#diagram').boundingBox();
+        await olorin.panBackground(d.x + 5, d.y + 5, d.x + 125, d.y + 85);
+        expect(await olorin.arrangeButtonText()).toBe('Undo Arrange');
+        const panned = await olorin.nodes();
+        const shift = { x: px(panned[0].left) - px(arranged[0].left), y: px(panned[0].top) - px(arranged[0].top) };
+        expect(shift.x).toBeGreaterThan(0);
+        expect(shift.y).toBeGreaterThan(0);
+        expect(panned.map((n, i) => [px(n.left) - px(arranged[i].left), px(n.top) - px(arranged[i].top)]))
+            .toEqual(panned.map(() => [shift.x, shift.y]));
+
+        // Undoing puts everything back where it was, slid along with the rest.
+        await olorin.arrange();
+        expect(await olorin.arrangeButtonText()).toBe('Arrange');
+        expect((await olorin.nodes()).map((n) => [n.id, px(n.left), px(n.top), n.width]))
+            .toEqual(placed.map((n) => [n.id, px(n.left) + shift.x, px(n.top) + shift.y, n.width]));
+    });
+
     test('any change to the diagram makes an arrangement too late to undo', async ({ page }) => {
         const olorin = new Olorin(page);
         const c = arrangeCases().find((x) => x.state.nodes.length > 3);
