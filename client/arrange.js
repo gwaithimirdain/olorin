@@ -51,7 +51,7 @@ const SPACING = {
     wireMin: 40,
     wireIdeal: 80,
     // How much of a wire should show past its label, all told (see shownOf).
-    wireShown: 40,
+    wireShown: 80,
 };
 const MAX_SPREAD = 2;
 // The spreads tried go down from there in steps of this much.
@@ -532,36 +532,88 @@ const WIRE_CLEARANCE = 4;
 
 // How much of a wire shows past its label, and how that changes as it runs further across (dAcross)
 // and rises or falls further (dUpDown).  Its label sits in the middle of it, and the label's white
-// box hides whatever of the wire runs under it; and a little at each end is taken up by the port
-// and the arrowhead, and doesn't count.  Running level, a wire shows only what of its run the
-// label is too narrow to cover.  Rising or falling by as much as the label is tall, it has its
-// label on the rise or fall, and shows all of its run, and what it rises or falls beyond that.  In
-// between, the label covers less and less of the run (which is how a curve behaves, near enough,
-// and for an angled wire, points the way to it).
+// box hides whatever of the wire runs under it; and the port at one end and the port and arrowhead
+// at the other hide a little more.  So what shows is measured along the wire's path itself (see
+// wirePath): a curved wire whose ends are close together loops back through its own middle, where
+// the label is, and shows much less than its ends being far apart would suggest.
+//
+// The rates are only a guide to which way to go: running level, a wire shows more for running
+// further across once its run is longer than its label, and for rising or falling, which starts
+// moving the label onto a slope, up to the height of the label, beyond which what it rises or falls
+// shows as it is.  (They are kept from getting small: a descent step divides by them, and would send
+// a block flying off to make up the shortfall at a rate that only holds for the first pixel.)
 function shownOf(S, w, xs, ys) {
     const dx = val(xs, S.at.portX(w.t, w.tp)) - val(xs, S.at.portX(w.s, w.sp));
     const dy = val(ys, S.at.portY(w.t, w.tp)) - val(ys, S.at.portY(w.s, w.sp));
     const lw = Math.max(...w.labels.map((l) => l.w)), lh = Math.max(...w.labels.map((l) => l.h));
-    const run = Math.max(0, dx - WIRE_ENDS), rise = Math.abs(dy);
-    const uncovered = Math.min(1, rise / lh);
-    // An angled wire, though, runs level to either side of its label until it rises or falls by
-    // the whole height of the label, and until then the label hides all it can of the run.  (The
-    // rates below still go by the gradual version, which points the way.)
-    // (Over a few pixels, rather than all at once, or a descent could come to rest either side of
-    // the edge.)
-    const reallyUncovered = w.curved ? uncovered : Math.max(0, Math.min(1, (rise - lh) / RISE_RAMP));
-    const covered = Math.min(lw, run) * (1 - reallyUncovered);
-    // (The rates are kept from getting small: a descent step divides by them, and would send a
-    // block flying off to make up the shortfall at a rate that only holds for the first pixel.)
+    const run = Math.max(0, dx - SOURCE_END - TARGET_END), rise = Math.abs(dy);
     return {
-        shown: run - covered + Math.max(0, rise - lh - (w.curved ? 0 : RISE_RAMP)),
-        dAcross: run <= 0 ? 0 : run > lw ? 1 : Math.max(MIN_RATE, uncovered),
-        dUpDown: w.curved ? (rise < lh ? Math.max(MIN_RATE, Math.min(lw, run) / lh) : 1)
-            : rise < lh ? Math.max(MIN_RATE, Math.min(lw, run) / (lh + RISE_RAMP))
-            : rise < lh + RISE_RAMP ? Math.max(MIN_RATE, Math.min(lw, run) / RISE_RAMP) : 1,
+        shown: shownAlong(w.curved, dx, dy, lw, lh),
+        dAcross: run <= 0 ? 0 : run > lw ? 1 : Math.max(MIN_RATE, Math.min(1, rise / lh)),
+        dUpDown: rise < lh ? Math.max(MIN_RATE, Math.min(lw, run) / lh) : 1,
         sign: Math.abs(dy) >= 1 ? Math.sign(dy) : levelWay(w),
     };
 }
+
+// How much shows of a wire running (dx, dy) from one end to the other, with a label lw by lh.  That
+// is all it depends on, and a descent asks it over and over about wires that have hardly moved, so
+// the answers are kept, for whole pixels, and in between it goes smoothly from one to the next
+// (or a descent would never settle, for jumping from pixel to pixel).
+const shownCache = new Map();
+function shownAlong(curved, dx, dy, lw, lh) {
+    const at = function (x, y) {
+        const key = (curved ? 'c' : 'a') + x + ',' + y + ',' + lw + ',' + lh;
+        var shown = shownCache.get(key);
+        if(shown === undefined) {
+            if(shownCache.size > 100000) { shownCache.clear(); }
+            shown = pathShown(wirePath(curved, 0, 0, x, y), lw, lh);
+            shownCache.set(key, shown);
+        }
+        return shown;
+    };
+    const x = Math.floor(dx), y = Math.floor(dy), fx = dx - x, fy = dy - y;
+    return (1 - fx) * ((1 - fy) * at(x, y) + fy * at(x, y + 1)) + fx * ((1 - fy) * at(x + 1, y) + fy * at(x + 1, y + 1));
+}
+
+// The length of a path (as wirePath gives it) that shows: outside the label, a box lw by lh around
+// the middle of the path, and clear of the ports and arrowhead at its two ends.
+function pathShown(path, lw, lh) {
+    const segs = [];
+    var total = 0;
+    for(var i = 1; i < path.length; i++) {
+        const len = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+        segs.push(len);
+        total += len;
+    }
+    // The label goes halfway along the path (jsPlumb's location 0.5).
+    var mid = null, soFar = 0;
+    for(var i = 0; i < segs.length && mid === null; i++) {
+        if(soFar + segs[i] >= total / 2) {
+            const f = segs[i] === 0 ? 0 : (total / 2 - soFar) / segs[i];
+            mid = [path[i][0] + f * (path[i + 1][0] - path[i][0]), path[i][1] + f * (path[i + 1][1] - path[i][1])];
+        }
+        soFar += segs[i];
+    }
+    if(mid === null) { return 0; }
+    const start = path[0], end = path[path.length - 1];
+    const hidden = (p) => (Math.abs(p[0] - mid[0]) < lw / 2 && Math.abs(p[1] - mid[1]) < lh / 2)
+        || Math.hypot(p[0] - start[0], p[1] - start[1]) < SOURCE_END
+        || Math.hypot(p[0] - end[0], p[1] - end[1]) < TARGET_END;
+    // Walk the path a few pixels at a time, counting the steps that show.
+    var shown = 0;
+    for(var i = 0; i < segs.length; i++) {
+        const n = Math.max(1, Math.ceil(segs[i] / PATH_STEP));
+        for(var k = 0; k < n; k++) {
+            const f = (k + 0.5) / n;
+            const p = [path[i][0] + f * (path[i + 1][0] - path[i][0]), path[i][1] + f * (path[i + 1][1] - path[i][1])];
+            if(!hidden(p)) { shown += segs[i] / n; }
+        }
+    }
+    return shown;
+}
+// How far along a path pathShown looks at a time, in pixels.
+const PATH_STEP = 3;
+
 // Which way a level wire had better go, up (-1) or down (1), if it goes either way: up out of the
 // upper of a block's ports, or into the lower of them, and down out of a lower one or into an upper.
 // Down if nothing says either.
@@ -570,11 +622,12 @@ function levelWay(w) {
     return out + into < 0 ? -1 : 1;
 }
 
-// How much of a wire's run its ports and arrowhead take up.
-const WIRE_ENDS = 24;
+// How far from its ends a wire is hidden by the port at its start, and by the port and the
+// arrowhead at its end.
+const SOURCE_END = 8;
+const TARGET_END = 18;
 const MIN_RATE = 0.5;
 const VISIBLE_BAND = 30;
-const RISE_RAMP = 10;
 
 // A wire that shows less than it should past its label (see shownOf) looks as if there were no
 // wire there at all, only a label.  It can be put right by running the wire further across, or up
@@ -582,6 +635,16 @@ const RISE_RAMP = 10;
 // the second time as a `shadow` that the energy's total leaves out.
 function visibility(S, w, xs, ys, xTerms, yTerms) {
     if(w.labels.length === 0) { return; }
+    // Most wires show plenty, and it can be seen without following their paths: one that heads
+    // steadily rightwards (as an angled wire does, and a curved one whose ends are far enough apart
+    // not to loop) can have no more of it under its label than the label is wide and tall.
+    const dx = val(xs, S.at.portX(w.t, w.tp)) - val(xs, S.at.portX(w.s, w.sp));
+    const dy = val(ys, S.at.portY(w.t, w.tp)) - val(ys, S.at.portY(w.s, w.sp));
+    if(dx > 0 && (!w.curved || dx >= 2 * CURVINESS)) {
+        const lw = Math.max(...w.labels.map((l) => l.w)), lh = Math.max(...w.labels.map((l) => l.h));
+        const least = Math.hypot(dx, dy) - lw - lh - SOURCE_END - TARGET_END;
+        if(least >= S.sp.wireShown + VISIBLE_BAND) { return; }
+    }
     const { shown, dAcross, dUpDown, sign } = shownOf(S, w, xs, ys);
     const short = S.sp.wireShown - shown;
     // Just past showing enough, the term is kept on, only with nothing to push: a descent step
@@ -701,7 +764,7 @@ const MAX_STEP = 200;
 // What fraction of a Newton step each step of the descent takes.
 const STEP = 0.5;
 // How little a step has to move everything by for a descent to count as settled.
-const SETTLING = 0.02;
+const SETTLING = 0.5;
 // How weak the hold on where things started gets by the end of a descent (see descend).
 const STAY_FADE = 1e-3;
 
@@ -778,25 +841,28 @@ const CURVINESS = 150;
 const CROSSING = 3000;
 const THROUGH = 3000;
 
-// The path each wire is drawn along, as a list of points: a curved wire is jsPlumb's Bezier curve,
-// and an angled one runs across, then up or down halfway along, then across again.
+// The path a wire from (sx, sy) to (tx, ty) is drawn along, as a list of points: a curved wire is
+// jsPlumb's Bezier curve, and an angled one runs across, then up or down halfway along, then across
+// again.
+function wirePath(curved, sx, sy, tx, ty) {
+    if(!curved) {
+        const mx = (sx + tx) / 2;
+        return [[sx, sy], [mx, sy], [mx, ty], [tx, ty]];
+    }
+    const pts = [];
+    for(var i = 0; i <= 24; i++) {
+        const t = i / 24, u = 1 - t;
+        const a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+        pts.push([a * sx + b * (sx + CURVINESS) + c * (tx - CURVINESS) + d * tx,
+                  a * sy + b * sy + c * ty + d * ty]);
+    }
+    return pts;
+}
+
+// The path each wire is drawn along (see wirePath).
 function wirePaths(S, xs, ys) {
-    return S.wires.map(function (w) {
-        const sx = val(xs, S.at.portX(w.s, w.sp)), sy = val(ys, S.at.portY(w.s, w.sp));
-        const tx = val(xs, S.at.portX(w.t, w.tp)), ty = val(ys, S.at.portY(w.t, w.tp));
-        if(!w.curved) {
-            const mx = (sx + tx) / 2;
-            return [[sx, sy], [mx, sy], [mx, ty], [tx, ty]];
-        }
-        const pts = [];
-        for(var i = 0; i <= 12; i++) {
-            const t = i / 12, u = 1 - t;
-            const a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
-            pts.push([a * sx + b * (sx + CURVINESS) + c * (tx - CURVINESS) + d * tx,
-                      a * sy + b * sy + c * ty + d * ty]);
-        }
-        return pts;
-    });
+    return S.wires.map((w) => wirePath(w.curved, val(xs, S.at.portX(w.s, w.sp)), val(ys, S.at.portY(w.s, w.sp)),
+                                       val(xs, S.at.portX(w.t, w.tp)), val(ys, S.at.portY(w.t, w.tp))));
 }
 
 function segmentsCross(p, q, r, s) {
@@ -1009,13 +1075,17 @@ function refine(model, scopes, L, spread) {
 
 // Whether a tidied layout is enough of an improvement on the player's own to be worth moving
 // things for, at the given spread: it isn't if the player's already keeps the rules at that spread
-// and scores within IMPROVEMENT of it.  (The descent can creep on a long way for very little.)
+// and scores within IMPROVEMENT of it, or LEAST_IMPROVEMENT.  (The descent can creep on a long way
+// for very little.)
 function improves(model, scopes, original, tidied, spread) {
     const own = layOut(model, scopes, original, original, spread, 0, 0);
     if(own.worst > 2 || moved(own.positions, original) > 2) { return true; }
-    return score(tidied.S, tidied.xs, tidied.ys) < (1 - IMPROVEMENT) * score(own.S, own.xs, own.ys);
+    const was = score(own.S, own.xs, own.ys);
+    return score(tidied.S, tidied.xs, tidied.ys) < was - Math.max(IMPROVEMENT * was, LEAST_IMPROVEMENT);
 }
+// (For a small proof, whose whole score is small, a few percent of it is nothing to see.)
 const IMPROVEMENT = 0.05;
+const LEAST_IMPROVEMENT = 1500;
 
 // How far the furthest block moved from one layout to another (see positionsOf).  Where the whole
 // thing is doesn't come into it, only its shape: nothing in the energy cares where the whole thing
