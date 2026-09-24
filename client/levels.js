@@ -2554,6 +2554,26 @@ export const LEVELS = [
             rules: [ "orE", "orI1", "orI2", "impE", "impI", "cnegI", "negE", "allE", "allI", "exE", "exI", "expr", "algplus", "deceq", "tord", "zton", "asc", "natE", "natInd" ],
             levels: [
                 {
+                    parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "f(0)=2" }, { ty: "f(1)=1" }, { ty: "∀n∈ℕ,(f(n+2)=2·f(n)+f(n+1))" } ],
+                    conclusion: { ty: "∀n∈ℕ,(f(n)=2^n+(−1)^n)" }
+                },
+                {
+                    parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "f(0)=1" }, { ty: "f(1)=7" }, { ty: "∀n∈ℕ,(f(n+2)=5·f(n+1)−4·f(n))" } ],
+                    conclusion: { ty: "∀n∈ℕ,(f(n)=2·4^n−1)" }
+                },
+                // Z3 seems to sometimes have an easier time with the algebra for the Fibonacci level if we give
+                // it the golden ratio numbers and their properties abstractly, rather than writing out (1+√5)/2.
+                {
+                    parameters: [ { name: "F", ty: "ℕ→ℕ" } ],
+                    variables: [ { name: "ϕ₁", ty: "ℝ" }, { name: "ϕ₂", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "F(0)=1" }, { ty: "F(1)=1" }, { ty: "∀n∈ℕ,(F(n+2)=F(n)+F(n+1))" }, { ty: "((ϕ₁²=ϕ₁+1)∧(ϕ₁>0))∧((ϕ₂²=ϕ₂+1)∧(ϕ₂<0))" } ],
+                    conclusion: { ty: "∀n∈ℕ,(F(n)=(ϕ₁^(n+1)−ϕ₂^(n+1))/√5)" }
+                },
+                {
                     parameters: [ ],
                     variables: [ { name: "n", ty: "ℕ" } ],
                     hypotheses: [ { ty: "∀a∈ℕ,((a<n)⇒(a mod n = a))" }, { ty: "∀a∈ℕ,((a≥n)⇒(a mod n = a−n mod n))" }, { ty: "n>0" } ],
