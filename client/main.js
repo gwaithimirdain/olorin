@@ -1813,6 +1813,10 @@ difficultyRadios.forEach(function (radios, i) {
     });
 });
 
+// In test mode chooseLevel doesn't pick a level's difficulty, so the chooser shows the global
+// radios for picking it by hand.
+if(TEST_MODE) { document.getElementById("chooseDifficulty").style.display = "flex"; }
+
 // DEPRECATED, with the `saveable` blocks in levels.js: the keys a level's records were filed under
 // before its statement was last written differently -- one per earlier statement, and none at all
 // for the levels that never moved.
