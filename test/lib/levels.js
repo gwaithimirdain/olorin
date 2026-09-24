@@ -28,9 +28,33 @@ function loadLevelsModule() {
     return new Function(transformed)();
 }
 
-// All levels, in play order.  `name` is the "world-stage-level" id the app shows (1-indexed),
-// `saveable` is the level identity used as its localStorage key, and the rest is the level's own
-// data, for tests to select on.
+// The record the tests see for one level of levels.js.  `name` is the "world-stage-level" id the
+// app shows (1-indexed), `saveable` is the level identity used as its localStorage key, and the
+// rest is the level's own data, for tests to select on.
+function levelRecord(saveable, legacySaveables, stage, level, x, y, z) {
+    return {
+        name: `${x + 1}-${y + 1}-${z + 1}`,
+        world: x + 1,
+        stage: y + 1,
+        index: z + 1,
+        // The palette this level offers: its stage's rules plus any of its own.
+        rules: stage.rules.concat(level.extrarules || []),
+        extrarules: level.extrarules || [],
+        saveable: saveable(level),
+        // DEPRECATED (see client/levels.js): the statements this level was stored under
+        // before it was last restated, for the levels that moved; empty otherwise.
+        legacySaveables: legacySaveables(level),
+        parameters: level.parameters.map((p) => p.name),
+        variables: level.variables.map((v) => v.name),
+        hypotheses: level.hypotheses.map((h) => h.ty),
+        conclusion: level.conclusion.ty,
+        trivial: !!level.trivial,
+        autoComplete: !!level.autoComplete,
+        hint: level.hint || null,
+    };
+}
+
+// All levels, in play order, as `levelRecord`s.
 let cached = null;
 function allLevels() {
     if (cached) return cached;
@@ -44,33 +68,40 @@ function allLevels() {
         if (world.courses) return;
         world.stages.forEach((stage, y) => {
             stage.levels.forEach((level, z) => {
-                out.push({
-                    name: `${x + 1}-${y + 1}-${z + 1}`,
-                    world: x + 1,
-                    stage: y + 1,
-                    index: z + 1,
-                    worldName: world.name,
-                    // The palette this level offers: its stage's rules plus any of its own.
-                    rules: stage.rules.concat(level.extrarules || []),
-                    extrarules: level.extrarules || [],
-                    saveable: saveable(level),
-                    // DEPRECATED (see client/levels.js): the statements this level was stored under
-                    // before it was last restated, for the levels that moved; empty otherwise.
-                    legacySaveables: legacySaveables(level),
-                    parameters: level.parameters.map((p) => p.name),
-                    variables: level.variables.map((v) => v.name),
-                    hypotheses: level.hypotheses.map((h) => h.ty),
-                    conclusion: level.conclusion.ty,
-                    trivial: !!level.trivial,
-                    autoComplete: !!level.autoComplete,
-                    hint: level.hint || null,
-                });
+                out.push(Object.assign(levelRecord(saveable, legacySaveables, stage, level, x, y, z),
+                    { worldName: world.name }));
             });
         });
     });
     cached = out;
     return out;
 }
+
+// The levels of the worlds a course keeps to itself, as `levelRecord`s with the `code` that shows
+// them (the app has to be opened with it for the level to be in the chooser at all).  These are
+// out of `allLevels`, but they want proof fixtures as much as any.
+function courseLevels() {
+    const { LEVELS, COURSE_CODES, saveable, legacySaveables } = loadLevelsModule();
+    const codeFor = (world) =>
+        Object.keys(COURSE_CODES).find((code) => world.courses.includes(COURSE_CODES[code]));
+    const out = [];
+    LEVELS.forEach((world, x) => {
+        if (!world.courses) return;
+        const code = codeFor(world);
+        // A world no code shows can't be played, so there's nothing to test on it.
+        if (code === undefined) return;
+        world.stages.forEach((stage, y) => {
+            stage.levels.forEach((level, z) => {
+                out.push(Object.assign(levelRecord(saveable, legacySaveables, stage, level, x, y, z),
+                    { worldName: world.name, code }));
+            });
+        });
+    });
+    return out;
+}
+
+// Every level a proof fixture can be filed for: the game's own and the courses'.
+const fixtureLevels = () => allLevels().concat(courseLevels());
 
 // The worlds' display names, in order (as the chooser and the unlock announcement show them).
 function worldNames() {
@@ -298,7 +329,7 @@ const prereqSeeds = (level, difficulty) =>
         .concat(prereqs(level, difficulty).flatMap(([levels, d]) => completions(levels, d)));
 
 module.exports = {
-    allLevels, worldNames, worldCount, courseWorlds, courseCodes,
+    allLevels, courseLevels, fixtureLevels, worldNames, worldCount, courseWorlds, courseCodes,
     inWorld, inStage, stagesInWorld, prereqStages, find,
     worlds, world, prereqWorlds, followerWorlds, worldGateSeeds,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, wrappableStatementLevel,

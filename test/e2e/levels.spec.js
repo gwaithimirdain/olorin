@@ -19,12 +19,13 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { allLevels } = require('../lib/levels');
+const { fixtureLevels } = require('../lib/levels');
 const { hasFixture, readFixture, fixtureMatches, proofRules, unavailableRules } =
     require('../lib/fixtures');
 
 test.describe('Levels have a working proof', () => {
-    for (const level of allLevels()) {
+    // A course's levels are in the chooser only when the app is opened with its code.
+    for (const level of fixtureLevels()) {
         if (!hasFixture(level)) {
             // No proof captured yet for this level: track it as an explicit TODO.
             test.fixme(`level ${level.name}`, () => {});
@@ -33,7 +34,7 @@ test.describe('Levels have a working proof', () => {
 
         test(`level ${level.name}`, async ({ page }) => {
             const olorin = new Olorin(page);
-            await olorin.open();
+            await olorin.open({ code: level.code });
             await olorin.selectLevel(level.name);
 
             const state = readFixture(level);
