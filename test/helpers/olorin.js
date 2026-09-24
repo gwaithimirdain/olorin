@@ -451,6 +451,27 @@ class Olorin {
         return this.page.evaluate(() => window.__olorin.complete());
     }
 
+    // Click the Arrange button (which is Undo Arrange just after arranging), and wait for the
+    // blocks to finish sliding into place.
+    async arrange() {
+        await this.page.click('#arrangeProof');
+        await this.page.waitForFunction(() => !window.__olorin.arranging());
+    }
+
+    arrangeButtonText() {
+        return this.page.textContent('#arrangeProof');
+    }
+
+    // The diagram as client/arrange.js sees it (blocks, ports, wires, the view), and what arranging
+    // it now would do, without doing it.
+    layoutModel() {
+        return this.page.evaluate(() => window.__olorin.layoutModel());
+    }
+
+    arrangement() {
+        return this.page.evaluate(() => window.__olorin.arrangement());
+    }
+
     savedKey() {
         return this.page.evaluate(() => window.__olorin.savedProofKey());
     }

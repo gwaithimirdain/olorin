@@ -16,10 +16,13 @@ test/
   lib/levels.js           # Enumerate the game's levels (read from client/levels.js)
   lib/fixtures.js         # Store/find proof fixtures by a hash of the level's statement
   lib/testmode.js         # The password ?test takes (read from client/main.js)
+  lib/arrange.js          # The proofs the Arrange button is tried on (fixtures/proofs + arrange)
   generate-fixtures.js    # Auto-solve levels and write verified proof fixtures
   add-fixture.js          # File a hand-made proof (an exported JSON) as a fixture
+  arrange-gallery.js      # Before/after pictures of the Arrange button on every case, for tuning it
   fixtures/proofs/        # One <statement-hash>.json per covered level (a correct proof)
   fixtures/rejected/      # Proofs that must be rejected (see rejected.spec.js for why each one)
+  fixtures/arrange/       # Proofs kept for how they are laid out, to try Arrange on
   e2e/                    # Test specs
     levels.spec.js        # One test per level: load its fixture proof, assert it's complete
                           #   and that its blocks are all in that level's palette
@@ -27,6 +30,8 @@ test/
     exportimport.spec.js  # Export/Import (incl. cross-level switch) tests
     rejected.spec.js      # Each proof in fixtures/rejected/ fails with the expected error,
                           #   and is accepted once the wires that fix it are added
+    arrange.spec.js       # Arrange on every case leaves the proof alone, keeps the rules of a
+                          #   tidy layout, is saved and undoable, and leaves a tidy layout be
 ```
 
 ## Per-level proof fixtures
@@ -73,6 +78,22 @@ node test/add-fixture.js ~/Downloads/exported.json
 That reads the level out of the proof itself, so it needs no level name and can't file a proof
 under the wrong level. Hand-made fixtures live alongside generated ones and survive renumbering
 the same way; `--list` also reports any *orphan*, a fixture whose statement no level makes any more.
+
+## Tuning the Arrange button
+
+The Arrange button (`client/arrange.js`) lays a proof out by minimizing a "niceness" energy, and
+getting that energy right is a matter of trying it on real proofs and looking.  So
+
+```bash
+npm run build                                      # (or build:static)
+node test/arrange-gallery.js [--only name,name]    # -> test-results/arrange-gallery/index.html
+```
+
+arranges every case in `lib/arrange.js` -- every proof fixture, plus the layouts in
+`fixtures/arrange/` -- and writes a page with each one before and after, beside the energy term by
+term and a few things measured off the page (labels covering blocks or each other, wires running
+backwards, how big it all is).  A proof worth keeping just for its layout goes in
+`fixtures/arrange/` as an exported JSON; it is found by the statement it carries, like any fixture.
 
 ## Running
 

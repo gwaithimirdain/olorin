@@ -1,6 +1,7 @@
 import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOVED, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_ELEMENT_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
+import { arrange } from "./arrange.js"
 
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
@@ -518,7 +519,10 @@ document.addEventListener('mouseup', function() {
     // resizes the canvas itself), and otherwise trim the surface to what we ended up needing.
     const shifted = normalizeOrigin();
     if(!shifted) { resizeCanvas(); }
-    if(moved || shifted) { autosave(); }
+    if(moved || shifted) {
+        forgetArrange();
+        autosave();
+    }
 });
 
 // Scrolling changes no part of the proof, but it does change where the player is looking, which a
@@ -740,6 +744,7 @@ ready(() => {
     // Dragging a node to rearrange the proof changes positions without re-typechecking, so save
     // the new positions when a drag finishes.
     instance.bind(EVENT_DRAG_STOP, function () {
+        forgetArrange();
         const dropped = dragPan ? dragPan.boxes : new Set();
         stopDragPan();
         // A box dragged off the top/left is sitting at negative coordinates; put the origin back.
@@ -2861,6 +2866,15 @@ if (TEST_MODE) {
         serialize: () => serializeProof(),
         // Rebuild the proof from a snapshot, into the current level.
         restore: (state) => restoreProof(state),
+        // The diagram as client/arrange.js sees it, and what it makes of it (worked out by the
+        // worker, as for the Arrange button), without moving anything.
+        layoutModel: () => layoutModel(),
+        arrangement: () => requestArrangement().promise,
+        // Whether the Arrange button is still waiting to know where the blocks go, or they are
+        // still sliding into place (after Arrange or its undo).
+        arranging: () => arrangeWaiting !== null || arrangeFrame !== null,
+        // Whether arrangements are being worked out in a worker, rather than on the page itself.
+        arrangeWorker: () => arrangeWorker !== null,
         // Whether the proof currently reads as complete (the conclusion turns a color).
         complete: proofIsComplete,
         // The per-difficulty ['locked'|'unlocked'|'completed'] states of a level, by name.
@@ -4010,6 +4024,7 @@ document.addEventListener('mousemove', (e) => {
 
 // Stop resizing on mouseup anywhere in the document
 document.addEventListener('mouseup', () => {
+    if(currentResizable) { forgetArrange(); }
     isResizingRight = false;
     isResizingLeft = false;
     currentResizable = null;
@@ -4192,6 +4207,8 @@ function addConnection(params) {
 
 // Parse the graph into a term and typecheck it, displaying diagnostics.  If 'remove' is true, also remove the connection indicated by the parameters, as this is a detach event.  Since we need to pass the result as an onclick callback, we manually curry the definition.
 function typecheck() {
+    // The diagram has changed, so an arrangement can no longer be undone.
+    forgetArrange();
     if(suppressChecking) { return; }
     // Wait for the round already in flight (see typecheckPending); it will come back here with the
     // diagram as it stands then.
@@ -4496,6 +4513,318 @@ function spreadWireLabels() {
     // Repaint only the wires whose labels actually moved.
     moved.forEach(function (el) { instance.revalidate(el); });
 }
+
+// The "Arrange" button tidies up the layout of the proof (see client/arrange.js), sliding the blocks
+// to where they go, and then offers to undo that until the diagram changes again.
+
+// The branches of each kind of bracket: the part above its bar, and for a bracket with two
+// subgoals, the part below it too.  A port's `side` says which branch it belongs to.
+const BRACKET_BRANCHES = {
+    impI: ['upper'], allI: ['upper'], negI: ['upper'], cnegI: ['upper'], natInd: ['upper'],
+    orE: ['upper', 'lower'], iffI: ['upper', 'lower'], natE: ['upper', 'lower'],
+};
+// How long the blocks take to slide into place, in milliseconds.
+const ARRANGE_DURATION = 500;
+
+// The diagram as client/arrange.js takes it: every block's geometry and ports, and every wire with
+// the size of its labels.  Coordinates are the canvas's, as the boxes' left/top are.
+function layoutModel() {
+    const origin = canvas.getBoundingClientRect();
+    const rectOf = function (el) {
+        const r = el.getBoundingClientRect();
+        return { x: r.x - origin.x, y: r.y - origin.y, w: r.width, h: r.height };
+    };
+    const portIndex = new Map();
+    const blocks = nodes.map(function (entry) {
+        const el = entry.node;
+        const x = el.offsetLeft, y = el.offsetTop, w = el.offsetWidth, h = el.offsetHeight;
+        const branches = BRACKET_BRANCHES[entry.rule];
+        const block = { id: entry.id, x: x, y: y, w: w, h: h };
+        if(branches) { block.branches = branches; }
+        if(FIXED_RULES.includes(entry.rule)) { block.root = true; }
+        // What the block covers, counting the type labels shown beside its ports.
+        const ext = { left: 0, top: 0, right: 0, bottom: h };
+        block.ports = instance.getEndpoints(el).map(function (ep, i) {
+            portIndex.set(ep, i);
+            const p = ep.parameters;
+            const loc = instance.router.getEndpointLocation(ep);
+            // On a bracket, the ports on the right-hand upright move with its right edge.
+            const right = !!branches && (p.sort === 'subgoal' || p.sort === 'output');
+            const ovl = ep.getOverlay("customLabel");
+            if(ovl && ovl.canvas && !p.hidden) {
+                const r = rectOf(ovl.canvas);
+                if(r.w > 0 && r.h > 0) {
+                    ext.left = Math.min(ext.left, r.x - x);
+                    ext.top = Math.min(ext.top, r.y - y);
+                    ext.right = Math.max(ext.right, r.x + r.w - (x + w));
+                    ext.bottom = Math.max(ext.bottom, r.y + r.h - y);
+                }
+            }
+            return {
+                sort: p.sort, label: p.label, side: p.side,
+                dx: loc.curX - (right ? x + w : x), dy: loc.curY - y, right: right,
+            };
+        });
+        block.extent = ext;
+        return block;
+    });
+    const wires = instance.getConnections().map(function (c) {
+        const labels = [];
+        ["label", "userLabel", "gotLabel", "expectedLabel"].forEach(function (id) {
+            const ovl = c.getOverlay(id);
+            if(!ovl || !ovl.canvas) { return; }
+            if(typeof ovl.getLabel === 'function' && ovl.getLabel() === "") { return; }
+            const r = rectOf(ovl.canvas);
+            if(r.w > 0 && r.h > 0) { labels.push({ w: r.w, h: r.h }); }
+        });
+        return {
+            src: { block: c.source.id, port: portIndex.get(c.endpoints[0]) },
+            tgt: { block: c.target.id, port: portIndex.get(c.endpoints[1]) },
+            labels: labels,
+            curved: !!c.connector && c.connector.type === BezierConnector.type,
+        };
+    });
+    // The part of the canvas in view, which a small proof is spread out to fill.
+    const view = { x: diagram.scrollLeft, y: diagram.scrollTop, w: diagram.clientWidth, h: diagram.clientHeight };
+    return { blocks: blocks, wires: wires, view: view };
+}
+
+// Where every block is, and how wide every bracket is, as their styles say: what an arrangement is
+// undone to.  (Only a bracket's width is the player's to change.)
+function blockPlacements() {
+    const out = {};
+    nodes.forEach(function (x) {
+        out[x.id] = { left: x.node.style.left, top: x.node.style.top };
+        if(BRACKET_BRANCHES[x.rule]) { out[x.id].width = x.node.style.width; }
+    });
+    return out;
+}
+
+// What undoing the last arrangement would put back (see blockPlacements), or null if there's
+// nothing to undo, and where the arrangement left everything, so we can tell if it has changed.
+var arrangeUndo = null;
+// The animation in progress, if any.
+var arrangeFrame = null;
+
+// A big proof can take a second or two to arrange, so that is worked out in a worker
+// (client/arrange-worker.js), leaving the page alive meanwhile.  The worker is started with the
+// page, so its script is loaded while we're sure to be online.  It is null where the browser
+// won't run one, and then arrangements are worked out here after all.
+var arrangeWorker = null;
+// The arrangements the worker is working out, by the id of the request, as { model, resolve }.
+const arrangeRequests = new Map();
+var arrangeRequestCount = 0;
+// The id of the request the Arrange button is waiting on, if it is.
+var arrangeWaiting = null;
+
+function startArrangeWorker() {
+    try {
+        arrangeWorker = new Worker(/* webpackChunkName: "arrange" */ new URL('./arrange-worker.js', import.meta.url));
+    } catch(e) {
+        arrangeWorker = null;
+        return;
+    }
+    arrangeWorker.onmessage = function (e) {
+        const request = arrangeRequests.get(e.data.id);
+        if(!request) { return; }
+        arrangeRequests.delete(e.data.id);
+        if(e.data.error) { console.error("Arranging failed:", e.data.error); }
+        request.resolve(e.data.error ? null : e.data.result);
+    };
+    // A worker that can't be run at all (its script didn't load, say): do without it, and answer
+    // whatever it was asked here instead.
+    arrangeWorker.onerror = function (e) {
+        e.preventDefault();
+        arrangeWorker = null;
+        const waiting = Array.from(arrangeRequests.values());
+        arrangeRequests.clear();
+        waiting.forEach(function (request) { request.resolve(arrangeHere(request.model)); });
+    };
+}
+startArrangeWorker();
+
+function arrangeHere(model) {
+    try {
+        return arrange(model);
+    } catch(err) {
+        console.error("Arranging failed:", err);
+        return null;
+    }
+}
+
+// Work out an arrangement of the diagram as it is now.  Returns the request's id, and a promise of
+// what client/arrange.js makes of it -- or null, if it failed or was cancelled.
+function requestArrangement() {
+    const model = layoutModel();
+    const id = ++arrangeRequestCount;
+    if(!arrangeWorker) { return { id: id, promise: Promise.resolve().then(() => arrangeHere(model)) }; }
+    const promise = new Promise(function (resolve) {
+        arrangeRequests.set(id, { model: model, resolve: resolve });
+    });
+    arrangeWorker.postMessage({ id: id, model: model });
+    return { id: id, promise: promise };
+}
+
+// Stop working out whatever arrangements are being worked out.  A worker can't be interrupted in
+// the middle of something, so it goes, and a fresh one takes its place.
+function cancelArrangements() {
+    if(arrangeRequests.size === 0) { return; }
+    const waiting = Array.from(arrangeRequests.values());
+    arrangeRequests.clear();
+    if(arrangeWorker) {
+        arrangeWorker.terminate();
+        startArrangeWorker();
+    }
+    waiting.forEach(function (request) { request.resolve(null); });
+}
+
+// Whether the Arrange button is waiting for an arrangement to be worked out.  While it is, nothing
+// in the diagram is to be touched: the arrangement is of the diagram as it was.
+function setArrangeWaiting(id) {
+    arrangeWaiting = id;
+    diagram.style.pointerEvents = id === null ? '' : 'none';
+    document.body.classList.toggle('arranging', id !== null);
+    updateArrangeButton();
+}
+
+function updateArrangeButton() {
+    const button = document.getElementById("arrangeProof");
+    if(arrangeWaiting !== null) {
+        button.innerText = "Cancel Arrange";
+        button.title = "Stop working out how to arrange the proof, and leave it as it is";
+        return;
+    }
+    button.innerText = arrangeUndo ? "Undo Arrange" : "Arrange";
+    button.title = arrangeUndo ? "Put the blocks back where they were before arranging them"
+        : "Tidy up the layout of the proof";
+}
+
+// Whatever changes the diagram after an arrangement makes it too late to undo it.
+function forgetArrange() {
+    if(!arrangeUndo) { return; }
+    arrangeUndo = null;
+    updateArrangeButton();
+}
+
+// Slide the blocks to the given places ({ id: { left, top, width } }, as numbers of pixels or as
+// CSS lengths, which they end up set to exactly; a missing width is left alone), then call `done`.
+// The wires follow them all the way.
+function slideBlocks(targets, done) {
+    const css = (v) => (typeof v === 'number' ? v + 'px' : v);
+    // How many pixels a CSS length comes to for this box, found by trying it.
+    const pixels = function (el, prop, v) {
+        if(typeof v === 'number') { return v; }
+        const was = el.style[prop];
+        el.style[prop] = v;
+        const px = prop === 'left' ? el.offsetLeft : prop === 'top' ? el.offsetTop : el.offsetWidth;
+        el.style[prop] = was;
+        return px;
+    };
+    const moves = [];
+    nodes.forEach(function (x) {
+        const t = targets[x.id];
+        if(!t) { return; }
+        const el = x.node;
+        const m = { el: el, from: {}, to: {}, end: {} };
+        ['left', 'top', 'width'].forEach(function (prop) {
+            if(t[prop] === undefined) { return; }
+            m.from[prop] = prop === 'left' ? el.offsetLeft : prop === 'top' ? el.offsetTop : el.offsetWidth;
+            m.to[prop] = pixels(el, prop, t[prop]);
+            m.end[prop] = css(t[prop]);
+        });
+        moves.push(m);
+    });
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const start = performance.now();
+    // Nothing is to be dragged, resized or wired while the blocks are on the move.
+    diagram.style.pointerEvents = 'none';
+    const frame = function (now) {
+        const t = reduce ? 1 : Math.min(1, (now - start) / ARRANGE_DURATION);
+        // Ease in and out.
+        const e = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+        moves.forEach(function (m) {
+            Object.keys(m.to).forEach(function (prop) {
+                m.el.style[prop] = t < 1 ? (m.from[prop] + (m.to[prop] - m.from[prop]) * e) + 'px'
+                    : m.end[prop];
+            });
+        });
+        instance.repaintEverything();
+        if(t < 1) {
+            arrangeFrame = requestAnimationFrame(frame);
+            return;
+        }
+        arrangeFrame = null;
+        diagram.style.pointerEvents = '';
+        done();
+    };
+    arrangeFrame = requestAnimationFrame(frame);
+}
+
+// Once the blocks have settled: bring everything back onto the canvas, move the wire labels off
+// each other, and save.  Returns where everything ended up.
+function settleArrangement() {
+    normalizeOrigin();
+    resizeCanvas();
+    spreadWireLabels();
+    autosave();
+    return blockPlacements();
+}
+
+// Where an arrangement puts the blocks, in the form slideBlocks takes.
+function arrangementTargets(result) {
+    const targets = {};
+    Object.keys(result.positions).forEach(function (id) {
+        const p = result.positions[id];
+        targets[id] = { left: p.x, top: p.y };
+        if(p.w !== undefined) { targets[id].width = p.w; }
+    });
+    return targets;
+}
+
+// Everything about the diagram an arrangement of it depends on, to tell whether it has changed.
+function diagramSignature() {
+    return JSON.stringify([blockPlacements(), instance.getConnections().length]);
+}
+
+function arrangeProof() {
+    if(arrangeFrame !== null) { return; }
+    // Clicked again while it's working out how: cancel.
+    if(arrangeWaiting !== null) {
+        setArrangeWaiting(null);
+        cancelArrangements();
+        return;
+    }
+    // The layout the undo would restore has to be the one on screen, or undoing would put back
+    // something the player has since changed.
+    if(arrangeUndo && JSON.stringify(blockPlacements()) !== JSON.stringify(arrangeUndo.after)) {
+        forgetArrange();
+    }
+    if(arrangeUndo) {
+        const back = arrangeUndo.before;
+        arrangeUndo = null;
+        slideBlocks(back, function () {
+            settleArrangement();
+            updateArrangeButton();
+        });
+        return;
+    }
+    const before = blockPlacements();
+    const signature = diagramSignature();
+    const request = requestArrangement();
+    setArrangeWaiting(request.id);
+    request.promise.then(function (result) {
+        // Not if it was cancelled, or the button has been waiting on something else since.
+        if(arrangeWaiting !== request.id) { return; }
+        setArrangeWaiting(null);
+        // Nor if it failed, or the diagram has changed after all (a key can still delete blocks).
+        if(result === null || diagramSignature() !== signature) { return; }
+        slideBlocks(arrangementTargets(result), function () {
+            arrangeUndo = { before: before, after: settleArrangement() };
+            updateArrangeButton();
+        });
+    });
+}
+document.getElementById("arrangeProof").onclick = arrangeProof;
 
 // The diagnostics from the most recent completed typecheck, for the test seam to read.
 var lastDiagnostics = [];
@@ -5085,6 +5414,18 @@ function setLevel(level, rulesAllowed) {
     document.getElementById("cancelChooseLevel").style.display = '';
     document.getElementById("cancelSetLevel").style.display = '';
 
+    // Blocks still sliding into an arrangement, or waiting for one to be worked out, are about to
+    // go, and that arrangement with them.
+    if(arrangeWaiting !== null) {
+        setArrangeWaiting(null);
+        cancelArrangements();
+    }
+    if(arrangeFrame !== null) {
+        cancelAnimationFrame(arrangeFrame);
+        arrangeFrame = null;
+        diagram.style.pointerEvents = '';
+    }
+    forgetArrange();
     // Delete all the existing nodes, to prepare for a new level.  We have to remove the jsPlumb connections and endpoints first, or they end up stashed in the corner of the window.
     instance.select().deleteAll();    // This removes all connections
     nodes.forEach((x) => {

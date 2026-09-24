@@ -104,6 +104,9 @@ body {
     white-space: nowrap;
 }
 
+/* While Arrange works out where the blocks go, the diagram is out of reach (see setArrangeWaiting). */
+body.arranging { cursor: progress; }
+
 /* Ctrl/Cmd- or middle-dragging the background pans the canvas behind the viewport. */
 #diagram.panready { cursor: grab; }
 #diagram.panning, #diagram.panning * { cursor: grabbing; }
@@ -908,6 +911,9 @@ body {
     background-color: #ffffff;
     padding: 5px;
     margin: 2px;
+    /* Like the labels on ports: a label near the edge of the canvas would otherwise wrap onto
+       another line for want of room, and be a different shape depending on where its wire is. */
+    white-space: nowrap;
     /* A label sits at the middle of its wire, right where you'd aim to hover the wire itself, so
        it lets the pointer through to the wire underneath.  The user-entered ones are clickable,
        so they take it back. */
