@@ -8,13 +8,24 @@
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 
-// The input ports on a block, and how many of them have a wire.
+// The input ports on a block, and how many of them have a wire.  Every call also checks that the
+// one empty port is drawn as an open circle (white inside, and ringed in the port's color), since
+// nothing need be wired to it, while the wired ones are drawn filled in like any other port.  The
+// color is the block's output port's: blue for an expression, black for an algebra block.
 async function inputs(page, id) {
-    return page.evaluate((i) => {
-        const ports = window.__olorin.ports().filter((p) => p.vertex === i && p.sort === 'input');
+    const { ports, color, wired } = await page.evaluate((i) => {
+        const all = window.__olorin.ports().filter((p) => p.vertex === i);
         const wired = window.__olorin.connections().filter((c) => c.target.vertex === i).length;
-        return { ports: ports.length, wired };
+        return {
+            ports: all.filter((p) => p.sort === 'input'),
+            color: all.find((p) => p.sort === 'output').fill,
+            wired,
+        };
     }, id);
+    const open = ports.filter((p) => p.fill === '#ffffff');
+    expect(open.map((p) => p.stroke)).toEqual([color]);
+    expect(ports.filter((p) => p.fill === color).length).toBe(wired);
+    return { ports: ports.length, wired };
 }
 
 const boxHeight = (page, id) =>

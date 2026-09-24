@@ -916,10 +916,7 @@ function syncVariadicInputs(box) {
     empty.slice(1).forEach(function (ep) { instance.deleteEndpoint(ep); });
     if(empty.length === 0) {
         const port = { anchor: "Left", target: true, parameters: { sort: "input" } };
-        if(spec.hasValue) {
-            port.parameters.hasValue = true;
-            port.paintStyle = { fill: VALUECOLOR };
-        }
+        if(spec.hasValue) { port.parameters.hasValue = true; }
         instance.addEndpoint(box, port);
     }
     // The empty port goes last, below all the wired ones.
@@ -927,7 +924,15 @@ function syncVariadicInputs(box) {
         return (a.connections.length === 0) - (b.connections.length === 0);
     });
     const n = laidOut.length;
-    laidOut.forEach(function (ep, i) { ep.setAnchor([0, (i + 0.5) / n, -1, 0]); });
+    // The empty port is drawn as an open circle: nothing has to be wired to it for the proof to
+    // be complete, as there does to any other input.
+    const color = spec.hasValue ? VALUECOLOR : "#000000";
+    laidOut.forEach(function (ep, i) {
+        ep.setAnchor([0, (i + 0.5) / n, -1, 0]);
+        ep.setPaintStyle(ep.connections.length === 0
+                         ? { fill: "#ffffff", stroke: color, strokeWidth: 2 }
+                         : { fill: color });
+    });
     // Past two ports the box has to get taller.  (A min-height, so it isn't saved with the proof:
     // it comes back by itself as the wires are restored.)
     const tall = n > 2 ? n * VARIADIC_PORT_SPACING : 0;
@@ -2869,6 +2874,10 @@ if (TEST_MODE) {
                     type: shown || n.node.dataset["label:" + ep.parameters.sort + ":" + ep.parameters.label],
                     // A quantifier block's condition port is hidden while it has nothing to it.
                     hidden: !!ep.parameters.hidden,
+                    // The colors the port is painted in: an open circle has a white fill and a
+                    // stroke of its own color.
+                    fill: ep.getPaintStyle().fill,
+                    stroke: ep.getPaintStyle().stroke,
                 };
             })),
         // The localStorage key a level's completion is recorded under, by name.
