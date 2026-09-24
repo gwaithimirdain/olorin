@@ -50,6 +50,8 @@ const SPACING = {
     // down.)
     wireMin: 40,
     wireIdeal: 80,
+    // How much of a wire should show past its label, all told (see shownOf).
+    wireShown: 40,
 };
 const MAX_SPREAD = 2;
 // The spreads tried go down from there in steps of this much.
@@ -65,11 +67,13 @@ const BRACKET_MIN_W = 100;
 
 // How much each part of the energy counts.
 const WEIGHTS = {
-    level: 1,        // a wire's two ends at the same height
+    level: 1,        // a wire's two ends at the same height (see HUBER)
+    levelSquare: 0.02, // ...and a little more so, the further out of level they are
     length: 0.3,     // a wire's horizontal run close to what it would like
     snug: 2,         // brackets no wider than they need to be (per pixel of width)
     labels: 20,      // wire labels clear of the blocks and of each other
-    through: 5,      // wires not running through blocks
+    visible: 5,      // enough of each wire showing past its label
+    through: 20,      // wires not running through blocks
     stay: 0.02,      // blocks close to where the player put them
 };
 
@@ -526,6 +530,75 @@ function pathPoints(S) {
 // How far outside a block a wire would like to keep.
 const WIRE_CLEARANCE = 4;
 
+// How much of a wire shows past its label, and how that changes as it runs further across (dAcross)
+// and rises or falls further (dUpDown).  Its label sits in the middle of it, and the label's white
+// box hides whatever of the wire runs under it; and a little at each end is taken up by the port
+// and the arrowhead, and doesn't count.  Running level, a wire shows only what of its run the
+// label is too narrow to cover.  Rising or falling by as much as the label is tall, it has its
+// label on the rise or fall, and shows all of its run, and what it rises or falls beyond that.  In
+// between, the label covers less and less of the run (which is how a curve behaves, near enough,
+// and for an angled wire, points the way to it).
+function shownOf(S, w, xs, ys) {
+    const dx = val(xs, S.at.portX(w.t, w.tp)) - val(xs, S.at.portX(w.s, w.sp));
+    const dy = val(ys, S.at.portY(w.t, w.tp)) - val(ys, S.at.portY(w.s, w.sp));
+    const lw = Math.max(...w.labels.map((l) => l.w)), lh = Math.max(...w.labels.map((l) => l.h));
+    const run = Math.max(0, dx - WIRE_ENDS), rise = Math.abs(dy);
+    const uncovered = Math.min(1, rise / lh);
+    // An angled wire, though, runs level to either side of its label until it rises or falls by
+    // the whole height of the label, and until then the label hides all it can of the run.  (The
+    // rates below still go by the gradual version, which points the way.)
+    // (Over a few pixels, rather than all at once, or a descent could come to rest either side of
+    // the edge.)
+    const reallyUncovered = w.curved ? uncovered : Math.max(0, Math.min(1, (rise - lh) / RISE_RAMP));
+    const covered = Math.min(lw, run) * (1 - reallyUncovered);
+    // (The rates are kept from getting small: a descent step divides by them, and would send a
+    // block flying off to make up the shortfall at a rate that only holds for the first pixel.)
+    return {
+        shown: run - covered + Math.max(0, rise - lh - (w.curved ? 0 : RISE_RAMP)),
+        dAcross: run <= 0 ? 0 : run > lw ? 1 : Math.max(MIN_RATE, uncovered),
+        dUpDown: w.curved ? (rise < lh ? Math.max(MIN_RATE, Math.min(lw, run) / lh) : 1)
+            : rise < lh ? Math.max(MIN_RATE, Math.min(lw, run) / (lh + RISE_RAMP))
+            : rise < lh + RISE_RAMP ? Math.max(MIN_RATE, Math.min(lw, run) / RISE_RAMP) : 1,
+        sign: Math.abs(dy) >= 1 ? Math.sign(dy) : levelWay(w),
+    };
+}
+// Which way a level wire had better go, up (-1) or down (1), if it goes either way: up out of the
+// upper of a block's ports, or into the lower of them, and down out of a lower one or into an upper.
+// Down if nothing says either.
+function levelWay(w) {
+    const out = { upper: -1, lower: 1 }[w.sp.side] || 0, into = { upper: 1, lower: -1 }[w.tp.side] || 0;
+    return out + into < 0 ? -1 : 1;
+}
+
+// How much of a wire's run its ports and arrowhead take up.
+const WIRE_ENDS = 24;
+const MIN_RATE = 0.5;
+const VISIBLE_BAND = 30;
+const RISE_RAMP = 10;
+
+// A wire that shows less than it should past its label (see shownOf) looks as if there were no
+// wire there at all, only a label.  It can be put right by running the wire further across, or up
+// or down, whichever costs less.  The term is in both coordinates at once, so it goes in both lists,
+// the second time as a `shadow` that the energy's total leaves out.
+function visibility(S, w, xs, ys, xTerms, yTerms) {
+    if(w.labels.length === 0) { return; }
+    const { shown, dAcross, dUpDown, sign } = shownOf(S, w, xs, ys);
+    const short = S.sp.wireShown - shown;
+    // Just past showing enough, the term is kept on, only with nothing to push: a descent step
+    // takes its size from how firmly the energy holds a variable, and without this, the step that
+    // makes a wire show enough would overshoot into where nothing holds it, and the level term
+    // would take it all the way back next step, and so on for ever.
+    if(!(short > -VISIBLE_BAND)) { return; }
+    const value = Math.max(0, short);
+    const a = S.at.portX(w.s, w.sp), b = S.at.portX(w.t, w.tp);
+    const c = S.at.portY(w.s, w.sp), d = S.at.portY(w.t, w.tp);
+    // (A level wire is sent whichever way its ports say: see levelWay.)
+    xTerms.push({ kind: 'visible', w: WEIGHTS.visible, value: value,
+                  vars: [[b.v, -dAcross], [a.v, dAcross]] });
+    yTerms.push({ kind: 'visible', w: WEIGHTS.visible, value: value, shadow: true,
+                  vars: [[d.v, -sign * dUpDown], [c.v, sign * dUpDown]] });
+}
+
 // The energy's terms, for the layout in (xs, ys), all but the hold on where everything started (see
 // `energy` and `descend`).  Each is { kind, w, vars, value }, standing for
 // w·value², where value is Σ c·x[v] over vars ([[v, c], ...]) plus a constant -- or with `huber`,
@@ -537,11 +610,17 @@ function energyTerms(S, xs, ys) {
         const ys_ = val(ys, at.portY(w.s, w.sp)), yt = val(ys, at.portY(w.t, w.tp));
         yTerms.push({ kind: 'level', w: WEIGHTS.level, value: yt - ys_, huber: true,
                       vars: [[at.portY(w.t, w.tp).v, 1], [at.portY(w.s, w.sp).v, -1]] });
+        // And a little of it as the square after all: a block between two wires going up and down
+        // to it costs the same anywhere between them in proportion, and would be left to wander;
+        // this puts it in the middle.
+        yTerms.push({ kind: 'level', w: WEIGHTS.levelSquare, value: yt - ys_,
+                      vars: [[at.portY(w.t, w.tp).v, 1], [at.portY(w.s, w.sp).v, -1]] });
         if(!w.hard) { return; }
         const a = at.portX(w.s, w.sp), b = at.portX(w.t, w.tp);
         xTerms.push({ kind: 'length', w: WEIGHTS.length, huber: true,
                       value: val(xs, b) - val(xs, a) - S.sp.wireIdeal,
                       vars: [[b.v, 1], [a.v, -1]] });
+        visibility(S, w, xs, ys, xTerms, yTerms);
     });
     // Where every rectangle is, worked out once.
     const rects = S.rects;
@@ -607,8 +686,8 @@ function energyTerms(S, xs, ys) {
 // The energy of a layout, term by term, for tuning and for the tests.
 function energy(S, xs, ys, x0, y0) {
     const { xTerms, yTerms } = energyTerms(S, xs, ys);
-    const out = { level: 0, length: 0, labels: 0, through: 0, snug: 0, stay: 0 };
-    xTerms.concat(yTerms).forEach((t) => { out[t.kind] += cost(t); });
+    const out = { level: 0, length: 0, labels: 0, visible: 0, through: 0, snug: 0, stay: 0 };
+    xTerms.concat(yTerms).forEach((t) => { if(!t.shadow) { out[t.kind] += cost(t); } });
     xs.forEach((x, v) => { out.stay += WEIGHTS.stay * (x - x0[v]) * (x - x0[v]); });
     ys.forEach((y, v) => { out.stay += WEIGHTS.stay * (y - y0[v]) * (y - y0[v]); });
     S.rightVar.forEach((r, i) => { out.snug += WEIGHTS.snug * (xs[r] - xs[i]); });
@@ -625,6 +704,14 @@ const STEP = 0.5;
 const SETTLING = 0.02;
 // How weak the hold on where things started gets by the end of a descent (see descend).
 const STAY_FADE = 1e-3;
+
+// Move the whole layout along one axis so that on average it is where the anchor is.
+function recenter(vals, anchor) {
+    var shift = 0;
+    for(var v = 0; v < vals.length; v++) { shift += anchor[v] - vals[v]; }
+    shift /= Math.max(1, vals.length);
+    for(var v = 0; v < vals.length; v++) { vals[v] += shift; }
+}
 
 // Minimize the energy under the constraints, starting from the layout S was set up with, and
 // holding each variable to the anchor given for it in (x0, y0) -- at first.  Over the second half
@@ -665,6 +752,11 @@ function descend(S, C, x0, y0, iterations, polish) {
         const yMass = step(ys, y0, yTerms);
         project(xs, xEdges, 30, xMass);
         project(ys, yEdges, 30, yMass);
+        // Nothing but the hold on where things started cares where the layout as a whole is, and
+        // what it wants is for it to be where it was on average -- but a step taken one variable at
+        // a time can nudge the whole of it along, and many such nudges add up.  So put it back.
+        recenter(xs, x0);
+        recenter(ys, y0);
         if(was) {
             var change = 0;
             xs.forEach((x, v) => { change = Math.max(change, Math.abs(x - was[0][v])); });
@@ -915,6 +1007,16 @@ function refine(model, scopes, L, spread) {
     return L;
 }
 
+// Whether a tidied layout is enough of an improvement on the player's own to be worth moving
+// things for, at the given spread: it isn't if the player's already keeps the rules at that spread
+// and scores within IMPROVEMENT of it.  (The descent can creep on a long way for very little.)
+function improves(model, scopes, original, tidied, spread) {
+    const own = layOut(model, scopes, original, original, spread, 0, 0);
+    if(own.worst > 2 || moved(own.positions, original) > 2) { return true; }
+    return score(tidied.S, tidied.xs, tidied.ys) < (1 - IMPROVEMENT) * score(own.S, own.xs, own.ys);
+}
+const IMPROVEMENT = 0.05;
+
 // How far the furthest block moved from one layout to another (see positionsOf).  Where the whole
 // thing is doesn't come into it, only its shape: nothing in the energy cares where the whole thing
 // is, so the descent is free to let it wander.
@@ -987,7 +1089,7 @@ export function arrange(model) {
     }
     spreads.push(1);
     // A layout that is tidy already, and within a few pixels of what arranging it at some spread
-    // would make it, stays exactly as it is.  The descent would only edge it on a little further
+    // would make it, or next to no worse, stays exactly as it is.  The descent would only edge it on a little further
     // each time, and arranging an arranged proof ought to leave it be.  (Where the whole thing is
     // doesn't come into it: see `moved`.)
     var L = null, settled = false;
@@ -1001,7 +1103,8 @@ export function arrange(model) {
         // it has to be less of a spread.
         if(spread > 1 && !fits(extent(tidied))) { continue; }
         if(L === null) { L = tidied; }
-        if(tidy && moved(tidied.positions, original) <= SETTLED) {
+        if(tidy && (moved(tidied.positions, original) <= SETTLED
+                    || !improves(model, scopes, original, tidied, spread))) {
             L = { S: S1, C: C1, xs: S1.xs, ys: S1.ys, worst: 0, spread: spread, positions: original };
             settled = true;
             break;
@@ -1042,6 +1145,8 @@ export function arrange(model) {
         spread: L.spread || 1,
         settled: settled,
         crossings: t.crossings.length,
+        hidden: L.S.wires.filter((w) => w.labels.length > 0
+                                 && shownOf(L.S, w, L.xs, L.ys).shown < SPACING.wireShown / 2).length,
         through: t.through.length,
         unresolved: L.worst,
     };
