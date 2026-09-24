@@ -954,6 +954,11 @@ function addRuleNode(id) {
     box.style.position = 'absolute';
     box.id = 'rule' + (counter++);
     canvas.appendChild(box);
+    // Register it with jsPlumb under that id right away.  Otherwise the first jsPlumb call to look
+    // at it registers it -- and anything but adding an endpoint (asking for its endpoints, say)
+    // does that under an id jsPlumb makes up, so it can no longer be looked up by its own, as
+    // getConnections({ source: id }) does.
+    instance.manage(box);
     // Make it selectable for multi-element dragging.
     box.onmousedown = toggleDragSelected(box);
     // Add it to the master list of nodes.

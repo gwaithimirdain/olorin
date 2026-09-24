@@ -28,6 +28,12 @@ async function inputs(page, id) {
     return { ports: ports.length, wired };
 }
 
+// The type shown beside a block's output port.  A port with a wire leaving it has none: the wire
+// carries the label instead.  (Laying out a block's inputs once made jsPlumb forget the block's own
+// id, which is how it finds the wires leaving a port, so a wired output was labeled as if bare.)
+const outputLabel = (page, id) => page.evaluate((i) =>
+    window.__olorin.ports().find((p) => p.vertex === i && p.sort === 'output').type, id);
+
 const boxHeight = (page, id) =>
     page.evaluate((i) => document.getElementById(i).getBoundingClientRect().height, id);
 
@@ -73,6 +79,7 @@ test.describe('Blocks with any number of inputs', () => {
         await olorin.connect({ vertex: alg, sort: 'output' }, { vertex: concl, sort: 'input' });
         await olorin.waitForTypecheck();
         expect(await olorin.isComplete()).toBe(true);
+        expect(await outputLabel(page, alg)).toBeUndefined();
 
         // Saved and restored, it comes back with the same ports, and still proves the goal.
         const saved = await page.evaluate(() => window.__olorin.serialize());
@@ -80,6 +87,7 @@ test.describe('Blocks with any number of inputs', () => {
         const restoredAlg = (await olorin.nodes()).find((n) => n.rule === 'algplus').id;
         expect(await inputs(page, restoredAlg)).toEqual({ ports: 4, wired: 3 });
         expect(await olorin.isComplete()).toBe(true);
+        expect(await outputLabel(page, restoredAlg)).toBeUndefined();
 
         // Deleting a wire into it takes its port away, and the box shrinks back.
         await deleteWire(olorin, page, 0);
