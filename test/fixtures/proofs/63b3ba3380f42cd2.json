@@ -1,0 +1,128 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      },
+      {
+        "name": "Q",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P∨(Q∧P)"
+      }
+    ],
+    "conclusion": {
+      "ty": "P"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 37,
+    "paramCounter": 15,
+    "varCounter": 0,
+    "hypCounter": 10,
+    "conclCounter": 9
+  },
+  "nodes": [
+    {
+      "id": "hyp9",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "474px",
+      "value": "P∨(Q∧P)"
+    },
+    {
+      "id": "concl8",
+      "rule": "conclusion",
+      "left": "1425px",
+      "top": "449px",
+      "value": "P"
+    },
+    {
+      "id": "rule35",
+      "rule": "orE",
+      "left": "304px",
+      "top": "375px",
+      "width": "200px",
+      "height": "80px"
+    },
+    {
+      "id": "rule36",
+      "rule": "andE",
+      "left": "457px",
+      "top": "542px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp9",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule35",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule35",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl8",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule35",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule35",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "rule35",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule36",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule36",
+        "sort": "output",
+        "label": "snd"
+      },
+      "target": {
+        "vertex": "rule35",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}

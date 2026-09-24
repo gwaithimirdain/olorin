@@ -1,0 +1,106 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P∨P"
+      }
+    ],
+    "conclusion": {
+      "ty": "P"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 13,
+    "y": 0
+  },
+  "counters": {
+    "counter": 35,
+    "paramCounter": 13,
+    "varCounter": 0,
+    "hypCounter": 9,
+    "conclCounter": 8
+  },
+  "nodes": [
+    {
+      "id": "hyp8",
+      "rule": "hypothesis",
+      "left": "105px",
+      "top": "499px",
+      "value": "P∨P"
+    },
+    {
+      "id": "concl7",
+      "rule": "conclusion",
+      "left": "1485px",
+      "top": "474px",
+      "value": "P"
+    },
+    {
+      "id": "rule34",
+      "rule": "orE",
+      "left": "608px",
+      "top": "418px",
+      "width": "200px",
+      "height": "80px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp8",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule34",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule34",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl7",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule34",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule34",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "rule34",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule34",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Straight"
+    }
+  ]
+}

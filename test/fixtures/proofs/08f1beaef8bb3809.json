@@ -1,0 +1,223 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      }
+    ],
+    "variables": [
+      {
+        "name": "x",
+        "ty": "ℝ"
+      }
+    ],
+    "hypotheses": [
+      {
+        "ty": "x²=5"
+      },
+      {
+        "ty": "(x≠√5)∨P"
+      },
+      {
+        "ty": "(x≠−√5)∨P"
+      }
+    ],
+    "conclusion": {
+      "ty": "P"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 45,
+    "paramCounter": 17,
+    "varCounter": 8,
+    "hypCounter": 19,
+    "conclCounter": 14
+  },
+  "nodes": [
+    {
+      "id": "var7",
+      "rule": "variable",
+      "left": "50px",
+      "top": "10px",
+      "name": "x",
+      "value": "ℝ"
+    },
+    {
+      "id": "hyp16",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "281px",
+      "value": "x²=5"
+    },
+    {
+      "id": "hyp17",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "500px",
+      "value": "(x≠√5)∨P"
+    },
+    {
+      "id": "hyp18",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "719px",
+      "value": "(x≠−√5)∨P"
+    },
+    {
+      "id": "concl13",
+      "rule": "conclusion",
+      "left": "1430px",
+      "top": "449px",
+      "value": "P"
+    },
+    {
+      "id": "rule42",
+      "rule": "orE",
+      "left": "442px",
+      "top": "571px",
+      "width": "580px",
+      "height": "80px"
+    },
+    {
+      "id": "rule43",
+      "rule": "orE",
+      "left": "544.717px",
+      "top": "262px",
+      "width": "346px",
+      "height": "80px"
+    },
+    {
+      "id": "rule44",
+      "rule": "algneq",
+      "left": "645.717px",
+      "top": "129px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp17",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule42",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule42",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl13",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule42",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule42",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "hyp18",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule43",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule43",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule42",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule43",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule43",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "hyp16",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule44",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule43",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule44",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule42",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule44",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule44",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule43",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}
