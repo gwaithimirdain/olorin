@@ -9,7 +9,7 @@
 // levels.spec.js looks for it -- before and after any renumbering of the levels.
 
 const fs = require('fs');
-const { allLevels } = require('./lib/levels');
+const { fixtureLevels } = require('./lib/levels');
 const { canonicalStatement, statementHash, fixturePath, hasFixture, levelOfFixture, writeFixture,
     unavailableRules } = require('./lib/fixtures');
 
@@ -41,7 +41,7 @@ if (state.complete === false) {
 
 // Every level stating this -- more than one may, and they are all filed under the one hash, so the
 // proof has to be buildable on each of them.
-const stating = allLevels().filter((l) => canonicalStatement(l) === canonicalStatement(stated));
+const stating = fixtureLevels().filter((l) => canonicalStatement(l) === canonicalStatement(stated));
 if (stating.length === 0) {
     die(`No level in client/levels.js states ${canonicalStatement(stated)}.\n`
         + 'A fixture for a statement no game level makes would never be run (probably a custom level).');

@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { chromium } = require('@playwright/test');
-const { allLevels } = require('./lib/levels');
+const { allLevels, fixtureLevels } = require('./lib/levels');
 const { testQuery } = require('./lib/testmode');
 const { FIXTURE_DIR, writeFixture, coverage, hasFixture, readFixture, unavailableRules } =
     require('./lib/fixtures');
@@ -236,18 +236,18 @@ async function solveLevel(page, level) {
 // level whose statement was edited, or that was deleted), and any whose proof the level's palette
 // couldn't build -- which levels.spec.js fails on, so it is worth saying here too.
 function list() {
-    const { covered, orphans, dir } = coverage(allLevels());
+    const { covered, orphans, dir } = coverage(fixtureLevels());
     for (const { file, level } of covered) console.log(`  ${level.name}  ${file}`);
     for (const file of orphans) console.log(`  (orphan: no level states this) ${file}`);
     // Checked over every level with a fixture, not just `covered`: two levels can state the same
     // thing and so share one fixture, and only one of them is listed above.
-    const unplayable = allLevels().filter((l) => hasFixture(l))
+    const unplayable = fixtureLevels().filter((l) => hasFixture(l))
         .map((l) => ({ level: l, missing: unavailableRules(readFixture(l), l.rules) }))
         .filter(({ missing }) => missing.length > 0);
     for (const { level, missing } of unplayable) {
         console.log(`  (unplayable: level ${level.name}'s palette has no ${missing.join(', ')})`);
     }
-    console.log(`\n${covered.length}/${allLevels().length} levels covered, ${orphans.length} orphaned, `
+    console.log(`\n${covered.length}/${fixtureLevels().length} levels covered, ${orphans.length} orphaned, `
         + `${unplayable.length} unplayable, in ${dir}`);
 }
 
