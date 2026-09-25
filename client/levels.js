@@ -737,7 +737,7 @@ export const LEVELS = [
     { name: "Advanced proposition world",
       previous: [1, 2],
       stages: [
-          { name: "∧∨⇒",
+          { name: "∧∨⇒₁",
             rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
             levels: [
                 {
@@ -776,6 +776,12 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P⇒Q" }, { ty: "P⇒(Q⇒R)" }, ],
                     conclusion: { ty: "P⇒R" },
                 },
+            ],
+          },
+          { name: "∧∨⇒₂",
+            rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
+            bonus: true,
+            levels: [
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
                     variables: [ ],
