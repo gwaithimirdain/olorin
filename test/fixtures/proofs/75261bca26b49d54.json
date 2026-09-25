@@ -1,0 +1,219 @@
+{
+  "level": {
+    "parameters": [],
+    "variables": [],
+    "hypotheses": [],
+    "conclusion": {
+      "ty": "∃!x∈ℝ,∀y∈ℝ,(x+y=y)"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 10,
+    "paramCounter": 0,
+    "varCounter": 0,
+    "hypCounter": 0,
+    "conclCounter": 1
+  },
+  "nodes": [
+    {
+      "id": "concl0",
+      "rule": "conclusion",
+      "left": "1278px",
+      "top": "335px",
+      "value": "∃!x∈ℝ,∀y∈ℝ,(x+y=y)"
+    },
+    {
+      "id": "rule0",
+      "rule": "uexI",
+      "left": "924px",
+      "top": "302px"
+    },
+    {
+      "id": "rule1",
+      "rule": "expr",
+      "left": "761px",
+      "top": "240px",
+      "value": "0",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule2",
+      "rule": "allI",
+      "left": "458px",
+      "top": "320px",
+      "names": [
+        "y"
+      ],
+      "width": "220px",
+      "height": "50px"
+    },
+    {
+      "id": "rule3",
+      "rule": "algplus",
+      "left": "498px",
+      "top": "233px"
+    },
+    {
+      "id": "rule4",
+      "rule": "allI",
+      "left": "142px",
+      "top": "655px",
+      "names": [
+        "x"
+      ],
+      "width": "680px",
+      "height": "50px"
+    },
+    {
+      "id": "rule6",
+      "rule": "impI",
+      "left": "181px",
+      "top": "553px",
+      "width": "519px",
+      "height": "50px"
+    },
+    {
+      "id": "rule7",
+      "rule": "allE",
+      "left": "286px",
+      "top": "445px"
+    },
+    {
+      "id": "rule8",
+      "rule": "expr",
+      "left": "77px",
+      "top": "419px",
+      "value": "0",
+      "width": "fit-content"
+    },
+    {
+      "id": "rule9",
+      "rule": "algplus",
+      "left": "525px",
+      "top": "466px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl0",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule2",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule3",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule2",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule4",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input",
+        "label": "unique"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule4",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "assumption"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "input",
+        "label": "universal"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule8",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule7",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule7",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule9",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule9",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule6",
+        "sort": "subgoal"
+      },
+      "connector": "Bezier"
+    }
+  ]
+}
