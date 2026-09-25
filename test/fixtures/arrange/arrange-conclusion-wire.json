@@ -1,0 +1,254 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "A",
+        "ty": "Type"
+      },
+      {
+        "name": "P",
+        "ty": "A→Type"
+      },
+      {
+        "name": "Q",
+        "ty": "A→Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "(∃x∈A,P(x))∨(∃x∈A,Q(x))"
+      }
+    ],
+    "conclusion": {
+      "ty": "∃x∈A,(P(x)∨Q(x))"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 0,
+    "y": 0
+  },
+  "counters": {
+    "counter": 7,
+    "paramCounter": 6,
+    "varCounter": 0,
+    "hypCounter": 2,
+    "conclCounter": 2
+  },
+  "nodes": [
+    {
+      "id": "hyp1",
+      "rule": "hypothesis",
+      "left": "50px",
+      "top": "669px",
+      "value": "(∃x∈A,P(x))∨(∃x∈A,Q(x))"
+    },
+    {
+      "id": "concl1",
+      "rule": "conclusion",
+      "left": "955px",
+      "top": "644px",
+      "value": "∃x∈A,(P(x)∨Q(x))"
+    },
+    {
+      "id": "rule0",
+      "rule": "exI",
+      "left": "694px",
+      "top": "800px"
+    },
+    {
+      "id": "rule1",
+      "rule": "orE",
+      "left": "178px",
+      "top": "923px",
+      "width": "717px",
+      "height": "80px"
+    },
+    {
+      "id": "rule2",
+      "rule": "exI",
+      "left": "706px",
+      "top": "1055px"
+    },
+    {
+      "id": "rule3",
+      "rule": "exE",
+      "left": "371px",
+      "top": "738px",
+      "names": [
+        "u"
+      ]
+    },
+    {
+      "id": "rule4",
+      "rule": "exE",
+      "left": "350px",
+      "top": "1068px",
+      "names": [
+        "v"
+      ]
+    },
+    {
+      "id": "rule5",
+      "rule": "orI1",
+      "left": "529px",
+      "top": "878px"
+    },
+    {
+      "id": "rule6",
+      "rule": "orI2",
+      "left": "547px",
+      "top": "1168px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl1",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule2",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule1",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule3",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule1",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule4",
+        "sort": "input"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule3",
+        "sort": "output",
+        "label": "element"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule4",
+        "sort": "output",
+        "label": "element"
+      },
+      "target": {
+        "vertex": "rule2",
+        "sort": "input",
+        "label": "element"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule3",
+        "sort": "output",
+        "label": "property"
+      },
+      "target": {
+        "vertex": "rule5",
+        "sort": "input",
+        "label": "left"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule5",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule4",
+        "sort": "output",
+        "label": "property"
+      },
+      "target": {
+        "vertex": "rule6",
+        "sort": "input",
+        "label": "right"
+      },
+      "connector": "Flowchart"
+    },
+    {
+      "source": {
+        "vertex": "rule6",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule2",
+        "sort": "input",
+        "label": "property"
+      },
+      "connector": "Flowchart"
+    }
+  ]
+}

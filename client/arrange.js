@@ -541,10 +541,11 @@ const WIRE_CLEARANCE = 4;
 // a curved wire whose ends are close together loops back through its own middle, where the label
 // is, and shows much less than its ends being far apart would suggest.
 //
-// The rates are how much more shows a few pixels (RATE_SPAN) either way: they are what the descent
+// The rates are how much more shows some way (RATE_SPAN) either way: they are what the descent
 // steers by, so they must say truly which way shows more, or a step the descent takes to show more
 // can show less, and never settle (see descend).  A pixel either way would see nothing where the
-// label covers the wire completely; a few pixels see past the edge of that.  A level wire is looked
+// label covers the wire completely, and a few pixels either way can be fooled by a wire running
+// just along the label's edge; looking further sees past both.  A level wire is looked
 // at only the way its ports send it (see levelWay), since up and down would show the same.
 function shownOf(S, w, xs, ys) {
     const dx = val(xs, S.at.portX(w.t, w.tp)) - val(xs, S.at.portX(w.s, w.sp));
@@ -559,8 +560,10 @@ function shownOf(S, w, xs, ys) {
             : way * (shown(dx, dy + way * h) - shown(dx, dy)) / h,
     };
 }
-// How far either way shownOf looks to see how much more of a wire would show.
-const RATE_SPAN = 4;
+// How far either way shownOf looks to see how much more of a wire would show.  (Found by trying:
+// much less and arranging an arranged proof can move it on again; much more and the rates miss
+// what is close by.)
+const RATE_SPAN = 12;
 
 // How much shows of a wire running (dx, dy) from one end to the other, with a label lw by lh.  That
 // is all it depends on, and a descent asks it over and over about wires that have hardly moved, so
@@ -603,7 +606,7 @@ function pathShown(path, lw, lh) {
     }
     if(mid === null) { return 0; }
     const start = path[0], end = path[path.length - 1];
-    const hidden = (p) => (Math.abs(p[0] - mid[0]) < lw / 2 && Math.abs(p[1] - mid[1]) < lh / 2)
+    const hidden = (p) => (Math.abs(p[0] - mid[0]) < lw / 2 + LABEL_HUG && Math.abs(p[1] - mid[1]) < lh / 2 + LABEL_HUG)
         || Math.hypot(p[0] - start[0], p[1] - start[1]) < SOURCE_END
         || Math.hypot(p[0] - end[0], p[1] - end[1]) < TARGET_END;
     // Walk the path a few pixels at a time, counting the steps that show.
@@ -620,6 +623,9 @@ function pathShown(path, lw, lh) {
 }
 // How far along a path pathShown looks at a time, in pixels.
 const PATH_STEP = 3;
+// A wire running along the edge of its label, or within this many pixels of it, doesn't show as a
+// wire either: it reads as the label's border.
+const LABEL_HUG = 4;
 
 // Which way a level wire had better go, up (-1) or down (1), if it goes either way: up out of the
 // upper of a block's ports, or into the lower of them, and down out of a lower one or into an upper.
