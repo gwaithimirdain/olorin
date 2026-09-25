@@ -492,14 +492,20 @@ body.arranging { cursor: progress; }
 /* The clickable index of worlds, pinned above the scrolling world list. */
 #worldIndex {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-wrap: nowrap;
+    /* Scroll horizontally when the chips don't fit; "safe" keeps the first chip reachable. */
+    justify-content: safe center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Non-visible overflow drops the flex min-height to 0, so keep the modal from squashing it. */
+    flex-shrink: 0;
     gap: 6px;
     padding: 2px 0 4px;
     font-family: sans-serif;
 }
 
 .world-chip {
+    flex-shrink: 0;
     padding: 4px 10px;
     border: 1px solid #888888;
     border-radius: 14px;

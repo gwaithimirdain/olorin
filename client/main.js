@@ -1820,13 +1820,27 @@ function setWorld(newWorld) {
     }
 }
 
-// Mark the given world's chip active in the index bar.
+// Mark the given world's chip active in the index bar, scrolling the bar horizontally if needed
+// to show it.
 function highlightWorldChip(i) {
     worldPanes.forEach(function (entry, j) {
         if(entry.chip) {
             entry.chip.classList.toggle("active", i === j);
         }
     });
+    const chip = worldPanes[i] && worldPanes[i].chip;
+    if(chip) {
+        // Adjust scrollLeft directly rather than using scrollIntoView, which could also scroll
+        // the worlds list or the page vertically.
+        const bar = chip.parentElement;
+        const barRect = bar.getBoundingClientRect();
+        const chipRect = chip.getBoundingClientRect();
+        if(chipRect.left < barRect.left) {
+            bar.scrollLeft -= barRect.left - chipRect.left;
+        } else if(chipRect.right > barRect.right) {
+            bar.scrollLeft += chipRect.right - barRect.right;
+        }
+    }
 }
 
 // As the user scrolls the worlds list, highlight the chip for the world currently at the top.
