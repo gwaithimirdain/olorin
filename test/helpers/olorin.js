@@ -451,11 +451,29 @@ class Olorin {
         return this.page.evaluate(() => window.__olorin.complete());
     }
 
-    // Click the Arrange button (which is Undo Arrange just after arranging), and wait for the
-    // blocks to finish sliding into place.
+    // Click the Arrange button, and wait for the blocks to finish sliding into place.
     async arrange() {
         await this.page.click('#arrangeProof');
         await this.page.waitForFunction(() => !window.__olorin.arranging());
+    }
+
+    // Click the Undo (or Redo) button, and wait for the blocks to finish sliding back, or the
+    // proof put back to be typechecked.
+    async undo() {
+        await this.page.click('#undo');
+        await this.page.waitForFunction(() => !window.__olorin.arranging());
+        await this.waitForTypecheck();
+    }
+
+    async redo() {
+        await this.page.click('#redo');
+        await this.page.waitForFunction(() => !window.__olorin.arranging());
+        await this.waitForTypecheck();
+    }
+
+    // How many changes there are to undo, and to redo, as { undo, redo }.
+    undoDepth() {
+        return this.page.evaluate(() => window.__olorin.undoDepth());
     }
 
     arrangeButtonText() {

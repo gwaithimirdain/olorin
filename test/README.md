@@ -32,6 +32,8 @@ test/
                           #   and is accepted once the wires that fix it are added
     arrange.spec.js       # Arrange on every case leaves the proof alone, keeps the rules of a
                           #   tidy layout, is saved and undoable, and leaves a tidy layout be
+    undo.spec.js          # Undo/Redo: every change undone in turn and redone, one step per
+                          #   change, across pans and Clear; cancelled dialogs aren't changes
 ```
 
 ## Per-level proof fixtures

@@ -3,7 +3,7 @@
 // must leave the proof itself alone and give a layout that keeps the rules a tidy one keeps: no
 // blocks on top of each other, wires running left to right, every subproof between its bracket's
 // uprights and on its side of the bar.  It must keep each block in the subproof the player drew it
-// in, save what it did, and be undoable.  And arranging a tidy layout again must hardly move it.
+// in, save what it did, and be undoable (by the Undo button, as any change is: see undo.spec.js).  And arranging a tidy layout again must hardly move it.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -36,7 +36,7 @@ test.describe('Arrange', () => {
             expect(plan.unresolved).toBeLessThan(0.5);
 
             await olorin.arrange();
-            expect(await olorin.arrangeButtonText()).toBe('Undo Arrange');
+            expect(await olorin.undoDepth()).toEqual({ undo: 1, redo: 0 });
 
             // The proof itself is just as it was.
             expect(await olorin.connections()).toEqual(connections);
@@ -92,8 +92,8 @@ test.describe('Arrange', () => {
                 .toEqual(now.map((n) => [n.id, n.left, n.top, n.width]));
 
             // Undoing it puts every block back exactly where it was.
-            await olorin.arrange();
-            expect(await olorin.arrangeButtonText()).toBe('Arrange');
+            await olorin.undo();
+            expect(await olorin.undoDepth()).toEqual({ undo: 0, redo: 1 });
             expect(await olorin.nodes()).toEqual(placed);
         });
     }
@@ -121,7 +121,7 @@ test.describe('Arrange', () => {
 
         // And after that, it still arranges.
         await olorin.arrange();
-        expect(await olorin.arrangeButtonText()).toBe('Undo Arrange');
+        expect(await olorin.arrangeButtonText()).toBe('Arrange');
         expect(await olorin.nodes()).not.toEqual(placed);
     });
 
@@ -134,7 +134,7 @@ test.describe('Arrange', () => {
         expect(await page.evaluate(() => window.__olorin.arrangeWorker())).toBe(false);
         const placed = await olorin.nodes();
         await olorin.arrange();
-        expect(await olorin.arrangeButtonText()).toBe('Undo Arrange');
+        expect(await olorin.undoDepth()).toEqual({ undo: 1, redo: 0 });
         expect(await olorin.nodes()).not.toEqual(placed);
     });
 
@@ -152,7 +152,7 @@ test.describe('Arrange', () => {
         // nowhere to scroll to, so it slides the whole diagram along instead.
         const d = await page.locator('#diagram').boundingBox();
         await olorin.panBackground(d.x + 5, d.y + 5, d.x + 125, d.y + 85);
-        expect(await olorin.arrangeButtonText()).toBe('Undo Arrange');
+        expect(await olorin.undoDepth()).toEqual({ undo: 1, redo: 0 });
         const panned = await olorin.nodes();
         const shift = { x: px(panned[0].left) - px(arranged[0].left), y: px(panned[0].top) - px(arranged[0].top) };
         expect(shift.x).toBeGreaterThan(0);
@@ -161,23 +161,29 @@ test.describe('Arrange', () => {
             .toEqual(panned.map(() => [shift.x, shift.y]));
 
         // Undoing puts everything back where it was, slid along with the rest.
-        await olorin.arrange();
-        expect(await olorin.arrangeButtonText()).toBe('Arrange');
+        await olorin.undo();
         expect((await olorin.nodes()).map((n) => [n.id, px(n.left), px(n.top), n.width]))
             .toEqual(placed.map((n) => [n.id, px(n.left) + shift.x, px(n.top) + shift.y, n.width]));
     });
 
-    test('any change to the diagram makes an arrangement too late to undo', async ({ page }) => {
+    test('each arrangement is a change of its own, undone in turn with the others', async ({ page }) => {
         const olorin = new Olorin(page);
         const c = arrangeCases().find((x) => x.state.nodes.length > 3);
         await olorin.open({ code: c.level.code });
         await loadCase(olorin, c);
+        const placed = await olorin.nodes();
         await olorin.arrange();
-        expect(await olorin.arrangeButtonText()).toBe('Undo Arrange');
-        // Deleting a block (the last one the player added) is a change like any other.
-        const nodes = await olorin.nodes();
-        await olorin.deleteNode(nodes[nodes.length - 1].id);
+        const arranged = await olorin.nodes();
+        // Deleting a block (the last one the player added) after arranging is a change of its own.
+        await olorin.deleteNode(arranged[arranged.length - 1].id);
         await olorin.waitForTypecheck();
-        expect(await olorin.arrangeButtonText()).toBe('Arrange');
+        expect(await olorin.undoDepth()).toEqual({ undo: 2, redo: 0 });
+        await olorin.undo();
+        expect(await olorin.nodes()).toEqual(arranged);
+        await olorin.undo();
+        expect(await olorin.nodes()).toEqual(placed);
+        // And redoing the arrangement slides them back where it put them.
+        await olorin.redo();
+        expect(await olorin.nodes()).toEqual(arranged);
     });
 });

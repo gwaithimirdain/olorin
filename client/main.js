@@ -259,6 +259,18 @@ var restoring = false;
 // Dynamic variable to suppress autosaving while a level is being set up (so the initial empty proof doesn't clobber a saved one).
 var suppressSave = false;
 
+// The Undo and Redo history (see recordChange): snapshots of the diagram (see undoSnapshot), the
+// latest last, and the one of the diagram as it now stands.  It lasts as long as the
+// level stays open, and isn't saved with the proof.
+var undoStack = [];
+var redoStack = [];
+var undoCurrent = null;
+// While this is above zero, the changes being made are to be recorded as one, when it is back down.
+var undoBatching = 0;
+// How far the whole diagram has been slid along the canvas in all, by panning (see shiftWorld):
+// the snapshots are taken relative to it, so that panning isn't a change.
+const worldOffset = { x: 0, y: 0 };
+
 // The world/level select panes and buttons
 var worldPanes = [];
 var currentWorld = 0;
@@ -357,11 +369,11 @@ function resizeCanvas(scrollX, scrollY) {
 // whether anything moved.
 function shiftWorld(dx, dy, frozen) {
     if(!dx && !dy) { return false; }
-    // Sliding the whole diagram along changes nothing about how it's laid out, so an arrangement can
-    // still be undone afterwards, only with everything it puts back slid along too.  (Not when a
-    // drag is holding some of the boxes still: then they aren't all moving together.)
-    const undoable = !(frozen && frozen.size > 0) && arrangeUndo
-          && JSON.stringify(blockPlacements()) === JSON.stringify(arrangeUndo.after);
+    // Sliding the whole diagram along changes nothing about how it's laid out, so what Undo puts
+    // back has to be slid along too (see undoSnapshot).  A box a drag is holding still has, as far
+    // as that goes, moved the other way, which is how the drag's undo sees it.
+    worldOffset.x += dx;
+    worldOffset.y += dy;
     var moved = false;
     nodes.forEach((x) => {
         const el = x.node;
@@ -374,11 +386,6 @@ function shiftWorld(dx, dy, frozen) {
         instance.setElementPosition(el, left, top);
         moved = true;
     });
-    if(undoable) {
-        arrangeUndo.dx += dx;
-        arrangeUndo.dy += dy;
-        arrangeUndo.after = blockPlacements();
-    }
     return moved;
 }
 
@@ -751,7 +758,6 @@ ready(() => {
     // Dragging a node to rearrange the proof changes positions without re-typechecking, so save
     // the new positions when a drag finishes.
     instance.bind(EVENT_DRAG_STOP, function () {
-        forgetArrange();
         const dropped = dragPan ? dragPan.boxes : new Set();
         stopDragPan();
         // A box dragged off the top/left is sitting at negative coordinates; put the origin back.
@@ -760,6 +766,7 @@ ready(() => {
         // Dragging a box moves its wires, which can push labels onto each other.
         spreadWireLabels();
         autosave();
+        recordChange();
     });
 
     if(SERVER) {
@@ -958,13 +965,14 @@ function syncAllVariadicInputs() {
 }
 
 // Clone the palette rule `id` into a new diagram node: position it, register it in the
-// nodes list, and give it a close button.  Endpoints are added separately by
-// addEndpointsForRule.  Returns the new box element.
-function addRuleNode(id) {
+// nodes list, and give it a close button, and the id `boxId` if one is given (a fresh one
+// otherwise).  Endpoints are added separately by addEndpointsForRule.  Returns the new box element.
+function addRuleNode(id, boxId) {
     const originalBox = document.getElementById(id);
     const box = originalBox.cloneNode(true);
     box.style.position = 'absolute';
-    box.id = 'rule' + (counter++);
+    // A block Undo puts back has the id it had before.
+    box.id = boxId || ('rule' + (counter++));
     canvas.appendChild(box);
     // Register it with jsPlumb under that id right away.  Otherwise the first jsPlumb call to look
     // at it registers it -- and anything but adding an endpoint (asking for its endpoints, say)
@@ -1464,9 +1472,12 @@ document.addEventListener('keydown', function(e) {
     const selected = instance.dragSelection._dragSelection.slice();
     if(selected.length === 0) { return; }
     e.preventDefault();
-    selected.forEach(function(sel) {
-        const el = document.getElementById(sel.id);
-        if(el && el.querySelector('.closebutton')) { deleteRule(el); }
+    // Deleting them all is one change, undone all at once.
+    batchChanges(function () {
+        selected.forEach(function(sel) {
+            const el = document.getElementById(sel.id);
+            if(el && el.querySelector('.closebutton')) { deleteRule(el); }
+        });
     });
     instance.clearDragSelection();
 });
@@ -2373,10 +2384,13 @@ document.getElementById("selectLevel").onclick = function() {
 
 // To clear the current proof, discard its autosave and re-open the current level fresh.
 document.getElementById("clearProof").onclick = function() {
-    if(confirm("This will clear your current proof and reset to the beginning of this level!  It cannot be un-done.  Are you sure?")) {
-        const key = savedProofKey();
-        if(key) { localStorage.removeItem(key); }
-        reopenCurrentLevel();
+    if(confirm("This will clear your current proof and reset to the beginning of this level!  Are you sure?")) {
+        // Undo brings it back.
+        keepingHistory(function () {
+            const key = savedProofKey();
+            if(key) { localStorage.removeItem(key); }
+            reopenCurrentLevel();
+        });
     }
 }
 
@@ -2609,6 +2623,67 @@ function modernizeProof(state) {
     return Object.assign({}, state, { nodes: nodes, connections: connections });
 }
 
+// Recreate a user-added block from a saved proof (see serializeProof), with the id `boxId` if one
+// is given (a fresh one otherwise), and return its box.
+function restoreNode(sn, boxId) {
+    const rule = sn.rule;
+    const box = addRuleNode(rule, boxId);
+    addEndpointsForRule(box, rule, true);
+    if(sn.left)   { box.style.left = sn.left; }
+    if(sn.top)    { box.style.top = sn.top; }
+    if(sn.width)  { box.style.width = sn.width; }
+    if(sn.height) { box.style.height = sn.height; }
+    const entry = nodes.find((x) => x.id === box.id);
+    // Restore the bound-variable names (∀/∃ and the number blocks) into the global list and the
+    // node.  A proof saved before a block could bind more than one has a single "name" (and a
+    // "variable" beside it saying the same thing), which reads back as a list of one.
+    const bound = sn.names || (sn.name !== undefined ? [sn.name] : []);
+    if(bound.length > 0) {
+        if(entry) { entry.names = bound.slice(); }
+        bound.forEach(function (v) { if(!varnames.includes(v)) { varnames.push(v); } });
+    }
+    // Restore an ascription/expression value and re-render the box accordingly.
+    if(sn.value !== undefined) {
+        if(entry) { entry.value = sn.value; }
+        if(sn.rule === 'asc' || sn.rule === 'expr') {
+            box.innerHTML = (sn.rule === 'asc' ? "🏷&nbsp;" : "") + sn.value;
+            box.style.width = 'fit-content';
+            box.style.padding = "0px 8px 0px 8px";
+            // Re-rendering the box blew away its close button, so add it back.
+            addBoxCloseButton(box);
+        }
+    }
+    return box;
+}
+
+// Recreate the wires of a saved proof (see serializeProof) between the boxes `idMap` gives for its
+// blocks' saved ids, matching endpoints by their sort and label.
+function restoreConnections(connections, idMap) {
+    connections.forEach((c) => {
+        const srcEl = idMap[c.source.vertex];
+        const tgtEl = idMap[c.target.vertex];
+        if(!srcEl || !tgtEl) { return; }
+        const srcEp = findEndpoint(srcEl, c.source.sort, c.source.label);
+        const tgtEp = findEndpoint(tgtEl, c.target.sort, c.target.label);
+        if(!srcEp || !tgtEp) { return; }
+        const edge = instance.connect({ source: srcEp, target: tgtEp });
+        if(edge) {
+            // Connecting them styled the wire (see addConnection).  Restore the style it was saved
+            // in over that, when it differs -- but only where the style is the player's choice: a
+            // wire that begins and ends on the same block is drawn in the shape that wire needs,
+            // whatever it was saved as, or a proof saved before it had that shape (or saved after
+            // a restore that lost it) would come back drawn the wrong way round the block.
+            const saved = connectorOfType(c.connector);
+            if(saved && edge.connector && c.connector !== edge.connector.type
+               && !forcedConnector(edge)) {
+                setConnector(edge, saved);
+            }
+            // Restore the user-supplied wire label, if any (Adept/Master difficulty).
+            if(c.ty) { setUserWireLabel(edge, c.ty); }
+        }
+    });
+}
+
 // Rebuild the proof from a snapshot object (as produced by serializeProof), into the given
 // level (defaulting to the current one).  Shared by "Load" (from localStorage) and "Import"
 // (from pasted JSON).
@@ -2651,34 +2726,7 @@ function restoreProof(state, level, countAsCompletion) {
 
     // Recreate the user-added nodes, in their saved order, with their saved geometry and values.
     (state.nodes || []).filter((n) => !FIXED_RULES.includes(n.rule)).forEach((sn) => {
-        const rule = sn.rule;
-        const box = addRuleNode(rule);
-        addEndpointsForRule(box, rule, true);
-        if(sn.left)   { box.style.left = sn.left; }
-        if(sn.top)    { box.style.top = sn.top; }
-        if(sn.width)  { box.style.width = sn.width; }
-        if(sn.height) { box.style.height = sn.height; }
-        const entry = nodes.find((x) => x.id === box.id);
-        // Restore the bound-variable names (∀/∃ and the number blocks) into the global list and the
-        // node.  A proof saved before a block could bind more than one has a single "name" (and a
-        // "variable" beside it saying the same thing), which reads back as a list of one.
-        const bound = sn.names || (sn.name !== undefined ? [sn.name] : []);
-        if(bound.length > 0) {
-            if(entry) { entry.names = bound.slice(); }
-            bound.forEach(function (v) { if(!varnames.includes(v)) { varnames.push(v); } });
-        }
-        // Restore an ascription/expression value and re-render the box accordingly.
-        if(sn.value !== undefined) {
-            if(entry) { entry.value = sn.value; }
-            if(sn.rule === 'asc' || sn.rule === 'expr') {
-                box.innerHTML = (sn.rule === 'asc' ? "🏷&nbsp;" : "") + sn.value;
-                box.style.width = 'fit-content';
-                box.style.padding = "0px 8px 0px 8px";
-                // Re-rendering the box blew away its close button, so add it back.
-                addBoxCloseButton(box);
-            }
-        }
-        idMap[sn.id] = box;
+        idMap[sn.id] = restoreNode(sn);
     });
 
     // Repositioning the nodes invalidated jsPlumb's cached geometry; revalidate before reconnecting.
@@ -2688,33 +2736,12 @@ function restoreProof(state, level, countAsCompletion) {
     // carries none, and is found by looking at wherever its boxes actually are.
     if(state.view) { resizeCanvas(state.view.x, state.view.y); } else { scrollToContent(); }
 
-    // Recreate the connections, matching endpoints by their sort and label.
-    (state.connections || []).forEach((c) => {
-        const srcEl = idMap[c.source.vertex];
-        const tgtEl = idMap[c.target.vertex];
-        if(!srcEl || !tgtEl) { return; }
-        const srcEp = findEndpoint(srcEl, c.source.sort, c.source.label);
-        const tgtEp = findEndpoint(tgtEl, c.target.sort, c.target.label);
-        if(!srcEp || !tgtEp) { return; }
-        const edge = instance.connect({ source: srcEp, target: tgtEp });
-        if(edge) {
-            // Connecting them styled the wire (see addConnection).  Restore the style it was saved
-            // in over that, when it differs -- but only where the style is the player's choice: a
-            // wire that begins and ends on the same block is drawn in the shape that wire needs,
-            // whatever it was saved as, or a proof saved before it had that shape (or saved after
-            // a restore that lost it) would come back drawn the wrong way round the block.
-            const saved = connectorOfType(c.connector);
-            if(saved && edge.connector && c.connector !== edge.connector.type
-               && !forcedConnector(edge)) {
-                setConnector(edge, saved);
-            }
-            // Restore the user-supplied wire label, if any (Adept/Master difficulty).
-            if(c.ty) { setUserWireLabel(edge, c.ty); }
-        }
-    });
+    restoreConnections(state.connections || [], idMap);
 
     restoring = false;
     suppressChecking = false;
+    // The proof is new to this level, so there's nothing to undo in it.
+    resetUndo();
     // Restoring a proof that was already complete normally shouldn't count as a fresh completion,
     // except when restoring the lower-difficulty proof after a downgrade (countAsCompletion): that
     // re-locks the higher difficulty just as if you'd re-solved it -- but without advancing the
@@ -2795,7 +2822,13 @@ document.getElementById("submitImport").onclick = function() {
         return;
     }
     document.getElementById("importBG").style.display = "none";
-    restoreProof(state);
+    // Importing a proof into this level can be undone like any other change -- unless it changed
+    // the difficulty too, which undoing wouldn't put back.
+    if(typeof state.difficulty === 'number' && state.difficulty !== difficulty) {
+        restoreProof(state);
+    } else {
+        keepingHistory(function () { restoreProof(state); });
+    }
 };
 
 // Save a new custom level built from an imported proof's level definition, prompting for its name
@@ -2878,8 +2911,10 @@ if (TEST_MODE) {
         layoutModel: () => layoutModel(),
         arrangement: () => requestArrangement().promise,
         // Whether the Arrange button is still waiting to know where the blocks go, or they are
-        // still sliding into place (after Arrange or its undo).
+        // still sliding into place (after Arrange, or an undo or redo of a move).
         arranging: () => arrangeWaiting !== null || arrangeFrame !== null,
+        // How many changes there are to undo, and to redo.
+        undoDepth: () => ({ undo: undoStack.length, redo: redoStack.length }),
         // Whether arrangements are being worked out in a worker, rather than on the page itself.
         arrangeWorker: () => arrangeWorker !== null,
         // Whether the proof currently reads as complete (the conclusion turns a color).
@@ -3457,9 +3492,7 @@ function deleteRule(box) {
         varnames = varnames.filter(function(x) { return !gone.includes(x) })
     }
     nodes = nodes.filter(function (x) { return x.node !== box });
-    instance.deleteConnectionsForElement(box);
-    instance.removeAllEndpoints(box);
-    box.remove();
+    removeBox(box);
     // Wires from the block to a variadic one took their ports with them.
     syncAllVariadicInputs();
     // Removing a far-out node may let the canvas shrink back toward the viewport.
@@ -4031,7 +4064,7 @@ document.addEventListener('mousemove', (e) => {
 
 // Stop resizing on mouseup anywhere in the document
 document.addEventListener('mouseup', () => {
-    if(currentResizable) { forgetArrange(); }
+    if(currentResizable) { recordChange(); }
     isResizingRight = false;
     isResizingLeft = false;
     currentResizable = null;
@@ -4214,8 +4247,8 @@ function addConnection(params) {
 
 // Parse the graph into a term and typecheck it, displaying diagnostics.  If 'remove' is true, also remove the connection indicated by the parameters, as this is a detach event.  Since we need to pass the result as an onclick callback, we manually curry the definition.
 function typecheck() {
-    // The diagram has changed, so an arrangement can no longer be undone.
-    forgetArrange();
+    // The diagram has changed, and that is something to undo.
+    recordChange();
     if(suppressChecking) { return; }
     // Wait for the round already in flight (see typecheckPending); it will come back here with the
     // diagram as it stands then.
@@ -4522,7 +4555,7 @@ function spreadWireLabels() {
 }
 
 // The "Arrange" button tidies up the layout of the proof (see client/arrange.js), sliding the blocks
-// to where they go, and then offers to undo that until the diagram changes again.
+// to where they go.  That is a change like any other, for Undo to undo.
 
 // The branches of each kind of bracket: the part above its bar, and for a bracket with two
 // subgoals, the part below it too.  A port's `side` says which branch it belongs to.
@@ -4596,8 +4629,8 @@ function layoutModel() {
     return { blocks: blocks, wires: wires, view: view };
 }
 
-// Where every block is, and how wide every bracket is, as their styles say: what an arrangement is
-// undone to.  (Only a bracket's width is the player's to change.)
+// Where every block is, and how wide every bracket is, as their styles say.  (Only a bracket's
+// width is the player's to change.)
 function blockPlacements() {
     const out = {};
     nodes.forEach(function (x) {
@@ -4607,11 +4640,7 @@ function blockPlacements() {
     return out;
 }
 
-// What undoing the last arrangement would put back (see blockPlacements), or null if there's
-// nothing to undo, and where the arrangement left everything, so we can tell if it has changed;
-// and (dx, dy), how far the whole diagram has been slid along since (see shiftWorld).
-var arrangeUndo = null;
-// The animation in progress, if any.
+// The animation in progress, if any (of an arrangement, or of an undo or redo of a move).
 var arrangeFrame = null;
 
 // A big proof can take a second or two to arrange, so that is worked out in a worker
@@ -4702,16 +4731,8 @@ function updateArrangeButton() {
         button.title = "Stop working out how to arrange the proof, and leave it as it is";
         return;
     }
-    button.innerText = arrangeUndo ? "Undo Arrange" : "Arrange";
-    button.title = arrangeUndo ? "Put the blocks back where they were before arranging them"
-        : "Tidy up the layout of the proof";
-}
-
-// Whatever changes the diagram after an arrangement makes it too late to undo it.
-function forgetArrange() {
-    if(!arrangeUndo) { return; }
-    arrangeUndo = null;
-    updateArrangeButton();
+    button.innerText = "Arrange";
+    button.title = "Tidy up the layout of the proof";
 }
 
 // Slide the blocks to the given places ({ id: { left, top, width } }, as numbers of pixels or as
@@ -4772,13 +4793,12 @@ function slideBlocks(targets, done) {
 }
 
 // Once the blocks have settled: bring everything back onto the canvas, move the wire labels off
-// each other, and save.  Returns where everything ended up.
+// each other, and save.
 function settleArrangement() {
     normalizeOrigin();
     resizeCanvas();
     spreadWireLabels();
     autosave();
-    return blockPlacements();
 }
 
 // Where an arrangement puts the blocks, in the form slideBlocks takes.
@@ -4805,30 +4825,6 @@ function arrangeProof() {
         cancelArrangements();
         return;
     }
-    // The layout the undo would restore has to be the one on screen, or undoing would put back
-    // something the player has since changed.
-    if(arrangeUndo && JSON.stringify(blockPlacements()) !== JSON.stringify(arrangeUndo.after)) {
-        forgetArrange();
-    }
-    if(arrangeUndo) {
-        // Where everything was, slid along as far as the whole diagram has been since (see
-        // shiftWorld) -- exactly as it was, if it hasn't.
-        const { dx, dy } = arrangeUndo;
-        const back = {};
-        Object.keys(arrangeUndo.before).forEach(function (id) {
-            const b = arrangeUndo.before[id], el = document.getElementById(id);
-            back[id] = (!dx && !dy) || !el ? b : Object.assign({}, b, {
-                left: cssPixels(el, 'left', b.left) + dx, top: cssPixels(el, 'top', b.top) + dy,
-            });
-        });
-        arrangeUndo = null;
-        slideBlocks(back, function () {
-            settleArrangement();
-            updateArrangeButton();
-        });
-        return;
-    }
-    const before = blockPlacements();
     const signature = diagramSignature();
     const request = requestArrangement();
     setArrangeWaiting(request.id);
@@ -4839,12 +4835,243 @@ function arrangeProof() {
         // Nor if it failed, or the diagram has changed after all (a key can still delete blocks).
         if(result === null || diagramSignature() !== signature) { return; }
         slideBlocks(arrangementTargets(result), function () {
-            arrangeUndo = { before: before, after: settleArrangement(), dx: 0, dy: 0 };
-            updateArrangeButton();
+            settleArrangement();
+            recordChange();
         });
     });
 }
 document.getElementById("arrangeProof").onclick = arrangeProof;
+
+// Undo and Redo.  Rather than work out how to reverse each kind of change, we take a snapshot of the
+// whole diagram whenever it has changed (see recordChange), and undoing puts the one before back.
+// A change ends in a typecheck, a drag or bracket resize ending, or an arrangement settling; a
+// change that opens a dialog (to name a variable, or label a wire) ends when it is submitted, and
+// one cancelled there leaves the diagram as it was, which is no change at all.
+
+// How many changes can be undone.
+const UNDO_LIMIT = 100;
+
+// The diagram as undoing puts it back: the proof as serializeProof has it, with the fixed blocks
+// named by their place among them (they get new ids when a level is started over, as Clear does),
+// the names in use (which only the variable blocks among the fixed ones don't record), and how far
+// the whole diagram had been slid along then (see worldOffset), which panning since has to be
+// added to where it puts the blocks back (see snapshotPlace).
+function undoSnapshot() {
+    const proof = serializeProof();
+    const fixed = {};
+    proof.nodes.filter((n) => FIXED_RULES.includes(n.rule)).forEach(function (n, i) {
+        fixed[n.id] = 'fixed' + i;
+    });
+    const id = (v) => fixed[v] || v;
+    return {
+        nodes: proof.nodes.map((n) => Object.assign({}, n, { id: id(n.id) })),
+        connections: proof.connections.map((c) => Object.assign({}, c, {
+            source: Object.assign({}, c.source, { vertex: id(c.source.vertex) }),
+            target: Object.assign({}, c.target, { vertex: id(c.target.vertex) }),
+        })),
+        varnames: varnames.slice(),
+        offset: { x: worldOffset.x, y: worldOffset.y },
+    };
+}
+
+// Where a snapshot puts a block's left or top ('x' or 'y') now: where it was then, slid along as
+// far as the diagram has been since -- exactly as it was, if it hasn't.
+function snapshotPlace(snap, v, axis) {
+    const d = worldOffset[axis] - snap.offset[axis];
+    return d ? (parseFloat(v) + d) + 'px' : v;
+}
+
+// What tells two snapshots apart: with every position taken relative to how far the diagram had
+// been slid along (so panning, which slides everything along, is no change) and to the pixel (as
+// shiftWorld leaves it); and, if `layout` is false, with where everything is left out, so that two
+// snapshots differ only in that if they have the same one.
+function snapshotKey(snap, layout) {
+    const rel = (v, axis) => Math.round(parseFloat(v) - snap.offset[axis]);
+    return JSON.stringify([snap.nodes.map(function (n) {
+        const { left, top, width, ...rest } = n;
+        return layout ? Object.assign(rest, { left: rel(left, 'x'), top: rel(top, 'y'), width: width })
+            : rest;
+    }), snap.connections, snap.varnames]);
+}
+
+// Start the history afresh from the diagram as it is: a level has just been set up, or a proof
+// restored into it.
+function resetUndo() {
+    undoStack = [];
+    redoStack = [];
+    undoCurrent = undoSnapshot();
+    updateUndoButtons();
+}
+
+// The diagram has (perhaps) changed: if so, what it was is something to undo to, and whatever had
+// been undone can't be redone any more.
+function recordChange() {
+    if(suppressSave || restoring || undoBatching > 0 || undoCurrent === null) { return; }
+    const now = undoSnapshot();
+    if(snapshotKey(now, true) === snapshotKey(undoCurrent, true)) { return; }
+    undoStack.push(undoCurrent);
+    if(undoStack.length > UNDO_LIMIT) { undoStack.shift(); }
+    redoStack = [];
+    undoCurrent = now;
+    updateUndoButtons();
+}
+
+// Make all the changes `change` makes one change, undone all at once.
+function batchChanges(change) {
+    undoBatching++;
+    try {
+        change();
+    } finally {
+        undoBatching--;
+    }
+    recordChange();
+}
+
+// Make a change that starts the level over (and so the history too, see resetUndo) one that can be
+// undone like any other after all.
+function keepingHistory(change) {
+    const stack = undoStack, was = undoCurrent;
+    change();
+    if(was === null || undoCurrent === null) { return; }
+    undoStack = stack;
+    if(snapshotKey(undoCurrent, true) !== snapshotKey(was, true)) {
+        undoStack.push(was);
+        if(undoStack.length > UNDO_LIMIT) { undoStack.shift(); }
+    }
+    updateUndoButtons();
+}
+
+function updateUndoButtons() {
+    document.getElementById("undo").disabled = undoStack.length === 0;
+    document.getElementById("redo").disabled = redoStack.length === 0;
+}
+
+// Whether the diagram is still enough to undo or redo a change to it: not while anything is being
+// worked out, sliding, dragged or resized, nor while a dialog is open (some of which are part way
+// through a change).
+function canStepHistory() {
+    if(arrangeWaiting !== null || arrangeFrame !== null || typecheckPending) { return false; }
+    if(dragPan || bgPan || currentResizable) { return false; }
+    return !Array.from(document.querySelectorAll('.modalbg'))
+        .some((el) => getComputedStyle(el).display !== 'none');
+}
+
+// Undo the last change (or redo the last one undone): take the snapshot to put back off one stack,
+// and put one of the diagram as it is onto the other.  (That is undoCurrent but for any panning
+// since, which puts the blocks on whole pixels.)
+function stepHistory(from, to) {
+    if(from.length === 0 || !canStepHistory()) { return; }
+    const target = from.pop();
+    const now = undoSnapshot();
+    to.push(now);
+    undoCurrent = target;
+    updateUndoButtons();
+    unpinConnection();
+    hideWireTooltip();
+    instance.clearDragSelection();
+    putBackSnapshot(target, now);
+}
+function undo() { stepHistory(undoStack, redoStack); }
+function redo() { stepHistory(redoStack, undoStack); }
+
+// Make the diagram what the snapshot `snap` says, from what `now` says it is: if all that differs
+// is where the blocks are, slide them there, as the Arrange button does, and otherwise build it
+// afresh and typecheck it.  Either way, show the blocks that changed.
+function putBackSnapshot(snap, now) {
+    const fixedEls = nodes.filter((x) => FIXED_RULES.includes(x.rule)).map((x) => x.node);
+    const elOf = (id) => /^fixed\d+$/.test(id) ? fixedEls[parseInt(id.slice(5), 10)]
+          : document.getElementById(id);
+    // The blocks that aren't just as they were, and the blocks at each end of a wire that isn't.
+    const block = (s, n) => JSON.stringify(Object.assign({}, n, {
+        left: Math.round(parseFloat(n.left) - s.offset.x), top: Math.round(parseFloat(n.top) - s.offset.y),
+    }));
+    const was = {};
+    now.nodes.forEach(function (n) { was[n.id] = block(now, n); });
+    const changed = new Set(snap.nodes.filter((n) => was[n.id] !== block(snap, n)).map((n) => n.id));
+    const wiresOf = (s) => new Set(s.connections.map((c) => JSON.stringify(c)));
+    const wiresNow = wiresOf(now), wiresThen = wiresOf(snap);
+    snap.connections.concat(now.connections).forEach(function (c) {
+        const w = JSON.stringify(c);
+        if(!(wiresNow.has(w) && wiresThen.has(w))) { changed.add(c.source.vertex); changed.add(c.target.vertex); }
+    });
+    const show = function () {
+        scrollToShow(Array.from(changed).map(elOf).filter((el) => el && el.isConnected));
+    };
+    if(snapshotKey(snap, false) === snapshotKey(now, false)) {
+        const targets = {};
+        snap.nodes.forEach(function (n) {
+            const el = elOf(n.id);
+            if(!el) { return; }
+            targets[el.id] = { left: snapshotPlace(snap, n.left, 'x'), top: snapshotPlace(snap, n.top, 'y') };
+            if(BRACKET_BRANCHES[n.rule]) { targets[el.id].width = n.width || ''; }
+        });
+        slideBlocks(targets, function () {
+            settleArrangement();
+            undoCurrent = undoSnapshot();
+            show();
+        });
+        return;
+    }
+    rebuildDiagram(snap, fixedEls);
+    undoCurrent = undoSnapshot();
+    show();
+    typecheck();
+}
+
+// Replace the diagram with the one the snapshot `snap` describes, keeping the level's fixed blocks
+// (`fixedEls`, in order) but moving them to where it says.  Each block the player added comes back
+// with the id it had, so the snapshots on either side of this one still name it.
+function rebuildDiagram(snap, fixedEls) {
+    suppressChecking = true;
+    restoring = true;
+    instance.select().deleteAll();
+    nodes.filter((x) => !FIXED_RULES.includes(x.rule)).forEach((x) => { removeBox(x.node); });
+    nodes = nodes.filter((x) => FIXED_RULES.includes(x.rule));
+    varnames = snap.varnames.slice();
+    const idMap = {};
+    snap.nodes.forEach(function (sn) {
+        const at = { left: snapshotPlace(snap, sn.left, 'x'), top: snapshotPlace(snap, sn.top, 'y') };
+        if(/^fixed\d+$/.test(sn.id)) {
+            const el = fixedEls[parseInt(sn.id.slice(5), 10)];
+            if(!el) { return; }
+            el.style.left = at.left;
+            el.style.top = at.top;
+            idMap[sn.id] = el;
+        } else {
+            idMap[sn.id] = restoreNode(Object.assign({}, sn, at), sn.id);
+        }
+    });
+    nodes.forEach((entry) => instance.revalidate(entry.node));
+    restoreConnections(snap.connections, idMap);
+    restoring = false;
+    suppressChecking = false;
+    normalizeOrigin();
+    resizeCanvas();
+}
+
+// Take a box out of the diagram, with its wires and ports, and out of jsPlumb's keeping too: Undo
+// can bring a block back under the same id, which jsPlumb would otherwise take to be this one.
+function removeBox(el) {
+    instance.deleteConnectionsForElement(el);
+    instance.unmanage(el);
+    el.remove();
+}
+
+document.getElementById("undo").onclick = undo;
+document.getElementById("redo").onclick = redo;
+// Ctrl+Z undoes, and Ctrl+Shift+Z or Ctrl+Y redoes (Cmd on a Mac) -- except in a text field, which
+// has its own undo.
+document.addEventListener('keydown', function (e) {
+    if(!(e.ctrlKey || e.metaKey) || e.altKey) { return; }
+    const key = e.key.toLowerCase();
+    const isUndo = key === 'z' && !e.shiftKey;
+    const isRedo = (key === 'z' && e.shiftKey) || (key === 'y' && !e.shiftKey);
+    if(!isUndo && !isRedo) { return; }
+    const tag = (e.target.tagName || '').toLowerCase();
+    if(tag === 'input' || tag === 'textarea' || e.target.isContentEditable) { return; }
+    e.preventDefault();
+    if(isUndo) { undo(); } else { redo(); }
+});
 
 // The diagnostics from the most recent completed typecheck, for the test seam to read.
 var lastDiagnostics = [];
@@ -5445,13 +5672,9 @@ function setLevel(level, rulesAllowed) {
         arrangeFrame = null;
         diagram.style.pointerEvents = '';
     }
-    forgetArrange();
     // Delete all the existing nodes, to prepare for a new level.  We have to remove the jsPlumb connections and endpoints first, or they end up stashed in the corner of the window.
     instance.select().deleteAll();    // This removes all connections
-    nodes.forEach((x) => {
-        instance.removeAllEndpoints(x.node);
-        x.node.remove();
-    });
+    nodes.forEach((x) => { removeBox(x.node); });
     nodes = [];
 
     // Start each level with the canvas reset to fill the viewport, scrolled to the origin, so the
@@ -5555,8 +5778,10 @@ function setLevel(level, rulesAllowed) {
     // Finally, we typecheck.  It will fail since the user hasn't added any connections yet, but it adds labels to ports.
     suppressChecking = false;
     typecheck();
-    // The empty level is now set up; subsequent changes should autosave.
+    // The empty level is now set up; subsequent changes should autosave, and can be undone back to
+    // here but no further.
     suppressSave = false;
+    resetUndo();
 
     // Done setting up the new level!
 
