@@ -47,6 +47,9 @@ axiom oracle (A : Type) (x : A) (C : Type) : C
 axiom oracle_plus (A : Type) (x : A) (C : Type) : C
 axiom oracle_neq (A : Type) (x : A) (C : Type) : C
 
+def existsunique (A : Type) (P : A → Type) : Type ≔ data [
+| existsunique. (element : A) (property : P element) (unique : forall A (x ↦ imp (P x) (eq A x element))) ]
+
 {` The ordering is asserted separately on each number system, rather than once for every type at
 all.  A < that made sense at any type would be an axiom with no laws of its own, and reading one as
 an order -- which is what an algebra block does -- would then credit a proof with a transitivity
@@ -264,6 +267,7 @@ let onechar_ops =
 type (_, _, _) identity +=
   | Forall : (closed, No.zero, No.strict opn) identity
   | Exists : (closed, No.zero, No.strict opn) identity
+  | ExistsUnique : (closed, No.zero, No.strict opn) identity
   | ForallPos : (closed, No.zero, No.strict opn) identity
   | ExistsPos : (closed, No.zero, No.strict opn) identity
   | ForallBelow : (closed, No.zero, No.strict opn) identity
@@ -301,6 +305,7 @@ type (_, _, _) identity +=
 
 let forall : (closed, No.zero, No.strict opn) notation = (Forall, Prefix No.zero)
 let exists : (closed, No.zero, No.strict opn) notation = (Exists, Prefix No.zero)
+let existsunique : (closed, No.zero, No.strict opn) notation = (ExistsUnique, Prefix No.zero)
 let andn : (No.strict opn, No.zero, No.strict opn) notation = (And, Infix No.zero)
 let orn : (No.strict opn, No.zero, No.strict opn) notation = (Or, Infix No.zero)
 let imp : (No.strict opn, No.zero, No.strict opn) notation = (Imp, Infix No.zero)
@@ -312,7 +317,13 @@ let forallpos : (closed, No.zero, No.strict opn) notation = (ForallPos, Prefix N
 let existspos : (closed, No.zero, No.strict opn) notation = (ExistsPos, Prefix No.zero)
 let forallbelow : (closed, No.zero, No.strict opn) notation = (ForallBelow, Prefix No.zero)
 let existsbelow : (closed, No.zero, No.strict opn) notation = (ExistsBelow, Prefix No.zero)
-let quantifiers = [ ("∀", forall, "forall"); ("∃", exists, "exists") ]
+
+let quantifiers =
+  [
+    ("∀", [ Token.Ident [ "∀" ] ], forall, "forall");
+    ("∃", [ Ident [ "∃" ] ], exists, "exists");
+    ("∃!", [ Ident [ "∃" ]; Op "!" ], existsunique, "existsunique");
+  ]
 
 (* The set a quantifier ranges over is normally written out after ∈ as a term.  But some sets that
    are worth quantifying over aren't types of their own: ℝ₊, the positive reals, and [n], the whole
@@ -448,23 +459,22 @@ let pp_op opname obs =
 
 (* This is a little tricky because the unparser doesn't know about binding notations (yet), so it sees only two arguments and produces (a parse tree representation of) something like "∃ A (x ↦ P x)" rather than the desired "∃x∈A,P x".  But we also try to support reformatting parse trees produced by parsing the latter. *)
 let pp_quant qname obs =
-  let quant, wsquant, x, wsin, ty, wscomma, Wrap body =
+  let rec getstarts = function
+    | Token (tok, (wstok, _)) :: obs ->
+        let start, obs = getstarts obs in
+        (Token.pp tok ^^ pp_ws `None wstok ^^ start, obs)
+    | obs -> (empty, obs) in
+  let start, obs = getstarts obs in
+  let x, wsin, ty, wscomma, Wrap body =
     match obs with
-    | [ Token (quant, (wsquant, _)); Term ty; Token (Op ",", (wscomma, _)); Term body ] ->
+    | [ Term ty; Token (Op ",", (wscomma, _)); Term body ] ->
         let x, body = get_abs qname (Wrap body) in
-        (quant, wsquant, x, [], Wrap ty, wscomma, body)
-    | [
-     Token (quant, (wsquant, _));
-     Term x;
-     Token (Ident [ "∈" ], (wsin, _));
-     Term ty;
-     Token (Op ",", (wscomma, _));
-     Term body;
-    ] -> (quant, wsquant, Builtins.get_var x, wsin, Wrap ty, wscomma, Wrap body)
+        (x, [], Wrap ty, wscomma, body)
+    | [ Term x; Token (Ident [ "∈" ], (wsin, _)); Term ty; Token (Op ",", (wscomma, _)); Term body ]
+      -> (Builtins.get_var x, wsin, Wrap ty, wscomma, Wrap body)
     | _ -> Builtins.invalid qname in
   let pbody, wsbody = pp_term body in
-  ( Token.pp quant
-    ^^ pp_ws `None wsquant
+  ( start
     ^^ pp_var x
     ^^ Token.pp (Ident [ "∈" ])
     ^^ pp_ws `None wsin
@@ -588,17 +598,22 @@ let () =
       is_case = (fun _ -> false);
     };
   List.iter
-    (fun (name, qnotn, qstr) ->
+    (fun (name, tokens, qnotn, qstr) ->
       make qnotn
         {
           name;
           tree =
             Closed_entry
-              (eop (Ident [ name ]) (term (Ident [ "∈" ]) (term (Op ",") (Done_closed qnotn))));
+              (eop (List.hd tokens)
+                 (List.fold_right
+                    (fun tok tree -> op tok tree)
+                    (List.tl tokens)
+                    (term (Ident [ "∈" ]) (term (Op ",") (Done_closed qnotn)))));
           processor =
             (fun ctx obs loc ->
+              let obs = List.fold_right (fun _ obs -> List.tl obs) tokens obs in
               match obs with
-              | [ Token _; Term x; Token _; Term ty; Token _; Term body ] ->
+              | [ Term x; Token _; Term ty; Token _; Term body ] ->
                   let x = Builtins.get_var x in
                   let ty = process ctx ty in
                   let body = process (Bwv.snoc ctx x) body in
@@ -1057,14 +1072,15 @@ let install_notations () =
         })
     binops;
   List.iter
-    (fun (qname, qnotn, qstr) ->
+    (fun (_qname, tokens, qnotn, qstr) ->
       Scope.Situation.add_with_print
         {
           keys = [ `Constant (get_const [ qstr ]) ];
           notn = Wrap qnotn;
           pat_vars = [ "A"; "P" ];
           val_vars = [ "A"; "P" ];
-          inner_symbols = `Multiple (Op qname, [ None ], Op ",");
+          inner_symbols =
+            `Multiple (List.hd tokens, List.map Option.some (List.tl tokens) @ [ None ], Op ",");
         })
     quantifiers;
   (* pp_specialquant supplies the bound variable and the set's own tokens, so the only argument left

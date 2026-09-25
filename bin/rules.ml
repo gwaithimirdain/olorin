@@ -180,6 +180,18 @@ let rules =
             extras = [ "condition" ];
             implicit_post = None;
           } );
+      ( "uexE",
+        Coconstr
+          {
+            constr = Constr.intern "existsunique";
+            outputs = [ (true, "element"); (false, "property"); (false, "unique") ];
+          } );
+      ( "uexI",
+        Constr
+          {
+            inputs = [ Required "element"; Required "property"; Required "unique" ];
+            constr = Constr.intern "existsunique";
+          } );
       ( "negE",
         Neg
           {

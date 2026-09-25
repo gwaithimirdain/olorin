@@ -1128,31 +1128,51 @@ function addEndpointsForRule(box, id, restore) {
         box.style.width = '200px';
         box.style.height = '80px';
         makeResizable(box);
-    } else if (id === 'exE') {
-        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: "∃?∈?,?"} });
+    } else if (id === 'exE' || id === 'uexE') {
+        var shape = "∃?∈?,?";
+        var shift = 0;
+        var label_middle = "condition";
+        var label_lower = "property";
+        if (id === 'uexE') {
+            shape = "∃!?∈?,?";
+            shift = 0.1;
+            label_middle = "property";
+            label_lower = "unique";
+        }
+        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input", primary: shape} });
         instance.addEndpoint(box, {
-            anchor: [1, 0.2, 1, 0],
+            anchor: [1, 0.2 - shift, 1, 0],
             source: true, maxConnections: -1,
             parameters: { sort: "output", label: "element", hasValue: true, side: "upper"},
             paintStyle: { fill: VALUECOLOR },
             connectorStyle: { stroke: VALUECOLOR, strokeWidth: 2 }
         });
-        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "condition", side: "middle"} });
-        instance.addEndpoint(box, { anchor: [1, 0.8, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: "property", side: "lower"} });
+        instance.addEndpoint(box, { anchor: [1, 0.5, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: label_middle, side: "middle"} });
+        instance.addEndpoint(box, { anchor: [1, 0.8 + shift, 1, 0], source: true, maxConnections: -1, parameters: {sort: "output", label: label_lower, side: "lower"} });
         // Double-clicking the box re-opens the dialog to rename the variable it binds.
         box.addEventListener('dblclick', function () { editVariable(box); });
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
-    } else if (id === 'exI') {
+    } else if (id === 'exI' || id === 'uexI') {
+        var shape = "∃?∈?,?";
+        var shift = 0;
+        var label_middle = "condition";
+        var label_lower = "property";
+        if (id === 'uexI') {
+            shape = "∃!?∈?,?";
+            shift = 0.1;
+            label_middle = "property";
+            label_lower = "unique";
+        }
         instance.addEndpoint(box, {
-            anchor: [0, 0.2, -1, 0],
+            anchor: [0, 0.2 - shift, -1, 0],
             target: true,
             parameters: {sort: "input", label: "element", hasValue: true, side: "upper"},
             paintStyle: { fill: VALUECOLOR },
         });
-        instance.addEndpoint(box, { anchor: [0, 0.5, -1, 0], target: true, parameters: {sort: "input", label: "condition", side: "middle"} });
-        instance.addEndpoint(box, { anchor: [0, 0.8, -1, 0], target: true, parameters: {sort: "input", label: "property", side: "lower"} });
-        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "∃?∈?,?"} });
+        instance.addEndpoint(box, { anchor: [0, 0.5, -1, 0], target: true, parameters: {sort: "input", label: label_middle, side: "middle"} });
+        instance.addEndpoint(box, { anchor: [0, 0.8 + shift, -1, 0], target: true, parameters: {sort: "input", label: label_lower, side: "lower"} });
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: shape} });
     } else if (id === 'allE') {
         instance.addEndpoint(box, { anchor: [0, 0.2, -1, 0], target: true, parameters: {sort: "input", label: "universal", side: "upper", primary: "∀?∈?,?"} });
         instance.addEndpoint(box, {
