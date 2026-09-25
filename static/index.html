@@ -905,31 +905,23 @@
         The algebra block can't deal with absolute values on its own, but if we give it a hypothesis ensuring that one of these conditions holds, then the absolute value simplifies away and the algebra block takes over.
         (Remember to also write out all the algebraic proofs on paper yourself, though!)
       </div>
-      <div id="peano1Hint" class="modal hint">
-        The natural numbers ℕ are characterized by Peano's axioms.
-        The first few of these axioms say that 0 is a natural number, that if <i>n</i> is a natural number then so is <i>n</i>+1 (its <b>successor</b>), and that equality of natural numbers behaves correctly.
-        The first interesting axiom says that if two natural numbers have the same successor, then they are the same.
-      </div>
-      <div id="peano2Hint" class="modal hint">
-        The next Peano axiom says that 0 is not a successor.
-        Note that this would be false if <i>n</i> were an integer instead of a natural number!
+      <div id="ntozHint" class="modal hint">
+        The natural numbers are the non-negative integers.
+        I will let you use a natural number when I expect an integer, and the algebra block knows that every integer thereby obtained is non-negative.
       </div>
       <div id="ztonHint" class="modal hint">
-        Another way of describing the natural numbers is that they are the non-negative integers.
-        I will let you use a natural number when I expect an integer, and the algebra block knows that every integer thereby obtained is non-negative.
-        However, to use an integer where I expect a natural number, you have to give me a proof that it is non-negative.
+        To use an integer where I expect a natural number, you have to give me a proof that it is non-negative.
         The ℤ→ℕ block converts an integer <i>x</i> together with a proof of <i>x</i>≥0 to a natural number that is equal to <i>x</i>.
-      </div>
-      <div id="peano3Hint" class="modal hint">
-        The final Peano axiom is induction.
-        Part of induction (not all of it!) is that every natural number is either zero or a successor.
-        We can't prove this with just algebra and logic; we need a new block.
-        Rather than state the axiom as an ∨ and require a separate case split, this block directly breaks the proof into cases based on whether the number is zero or a successor.
-        In the second case, we get a new natural number variable representing the predecessor.
       </div>
       <div id="belowHint" class="modal hint">
         We use the notation [<i>n</i>] for the set of natural numbers less than <i>n</i>.
         When the ∀ and ∃ blocks quantify over [<i>n</i>], they require or supply a proof that <i>x</i>&lt;<i>n</i> along with the natural number <i>x</i>, on a port of its own.
+      </div>
+      <div id="natCasesHint" class="modal hint">
+        Another essential fact is that every natural number is either zero or a successor.
+        We can't prove this with just algebra and logic; we need a new block.
+        Rather than state the axiom as an ∨ and require a separate case split, this block directly breaks the proof into cases based on whether the number is zero or a successor.
+        In the second case, we get a new natural number variable representing the predecessor.
       </div>
       <div id="inductionHint" class="modal hint">
         <p>

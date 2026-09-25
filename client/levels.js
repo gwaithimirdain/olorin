@@ -2309,7 +2309,7 @@ export const LEVELS = [
       ],
     },
     { name: "Negated quantifier world",
-      previous: [1,2],
+      previous: [1, 3, 4],
       stages: [
           { name: "¬∀∃∨⊤⇒",
             rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI" ],
@@ -2445,30 +2445,23 @@ export const LEVELS = [
       ],
     },
     { name: "Induction world",
+      previous: [4, 5],
       stages: [
           { name: "ℕ",
-            rules: [ "orE", "orI1", "orI2", "cnegI", "negE", "expr", "algplus", "asc" ],
+            rules: [ "andE", "andI", "orE", "orI1", "orI2", "exE", "exI", "allE", "allI", "expr", "algplus", "asc", "zton" ],
             levels: [
-                {
-                    parameters: [ ],
-                    variables: [ { name: "m", ty: "ℕ" }, { name: "n", ty: "ℕ" } ],
-                    hypotheses: [ { ty: "m+1=n+1" } ],
-                    conclusion: { ty: "m=n" },
-                    hint: "peano1Hint",
-                },
                 {
                     parameters: [ ],
                     variables: [ { name: "n", ty: "ℕ" } ],
                     hypotheses: [ ],
-                    conclusion: { ty: "0≠n+1" },
-                    hint: "peano2Hint",
+                    conclusion: { ty: "∃x∈ℤ,((x≥0)∧(x=n))" },
+                    hint: "ntozHint",
                 },
                 {
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" } ],
                     hypotheses: [ { ty: "x≥0" } ],
                     conclusion: { ty: "∃n∈ℕ,(x=n)" },
-                    extrarules: [ "zton", "exE", "exI" ],
                     hint: "ztonHint",
                 },
                 {
@@ -2476,7 +2469,6 @@ export const LEVELS = [
                     variables: [ { name: "n", ty: "ℕ" } ],
                     hypotheses: [ ],
                     conclusion: { ty: "∀k∈[n],(k²<n²)" },
-                    extrarules: [ "allE", "allI" ],
                     hint: "belowHint",
                 },
                 {
@@ -2484,7 +2476,6 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ ],
                     conclusion: { ty: "∀k∈[0],⊥" },
-                    extrarules: [ "allE", "allI" ],
                 },
                 {
                     parameters: [ ],
@@ -2492,12 +2483,19 @@ export const LEVELS = [
                     hypotheses: [ ],
                     conclusion: { ty: "(n=0)∨(n≥1)" },
                     extrarules: [ "natE" ],
-                    hint: "peano3Hint",
+                    hint: "natCasesHint",
+                },
+                {
+                    parameters: [ ],
+                    variables: [ { name: "x", ty: "ℤ" } ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(x≤−1)∨((x=0)∨(x≥1))" },
+                    extrarules: [ "natE", "tord" ],
                 },
             ],
           },
           { name: "ind₁",
-            rules: [ "orE", "orI1", "orI2", "impE", "impI", "cnegI", "negE", "allE", "allI", "exE", "exI", "expr", "algplus", "deceq", "tord", "zton", "asc", "natE", "natInd" ],
+            rules: [ "orE", "orI1", "orI2", "impE", "impI", "allE", "allI", "exE", "exI", "expr", "algplus", "deceq", "tord", "zton", "asc", "natE", "natInd" ],
             levels: [
                 {
                     parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
@@ -2551,7 +2549,7 @@ export const LEVELS = [
             ],
           },
           { name: "ind₂",
-            rules: [ "orE", "orI1", "orI2", "impE", "impI", "cnegI", "negE", "allE", "allI", "exE", "exI", "expr", "algplus", "deceq", "tord", "zton", "asc", "natE", "natInd" ],
+            rules: [ "orE", "orI1", "orI2", "impE", "impI", "allE", "allI", "exE", "exI", "expr", "algplus", "deceq", "tord", "zton", "asc", "natE", "natInd" ],
             levels: [
                 {
                     parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
