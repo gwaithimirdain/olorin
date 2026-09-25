@@ -36,7 +36,9 @@ test.describe('Arrange', () => {
             expect(plan.unresolved).toBeLessThan(0.5);
 
             await olorin.arrange();
-            expect(await olorin.undoDepth()).toEqual({ undo: 1, redo: 0 });
+            // A layout that is tidy already, and near enough what arranging it would make it, is left
+            // as it is (see arrange in client/arrange.js), and then there is nothing to undo.
+            expect(await olorin.undoDepth()).toEqual({ undo: plan.settled ? 0 : 1, redo: 0 });
 
             // The proof itself is just as it was.
             expect(await olorin.connections()).toEqual(connections);
@@ -91,7 +93,15 @@ test.describe('Arrange', () => {
             expect(saved.nodes.map((n) => [n.id, n.left, n.top, n.width || '']))
                 .toEqual(now.map((n) => [n.id, n.left, n.top, n.width]));
 
-            // Undoing it puts every block back exactly where it was.
+            // A layout left as it was hasn't moved, but to whole pixels; any other, undoing puts
+            // every block back exactly where it was.
+            if (plan.settled) {
+                const px = (n) => ['left', 'top', 'width'].map((k) => parseFloat(n[k]) || 0);
+                const off = now.filter((n, i) => px(n).some((v, k) => Math.abs(v - px(placed[i])[k]) > 1))
+                    .map((n) => n.id);
+                expect(off).toEqual([]);
+                return;
+            }
             await olorin.undo();
             expect(await olorin.undoDepth()).toEqual({ undo: 0, redo: 1 });
             expect(await olorin.nodes()).toEqual(placed);

@@ -432,13 +432,17 @@ function cost(t) {
 }
 
 // Accumulates the energy's gradient and (diagonal) curvature over the variables.  A term that has
-// gone past HUBER is treated as the parabola through it with the same slope, which is flatter.
+// gone past HUBER is treated as the parabola through it with the same slope, which is flatter.  And
+// a term with a `minRate` counts each coefficient as at least that much for its curvature, so that
+// where it hardly changes, a step doesn't send a block flying off to make up the shortfall at a rate
+// that only holds for the first pixel (its slope, and so which way the step goes, stays true).
 function quadratic(grad, curv, terms) {
     terms.forEach(function (t) {
         const w = t.huber ? t.w * Math.min(1, HUBER / Math.max(1e-9, Math.abs(t.value))) : t.w;
         t.vars.forEach(function ([v, c]) {
+            const r = t.minRate ? Math.max(t.minRate, Math.abs(c)) : c;
             grad[v] += 2 * w * t.value * c;
-            curv[v] += 2 * w * c * c;
+            curv[v] += 2 * w * r * r;
         });
     });
 }
@@ -531,29 +535,32 @@ function pathPoints(S) {
 const WIRE_CLEARANCE = 4;
 
 // How much of a wire shows past its label, and how that changes as it runs further across (dAcross)
-// and rises or falls further (dUpDown).  Its label sits in the middle of it, and the label's white
-// box hides whatever of the wire runs under it; and the port at one end and the port and arrowhead
-// at the other hide a little more.  So what shows is measured along the wire's path itself (see
-// wirePath): a curved wire whose ends are close together loops back through its own middle, where
-// the label is, and shows much less than its ends being far apart would suggest.
+// and further down (dUpDown).  Its label sits in the middle of it, and the label's white box hides
+// whatever of the wire runs under it; and the port at one end and the port and arrowhead at the
+// other hide a little more.  So what shows is measured along the wire's path itself (see wirePath):
+// a curved wire whose ends are close together loops back through its own middle, where the label
+// is, and shows much less than its ends being far apart would suggest.
 //
-// The rates are only a guide to which way to go: running level, a wire shows more for running
-// further across once its run is longer than its label, and for rising or falling, which starts
-// moving the label onto a slope, up to the height of the label, beyond which what it rises or falls
-// shows as it is.  (They are kept from getting small: a descent step divides by them, and would send
-// a block flying off to make up the shortfall at a rate that only holds for the first pixel.)
+// The rates are how much more shows a few pixels (RATE_SPAN) either way: they are what the descent
+// steers by, so they must say truly which way shows more, or a step the descent takes to show more
+// can show less, and never settle (see descend).  A pixel either way would see nothing where the
+// label covers the wire completely; a few pixels see past the edge of that.  A level wire is looked
+// at only the way its ports send it (see levelWay), since up and down would show the same.
 function shownOf(S, w, xs, ys) {
     const dx = val(xs, S.at.portX(w.t, w.tp)) - val(xs, S.at.portX(w.s, w.sp));
     const dy = val(ys, S.at.portY(w.t, w.tp)) - val(ys, S.at.portY(w.s, w.sp));
     const lw = Math.max(...w.labels.map((l) => l.w)), lh = Math.max(...w.labels.map((l) => l.h));
-    const run = Math.max(0, dx - SOURCE_END - TARGET_END), rise = Math.abs(dy);
+    const shown = (x, y) => shownAlong(w.curved, x, y, lw, lh);
+    const h = RATE_SPAN, way = levelWay(w);
     return {
-        shown: shownAlong(w.curved, dx, dy, lw, lh),
-        dAcross: run <= 0 ? 0 : run > lw ? 1 : Math.max(MIN_RATE, Math.min(1, rise / lh)),
-        dUpDown: rise < lh ? Math.max(MIN_RATE, Math.min(lw, run) / lh) : 1,
-        sign: Math.abs(dy) >= 1 ? Math.sign(dy) : levelWay(w),
+        shown: shown(dx, dy),
+        dAcross: (shown(dx + h, dy) - shown(dx - h, dy)) / (2 * h),
+        dUpDown: Math.abs(dy) >= 1 ? (shown(dx, dy + h) - shown(dx, dy - h)) / (2 * h)
+            : way * (shown(dx, dy + way * h) - shown(dx, dy)) / h,
     };
 }
+// How far either way shownOf looks to see how much more of a wire would show.
+const RATE_SPAN = 4;
 
 // How much shows of a wire running (dx, dy) from one end to the other, with a label lw by lh.  That
 // is all it depends on, and a descent asks it over and over about wires that have hardly moved, so
@@ -626,6 +633,7 @@ function levelWay(w) {
 // arrowhead at its end.
 const SOURCE_END = 8;
 const TARGET_END = 18;
+// The least rate (see shownOf) a descent step takes the visible term's curvature from.
 const MIN_RATE = 0.5;
 const VISIBLE_BAND = 30;
 
@@ -645,7 +653,7 @@ function visibility(S, w, xs, ys, xTerms, yTerms) {
         const least = Math.hypot(dx, dy) - lw - lh - SOURCE_END - TARGET_END;
         if(least >= S.sp.wireShown + VISIBLE_BAND) { return; }
     }
-    const { shown, dAcross, dUpDown, sign } = shownOf(S, w, xs, ys);
+    const { shown, dAcross, dUpDown } = shownOf(S, w, xs, ys);
     const short = S.sp.wireShown - shown;
     // Just past showing enough, the term is kept on, only with nothing to push: a descent step
     // takes its size from how firmly the energy holds a variable, and without this, the step that
@@ -655,11 +663,11 @@ function visibility(S, w, xs, ys, xTerms, yTerms) {
     const value = Math.max(0, short);
     const a = S.at.portX(w.s, w.sp), b = S.at.portX(w.t, w.tp);
     const c = S.at.portY(w.s, w.sp), d = S.at.portY(w.t, w.tp);
-    // (A level wire is sent whichever way its ports say: see levelWay.)
-    xTerms.push({ kind: 'visible', w: WEIGHTS.visible, value: value,
+    // (The rates can be all but nothing, and a descent step divides by them: see minRate.)
+    xTerms.push({ kind: 'visible', w: WEIGHTS.visible, value: value, minRate: MIN_RATE,
                   vars: [[b.v, -dAcross], [a.v, dAcross]] });
-    yTerms.push({ kind: 'visible', w: WEIGHTS.visible, value: value, shadow: true,
-                  vars: [[d.v, -sign * dUpDown], [c.v, sign * dUpDown]] });
+    yTerms.push({ kind: 'visible', w: WEIGHTS.visible, value: value, shadow: true, minRate: MIN_RATE,
+                  vars: [[d.v, -dUpDown], [c.v, dUpDown]] });
 }
 
 // The energy's terms, for the layout in (xs, ys), all but the hold on where everything started (see
@@ -761,8 +769,12 @@ function energy(S, xs, ys, x0, y0) {
 // a step it cuts short upsets the balance between the steps and the projection (see project).
 const MAX_STEP = 200;
 
-// What fraction of a Newton step each step of the descent takes.
+// What fraction of a Newton step each step of the descent takes, at most (see descend).
 const STEP = 0.5;
+// How much shorter a step is taken after one that went uphill, and how much longer again after
+// each one that didn't, up to STEP.
+const STEP_BACK = 0.5;
+const STEP_ON = 1.25;
 // How little a step has to move everything by for a descent to count as settled.
 const SETTLING = 0.5;
 // How weak the hold on where things started gets by the end of a descent (see descend).
@@ -776,23 +788,64 @@ function recenter(vals, anchor) {
     for(var v = 0; v < vals.length; v++) { vals[v] += shift; }
 }
 
+// What the energy's terms (as energyTerms gives them for the layout xs, ys) come to, snug and all.
+function termsTotal(S, terms, xs) {
+    var total = 0;
+    terms.xTerms.forEach((t) => { if(!t.shadow) { total += cost(t); } });
+    terms.yTerms.forEach((t) => { if(!t.shadow) { total += cost(t); } });
+    S.rightVar.forEach((r, i) => { total += WEIGHTS.snug * (xs[r] - xs[i]); });
+    return total;
+}
+// How far the layout (xs, ys) is from (x0, y0), as the hold on where things started counts it,
+// before its weight.
+function strayed(xs, ys, x0, y0) {
+    var total = 0;
+    xs.forEach((x, v) => { total += (x - x0[v]) * (x - x0[v]); });
+    ys.forEach((y, v) => { total += (y - y0[v]) * (y - y0[v]); });
+    return total;
+}
+
 // Minimize the energy under the constraints, starting from the layout S was set up with, and
 // holding each variable to the anchor given for it in (x0, y0) -- at first.  Over the second half
 // of the descent that hold fades almost to nothing: it has done its job by then, of steering toward
 // the tidy layout nearest the player's own, and if it stayed it would stop the descent short of
 // that, so that arranging the result again would move it on further.
+//
+// A step is only as good as the energy's curvature says it is, and some of the terms bend sharply
+// where the curvature can't see: a wire whose label hides most of it can show a great deal more for
+// rising a few pixels, so a step that makes it show enough overshoots, the term lets go, and the
+// next step takes it all back.  Left alone, a descent can go back and forth like that for ever, and
+// where it stops depends on a pixel here or there.  So a step that leaves the energy higher than it
+// was is taken back, and a shorter one taken instead.
 function descend(S, C, x0, y0, iterations, polish) {
     const xs = S.xs.slice(), ys = S.ys.slice();
     const xEdges = C.cx.edges, yEdges = C.cy.edges;
     project(xs, xEdges, 500);
     project(ys, yEdges, 500);
     const half = iterations / 2, fade = Math.pow(STAY_FADE, 1 / half);
+    const restore = function (to) {
+        to.xs.forEach((x, v) => { xs[v] = x; });
+        to.ys.forEach((y, v) => { ys[v] = y; });
+    };
+    // The last layout a step reached without going uphill, and how long a step to take from here.
+    var last = null, stepSize = STEP;
     // After those, carry on until it has settled, however long that takes (up to a point).
     for(var it = 0; it < iterations + polish; it++) {
         const stayScale = it < half ? 1 : it < iterations ? Math.pow(fade, it - half) : STAY_FADE;
-        const was = it >= iterations ? [Float64Array.from(xs), Float64Array.from(ys)] : null;
-        const { xTerms, yTerms } = energyTerms(S, xs, ys);
         const stay = WEIGHTS.stay * stayScale;
+        var terms = energyTerms(S, xs, ys);
+        const here = { xs: xs.slice(), ys: ys.slice(), terms: terms,
+                       total: termsTotal(S, terms, xs), strayed: strayed(xs, ys, x0, y0) };
+        if(last !== null && here.total + stay * here.strayed > last.total + stay * last.strayed + 1e-6) {
+            restore(last);
+            terms = last.terms;
+            stepSize *= STEP_BACK;
+        } else {
+            last = here;
+            stepSize = Math.min(STEP, stepSize * STEP_ON);
+        }
+        const was = it >= iterations ? [Float64Array.from(xs), Float64Array.from(ys)] : null;
+        const { xTerms, yTerms } = terms;
         // A step of Newton's method, taking the curvature one variable at a time, and so the
         // curvature it returns is how firmly the energy holds each variable.
         const step = function (vals, anchor, terms, linear) {
@@ -804,7 +857,7 @@ function descend(S, C, x0, y0, iterations, polish) {
             }
             if(linear) { linear(grad); }
             for(var v = 0; v < vals.length; v++) {
-                const d = grad[v] / (curv[v] + 1e-9) * STEP;
+                const d = grad[v] / (curv[v] + 1e-9) * stepSize;
                 vals[v] -= Math.max(-MAX_STEP, Math.min(MAX_STEP, d));
             }
             return curv;
@@ -825,6 +878,14 @@ function descend(S, C, x0, y0, iterations, polish) {
             xs.forEach((x, v) => { change = Math.max(change, Math.abs(x - was[0][v])); });
             ys.forEach((y, v) => { change = Math.max(change, Math.abs(y - was[1][v])); });
             if(change < SETTLING) { break; }
+        }
+    }
+    // The last step hasn't been weighed yet: keep it only if it didn't go uphill either.
+    if(last !== null) {
+        const terms = energyTerms(S, xs, ys);
+        if(termsTotal(S, terms, xs) + WEIGHTS.stay * STAY_FADE * strayed(xs, ys, x0, y0)
+           > last.total + WEIGHTS.stay * STAY_FADE * last.strayed) {
+            restore(last);
         }
     }
     const worst = Math.max(project(xs, xEdges, 2000), project(ys, yEdges, 2000));
