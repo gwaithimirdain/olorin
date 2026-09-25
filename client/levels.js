@@ -737,7 +737,7 @@ export const LEVELS = [
     { name: "Advanced proposition world",
       previous: [1, 2],
       stages: [
-          { name: "∧∨⇒₁",
+          { name: "∧∨⇒",
             rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
             levels: [
                 {
@@ -770,8 +770,45 @@ export const LEVELS = [
                     hypotheses: [ { ty: "P⇒Q" }, { ty: "R⇒S" } ],
                     conclusion: { ty: "(P∨R)⇒(Q∨S)" },
                 },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P⇒Q" }, { ty: "P⇒(Q⇒R)" }, ],
+                    conclusion: { ty: "P⇒R" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P⇒(P⇒Q)" }, { ty: "(P⇒Q)⇒P" } ],
+                    conclusion: { ty: "Q" },
+                    hint: "multiUseHint",
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(P⇒Q)⇒R" }, { ty: "(Q⇒R)⇒P" }, { ty: "(R⇒P)⇒Q" } ],
+                    conclusion: { ty: "P∧(Q∧R)" },
+                    blocks: 10,
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P⇒(Q∧R)" }, { ty: "(P∧Q)⇒S" }, { ty: "(P⇒S)⇒(Q⇒P)" }  ],
+                    conclusion: { ty: "Q⇒(R∧S)" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "((P∨(P⇒Q))⇒Q)⇒Q" },
+                },
             ]
           },
+      ],
+    },
+    { name: "Equivalence world",
+      previous: [2, 3],
+      stages: [
           { name: "⇔∧",
             rules: [ "andE", "andI", "iffI", "iffE1", "iffE2" ],
             levels: [
@@ -932,46 +969,10 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∧∨⇒₂",
-            rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
-            levels: [
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒Q" }, { ty: "P⇒(Q⇒R)" }, ],
-                    conclusion: { ty: "P⇒R" },
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒(P⇒Q)" }, { ty: "(P⇒Q)⇒P" } ],
-                    conclusion: { ty: "Q" },
-                    hint: "multiUseHint",
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "(P⇒Q)⇒R" }, { ty: "(Q⇒R)⇒P" }, { ty: "(R⇒P)⇒Q" } ],
-                    conclusion: { ty: "P∧(Q∧R)" },
-                    blocks: 10,
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ { ty: "P⇒(Q∧R)" }, { ty: "(P∧Q)⇒S" }, { ty: "(P⇒S)⇒(Q⇒P)" }  ],
-                    conclusion: { ty: "Q⇒(R∧S)" },
-                },
-                {
-                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "((P∨(P⇒Q))⇒Q)⇒Q" },
-                },
-            ]
-          }
       ]
     },
     { name: "Existential world",
+      previous: [3, 4],
       stages: [
           { name: "∃⇒⊤⊥",
             rules: [ "impI", "impE", "exE", "exI", "topI", "botE" ],
@@ -1487,7 +1488,7 @@ export const LEVELS = [
       ]
     },
     { name: "Universal world",
-      previous: [2],
+      previous: [4, 5],
       stages: [
           { name: "∀⇒⊤",
             rules: [ "impI", "impE", "allE", "allI", "topI" ],
@@ -2084,7 +2085,7 @@ export const LEVELS = [
       ]
     },
     { name: "Negation world",
-      previous: [4],
+      previous: [5],
       stages: [
           { name: "¬⇒⊥",
             rules: [ "impI", "impE", "negI", "negE", "botE" ],
