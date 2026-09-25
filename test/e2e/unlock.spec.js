@@ -403,12 +403,11 @@ test.describe('A stage marked "bonus"', () => {
 // this difficulty, every world THEY follow 50% done one difficulty up, and every world that follows
 // THIS one 50% done one difficulty down.  These set the lists through test mode's setWorldOption.
 test.describe('Rules 1-3: a world\'s "previous" list', () => {
-    // A world with no `previous` of its own, far enough in to have two worlds before it, so that
-    // clearing the override on it exercises the default rather than a list levels.js wrote.
-    const DEFAULTED = worlds().find((w) => w.declared === undefined && w.number >= 3);
-    if (worlds().length < 3 || !DEFAULTED) {
-        throw new Error('This suite assumes at least three worlds, one of which (not the first two) '
-                      + 'declares no `previous` of its own; update it.');
+    // A world far enough in to have two worlds before it.  Whatever `previous` levels.js gives it,
+    // setWorldOption(..., null) deletes that list, so the default is what's left in play.
+    const DEFAULTED = worlds().find((w) => w.number >= 3);
+    if (!DEFAULTED) {
+        throw new Error('This suite assumes at least three worlds; update it.');
     }
     // The first level of a world, whose own stage and level rules ask for nothing.
     const opener = (w) => inWorld(w)[0];
