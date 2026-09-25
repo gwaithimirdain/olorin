@@ -1423,7 +1423,7 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∃₊<",
+          { name: "∃₊<∼",
             rules: [ "exE", "exI", "expr", "algplus", "asc" ],
             levels: [
                 {
@@ -1792,7 +1792,7 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∀₊∨<₁",
+          { name: "∀₊∨<",
             rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
             levels: [
                 {
@@ -1860,7 +1860,7 @@ export const LEVELS = [
                 },
             ],
           },
-          { name: "∀₊∨<₂",
+          { name: "∀₊∨≈",
             rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
             levels: [
                 {
