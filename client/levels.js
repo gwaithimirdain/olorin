@@ -985,7 +985,7 @@ export const LEVELS = [
       ]
     },
     { name: "Existential world",
-      previous: ["Disjunction world", "Implication world"],
+      previous: ["Advanced proposition world"],
       stages: [
           { name: "∃⇒⊤⊥",
             rules: [ "impI", "impE", "exE", "exI", "topI", "botE" ],
@@ -1501,7 +1501,7 @@ export const LEVELS = [
       ]
     },
     { name: "Universal world",
-      previous: ["Disjunction world", "Implication world"],
+      previous: ["Advanced proposition world"],
       stages: [
           { name: "∀⇒⊤",
             rules: [ "impI", "impE", "allE", "allI", "topI" ],
@@ -2098,7 +2098,7 @@ export const LEVELS = [
       ],
     },
     { name: "Uniqueness world",
-      previous: ["Advanced quantifier world"],
+      previous: ["Advanced quantifier world", "Equivalence world"],
       stages: [
           { name: "∃!",
             rules: [ "andI", "andE", "orE", "orI1", "orI2", "impI", "impE", "topI", "botE", "iffI", "iffE1", "iffE2", "allE", "allI", "exI", "exE", "uexI", "uexE", "algplus" ],
@@ -2118,8 +2118,8 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
                     variables: [ ],
-                    hypotheses: [ { ty: "∃x∈A,P(x)" }, { ty: "∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y))" } ],
-                    conclusion: { ty: "∃!x∈A,P(x)" },
+                    hypotheses: [ ],
+                    conclusion: { ty: "∃!x∈A,P(x)⇔((∃x∈A,P(x))∧∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y)))" },
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
@@ -2713,7 +2713,7 @@ export const LEVELS = [
       ],
     },
     { name: "Sequence world",
-      previous: ["Induction world"],
+      previous: ["Advanced quantifier world", "Equivalence world"],
       courses: [ "analysis" ],
       stages: [
           { name: "lim₁",
