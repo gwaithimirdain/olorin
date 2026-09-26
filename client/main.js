@@ -2057,10 +2057,10 @@ function stageLabel(w, s) {
 // of things for the player to do -- empty when the world is "open" at K (individual levels still
 // need the stage/level rules 4-6).
 //
-// Which worlds a world follows is its `previous` list in levels.js, defaulting to [1], the world
-// right before it (see computeUnlockData); each gate then asks about ALL the worlds it names, so a
-// world following two others waits for both.  The percentages are of each world's non-bonus levels;
-// a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
+// Which worlds a world follows is its `previous` list of names in levels.js (see
+// computeUnlockData); each gate then asks about ALL the worlds it names, so a world following two
+// others waits for both.  The percentages are of each world's non-bonus
+// levels; a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
 function worldGateBlockers(w, K, data) {
     const world = data[w];
     const blockers = [];
@@ -2116,13 +2116,11 @@ function unlockBlockers(w, s, c, K, data) {
     const blockers = worldGateBlockers(w, K, data);
     // 4. Each of this stage's prerequisite stages is >= 70% complete at K.  By default that's the
     //    single stage right before it; a stage can instead declare `previous: [...]` in levels.js,
-    //    listing how many stages back each prerequisite is -- [2] to look past the stage in between
-    //    (for two independent tracks), [1, 2] to require both, [] for no stage prerequisite at all.
-    //    Entries reaching back past the first stage are ignored, so the first stage is unrestricted.
-    const previous = stage.previous || [1];
-    for(var pi = 0; pi < previous.length; pi++) {
-        const ps = s - previous[pi];
-        if(ps < 0) { continue; }
+    //    naming the stages of its world it requires -- to look past the stage in between (for two
+    //    independent tracks), to require several, or [] for no stage prerequisite at all.  The
+    //    first stage has none by default.  (computeUnlockData resolves the names to indices.)
+    for(var pi = 0; pi < stage.previous.length; pi++) {
+        const ps = stage.previous[pi];
         const n = moreNeeded(world.stages[ps].done[K], world.stages[ps].total, 0.7);
         if(n > 0) { blockers.push('Complete ' + moreLevels(n) + ' of ' + stageLabel(w, ps) + ' at ' + diff); }
     }
@@ -2305,27 +2303,44 @@ function toggleCompletedAt(level, d) {
     refreshWorldProgress(level.worldPaneIndex);
 }
 
+// The index in `list` (LEVELS, or one world's stages) of the thing with this name, as a `previous`
+// list names it -- which must be exactly one thing's.  `what` says what they are, for the error.
+function indexNamed(list, name, what) {
+    const named = function (x) { return x.name === name; };
+    const i = list.findIndex(named);
+    if(i < 0) { throw new Error('No ' + what + ' is named "' + name + '"'); }
+    if(list.findLastIndex(named) !== i) { throw new Error('Two ' + what + 's are named "' + name + '"'); }
+    return i;
+}
+
 // Recompute, for every world and stage, how many of its levels are complete at each difficulty
 // (>= K) and each level's completed difficulty, from the saved results.  Drives the unlock rule.
 function computeUnlockData(res) {
     globalTime = parseInt(localStorage.getItem("time")) || 0;
     unlockData = LEVELS.map(function (world, w) {
-        // Which worlds this one follows: `previous` lists how many worlds back each is, defaulting
-        // to the world right before it.  Entries reaching back past the first world are ignored, so
-        // the first world follows nothing; `followers` (filled in below) is the reverse relation.
-        // A world this player doesn't have is left out of the relation at both ends, here and in
-        // the followers below: nobody can complete it, so gating anything on it would lock that
-        // thing for good.  So is a world on the other side of the line between the game and a
-        // course (see sameCourseSide).
-        const previous = (world.previous || [1]).map(function (n) { return w - n; })
-              .filter(function (i) {
-                  return i >= 0 && worldShown(LEVELS[i]) && sameCourseSide(world, LEVELS[i]);
-              });
+        // Which worlds this one follows: `previous` names them; `followers` (filled in below) is
+        // the reverse relation.  A world this player doesn't have is left out of the relation at
+        // both ends, here and in the followers below: nobody can complete it, so gating anything
+        // on it would lock that thing for good.  So is a world on the other side of the line
+        // between the game and a course (see sameCourseSide).
+        if(!world.previous) { throw new Error('World "' + world.name + '" has no `previous` list'); }
+        const previous = world.previous.map(function (name) {
+            return indexNamed(LEVELS, name, 'world');
+        }).filter(function (i) {
+            return worldShown(LEVELS[i]) && sameCourseSide(world, LEVELS[i]);
+        });
         const wd = { total: 0, done: [0, 0, 0], stages: [], previous: previous, followers: [] };
-        world.stages.forEach(function (stage) {
-            // `previous` is which stages back this one's rule-4 prerequisite is; see unlockBlockers.
+        world.stages.forEach(function (stage, s) {
+            // `previous` is the indices of the stages in this world that are this one's rule-4
+            // prerequisites (see unlockBlockers): the ones it names, defaulting to the stage right
+            // before it (so the first stage has none).
+            const previous = stage.previous
+                  ? stage.previous.map(function (name) {
+                      return indexNamed(world.stages, name, 'stage of "' + world.name + '"');
+                  })
+                  : s > 0 ? [s - 1] : [];
             const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
-                         previous: stage.previous };
+                         previous: previous };
             // A `bonus` stage is extra credit: its levels are left out of the world's totals, so the
             // inter-world percentages (rules 1-3) are fractions of the non-bonus levels only.  They
             // still count for their own stage, so the stage rules (4-6) treat them like any other.

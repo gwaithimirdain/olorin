@@ -263,14 +263,14 @@ test.describe('A padlock\'s tooltip', () => {
 });
 
 // Rule 4 normally looks at the stage immediately before this one.  A stage can say otherwise with
-// a `previous` list of how many stages back each of its prerequisites is (default [1]) -- so two
-// tracks can run side by side, or a stage can require several, or none.  These set the list
+// a `previous` list naming its prerequisites among its world's stages -- so two tracks can run
+// side by side, or a stage can require several, or none.  These set the list
 // themselves through test mode's setStageOption, so they hold whatever levels.js declares.
 test.describe('Rule 4: a stage\'s "previous" list', () => {
     const STAGES = stagesInWorld(FIRST.world);
     // A stage with two stages before it that declares no `previous` of its own, so setting the
     // list to null exercises the default rather than whatever levels.js wrote.  Two predecessors
-    // is enough to tell [1], [2] and [1, 2] apart.
+    // is enough to tell naming one, the other, and both apart.
     const AT = STAGES.findIndex((st, i) => i >= 2 && st.declared === undefined);
     if (AT < 0) {
         throw new Error('This suite assumes the first world has a third-or-later stage that '
@@ -278,9 +278,11 @@ test.describe('Rule 4: a stage\'s "previous" list', () => {
     }
     const [S1, S2, TARGET] = [STAGES[AT - 2], STAGES[AT - 1], STAGES[AT]];
     const done = (stage) => completions(stage.levels, 0);
-    // Set TARGET's list (null = whatever levels.js says) and read its first level's novice state.
-    async function stateWith(olorin, previous) {
-        await olorin.setStageOption(FIRST.world, TARGET.number, 'previous', previous);
+    // Set TARGET's list to name these stages (null = no list of its own) and read its first
+    // level's novice state.
+    async function stateWith(olorin, stages) {
+        await olorin.setStageOption(FIRST.world, TARGET.number, 'previous',
+                                    stages && stages.map((st) => st.name));
         return (await olorin.levelStates(TARGET.levels[0].name))[0];
     }
 
@@ -290,34 +292,27 @@ test.describe('Rule 4: a stage\'s "previous" list', () => {
         await page.close();
     });
 
-    test('previous: [2] looks past the stage in between', async ({ page }) => {
+    test('previous can look past the stage in between', async ({ page }) => {
         const olorin = await open(page, done(S1));
         // The stage two back is complete, and the one in between no longer matters.
-        expect(await stateWith(olorin, [2])).toBe('unlocked');
+        expect(await stateWith(olorin, [S1])).toBe('unlocked');
     });
 
-    test('previous: [1, 2] requires both of them', async ({ page }) => {
+    test('previous with two stages requires both of them', async ({ page }) => {
         const olorin = await open(page, done(S1));
-        expect(await stateWith(olorin, [1, 2])).toBe('locked'); // the nearer stage isn't done
+        expect(await stateWith(olorin, [S2, S1])).toBe('locked'); // the nearer stage isn't done
         await page.close();
     });
 
-    test('previous: [1, 2] unlocks once both are complete', async ({ page }) => {
+    test('previous with two stages unlocks once both are complete', async ({ page }) => {
         const olorin = await open(page, done(S1).concat(done(S2)));
-        expect(await stateWith(olorin, [1, 2])).toBe('unlocked');
+        expect(await stateWith(olorin, [S2, S1])).toBe('unlocked');
     });
 
     test('previous: [] asks for no stage at all', async ({ page }) => {
         const olorin = await open(page); // nothing completed anywhere
-        expect(await stateWith(olorin, [1])).toBe('locked');
+        expect(await stateWith(olorin, [S2])).toBe('locked');
         expect(await stateWith(olorin, [])).toBe('unlocked');
-    });
-
-    test('prerequisites reaching back past the first stage are ignored', async ({ page }) => {
-        const olorin = await open(page);
-        // The first stage has nothing before it, so [1] (and [3]) name nothing and impose nothing.
-        await olorin.setStageOption(FIRST.world, 1, 'previous', [1, 3]);
-        expect((await olorin.levelStates(FIRST.name))[0]).toBe('unlocked');
     });
 
     test('the list levels.js declares is what applies until overridden', async ({ page }) => {
@@ -380,7 +375,7 @@ test.describe('A stage marked "bonus"', () => {
     test('it still counts for the stage after it', async ({ page }) => {
         // A stage that requires only the one before it, so marking that one bonus is the only
         // change in play.
-        const AFTER = STAGES.find((st) => st.number > 1 && st.previous.length === 1 && st.previous[0] === 1);
+        const AFTER = STAGES.find((st) => st.previous.length === 1 && st.previous[0] === st.number - 1);
         const BEFORE = STAGES[AFTER.number - 2];
         const olorin = await open(page);
         await olorin.setStageOption(FIRST.world, BEFORE.number, 'bonus', true);
@@ -390,7 +385,7 @@ test.describe('A stage marked "bonus"', () => {
     });
 
     test('and satisfies that stage once complete', async ({ page }) => {
-        const AFTER = STAGES.find((st) => st.number > 1 && st.previous.length === 1 && st.previous[0] === 1);
+        const AFTER = STAGES.find((st) => st.previous.length === 1 && st.previous[0] === st.number - 1);
         const BEFORE = STAGES[AFTER.number - 2];
         const olorin = await open(page, prereqStages(BEFORE, STAGES).flatMap(done).concat(done(BEFORE)));
         await olorin.setStageOption(FIRST.world, BEFORE.number, 'bonus', true);
@@ -398,15 +393,12 @@ test.describe('A stage marked "bonus"', () => {
     });
 });
 
-// Which worlds a world follows is its own `previous` list, defaulting to [1].  All three of the
+// Which worlds a world follows is its own `previous` list of names.  All three of the
 // rules that open a world quantify over the relation: every world it follows must be 80% done at
 // this difficulty, every world THEY follow 50% done one difficulty up, and every world that follows
 // THIS one 50% done one difficulty down.  These set the lists through test mode's setWorldOption.
 test.describe('Rules 1-3: a world\'s "previous" list', () => {
-    // A world far enough in to have two worlds before it.  Whatever `previous` levels.js gives it,
-    // setWorldOption(..., null) deletes that list, so the default is what's left in play.
-    const DEFAULTED = worlds().find((w) => w.number >= 3);
-    if (!DEFAULTED) {
+    if (worlds().length < 3) {
         throw new Error('This suite assumes at least three worlds; update it.');
     }
     // The first level of a world, whose own stage and level rules ask for nothing.
@@ -419,27 +411,20 @@ test.describe('Rules 1-3: a world\'s "previous" list', () => {
     // predecessors' predecessors (rule 3) depend on what EVERY other world declares, so whatever
     // levels.js happens to say would leak into all of them.  So each test first puts every world
     // on the plain chain -- each following the one before it -- and then sets the list under test.
+    // `overrides` maps a world's number to the numbers of the worlds it should follow instead.
     async function chain(olorin, overrides = {}) {
-        for (const w of worlds()) {
+        const all = worlds();
+        for (const [i, w] of all.entries()) {
             const has = Object.prototype.hasOwnProperty.call(overrides, w.number);
-            await olorin.setWorldOption(w.number, 'previous', has ? overrides[w.number] : [1]);
+            const follows = has ? overrides[w.number] : i > 0 ? [all[i - 1].number] : [];
+            await follow(olorin, w.number, follows);
         }
     }
+    // Make world `w` follow the worlds numbered `ws`, by name.
+    const follow = (olorin, w, ws) =>
+        olorin.setWorldOption(w, 'previous', ws.map((x) => world(x).name));
 
-    test('a world with no list of its own defaults to the one before it', async ({ page }) => {
-        const w = DEFAULTED.number;
-        // Every world before it is finished except the one right before, so [1] locks it and
-        // looking past that one doesn't.
-        const olorin = await open(page, worlds()
-            .filter((x) => x.number < w && x.number !== w - 1)
-            .flatMap((x) => done(x.number, 2)));
-        await chain(olorin, { [w]: null }); // no list of its own -> the default
-        expect(await state(olorin, w)).toBe('locked');
-        await olorin.setWorldOption(w, 'previous', [2]); // ...which was indeed the world before it
-        expect(await state(olorin, w)).toBe('unlocked');
-    });
-
-    test('by default a world follows the one before it', async ({ page }) => {
+    test('a world following the one before it waits on that one only', async ({ page }) => {
         // World 1 is finished, but world 3 waits on world 2, not on world 1.
         const olorin = await open(page, done(1, 0));
         await chain(olorin);
@@ -447,25 +432,25 @@ test.describe('Rules 1-3: a world\'s "previous" list', () => {
         await page.close();
     });
 
-    test('previous: [2] looks past the world in between', async ({ page }) => {
+    test('previous can look past the world in between', async ({ page }) => {
         const olorin = await open(page, done(1, 0));
-        await chain(olorin, { 3: [2] });
+        await chain(olorin, { 3: [1] });
         // World 3 now follows world 1, which is done -- and world 1 follows nothing, so the
         // grandparent rule asks for nothing either.
         expect(await state(olorin, 3)).toBe('unlocked');
     });
 
-    test('previous: [1, 2] waits for both of them', async ({ page }) => {
+    test('previous with two worlds waits for both of them', async ({ page }) => {
         // World 1 done at adept (so the grandparent rule is satisfied too), world 2 untouched.
         const olorin = await open(page, done(1, 1));
-        await chain(olorin, { 3: [1, 2] });
+        await chain(olorin, { 3: [2, 1] });
         expect(await state(olorin, 3)).toBe('locked');
         await page.close();
     });
 
-    test('previous: [1, 2] opens once both are done', async ({ page }) => {
+    test('previous with two worlds opens once both are done', async ({ page }) => {
         const olorin = await open(page, done(1, 1).concat(done(2, 0)));
-        await chain(olorin, { 3: [1, 2] });
+        await chain(olorin, { 3: [2, 1] });
         expect(await state(olorin, 3)).toBe('unlocked');
     });
 
@@ -473,7 +458,7 @@ test.describe('Rules 1-3: a world\'s "previous" list', () => {
         const olorin = await open(page); // nothing completed anywhere
         await chain(olorin);
         expect(await state(olorin, 2)).toBe('locked');
-        await olorin.setWorldOption(2, 'previous', []);
+        await follow(olorin, 2, []);
         expect(await state(olorin, 2)).toBe('unlocked');
     });
 
@@ -486,7 +471,7 @@ test.describe('Rules 1-3: a world\'s "previous" list', () => {
         expect(await adept(olorin, 2)).toBe('locked');
 
         // Point world 3 elsewhere and world 2 has no follower left to wait for.
-        await olorin.setWorldOption(3, 'previous', []);
+        await follow(olorin, 3, []);
         expect(await adept(olorin, 2)).not.toBe('locked');
     });
 
@@ -497,7 +482,7 @@ test.describe('Rules 1-3: a world\'s "previous" list', () => {
         expect(await state(olorin, 3)).toBe('locked');
 
         // World 3 following world 1 directly leaves nothing beyond it to ask about.
-        await olorin.setWorldOption(3, 'previous', [2]);
+        await follow(olorin, 3, [1]);
         expect(await state(olorin, 3)).toBe('unlocked');
     });
 

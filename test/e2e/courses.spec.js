@@ -225,7 +225,10 @@ test.describe('Rule 3, the difficulty above', () => {
     // Put every world on the plain chain, each following the one before it, so the relation under
     // test is this suite's and not whatever levels.js happens to declare.
     async function chain(olorin) {
-        for (const w of worlds()) { await olorin.setWorldOption(w.number, 'previous', [1]); }
+        const all = worlds();
+        for (const [i, w] of all.entries()) {
+            await olorin.setWorldOption(w.number, 'previous', i > 0 ? [all[i - 1].name] : []);
+        }
     }
     // World 3 at adept: world 2 is finished at adept (rule 1) and world 4 at novice (rule 2), but
     // world 1 is only at adept, where rule 3 wants master.  The level asked about is solved at

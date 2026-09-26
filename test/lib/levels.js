@@ -108,6 +108,22 @@ function worldNames() {
     return loadLevelsModule().LEVELS.filter((w) => !w.courses).map((w) => w.name);
 }
 
+// The index in `list` (LEVELS, or one world's stages) of the one thing with this name, as a
+// `previous` list names it, the way the app's indexNamed finds it.
+function indexNamed(list, name, what) {
+    const named = (x) => x.name === name;
+    const i = list.findIndex(named);
+    if (i < 0) throw new Error(`No ${what} is named "${name}"`);
+    if (list.findLastIndex(named) !== i) throw new Error(`Two ${what}s are named "${name}"`);
+    return i;
+}
+
+// The 1-based numbers of the worlds that LEVELS[i] follows, as its `previous` list names them.
+function previousWorlds(LEVELS, i) {
+    if (!LEVELS[i].previous) throw new Error(`World "${LEVELS[i].name}" has no \`previous\` list`);
+    return LEVELS[i].previous.map((name) => indexNamed(LEVELS, name, 'world') + 1);
+}
+
 // The worlds a course keeps to itself, as {number, name, courses, levels}: the ones everything
 // above leaves out, for the tests that open the app with a course code and expect to see them.
 // `number` is the world's id in levels.js, which is what a level name is numbered by.
@@ -124,10 +140,10 @@ function courseWorlds() {
                 bonus: !!stage.bonus,
                 saveable: saveable(level),
             })));
-        // Which worlds it follows, resolved as the app resolves them: `previous` counts worlds
-        // back, defaulting to the one before, and only a world of the same course counts -- the
-        // game's own worlds are no prerequisite for a course's (see sameCourseSide in main.js).
-        const previous = (world.previous || [1]).map((n) => x + 1 - n).filter(function (p) {
+        // Which worlds it follows, resolved as the app resolves them: `previous` names them, and
+        // only a world of the same course counts -- the game's
+        // own worlds are no prerequisite for a course's (see sameCourseSide in main.js).
+        const previous = previousWorlds(LEVELS, x).filter(function (p) {
             const prev = p >= 1 && LEVELS[p - 1];
             return prev && prev.courses && prev.courses.some((c) => world.courses.includes(c));
         });
@@ -150,36 +166,36 @@ const courseCodes = () =>
 
 const inWorld = (w) => allLevels().filter((l) => l.world === w);
 const inStage = (w, s) => allLevels().filter((l) => l.world === w && l.stage === s);
-// A world's stages, in order, with the unlock options they declare in levels.js: `previous` (which
-// stages back this one requires, defaulted to [1] here) and `bonus` (left out of the world total).
+// A world's stages, in order, with the unlock options they declare in levels.js: `previous` (the
+// numbers of the stages this one requires, resolved from their names as the app resolves them,
+// defaulting to the stage before) and `bonus` (left out of the world total).
 function stagesInWorld(w) {
     const { LEVELS } = loadLevelsModule();
-    return LEVELS[w - 1].stages.map(function (stage, i) {
+    const stages = LEVELS[w - 1].stages;
+    return stages.map(function (stage, i) {
         return {
             number: i + 1,
             name: stage.name,
             // `declared` is the list levels.js actually wrote, so a test can pick a stage that
             // relies on the default; `previous` is that default filled in.
             declared: stage.previous,
-            previous: stage.previous || [1],
+            previous: stage.previous
+                ? stage.previous.map((name) => indexNamed(stages, name, 'stage') + 1)
+                : i > 0 ? [i] : [],
             bonus: !!stage.bonus,
             levels: inStage(w, i + 1),
         };
     });
 }
 
-// The stages `stage` requires to be complete (its `previous` entries that name a real stage),
-// given that world's stages.
-const prereqStages = (stage, stages) =>
-    stage.previous.map(function (n) { return stages[stage.number - 1 - n]; }).filter(Boolean);
+// The stages `stage` requires to be complete, given that world's stages.
+const prereqStages = (stage, stages) => stage.previous.map((n) => stages[n - 1]);
 const worldCount = () => worldNames().length;
 
 // Every world, with what the three inter-world gates read of it, resolved the way the app's
-// computeUnlockData does.  `previous` is which worlds this one follows: levels.js gives how many
-// worlds back each is, defaulting to [1] (the world right before), and entries reaching past the
-// first world are dropped, so the first world follows nothing.  `counted` is the levels its
-// percentages are of -- a `bonus` stage is left out of its world's totals.  `declared` is the list
-// levels.js actually wrote, so a test can pick a world that relies on the default.
+// computeUnlockData does.  `previous` is which worlds this one follows, by number (levels.js names
+// them).  `counted` is the levels its percentages are of -- a `bonus` stage is left out of its
+// world's totals.
 //
 // Tests must go through this rather than assuming world w is followed by world w+1: worlds declare
 // their own lists, so the relation is not the order they appear in.
@@ -196,9 +212,7 @@ function worlds() {
         return [{
             number: w,
             name: world.name,
-            declared: world.previous,
-            previous: (world.previous || [1]).map((n) => w - n)
-                .filter((p) => p >= 1 && !LEVELS[p - 1].courses),
+            previous: previousWorlds(LEVELS, i).filter((p) => !LEVELS[p - 1].courses),
             levels: inWorld(w),
             counted: world.stages.flatMap((stage, j) => (stage.bonus ? [] : inStage(w, j + 1))),
         }];
