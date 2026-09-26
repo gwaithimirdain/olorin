@@ -1,6 +1,18 @@
 // The game's levels, as worlds -> stages -> levels.
 //
-// A world is { name, stages }: its title in the chooser and the stages it holds.  It may also carry:
+// A world is { name, previous, stages }: its title in the chooser, the worlds it follows, and the
+// stages it holds.
+//
+//   previous: [ "name", ...]
+//                       Which worlds this one follows, by name.  All three of the rules that open a
+//                       world ask about every world named, and about the whole relation: this world
+//                       opens at a difficulty once every world it follows is >= 80% complete at
+//                       that difficulty, every world THEY follow is >= 50% complete one difficulty
+//                       higher, and every world that follows THIS one is >= 50% complete one
+//                       difficulty lower.  Every world must have this list, even the first, whose is
+//                       [] (it follows nothing); a name that isn't a world's is an error.
+//
+// It may also carry:
 //
 //   courses: [ "name", ...]
 //                       This world belongs to those courses, and is shown only to their students:
@@ -16,15 +28,6 @@
 //                       it, which it hasn't got: a world of a course opens at a difficulty once it
 //                       is 80% complete at the one below, and a level of it once that level has
 //                       been solved at the one below.
-//
-//   previous: [N, ...]  Which worlds this one follows, as how many worlds back each is, instead of
-//                       the default [1] (the world right before it).  All three of the rules that
-//                       open a world ask about every world named, and about the whole relation:
-//                       this world opens at a difficulty once every world it follows is >= 80%
-//                       complete at that difficulty, every world THEY follow is >= 50% complete one
-//                       difficulty higher, and every world that follows THIS one is >= 50% complete
-//                       one difficulty lower.  Entries reaching back past the first world are
-//                       ignored, so the first world follows nothing, and [] follows nothing either.
 //
 // A stage is { name, rules, levels }: its label in the chooser, the palette rules its levels may
 // use, and the levels themselves.  It may also carry:
@@ -73,6 +76,7 @@ export const COURSE_CODES = {
 
 export const LEVELS = [
     { name: "Conjunction world",
+      previous: [],
       stages: [
           { name: "",
             rules: [],
@@ -307,6 +311,7 @@ export const LEVELS = [
       ],
     },
     { name: "Implication world",
+      previous: ["Conjunction world"],
       stages: [
           { name: "⇒",
             rules: [ "impE", "impI" ],
@@ -423,7 +428,7 @@ export const LEVELS = [
       ]
     },
     { name: "Disjunction world",
-      previous: [2],
+      previous: ["Conjunction world"],
       stages: [
           { name: "∨",
             rules: [ "orE", "orI1", "orI2" ],
@@ -735,7 +740,7 @@ export const LEVELS = [
       ]
     },
     { name: "Advanced proposition world",
-      previous: [1, 2],
+      previous: ["Disjunction world", "Implication world"],
       stages: [
           { name: "∧∨⇒₁",
             rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
@@ -813,7 +818,7 @@ export const LEVELS = [
       ],
     },
     { name: "Equivalence world",
-      previous: [2, 3],
+      previous: ["Disjunction world", "Implication world"],
       stages: [
           { name: "⇔∧",
             rules: [ "andE", "andI", "iffI", "iffE1", "iffE2" ],
@@ -978,7 +983,7 @@ export const LEVELS = [
       ]
     },
     { name: "Existential world",
-      previous: [3, 4],
+      previous: ["Disjunction world", "Implication world"],
       stages: [
           { name: "∃⇒⊤⊥",
             rules: [ "impI", "impE", "exE", "exI", "topI", "botE" ],
@@ -1494,7 +1499,7 @@ export const LEVELS = [
       ]
     },
     { name: "Universal world",
-      previous: [4, 5],
+      previous: ["Disjunction world", "Implication world"],
       stages: [
           { name: "∀⇒⊤",
             rules: [ "impI", "impE", "allE", "allI", "topI" ],
@@ -1899,7 +1904,7 @@ export const LEVELS = [
       ]
     },
     { name: "Advanced quantifier world",
-      previous: [1, 2],
+      previous: ["Universal world", "Existential world"],
       stages: [
           { name: "∃∀⇒",
             rules: [ "impI", "impE", "exE", "exI", "allI", "allE" ],
@@ -2091,6 +2096,7 @@ export const LEVELS = [
       ],
     },
     { name: "Uniqueness world",
+      previous: ["Advanced quantifier world"],
       stages: [
           { name: "∃!",
             rules: [ "andI", "andE", "orE", "orI1", "orI2", "impI", "impE", "topI", "botE", "iffI", "iffE1", "iffE2", "allE", "allI", "exI", "exE", "uexI", "uexE", "algplus" ],
@@ -2195,7 +2201,7 @@ export const LEVELS = [
       ]
     },
     { name: "Negation world",
-      previous: [6],
+      previous: ["Advanced proposition world"],
       stages: [
           { name: "¬⇒⊥",
             rules: [ "impI", "impE", "negI", "negE", "botE" ],
@@ -2420,7 +2426,7 @@ export const LEVELS = [
       ],
     },
     { name: "Negated quantifier world",
-      previous: [1, 4, 5],
+      previous: ["Negation world", "Universal world", "Existential world"],
       stages: [
           { name: "¬∀∃∨⊤⇒",
             rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI" ],
@@ -2556,7 +2562,7 @@ export const LEVELS = [
       ],
     },
     { name: "Induction world",
-      previous: [5, 6],
+      previous: ["Universal world", "Existential world"],
       stages: [
           { name: "ℕ",
             rules: [ "andE", "andI", "orE", "orI1", "orI2", "exE", "exI", "allE", "allI", "expr", "algplus", "asc", "zton" ],
@@ -2705,6 +2711,7 @@ export const LEVELS = [
       ],
     },
     { name: "Sequence world",
+      previous: ["Induction world"],
       courses: [ "analysis" ],
       stages: [
           { name: "lim₁",

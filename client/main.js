@@ -2057,10 +2057,10 @@ function stageLabel(w, s) {
 // of things for the player to do -- empty when the world is "open" at K (individual levels still
 // need the stage/level rules 4-6).
 //
-// Which worlds a world follows is its `previous` list in levels.js, defaulting to [1], the world
-// right before it (see computeUnlockData); each gate then asks about ALL the worlds it names, so a
-// world following two others waits for both.  The percentages are of each world's non-bonus levels;
-// a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
+// Which worlds a world follows is its `previous` list of names in levels.js (see
+// computeUnlockData); each gate then asks about ALL the worlds it names, so a world following two
+// others waits for both.  The percentages are of each world's non-bonus
+// levels; a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
 function worldGateBlockers(w, K, data) {
     const world = data[w];
     const blockers = [];
@@ -2305,22 +2305,30 @@ function toggleCompletedAt(level, d) {
     refreshWorldProgress(level.worldPaneIndex);
 }
 
+// The index in LEVELS of the world with this name, as a world's `previous` list names it -- which
+// must be exactly one world's.
+function worldIndexNamed(name) {
+    const named = function (world) { return world.name === name; };
+    const i = LEVELS.findIndex(named);
+    if(i < 0) { throw new Error('No world is named "' + name + '"'); }
+    if(LEVELS.findLastIndex(named) !== i) { throw new Error('Two worlds are named "' + name + '"'); }
+    return i;
+}
+
 // Recompute, for every world and stage, how many of its levels are complete at each difficulty
 // (>= K) and each level's completed difficulty, from the saved results.  Drives the unlock rule.
 function computeUnlockData(res) {
     globalTime = parseInt(localStorage.getItem("time")) || 0;
     unlockData = LEVELS.map(function (world, w) {
-        // Which worlds this one follows: `previous` lists how many worlds back each is, defaulting
-        // to the world right before it.  Entries reaching back past the first world are ignored, so
-        // the first world follows nothing; `followers` (filled in below) is the reverse relation.
-        // A world this player doesn't have is left out of the relation at both ends, here and in
-        // the followers below: nobody can complete it, so gating anything on it would lock that
-        // thing for good.  So is a world on the other side of the line between the game and a
-        // course (see sameCourseSide).
-        const previous = (world.previous || [1]).map(function (n) { return w - n; })
-              .filter(function (i) {
-                  return i >= 0 && worldShown(LEVELS[i]) && sameCourseSide(world, LEVELS[i]);
-              });
+        // Which worlds this one follows: `previous` names them; `followers` (filled in below) is
+        // the reverse relation.  A world this player doesn't have is left out of the relation at
+        // both ends, here and in the followers below: nobody can complete it, so gating anything
+        // on it would lock that thing for good.  So is a world on the other side of the line
+        // between the game and a course (see sameCourseSide).
+        if(!world.previous) { throw new Error('World "' + world.name + '" has no `previous` list'); }
+        const previous = world.previous.map(worldIndexNamed).filter(function (i) {
+            return worldShown(LEVELS[i]) && sameCourseSide(world, LEVELS[i]);
+        });
         const wd = { total: 0, done: [0, 0, 0], stages: [], previous: previous, followers: [] };
         world.stages.forEach(function (stage) {
             // `previous` is which stages back this one's rule-4 prerequisite is; see unlockBlockers.
