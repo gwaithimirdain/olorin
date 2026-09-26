@@ -32,13 +32,15 @@
 // A stage is { name, rules, levels }: its label in the chooser, the palette rules its levels may
 // use, and the levels themselves.  It may also carry:
 //
-//   previous: [N, ...]  Which stages back this stage's "previous stage" unlock requirement looks,
-//                       instead of the default [1] (just the stage before it).  Each stage listed
-//                       must be >= 70% complete at a difficulty before this stage's levels unlock
-//                       at it.  Use [2] when this stage continues the one two back rather than its
-//                       immediate neighbour (two independent tracks side by side), [1, 2] to
-//                       require both, or [] for no stage prerequisite at all.  Entries reaching
-//                       back past the first stage of the world are ignored.
+//   previous: [ "name", ...]
+//                       Which stages of this world this stage's "previous stage" unlock requirement
+//                       asks about, by name, instead of the default (just the stage before it, and
+//                       none for the first stage).  Each stage named must be >= 70% complete at a
+//                       difficulty before this stage's levels unlock at it.  Name a stage further
+//                       back when this one continues it rather than its immediate neighbour (two
+//                       independent tracks side by side), name several to require them all, or use
+//                       [] for no stage prerequisite at all.  Only this world's stages are looked
+//                       at; a name that isn't exactly one of theirs is an error.
 //
 //   bonus: true         Extra credit: this stage's levels are left out of its world's totals, so
 //                       the percentages that open worlds and difficulties (>= 80% of the previous

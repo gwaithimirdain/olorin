@@ -263,14 +263,14 @@ test.describe('A padlock\'s tooltip', () => {
 });
 
 // Rule 4 normally looks at the stage immediately before this one.  A stage can say otherwise with
-// a `previous` list of how many stages back each of its prerequisites is (default [1]) -- so two
-// tracks can run side by side, or a stage can require several, or none.  These set the list
+// a `previous` list naming its prerequisites among its world's stages -- so two tracks can run
+// side by side, or a stage can require several, or none.  These set the list
 // themselves through test mode's setStageOption, so they hold whatever levels.js declares.
 test.describe('Rule 4: a stage\'s "previous" list', () => {
     const STAGES = stagesInWorld(FIRST.world);
     // A stage with two stages before it that declares no `previous` of its own, so setting the
     // list to null exercises the default rather than whatever levels.js wrote.  Two predecessors
-    // is enough to tell [1], [2] and [1, 2] apart.
+    // is enough to tell naming one, the other, and both apart.
     const AT = STAGES.findIndex((st, i) => i >= 2 && st.declared === undefined);
     if (AT < 0) {
         throw new Error('This suite assumes the first world has a third-or-later stage that '
@@ -278,9 +278,11 @@ test.describe('Rule 4: a stage\'s "previous" list', () => {
     }
     const [S1, S2, TARGET] = [STAGES[AT - 2], STAGES[AT - 1], STAGES[AT]];
     const done = (stage) => completions(stage.levels, 0);
-    // Set TARGET's list (null = whatever levels.js says) and read its first level's novice state.
-    async function stateWith(olorin, previous) {
-        await olorin.setStageOption(FIRST.world, TARGET.number, 'previous', previous);
+    // Set TARGET's list to name these stages (null = no list of its own) and read its first
+    // level's novice state.
+    async function stateWith(olorin, stages) {
+        await olorin.setStageOption(FIRST.world, TARGET.number, 'previous',
+                                    stages && stages.map((st) => st.name));
         return (await olorin.levelStates(TARGET.levels[0].name))[0];
     }
 
@@ -290,34 +292,27 @@ test.describe('Rule 4: a stage\'s "previous" list', () => {
         await page.close();
     });
 
-    test('previous: [2] looks past the stage in between', async ({ page }) => {
+    test('previous can look past the stage in between', async ({ page }) => {
         const olorin = await open(page, done(S1));
         // The stage two back is complete, and the one in between no longer matters.
-        expect(await stateWith(olorin, [2])).toBe('unlocked');
+        expect(await stateWith(olorin, [S1])).toBe('unlocked');
     });
 
-    test('previous: [1, 2] requires both of them', async ({ page }) => {
+    test('previous with two stages requires both of them', async ({ page }) => {
         const olorin = await open(page, done(S1));
-        expect(await stateWith(olorin, [1, 2])).toBe('locked'); // the nearer stage isn't done
+        expect(await stateWith(olorin, [S2, S1])).toBe('locked'); // the nearer stage isn't done
         await page.close();
     });
 
-    test('previous: [1, 2] unlocks once both are complete', async ({ page }) => {
+    test('previous with two stages unlocks once both are complete', async ({ page }) => {
         const olorin = await open(page, done(S1).concat(done(S2)));
-        expect(await stateWith(olorin, [1, 2])).toBe('unlocked');
+        expect(await stateWith(olorin, [S2, S1])).toBe('unlocked');
     });
 
     test('previous: [] asks for no stage at all', async ({ page }) => {
         const olorin = await open(page); // nothing completed anywhere
-        expect(await stateWith(olorin, [1])).toBe('locked');
+        expect(await stateWith(olorin, [S2])).toBe('locked');
         expect(await stateWith(olorin, [])).toBe('unlocked');
-    });
-
-    test('prerequisites reaching back past the first stage are ignored', async ({ page }) => {
-        const olorin = await open(page);
-        // The first stage has nothing before it, so [1] (and [3]) name nothing and impose nothing.
-        await olorin.setStageOption(FIRST.world, 1, 'previous', [1, 3]);
-        expect((await olorin.levelStates(FIRST.name))[0]).toBe('unlocked');
     });
 
     test('the list levels.js declares is what applies until overridden', async ({ page }) => {
@@ -380,7 +375,7 @@ test.describe('A stage marked "bonus"', () => {
     test('it still counts for the stage after it', async ({ page }) => {
         // A stage that requires only the one before it, so marking that one bonus is the only
         // change in play.
-        const AFTER = STAGES.find((st) => st.number > 1 && st.previous.length === 1 && st.previous[0] === 1);
+        const AFTER = STAGES.find((st) => st.previous.length === 1 && st.previous[0] === st.number - 1);
         const BEFORE = STAGES[AFTER.number - 2];
         const olorin = await open(page);
         await olorin.setStageOption(FIRST.world, BEFORE.number, 'bonus', true);
@@ -390,7 +385,7 @@ test.describe('A stage marked "bonus"', () => {
     });
 
     test('and satisfies that stage once complete', async ({ page }) => {
-        const AFTER = STAGES.find((st) => st.number > 1 && st.previous.length === 1 && st.previous[0] === 1);
+        const AFTER = STAGES.find((st) => st.previous.length === 1 && st.previous[0] === st.number - 1);
         const BEFORE = STAGES[AFTER.number - 2];
         const olorin = await open(page, prereqStages(BEFORE, STAGES).flatMap(done).concat(done(BEFORE)));
         await olorin.setStageOption(FIRST.world, BEFORE.number, 'bonus', true);
