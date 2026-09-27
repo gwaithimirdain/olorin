@@ -2,6 +2,7 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 import { arrange } from "./arrange.js"
+import { layoutWorldMap, NODE_WIDTH, NODE_HEIGHT, JUNCTION_RADIUS } from "./worldmap.js"
 
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
@@ -291,7 +292,10 @@ var currentMaxRules = null;
 var currentCustom = null;
 // References to the dynamically-built "Custom" world pane, populated by refreshCustomWorld.
 var customRowsContainer = null;
-var customChipEl = null;
+var customNodeEl = null;
+// The rows of the Custom world, each with the saved custom level it opens, as { el, custom }, for
+// the preview panel to find the one under the pointer.
+var customRowEls = [];
 
 // A counter (in localStorage "time") incremented on each level completion; per-difficulty
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
@@ -1574,7 +1578,7 @@ function login(email, course) {
 };
 
 // Add level select buttons to the dialog box.
-// A short label for a world's index chip, e.g. "Quantifier world" -> "Quantifier".  A few names
+// A short label for a world's box on the map, e.g. "Quantifier world" -> "Quantifier".  A few names
 // have an explicit short form; the rest just drop " world" and keep the first word.
 const SHORT_WORLD_NAMES = {
     "Advanced proposition world": "Adv. Prop.",
@@ -1586,18 +1590,18 @@ function shortWorldName(name) {
     return name.replace(/ world$/i, '').split(' ')[0];
 }
 
-// Recompute and display the "done/total" count on a world's index chip.
+// Recompute and display the "done/total" count on a world's box on the map.
 function refreshWorldProgress(worldPaneIndex) {
     const entry = worldPanes[worldPaneIndex];
-    if(!entry || !entry.chip) { return; }
-    const prog = entry.chip.querySelector('.world-progress');
+    if(!entry || !entry.node) { return; }
+    const prog = entry.node.querySelector('.world-progress');
     if(!prog) { return; }
     const done = entry.levels.filter(function (l) { return getPast(null, l).complete; }).length;
     prog.innerText = done + '/' + entry.levels.length;
 }
 
 function makeLevelSelect(res) {
-    const worldIndex = document.getElementById('worldIndex');
+    const worldMapCanvas = document.getElementById('worldMapCanvas');
     const worlds = document.getElementById("worlds");
     var maxcols = 0;
     var maxrows = 0;
@@ -1622,7 +1626,7 @@ function makeLevelSelect(res) {
         worlds.appendChild(worldPane);
         var countstages = 1;
 
-        // Track this world's levels and how many are completed, for the index-chip progress count.
+        // Track this world's levels and how many are completed, for the progress count on its box.
         const worldLevels = [];
         var worldDone = 0;
         const worldNum = worldPanes.length;
@@ -1710,25 +1714,25 @@ function makeLevelSelect(res) {
 
         worldPane.appendChild(otherStage);
 
-        // A clickable chip in the index bar scrolls to this world, with a short name and a
-        // running "done/total" level count.
-        const chip = document.createElement("div");
-        chip.className = "world-chip";
-        chip.innerHTML = escapeHtml(shortWorldName(world.name)) +
-            ' <span class="world-progress">' + worldDone + '/' + worldLevels.length + '</span>';
-        chip.onclick = function () { setWorld(worldNum); };
-        worldIndex.appendChild(chip);
+        // Its box on the map shows this world's levels when clicked, with a short name, a running
+        // "done/total" level count, and a mark for each difficulty (see updateWorldMap).  It is
+        // numbered like the levels in it, by where the world is in levels.js.
+        const node = makeWorldNode(shortWorldName(world.name), world.name, worldNum);
+        node.dataset.world = x + 1;
+        node.querySelector('.world-progress').innerText = worldDone + '/' + worldLevels.length;
+        worldMapCanvas.appendChild(node);
 
         worldPanes.push({
             name: world.name,
+            world: x,
             pane: worldPane,
-            chip: chip,
+            node: node,
             levels: worldLevels,
         });
     });
 
     // A final "Custom" world holds the player's saved custom levels, listed as named rows (built by
-    // refreshCustomWorld), with its own index chip.
+    // refreshCustomWorld), with a box of its own at the far end of the map.
     const customPane = document.createElement("div");
     customPane.className = "world";
     const customHeader = document.createElement("div");
@@ -1741,18 +1745,15 @@ function makeLevelSelect(res) {
     worlds.appendChild(customPane);
 
     const customWorldNum = worldPanes.length;
-    customChipEl = document.createElement("div");
-    customChipEl.className = "world-chip";
-    customChipEl.innerHTML = 'Custom <span class="world-progress"></span>';
-    customChipEl.onclick = function () { setWorld(customWorldNum); };
-    worldIndex.appendChild(customChipEl);
-    worldPanes.push({ name: "Custom", pane: customPane, chip: customChipEl, levels: [], custom: true });
+    customNodeEl = makeWorldNode("Custom", "Your saved custom levels", customWorldNum);
+    customNodeEl.dataset.world = "custom";
+    worldMapCanvas.appendChild(customNodeEl);
+    worldPanes.push({ name: "Custom", pane: customPane, node: customNodeEl, levels: [], custom: true });
     refreshCustomWorld();
+    updateWorldMap();
 
-    document.getElementById("levelChooseModal").style.width = (maxcols * 80 + 30) + 'px';
-
-    // Keep the active world chip in sync as the user scrolls through the worlds.
-    worlds.onscroll = updateActiveWorldFromScroll;
+    chooserGridWidth = maxcols * 80 + 30;
+    sizeChooser();
 
     currentWorld = parseInt(localStorage.getItem("world")) || 0;
     if(! worldPanes[currentWorld] ) {
@@ -1827,62 +1828,433 @@ function updateLevelSelect(res) {
             });
         });
     });
+    updateWorldMap();
+    renderPreview();
 }
 
-// Scroll the level chooser to a given world (by its index in worldPanes) and mark its chip active.
+// Show one world's levels in the chooser (by its index in worldPanes), and mark its box on the map.
+// Only that world's levels are shown: which world comes after which is the map's to say, and a list
+// of them all would put them in an order they haven't got.
 function setWorld(newWorld) {
+    if(!worldPanes[newWorld]) { return; }
     currentWorld = newWorld;
     localStorage.setItem("world", currentWorld);
-    const entry = worldPanes[currentWorld];
-    if(entry) {
-        entry.pane.scrollIntoView({ block: 'start' });
-        highlightWorldChip(currentWorld);
-    }
-}
-
-// Mark the given world's chip active in the index bar, scrolling the bar horizontally if needed
-// to show it.
-function highlightWorldChip(i) {
     worldPanes.forEach(function (entry, j) {
-        if(entry.chip) {
-            entry.chip.classList.toggle("active", i === j);
-        }
+        entry.pane.style.display = (j === newWorld) ? '' : 'none';
+        entry.node.classList.toggle("selected", j === newWorld);
     });
-    const chip = worldPanes[i] && worldPanes[i].chip;
-    if(chip) {
-        // Adjust scrollLeft directly rather than using scrollIntoView, which could also scroll
-        // the worlds list or the page vertically.
-        const bar = chip.parentElement;
-        const barRect = bar.getBoundingClientRect();
-        const chipRect = chip.getBoundingClientRect();
-        if(chipRect.left < barRect.left) {
-            bar.scrollLeft -= barRect.left - chipRect.left;
-        } else if(chipRect.right > barRect.right) {
-            bar.scrollLeft += chipRect.right - barRect.right;
-        }
+    document.getElementById("worlds").scrollTop = 0;
+    scrollMapToWorld(newWorld);
+}
+
+// Scroll the map, if need be, to bring a world's box into view.  Only the map itself is scrolled:
+// scrollIntoView could scroll the page as well.  A hidden chooser has no size to scroll in, so this
+// is done again whenever the map changes size, the chooser being shown included (see the
+// ResizeObserver below).
+function scrollMapToWorld(i) {
+    const map = document.getElementById("worldMap");
+    const node = worldPanes[i] && worldPanes[i].node;
+    if(!node || map.clientWidth === 0) { return; }
+    const left = node.offsetLeft, top = node.offsetTop;
+    if(left < map.scrollLeft || left + node.offsetWidth > map.scrollLeft + map.clientWidth) {
+        map.scrollLeft = left + node.offsetWidth / 2 - map.clientWidth / 2;
+    }
+    if(top < map.scrollTop || top + node.offsetHeight > map.scrollTop + map.clientHeight) {
+        map.scrollTop = top + node.offsetHeight / 2 - map.clientHeight / 2;
+    }
+}
+new ResizeObserver(function () { scrollMapToWorld(currentWorld); updateMapFades(); })
+    .observe(document.getElementById("worldMap"));
+
+// Fade out each edge of the map that has more of it beyond, to scroll to.
+function updateMapFades() {
+    const map = document.getElementById("worldMap");
+    const frame = document.getElementById("worldMapFrame");
+    // The fades sit over the map's scrollbars, if it has any, so they stop short of them.
+    const scrollbarWidth = map.offsetWidth - map.clientWidth;
+    const scrollbarHeight = map.offsetHeight - map.clientHeight;
+    frame.querySelectorAll('.map-fade-right').forEach(function (f) { f.style.right = scrollbarWidth + 'px'; });
+    frame.querySelectorAll('.map-fade-bottom').forEach(function (f) { f.style.bottom = scrollbarHeight + 'px'; });
+    frame.classList.toggle("more-left", map.scrollLeft > 1);
+    frame.classList.toggle("more-right", map.scrollLeft + map.clientWidth < map.scrollWidth - 1);
+    frame.classList.toggle("more-top", map.scrollTop > 1);
+    frame.classList.toggle("more-bottom", map.scrollTop + map.clientHeight < map.scrollHeight - 1);
+}
+document.getElementById("worldMap").addEventListener("scroll", updateMapFades);
+
+// A world's box on the map: a button that shows that world's levels (the one at `worldNum` in
+// worldPanes), with its short name over its "done/total" count and difficulty marks.  `title` is
+// the tooltip, its full name.
+function makeWorldNode(label, title, worldNum) {
+    const node = document.createElement("button");
+    node.className = "world-node";
+    node.title = title;
+    node.style.width = NODE_WIDTH + 'px';
+    node.style.height = NODE_HEIGHT + 'px';
+    node.innerHTML = '<div class="world-node-name">' + escapeHtml(label) + '</div>' +
+        '<div class="world-node-info"><span class="world-progress"></span>' +
+        '<span class="world-node-marks"></span></div>';
+    node.onclick = function () { setWorld(worldNum); };
+    // Hovering a world picks out the lines to and from it.
+    node.onmouseenter = function () { highlightMapEdges(worldNum, true); };
+    node.onmouseleave = function () { highlightMapEdges(worldNum, false); };
+    return node;
+}
+
+// Lay out the map of worlds again, and redraw the lines between them and the marks on them.  Which
+// world follows which is unlockData's, so this comes after computeUnlockData: the map shows exactly
+// the relation the unlock rules use, a world a player hasn't got or one across the line between
+// the game and a course being left out of it just as they are there.
+//
+// The game's own worlds are laid out first, then those of the player's course, if any, and last of
+// all Custom -- each by itself, with nothing joining it to the others, so that the course's worlds
+// and Custom come after the whole game, where the map has to be scrolled to its far end to see
+// them.
+function updateWorldMap() {
+    if(worldPanes.length === 0) { return; }
+    const paneOf = [];
+    worldPanes.forEach(function (entry, i) { if(!entry.custom) { paneOf[entry.world] = i; } });
+    const game = [], course = [], custom = [];
+    worldPanes.forEach(function (entry, i) {
+        if(entry.custom) { custom.push({ id: i, previous: [] }); return; }
+        const spec = { id: i, previous: unlockData[entry.world].previous.map(function (p) { return paneOf[p]; }) };
+        (outsideCourses(LEVELS[entry.world]) ? game : course).push(spec);
+    });
+    const layout = layoutWorldMap([game, course, custom]);
+
+    const canvas = document.getElementById("worldMapCanvas");
+    canvas.style.width = layout.width + 'px';
+    canvas.style.height = layout.height + 'px';
+    layout.nodes.forEach(function (p, i) {
+        worldPanes[i].node.style.left = p.x + 'px';
+        worldPanes[i].node.style.top = p.y + 'px';
+    });
+    worldPanes.forEach(function (entry) { if(!entry.custom) { markWorldNode(entry); } });
+
+    // A line from a world is solid once that world is far enough along to count towards opening the
+    // worlds after it (rule 1, at novice), and dashed and grey until then.  A junction is solid when
+    // all the worlds coming into it are, and so are the lines out of it.
+    const met = function (i) {
+        const wd = unlockData[worldPanes[i].world];
+        return moreNeeded(wd.done[0], wd.total, 0.8) === 0;
+    };
+    const junctionMet = layout.junctions.map(function (j) { return j.sources.every(met); });
+    const endMet = function (end) { return end.junction === undefined ? met(end.world) : junctionMet[end.junction]; };
+    // The worlds at the far ends of a line, for picking out the lines to and from a world: through
+    // a junction, a line into it leads to every world out of it, and a line out of it comes from
+    // every world into it.
+    const across = function (end, side) {
+        return end.junction === undefined ? [end.world] : layout.junctions[end.junction][side];
+    };
+    const svg = document.getElementById("worldMapEdges");
+    svg.setAttribute('width', layout.width);
+    svg.setAttribute('height', layout.height);
+    var html = '';
+    layout.dividers.forEach(function (x) {
+        html += '<line class="map-divider" x1="' + x + '" y1="0" x2="' + x + '" y2="' + layout.height + '"/>';
+    });
+    layout.edges.forEach(function (e) {
+        const worlds = across(e.source, 'sources').concat(across(e.target, 'targets'));
+        // Its ends, as the boxes are numbered (or as "j" and the junction's index), say what it
+        // joins; `data-worlds` is the worlds to pick it out for.
+        const end = function (x) { return x.junction === undefined ? worldPanes[x.world].node.dataset.world : 'j' + x.junction; };
+        html += '<path class="map-edge' + (endMet(e.source) ? '' : ' unmet') + '" d="' + e.path +
+            '" data-source="' + end(e.source) + '" data-target="' + end(e.target) +
+            '" data-worlds=" ' + worlds.join(' ') + ' "/>';
+    });
+    layout.junctions.forEach(function (j, k) {
+        html += '<circle class="map-junction' + (junctionMet[k] ? '' : ' unmet') + '" cx="' + j.x +
+            '" cy="' + j.y + '" r="' + JUNCTION_RADIUS + '" data-worlds=" ' + j.sources.concat(j.targets).join(' ') + ' "/>';
+    });
+    svg.innerHTML = html;
+    scrollMapToWorld(currentWorld);
+    updateMapFades();
+}
+
+// Pick out (or stop picking out) the lines on the map to and from a world.
+function highlightMapEdges(i, on) {
+    document.querySelectorAll('#worldMapEdges [data-worlds~="' + i + '"]').forEach(function (e) {
+        e.classList.toggle("highlight", on);
+    });
+}
+
+// How far the player has got in a world (an entry of worldPanes), at each difficulty: 'completed'
+// once every level of it is complete there, 'unlocked' where the world is open (its unlock gates,
+// rules 1-3, pass), and 'locked' where it isn't.
+function worldStates(entry) {
+    const wd = unlockData[entry.world];
+    return [0, 1, 2].map(function (K) {
+        if(wd.stages.every(function (sd) { return sd.levelDiff.every(function (d) { return d >= K; }); })) { return 'completed'; }
+        return worldGatesPass(entry.world, K, unlockData) ? 'unlocked' : 'locked';
+    });
+}
+
+// Mark a world's box on the map for how far the player has got in it (see worldStates): for each
+// difficulty, a star, an open padlock or a closed one; a world not open even at novice is greyed.
+// Like a level's button, its top edge takes the color of the highest difficulty it is complete at.
+function markWorldNode(entry) {
+    const states = worldStates(entry);
+    entry.node.querySelector('.world-node-marks').innerHTML =
+        difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2);
+    entry.node.classList.toggle("world-node-locked", states[0] === 'locked');
+    const hc = states.lastIndexOf('completed');
+    entry.node.style.borderTop = hc >= 0 ? '5px solid ' + COLORS[hc][1].backgroundColor : '';
+}
+
+// ===== The preview panel =====
+// Beside the levels in the chooser is a panel showing what's under the pointer, without opening it:
+// a level's statement (its parameters, variables and hypotheses over a line, and its conclusion
+// under it) and how it stands at each difficulty, with what remains to be done to unlock any that
+// are locked; a saved custom level's statement likewise; or, for a world's box on the map, how that
+// world stands.  Clicking still opens the level.  With nothing under the pointer the panel is blank.
+//
+// So that it doesn't flicker as the pointer goes from one level to the next, a level counts as under
+// the pointer out to halfway across the gap to the next one, and the panel waits a moment before
+// going blank.  On a touchscreen, which has no hovering, pressing and holding does the same:
+// the panel shows what's under the finger, sliding it along shows the others, and lifting it clears
+// the panel without opening anything, while a tap still opens the level.
+//
+// Where there's room the panel stands beside the levels; where there isn't (a tablet, say) it sits
+// over them, below the map, where a finger holding a level doesn't cover it.
+
+const PREVIEW_WIDTH = 340;
+const PREVIEW_GAP = 16;
+// How far past its edges a level counts as under the pointer: half the gap between two levels.
+const HOVER_MARGIN = 6;
+// How long the panel waits, once nothing is under the pointer, before going blank.
+const PREVIEW_CLEAR_DELAY = 150;
+// How long a press on a touchscreen has to be held to show the panel, and how far the finger may
+// wander before then without its being taken for a scroll instead.
+const LONG_PRESS = 400;
+const LONG_PRESS_SLOP = 10;
+
+// The width the chooser's levels need (set by makeLevelSelect), to which the panel is added when
+// there's room for it alongside.
+var chooserGridWidth = 0;
+
+// Size the chooser for its levels, with the preview panel beside them if the window has room for
+// both, and over them if not.
+function sizeChooser() {
+    const modal = document.getElementById("levelChooseModal");
+    // The modal's padding, and a margin of the window to either side of it.
+    const room = window.innerWidth * 0.95 - 40;
+    const beside = room >= chooserGridWidth + PREVIEW_GAP + PREVIEW_WIDTH;
+    modal.classList.toggle("preview-over", !beside);
+    modal.style.width = (beside ? chooserGridWidth + PREVIEW_GAP + PREVIEW_WIDTH : chooserGridWidth) + 'px';
+}
+window.addEventListener("resize", sizeChooser);
+
+// What the panel is showing -- { level }, { custom } (a saved custom level) or { world } (an entry of
+// worldPanes) -- or null when it's blank; and the timer that will blank it.
+var previewTarget = null;
+var previewClearTimer = null;
+
+// Whether two things the panel might show are the same thing.
+function samePreview(a, b) {
+    if(!a || !b) { return a === b; }
+    return a.level === b.level && a.custom === b.custom && a.world === b.world;
+}
+
+// Show something in the panel (see previewTarget), or blank it with null, at once.
+function showPreview(target) {
+    if(previewClearTimer) { clearTimeout(previewClearTimer); previewClearTimer = null; }
+    if(samePreview(target, previewTarget)) { return; }
+    previewTarget = target;
+    renderPreview();
+}
+
+// Show something under the pointer in the panel, or, with null, blank it after a moment -- unless
+// something else comes under the pointer first.
+function hoverPreview(target) {
+    if(target) { showPreview(target); return; }
+    if(previewTarget && !previewClearTimer) {
+        previewClearTimer = setTimeout(function () {
+            previewClearTimer = null;
+            previewTarget = null;
+            renderPreview();
+        }, PREVIEW_CLEAR_DELAY);
     }
 }
 
-// As the user scrolls the worlds list, highlight the chip for the world currently at the top.
-function updateActiveWorldFromScroll() {
-    const worlds = document.getElementById("worlds");
-    const top = worlds.getBoundingClientRect().top;
-    var active = 0;
-    worldPanes.forEach(function (entry, i) {
-        if(entry.pane.getBoundingClientRect().top - top <= 5) {
-            active = i;
-        }
-    });
-    // When scrolled to the bottom, the last (short) world can't reach the top, so select it.
-    if(worlds.scrollTop + worlds.clientHeight >= worlds.scrollHeight - 5) {
-        active = worldPanes.length - 1;
-    }
-    if(active !== currentWorld) {
-        currentWorld = active;
-        localStorage.setItem("world", currentWorld);
-        highlightWorldChip(active);
-    }
+// Draw the panel for what it's showing -- again, whenever that may have changed (a level being
+// completed, say).
+function renderPreview() {
+    const panel = document.getElementById("levelPreview");
+    const t = previewTarget;
+    panel.innerHTML = !t ? '' : t.level ? levelPreviewHtml(t.level) : t.custom ? customPreviewHtml(t.custom)
+        : worldPreviewHtml(t.world);
 }
+
+// The thing at a point of the window (client coordinates) that the panel can show, or null: a world's
+// box on the map, or one of the levels of the world showing.  Only what can be seen counts, so a
+// level scrolled out of view isn't found where it would be.  A level counts out to HOVER_MARGIN past
+// its edges; where two do, the one whose middle is nearer wins.
+function previewTargetAt(x, y) {
+    const within = function (r, m) { return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m; };
+    var candidates;
+    if(within(document.getElementById("worldMap").getBoundingClientRect(), 0)) {
+        candidates = worldPanes.filter(function (e) { return !e.custom; })
+            .map(function (e) { return { el: e.node, target: { world: e } }; });
+    } else if(within(document.getElementById("worlds").getBoundingClientRect(), 0)) {
+        const entry = worldPanes[currentWorld];
+        if(!entry) { return null; }
+        candidates = entry.custom
+            ? customRowEls.map(function (c) { return { el: c.el, target: { custom: c.custom } }; })
+            : entry.levels.map(function (l) { return { el: l.button, target: { level: l } }; });
+    } else {
+        return null;
+    }
+    var best = null, bestDistance = Infinity;
+    candidates.forEach(function (c) {
+        const r = c.el.getBoundingClientRect();
+        if(r.width === 0 || !within(r, HOVER_MARGIN)) { return; }
+        const d = Math.hypot(x - (r.left + r.right) / 2, y - (r.top + r.bottom) / 2);
+        if(d < bestDistance) { best = c.target; bestDistance = d; }
+    });
+    return best;
+}
+
+// Text for the panel, with a chance to break a line after each connective and comma, so that a long
+// formula wraps between its parts rather than wherever it runs out of room.
+function formulaHtml(text) {
+    return escapeHtml(text).replace(/([∧∨⇒⇔→,])/g, '$1<wbr>');
+}
+
+// A level's statement, as the panel shows it: its parameters and variables (those of one type
+// together, as "P, Q : Type"), its hypotheses, a line, and its conclusion.  `def` is a built-in
+// level or a saved custom one.
+function statementHtml(def) {
+    const decls = [];
+    const declare = function (name, sep, ty) {
+        const last = decls[decls.length - 1];
+        if(last && last.sep === sep && last.ty === ty) { last.names.push(name); }
+        else { decls.push({ names: [name], sep: sep, ty: ty }); }
+    };
+    def.parameters.forEach(function (p) { declare(p.name, ':', p.ty); });
+    def.variables.forEach(function (v) { declare(v.name, '∈', v.ty); });
+    var html = '<div class="preview-statement">';
+    if(decls.length > 0) {
+        html += '<div class="preview-context">' + decls.map(function (d) {
+            return '<span class="preview-decl">' + formulaHtml(d.names.join(', ') + ' ' + d.sep + ' ' + d.ty) + '</span>';
+        }).join(' ') + '</div>';
+    }
+    def.hypotheses.forEach(function (h) { html += '<div class="preview-hypothesis">' + formulaHtml(h.ty) + '</div>'; });
+    html += '<div class="preview-rule"></div>' +
+        '<div class="preview-conclusion">' + formulaHtml(def.conclusion.ty) + '</div></div>';
+    return html;
+}
+
+// How something stands at each difficulty, as the panel shows it: each one's mark and state, and for
+// one that's locked, what remains to be done to unlock it.  `blockers(K)` is that list at K.
+function difficultiesHtml(states, blockers) {
+    const said = { completed: 'solved', unlocked: 'open', locked: 'locked' };
+    return '<div class="preview-difficulties">' + states.map(function (state, K) {
+        const todo = state === 'locked' ? blockers(K) : [];
+        return '<div class="preview-difficulty" data-difficulty="' + K + '" data-state="' + state + '">' +
+            difficultyMark(state, K) + ' <b>' + DIFFICULTIES[K] + '</b> ' + said[state] +
+            (todo.length > 0 ? '<ul class="preview-blockers">' +
+             todo.map(function (b) { return '<li>' + escapeHtml(b) + '</li>'; }).join('') + '</ul>' : '') +
+            '</div>';
+    }).join('') + '</div>';
+}
+
+function levelPreviewHtml(level) {
+    const w = level.worldIndex, s = level.stageIndex, c = level.levelIndex;
+    const states = levelDifficultyStates(level, getPast(null, level), unlockData);
+    return '<div class="preview-title">Level ' + escapeHtml(level.name) + '</div>' +
+        '<div class="preview-where">' + escapeHtml(LEVELS[w].name + ', ' + stageLabel(w, s)) + '</div>' +
+        statementHtml(level) +
+        difficultiesHtml(states, function (K) { return unlockBlockers(w, s, c, K, unlockData); });
+}
+
+function customPreviewHtml(cl) {
+    return '<div class="preview-title">' + escapeHtml(cl.name) + '</div>' +
+        '<div class="preview-where">Custom level</div>' +
+        statementHtml(cl) +
+        // A custom level's difficulties are climbed one at a time, and that is all that locks them.
+        difficultiesHtml(customStates(cl), function (K) {
+            return ['Complete this level at ' + DIFFICULTIES[K - 1]];
+        });
+}
+
+function worldPreviewHtml(entry) {
+    const w = entry.world;
+    const previous = unlockData[w].previous.map(function (p) { return LEVELS[p].name; });
+    const done = entry.levels.filter(function (l) { return getPast(null, l).complete; }).length;
+    return '<div class="preview-title">' + escapeHtml(LEVELS[w].name) + '</div>' +
+        '<div class="preview-where">' + done + ' of its ' + entry.levels.length + ' levels solved</div>' +
+        '<div class="preview-follows">' + (previous.length > 0
+            ? 'Follows ' + escapeHtml(previous.join(', ')) : 'Follows no other world') + '</div>' +
+        difficultiesHtml(worldStates(entry), function (K) { return worldGateBlockers(w, K, unlockData); });
+}
+
+// Hovering with a mouse.  A touchscreen fakes mouse events after a tap, which mustn't count as
+// hovering -- on a touchscreen, only holding a press shows the panel -- so mouse events for a
+// little while after a touch are ignored.
+var lastTouch = 0;
+const touchedRecently = function () { return Date.now() - lastTouch < 800; };
+const levelChooseModal = document.getElementById("levelChooseModal");
+levelChooseModal.addEventListener("mousemove", function (e) {
+    if(!touchedRecently()) { hoverPreview(previewTargetAt(e.clientX, e.clientY)); }
+});
+levelChooseModal.addEventListener("mouseleave", function () { hoverPreview(null); });
+// Focusing a level or a world's box from the keyboard shows it too.
+levelChooseModal.addEventListener("focusin", function (e) {
+    if(touchedRecently()) { return; }
+    const r = e.target.getBoundingClientRect();
+    hoverPreview(previewTargetAt((r.left + r.right) / 2, (r.top + r.bottom) / 2));
+});
+levelChooseModal.addEventListener("focusout", function () { hoverPreview(null); });
+
+// Pressing and holding on a touchscreen.  `pressTimer` is waiting to show the panel for a press not
+// yet held long enough, from the point `pressStart`; `peeking` is whether it has been, so that the
+// finger is showing what's under it (and isn't scrolling, or opening anything when lifted).
+var pressTimer = null;
+var pressStart = null;
+var peeking = false;
+function endPress() {
+    if(pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    const was = peeking;
+    peeking = false;
+    if(was) { showPreview(null); }
+    return was;
+}
+levelChooseModal.addEventListener("touchstart", function (e) {
+    lastTouch = Date.now();
+    endPress();
+    if(e.touches.length !== 1) { return; }
+    const t = e.touches[0];
+    if(!previewTargetAt(t.clientX, t.clientY)) { return; }
+    pressStart = { x: t.clientX, y: t.clientY };
+    pressTimer = setTimeout(function () {
+        pressTimer = null;
+        peeking = true;
+        showPreview(previewTargetAt(pressStart.x, pressStart.y));
+    }, LONG_PRESS);
+}, { passive: true });
+levelChooseModal.addEventListener("touchmove", function (e) {
+    lastTouch = Date.now();
+    const t = e.touches[0];
+    if(peeking) {
+        // Sliding the finger shows whatever it comes to, rather than scrolling.
+        e.preventDefault();
+        pressStart = { x: t.clientX, y: t.clientY };
+        showPreview(previewTargetAt(t.clientX, t.clientY));
+    } else if(pressTimer && Math.hypot(t.clientX - pressStart.x, t.clientY - pressStart.y) > LONG_PRESS_SLOP) {
+        // It's a scroll.
+        endPress();
+    }
+}, { passive: false });
+levelChooseModal.addEventListener("touchend", function (e) {
+    lastTouch = Date.now();
+    // Lifting a finger that was holding a press doesn't open what's under it (a quick tap does).
+    if(endPress()) { e.preventDefault(); }
+});
+levelChooseModal.addEventListener("touchcancel", function () { lastTouch = Date.now(); endPress(); });
+// A press held long enough to show the panel mustn't bring up the browser's own menu for it as well.
+levelChooseModal.addEventListener("contextmenu", function (e) {
+    if(peeking || pressTimer || touchedRecently()) { e.preventDefault(); }
+});
 
 // Set the colors of the difficulty select buttons
 
@@ -2172,13 +2544,6 @@ function difficultyUnlocked(w, s, c, K, data) {
     return unlockBlockers(w, s, c, K, data).length === 0;
 }
 
-// The tooltip on a level's padlock at difficulty K: what remains to be done to unlock it.
-function lockTooltip(level, K) {
-    const blockers = unlockBlockers(level.worldIndex, level.stageIndex, level.levelIndex, K, unlockData);
-    return 'To unlock ' + DIFFICULTIES[K] + ':\n' +
-        blockers.map(function (b) { return '• ' + b; }).join('\n');
-}
-
 // How many completions must pass before a just-completed difficulty stops re-locking the next.
 const RECENT_COMPLETION_WINDOW = 10;
 
@@ -2200,14 +2565,6 @@ function difficultyMark(state, d) {
     if(state === 'completed') { return '<span class="lvmark" style="color:' + color + '">★</span>'; }
     if(state === 'unlocked')  { return '<span class="lvmark" style="color:' + color + '">' + UNLOCK_SVG + '</span>'; }
     return '<span class="lvmark locked" data-difficulty="' + d + '" style="color:' + color + '">' + LOCK_SVG + '</span>';
-}
-
-// Give each closed padlock on a level's button a tooltip saying what remains to unlock it.
-function addLockTooltips(b, level) {
-    if(!level) { return; }
-    b.querySelectorAll('.lvmark.locked').forEach(function (mark) {
-        mark.title = lockTooltip(level, parseInt(mark.dataset.difficulty));
-    });
 }
 
 // A level that has a hint carries an "i" in the top-right corner of its button.  While the level
@@ -2242,7 +2599,6 @@ function renderLevelButton(b, name, states, level) {
         if(!TEST_MODE) {
             b.innerHTML = '<div class="level-number">' + name + '</div>' +
                 '<div class="level-marks"><span class="lvmark locked" data-difficulty="0" style="color:#888">' + LOCK_SVG + '</span></div>';
-            addLockTooltips(b, level);
             addHintBubble(b, level, false);
             return;
         }
@@ -2255,7 +2611,6 @@ function renderLevelButton(b, name, states, level) {
         '<div class="level-marks">' +
         difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2) +
         '</div>';
-    addLockTooltips(b, level);
     var hc = -1;
     for(var d = 0; d < 3; d++) { if(states[d] === 'completed') { hc = d; } }
     if(hc >= 0) { b.style.borderTop = '5px solid ' + COLORS[hc][1].backgroundColor; }
@@ -2298,7 +2653,7 @@ function toggleCompletedAt(level, d) {
             difficulty: completed ? d - 1 : Math.max(past.difficulty || 0, d),
         }));
     }
-    // Re-render every level (this completion feeds the unlock rules) and this world's chip count.
+    // Re-render every level (this completion feeds the unlock rules) and the count on this world's box.
     updateLevelSelect(null);
     refreshWorldProgress(level.worldPaneIndex);
 }
@@ -3031,7 +3386,7 @@ document.getElementById("cancelChooseLevel").onclick = clearLevelSelect;
 
 // Open a level (switching worlds in the chooser if needed) -- used by the completion pop-up.
 function goToLevel(level) {
-    if(level.worldIndex !== currentWorld) { setWorld(level.worldIndex); }
+    if(level.worldPaneIndex !== currentWorld) { setWorld(level.worldPaneIndex); }
     chooseLevel(level);
 }
 
@@ -3433,11 +3788,12 @@ function deleteCustomLevel(cl) {
     refreshCustomWorld();
 }
 
-// (Re)render the "Custom" world's rows from the saved list, and update its chip count.
+// (Re)render the "Custom" world's rows from the saved list, and update the count on its box.
 function refreshCustomWorld() {
     if(!customRowsContainer) { return; }
     const list = loadCustomLevels();
     customRowsContainer.innerHTML = '';
+    customRowEls = [];
     if(list.length === 0) {
         const empty = document.createElement("div");
         empty.className = "custom-empty";
@@ -3464,10 +3820,11 @@ function refreshCustomWorld() {
             row.appendChild(del);
             row.onclick = function () { openCustomLevel(cl); };
             customRowsContainer.appendChild(row);
+            customRowEls.push({ el: row, custom: cl });
         });
     }
-    if(customChipEl) {
-        const prog = customChipEl.querySelector('.world-progress');
+    if(customNodeEl) {
+        const prog = customNodeEl.querySelector('.world-progress');
         if(prog) { prog.innerText = list.filter(function (c) { return c.completed[0]; }).length + '/' + list.length; }
     }
 }
@@ -5368,7 +5725,7 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const value = { complete: true, difficulty: Math.max(difficulty, past.difficulty || 0), times: times };
                     localStorage.setItem(key, JSON.stringify(value));
                     // Re-render the level buttons (this level is now complete, and others may have
-                    // unlocked or re-locked), and update this world's index-chip progress count.
+                    // unlocked or re-locked), and update the progress count on this world's box.
                     updateLevelSelect(null);
                     refreshWorldProgress(currentLevel.worldPaneIndex);
                     // If a new world just opened at some difficulty, tell the player.
@@ -5842,6 +6199,7 @@ function setLevel(level, rulesAllowed) {
 }
 
 function clearLevelSelect () {
+    showPreview(null);
     document.getElementById("levelSelectBG").style.display = "none";
     document.getElementById("levelChooseBG").style.display = "none";
     document.getElementById("parameters").value = "";

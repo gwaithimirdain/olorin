@@ -123,7 +123,7 @@ test.describe('Per-difficulty unlocking', () => {
         // either: the player must solve it at least once.
         const olorin = await open(page, OPEN_ADEPT);
         expect(await olorin.levelStates(FIRST.name)).toEqual(['unlocked', 'locked', 'locked']);
-        expect(await olorin.lockTooltip(FIRST.name, 1)).toContain('Complete this level at Novice');
+        expect(await olorin.lockExplanation(FIRST.name, 1)).toContain('Complete this level at Novice');
     });
 
     test('rule 8: master waits for adept, however open the world is at master', async ({ page }) => {
@@ -134,7 +134,7 @@ test.describe('Per-difficulty unlocking', () => {
             .concat([['time', '100']])
             .concat(completions([MANUAL], 0, { times: { 0: 1 } })));
         expect((await olorin.levelStates(MANUAL.name)).slice(1)).toEqual(['unlocked', 'locked']);
-        expect(await olorin.lockTooltip(MANUAL.name, 2)).toContain('Complete this level at Adept');
+        expect(await olorin.lockExplanation(MANUAL.name, 2)).toContain('Complete this level at Adept');
     });
 
     test('auto-complete: once novice is solved, a trivial level completes its higher difficulties', async ({ page }) => {
@@ -233,32 +233,33 @@ test.describe('Per-difficulty unlocking', () => {
     });
 });
 
-// Hovering a closed padlock says what remains to be done to open that difficulty.
-test.describe('A padlock\'s tooltip', () => {
+// With a level under the pointer, the chooser's preview panel says, for each difficulty of it that's
+// locked, what remains to be done to open it.
+test.describe('The preview of a locked difficulty', () => {
     test('names the hinted level still to be solved (rule 6)', async ({ page }) => {
         const olorin = await open(page);
-        const tip = await olorin.lockTooltip(AFTER_FIRST.name, 0);
+        const tip = await olorin.lockExplanation(AFTER_FIRST.name, 0);
         expect(tip).toMatch(/^To unlock Novice:\n/);
         expect(tip).toContain(`Complete level ${FIRST.name}, which introduces something new`);
     });
 
     test('counts the levels still wanted in the world before (rule 1)', async ({ page }) => {
         const olorin = await open(page, completions(W1.slice(0, W1_MOST - 1), 0));
-        expect(await olorin.lockTooltip(NEXT_WORLD.name, 0))
+        expect(await olorin.lockExplanation(NEXT_WORLD.name, 0))
             .toContain(`Complete 1 more level of ${world(FIRST.world).name}`);
     });
 
     test('counts the completions still to wait out (rule 7)', async ({ page }) => {
         // Novice completed at time 10, global time 15: 6 more completions take it past the window.
         const olorin = await open(page, rule7Base(15, 10));
-        expect(await olorin.lockTooltip(MANUAL.name, 1)).toBe(
+        expect(await olorin.lockExplanation(MANUAL.name, 1)).toBe(
             'To unlock Adept:\n• You solved this level at Novice too recently: complete 6 more levels ' +
             'first (or every level at Novice)');
     });
 
     test('is absent once the difficulty is unlocked', async ({ page }) => {
         const olorin = await open(page, completions([FIRST], 0));
-        expect(await olorin.lockTooltip(AFTER_FIRST.name, 0)).toBeNull();
+        expect(await olorin.lockExplanation(AFTER_FIRST.name, 0)).toBeNull();
     });
 });
 

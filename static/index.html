@@ -181,8 +181,24 @@
 
     <div id="levelChooseBG" class="modalbg">
       <div class="modal" id="levelChooseModal">
-        <div id="worldIndex"></div>
-        <div id="worlds"></div>
+        <!-- The map of worlds: which follows which, filled in by makeLevelSelect/updateWorldMap. -->
+        <div id="worldMapFrame">
+          <div id="worldMap">
+            <div id="worldMapCanvas">
+              <svg id="worldMapEdges" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+          </div>
+          <!-- Fades over whichever edges of the map have more of it to scroll to. -->
+          <div class="map-fade map-fade-left"></div>
+          <div class="map-fade map-fade-right"></div>
+          <div class="map-fade map-fade-top"></div>
+          <div class="map-fade map-fade-bottom"></div>
+        </div>
+        <div id="chooserBody">
+          <div id="worlds"></div>
+          <!-- What's under the pointer, without opening it: filled in by renderPreview. -->
+          <div id="levelPreview"></div>
+        </div>
         <div id="chooseLevelButtons">
           <!-- Difficulty is now chosen per level (a level opens at its highest unlocked difficulty),
                so these global radios are hidden -- except in test mode, where a level opens at
@@ -455,6 +471,11 @@
             Once you've completed enough levels on Novice difficulty, some older levels will start to unlock on Adept difficulty, and so on.
             By inserting a delay before you go back to re-do each level at a higher difficulty, you will reinforce your learning and make the challenge more meaningful.
             If you are working on a higher difficulty setting and get stuck, you can downgrade the difficulty without losing your partial proof using the button in the upper-right corner; but then the harder difficulty for that level will re-lock until you complete some other levels.
+          </p>
+          <p class="about">
+            The levels are grouped into worlds, and the map at the top of the level-selection dialog shows which worlds follow which: a world opens once you have done enough of the worlds that lead to it.
+            Click a world on the map to see its levels.
+            To see a level's statement, or what remains to be done to unlock it, without opening it, hover over it (or, on a touchscreen, press and hold it).
           </p>
           <p class="about">
             It's worth noting that whether a given wire is colored red as "incorrect" in Novice and Adept modes can depend not only on that wire and its label, but on the other wires in the diagram.

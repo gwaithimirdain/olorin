@@ -13,10 +13,7 @@ const ELSEWHERE = otherLevel(HINTED);
 // Open the chooser if needed and click a level, WITHOUT auto-dismissing its hint (so the test
 // can observe whether the hint popped up).
 async function selectLevelKeepingHint(page, name) {
-    await page.evaluate(() => {
-        const bg = document.getElementById('levelChooseBG');
-        if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
-    });
+    await new Olorin(page).showWorldOf(name);
     await page.click(`#worlds .level[data-name="${name}"] .level-number`);
     await page.waitForFunction((n) => document.getElementById('currentLevel').innerText.includes(n), name);
 }
@@ -110,6 +107,7 @@ test.describe('Hint markers in the level chooser', () => {
         await olorin.openChooser();
         const { open } = await openAndLocked(olorin);
 
+        await olorin.showWorldOf(open.name);
         await page.click(`#worlds .level[data-name="${open.name}"] .hintbubble`);
         expect(await olorin.hintVisible()).toBe(true);
         expect(await page.isVisible('#' + open.hint)).toBe(true);   // that level's hint, not just any
@@ -127,6 +125,7 @@ test.describe('Hint markers in the level chooser', () => {
         await olorin.openChooser();
         const { locked } = await openAndLocked(olorin);
 
+        await olorin.showWorldOf(locked.name);
         await page.click(`#worlds .level[data-name="${locked.name}"] .hintbubble`);
         expect(await olorin.hintVisible()).toBe(false);
         expect(await page.isVisible('#levelChooseBG')).toBe(true);
@@ -139,6 +138,7 @@ test.describe('Hint markers in the level chooser', () => {
         await olorin.openChooser();
         const { open } = await openAndLocked(olorin);
 
+        await olorin.showWorldOf(open.name);
         await page.click(`#worlds .level[data-name="${open.name}"] .hintbubble`);
         expect(await olorin.hintVisible()).toBe(true);
         await olorin.dismissHints();

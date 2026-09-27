@@ -12,6 +12,10 @@
 
 const { testQuery } = require('../lib/testmode');
 
+// The selector for the box on the map of worlds of the world a level is in, by the level's
+// "world-stage-level" name.
+const worldNodeOf = (name) => `#worldMap .world-node[data-world="${name.split('-')[0]}"]`;
+
 class Olorin {
     constructor(page) {
         this.page = page;
@@ -111,14 +115,27 @@ class Olorin {
         }, name);
     }
 
-    // The tooltip on a level's closed padlock at a difficulty (0-2), saying what remains to unlock
-    // it -- or null if that difficulty shows no closed padlock.
-    lockTooltip(name, difficulty) {
-        return this.page.evaluate(({ n, d }) => {
-            const e = document.querySelector(
-                `#worlds .level[data-name="${n}"] .lvmark.locked[data-difficulty="${d}"]`);
-            return e ? e.title : null;
-        }, { n: name, d: difficulty });
+    // What remains to be done to unlock a level's difficulty (0-2), as the chooser's preview panel
+    // shows it with the level under the pointer: "To unlock Adept:" and then a "• " line for each
+    // thing -- or null if that difficulty isn't locked.
+    async lockExplanation(name, difficulty) {
+        await this.previewLevel(name);
+        return this.page.evaluate((d) => {
+            const row = document.querySelector(`#levelPreview .preview-difficulty[data-difficulty="${d}"]`);
+            if (row.dataset.state !== 'locked') return null;
+            return 'To unlock ' + row.querySelector('b').innerText + ':\n' +
+                Array.from(row.querySelectorAll('.preview-blockers li')).map((li) => '• ' + li.innerText).join('\n');
+        }, difficulty);
+    }
+
+    // Put the pointer over a level in the chooser, so that the preview panel shows it.
+    async previewLevel(name) {
+        await this.showWorldOf(name);
+        await this.page.hover(`#worlds .level[data-name="${name}"]`);
+        await this.page.waitForFunction((n) => {
+            const t = document.querySelector('#levelPreview .preview-title');
+            return t && t.innerText === 'Level ' + n;
+        }, name);
     }
 
     // Whether a level's chooser button is highlighted as "active" (has an unlocked, uncompleted
@@ -132,11 +149,8 @@ class Olorin {
 
     // Pick a built-in level by its "world-stage-level" name, e.g. "1-1-1".
     async selectLevel(name) {
-        // Make sure the level chooser is open (it closes after a level is picked).
-        await this.page.evaluate(() => {
-            const bg = document.getElementById('levelChooseBG');
-            if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
-        });
+        // Make sure the level chooser is open (it closes after a level is picked), at the level's world.
+        await this.showWorldOf(name);
         // Click the number, not the button's centre: in test mode the difficulty marks swallow
         // clicks of their own (double-clicking one toggles that difficulty's completion).
         await this.page.click(`#worlds .level[data-name="${name}"] .level-number`);
@@ -153,6 +167,21 @@ class Olorin {
             const bg = document.getElementById('levelChooseBG');
             if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
         });
+    }
+
+    // Open the level chooser at the world a level is in, by clicking that world's box on the map: the
+    // chooser shows only one world's levels at a time.  A world's box is numbered like its levels,
+    // so it is found by the first part of the level's name.
+    async showWorldOf(name) {
+        await this.openChooser();
+        await this.page.click(worldNodeOf(name));
+    }
+
+    // The worlds the chooser is showing the levels of (just one), by the name in each one's header.
+    shownWorlds() {
+        return this.page.evaluate(() => Array.from(document.querySelectorAll('#worlds .world'))
+            .filter((w) => w.style.display !== 'none')
+            .map((w) => w.querySelector('.world-header').innerText));
     }
 
     // Build (and set) a custom level through the custom-level dialog, defaulting to P |- P.  With a
@@ -595,4 +624,4 @@ class Olorin {
     }
 }
 
-module.exports = { Olorin };
+module.exports = { Olorin, worldNodeOf };
