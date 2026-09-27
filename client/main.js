@@ -296,6 +296,8 @@ var customNodeEl = null;
 // The rows of the Custom world, each with the saved custom level it opens, as { el, custom }, for
 // the preview panel to find the one under the pointer.
 var customRowEls = [];
+// The last layout of the map of worlds (see updateWorldMap), with the relation it was laid out for.
+var worldMapLayout = null;
 
 // A counter (in localStorage "time") incremented on each level completion; per-difficulty
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
@@ -1908,7 +1910,14 @@ function updateWorldMap() {
         const spec = { id: i, previous: unlockData[entry.world].previous.map(function (p) { return paneOf[p]; }) };
         (outsideCourses(LEVELS[entry.world]) ? game : course).push(spec);
     });
-    const layout = layoutWorldMap([game, course, custom]);
+    // Laying it out takes a moment for a big map, and depends only on which world follows which,
+    // so it's done again only when that has changed -- not every time a level is solved.
+    const groups = [game, course, custom];
+    const key = JSON.stringify(groups);
+    if(!worldMapLayout || worldMapLayout.key !== key) {
+        worldMapLayout = { key: key, layout: layoutWorldMap(groups) };
+    }
+    const layout = worldMapLayout.layout;
 
     const canvas = document.getElementById("worldMapCanvas");
     canvas.style.width = layout.width + 'px';

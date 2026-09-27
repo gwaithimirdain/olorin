@@ -106,6 +106,32 @@ test.describe('The map of worlds', () => {
         expectFollowersRight(bs, declared(worlds()));
     });
 
+    test('stacks each column of worlds tight, but for room for a line passing between', async ({ page }) => {
+        await open(page);
+        // Each pair of boxes one above the other in a column, with the gap between them, and
+        // whether some line goes through that gap.
+        const gaps = await page.evaluate(() => {
+            const nodes = Array.from(document.querySelectorAll('#worldMap .world-node')).map((n) => ({
+                name: n.innerText.split('\n')[0], left: n.offsetLeft, right: n.offsetLeft + n.offsetWidth,
+                top: n.offsetTop, bottom: n.offsetTop + n.offsetHeight }));
+            const paths = Array.from(document.querySelectorAll('#worldMapEdges .map-edge'));
+            const points = paths.flatMap((p) => {
+                const n = Math.ceil(p.getTotalLength() / 2);
+                return Array.from({ length: n + 1 }, (_, i) => p.getPointAtLength(i * p.getTotalLength() / n));
+            });
+            const found = [];
+            nodes.forEach((a) => nodes.forEach(function (b) {
+                if (a.left !== b.left || b.top <= a.top) return;
+                if (nodes.some((c) => c.left === a.left && c.top > a.top && c.top < b.top)) return;
+                const through = points.some((p) => p.x > a.left && p.x < a.right && p.y > a.bottom && p.y < b.top);
+                found.push({ between: a.name + '/' + b.name, gap: b.top - a.bottom, through });
+            }));
+            return found;
+        });
+        expect(gaps.length).toBeGreaterThan(0);
+        gaps.forEach((g) => expect(g.through || g.gap <= 9, `${g.between}: ${g.gap}px`).toBe(true));
+    });
+
     test("greys the worlds a new player can't open yet", async ({ page }) => {
         await open(page);
         const bs = await boxes(page);
