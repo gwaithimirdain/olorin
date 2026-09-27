@@ -12,7 +12,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { worlds, courseWorlds, courseCodes, inWorld, completions } = require('../lib/levels');
+const { worlds, courseWorlds, courseCodes, inWorld, completions, worldGateSeeds } = require('../lib/levels');
 
 const COURSE = courseWorlds()[0];
 const CODE = COURSE && courseCodes().find((c) => COURSE.courses.includes(c.course));
@@ -127,6 +127,61 @@ test.describe('The map of worlds', () => {
         // ...and the world, complete at novice, has a star for it.
         const marks = page.locator(`#worldMap .world-node[data-world="${first.number}"] .lvmark`);
         expect(await marks.first().innerText()).toBe('★');
+    });
+});
+
+// Each box counts the world's levels done, at the difficulty the world is being worked at: the
+// highest it is open at, once it is 80% done at the one below.  Above novice, a level that completes
+// itself there (`autoComplete`) isn't counted, done or not.
+test.describe("A world's count of levels done", () => {
+    const FIRST = worlds().find((w) => w.previous.length === 0);
+    // The levels counted above novice.
+    const MANUAL = FIRST.levels.filter((l) => !l.autoComplete);
+    const count = (page, w) => page.evaluate((n) => {
+        const c = document.querySelector(`#worldMap .world-node[data-world="${n}"] .world-progress`);
+        return { difficulty: Number(c.dataset.difficulty), text: c.innerText };
+    }, w.number);
+
+    test('is at novice for a new player', async ({ page }) => {
+        await open(page);
+        for (const w of worlds()) {
+            expect(await count(page, w), w.name).toEqual({ difficulty: 0, text: `0/${w.levels.length}` });
+        }
+    });
+
+    test('stays at novice for a world done at novice but not open at adept', async ({ page }) => {
+        const olorin = await open(page, { seeds: completions(inWorld(FIRST.number), 0) });
+        expect((await olorin.levelStates(FIRST.levels[FIRST.levels.length - 1].name))[1]).toBe('locked');
+        const n = FIRST.levels.length;
+        expect(await count(page, FIRST)).toEqual({ difficulty: 0, text: `${n}/${n}` });
+    });
+
+    test('moves on to adept once the world is done enough at novice and open at adept', async ({ page }) => {
+        const olorin = await open(page, {
+            seeds: completions(inWorld(FIRST.number), 0).concat(worldGateSeeds(FIRST.number, 1)),
+        });
+        const solved = [];
+        for (const l of MANUAL) {
+            if ((await olorin.levelStates(l.name))[1] === 'completed') solved.push(l.name);
+        }
+        expect(await count(page, FIRST)).toEqual({ difficulty: 1, text: `${solved.length}/${MANUAL.length}` });
+        // ...leaving out the levels that have completed themselves at adept -- of which, if the world
+        // has any, some have, or this would be testing nothing.
+        const auto = FIRST.levels.filter((x) => x.autoComplete);
+        let autoDone = 0;
+        for (const l of auto) {
+            if ((await olorin.levelStates(l.name))[1] === 'completed') autoDone++;
+        }
+        if (auto.length > 0) expect(autoDone).toBeGreaterThan(0);
+    });
+
+    test('is given at every difficulty in the panel, for the world showing', async ({ page }) => {
+        await open(page, { seeds: completions(inWorld(FIRST.number), 0) });
+        await page.click(`#worldMap .world-node[data-world="${FIRST.number}"]`);
+        const n = FIRST.levels.length, m = MANUAL.length;
+        const rows = await page.evaluate(() => Array.from(document.querySelectorAll('#previewContent .preview-count'))
+            .map((c) => c.innerText));
+        expect(rows).toEqual([`: ${n} of ${n} levels solved`, `: 0 of ${m} levels solved`, `: 0 of ${m} levels solved`]);
     });
 });
 

@@ -1590,16 +1590,6 @@ function shortWorldName(name) {
     return name.replace(/ world$/i, '').split(' ')[0];
 }
 
-// Recompute and display the "done/total" count on a world's box on the map.
-function refreshWorldProgress(worldPaneIndex) {
-    const entry = worldPanes[worldPaneIndex];
-    if(!entry || !entry.node) { return; }
-    const prog = entry.node.querySelector('.world-progress');
-    if(!prog) { return; }
-    const done = entry.levels.filter(function (l) { return getPast(null, l).complete; }).length;
-    prog.innerText = done + '/' + entry.levels.length;
-}
-
 function makeLevelSelect(res) {
     const worldMapCanvas = document.getElementById('worldMapCanvas');
     const worlds = document.getElementById("worlds");
@@ -1626,9 +1616,8 @@ function makeLevelSelect(res) {
         worlds.appendChild(worldPane);
         var countstages = 1;
 
-        // Track this world's levels and how many are completed, for the progress count on its box.
+        // Track this world's levels.
         const worldLevels = [];
-        var worldDone = 0;
         const worldNum = worldPanes.length;
 
         var nontrivialWorldLevels = [];
@@ -1671,7 +1660,6 @@ function makeLevelSelect(res) {
                 // Has the user has solved this level before?
                 const past = getPast(res, level);
                 worldLevels.push(level);
-                if(past.complete) { worldDone++; }
 
                 // Render the button showing the number and per-difficulty lock/unlock/done marks.
                 renderLevelButton(b, name, levelDifficultyStates(level, past, unlockData), level);
@@ -1714,12 +1702,11 @@ function makeLevelSelect(res) {
 
         worldPane.appendChild(otherStage);
 
-        // Its box on the map shows this world's levels when clicked, with a short name, a running
-        // "done/total" level count, and a mark for each difficulty (see updateWorldMap).  It is
+        // Its box on the map shows this world's levels when clicked, with a short name, a mark
+        // for each difficulty, and a running "done/total" level count (see markWorldNode).  It is
         // numbered like the levels in it, by where the world is in levels.js.
         const node = makeWorldNode(shortWorldName(world.name), world.name, worldNum);
         node.dataset.world = x + 1;
-        node.querySelector('.world-progress').innerText = worldDone + '/' + worldLevels.length;
         worldMapCanvas.appendChild(node);
 
         worldPanes.push({
@@ -1885,8 +1872,8 @@ function updateMapFades() {
 document.getElementById("worldMap").addEventListener("scroll", updateMapFades);
 
 // A world's box on the map: a button that shows that world's levels (the one at `worldNum` in
-// worldPanes), with its short name over its "done/total" count and difficulty marks.  `title` is
-// the tooltip, its full name.
+// worldPanes), with its short name over its difficulty marks and "done/total" count (see
+// markWorldNode; Custom has just the count).  `title` is the tooltip, its full name.
 function makeWorldNode(label, title, worldNum) {
     const node = document.createElement("button");
     node.className = "world-node";
@@ -1894,8 +1881,7 @@ function makeWorldNode(label, title, worldNum) {
     node.style.width = NODE_WIDTH + 'px';
     node.style.height = NODE_HEIGHT + 'px';
     node.innerHTML = '<div class="world-node-name">' + escapeHtml(label) + '</div>' +
-        '<div class="world-node-info"><span class="world-progress"></span>' +
-        '<span class="world-node-marks"></span></div>';
+        '<div class="world-node-info"><span class="world-node-marks"></span></div>';
     node.onclick = function () { setWorld(worldNum); };
     // Hovering a world picks out the lines to and from it.
     node.onmouseenter = function () { highlightMapEdges(worldNum, true); };
@@ -1991,13 +1977,53 @@ function worldStates(entry) {
     });
 }
 
+// How many of a world's levels are complete at each difficulty (at it or above), and of how many:
+// { done, total }, each indexed by difficulty.  A bonus stage's levels count, as they're the
+// player's to solve too.  An `autoComplete` level counts only at novice: above that it completes
+// itself, so it would be a count of nothing done.
+function worldCounts(entry) {
+    const done = [0, 0, 0];
+    const total = [0, 0, 0];
+    unlockData[entry.world].stages.forEach(function (sd, s) {
+        sd.levelDiff.forEach(function (d, c) {
+            const auto = LEVELS[entry.world].stages[s].levels[c].autoComplete;
+            for(var K = 0; K < 3; K++) {
+                if(K > 0 && auto) { continue; }
+                total[K]++;
+                if(d >= K) { done[K]++; }
+            }
+        });
+    });
+    return { done: done, total: total };
+}
+
+// The difficulty a world is being worked at, whose count its box on the map shows: the highest one
+// it is open at (`states` being worldStates'), as long as it has been done enough at each one below
+// -- the 80% of rule 1, which opens the worlds after it, and which like rule 1 is of its non-bonus
+// levels (autoComplete ones included) -- to be moving on from them.  So a world
+// counts its novice levels until it is 80% done at novice and open at adept, and then counts its
+// adept ones, and so on.  A world not open at all counts at novice.
+function workingDifficulty(entry, states) {
+    const wd = unlockData[entry.world];
+    var K = 0;
+    while(K < 2 && states[K + 1] !== 'locked' && moreNeeded(wd.done[K], wd.total, 0.8) === 0) { K++; }
+    return K;
+}
+
 // Mark a world's box on the map for how far the player has got in it (see worldStates): for each
-// difficulty, a star, an open padlock or a closed one; a world not open even at novice is greyed.
-// Like a level's button, its top edge takes the color of the highest difficulty it is complete at.
+// difficulty, a star, an open padlock or a closed one, with a "done/total" count of its levels
+// beside the one it's being worked at (see workingDifficulty); a world not open even at novice is
+// greyed.  Like a level's button, its top edge takes the color of the highest difficulty it is
+// complete at.
 function markWorldNode(entry) {
     const states = worldStates(entry);
-    entry.node.querySelector('.world-node-marks').innerHTML =
-        difficultyMark(states[0], 0) + difficultyMark(states[1], 1) + difficultyMark(states[2], 2);
+    const counts = worldCounts(entry);
+    const working = workingDifficulty(entry, states);
+    entry.node.querySelector('.world-node-marks').innerHTML = states.map(function (state, K) {
+        return difficultyMark(state, K) + (K === working
+            ? '<span class="world-progress" data-difficulty="' + K + '">' + counts.done[K] + '/' + counts.total[K] + '</span>'
+            : '');
+    }).join('');
     entry.node.classList.toggle("world-node-locked", states[0] === 'locked');
     const hc = states.lastIndexOf('completed');
     entry.node.style.borderTop = hc >= 0 ? '5px solid ' + COLORS[hc][1].backgroundColor : '';
@@ -2142,12 +2168,16 @@ function statementHtml(def) {
 
 // How something stands at each difficulty, as the panel shows it: each one's mark and state, and for
 // one that's locked, what remains to be done to unlock it.  `blockers(K)` is that list at K.
-function difficultiesHtml(states, blockers) {
-    const said = { completed: 'solved', unlocked: 'open', locked: 'locked' };
+// `counts`, if given, is how many levels are solved at each difficulty and of how many (as
+// worldCounts gives them), for a world.
+function difficultiesHtml(states, blockers, counts) {
+    // A level is solved at a difficulty; a world, all of whose levels are, is complete there.
+    const said = { completed: counts ? 'complete' : 'solved', unlocked: 'open', locked: 'locked' };
     return '<div class="preview-difficulties">' + states.map(function (state, K) {
         const todo = state === 'locked' ? blockers(K) : [];
         return '<div class="preview-difficulty" data-difficulty="' + K + '" data-state="' + state + '">' +
             difficultyMark(state, K) + ' <b>' + DIFFICULTIES[K] + '</b> ' + said[state] +
+            (counts ? '<span class="preview-count">: ' + counts.done[K] + ' of ' + counts.total[K] + ' levels solved</span>' : '') +
             (todo.length > 0 ? '<ul class="preview-blockers">' +
              todo.map(function (b) { return '<li>' + escapeHtml(b) + '</li>'; }).join('') + '</ul>' : '') +
             '</div>';
@@ -2176,12 +2206,11 @@ function customPreviewHtml(cl) {
 function worldPreviewHtml(entry) {
     const w = entry.world;
     const previous = unlockData[w].previous.map(function (p) { return LEVELS[p].name; });
-    const done = entry.levels.filter(function (l) { return getPast(null, l).complete; }).length;
     return '<div class="preview-title">' + escapeHtml(LEVELS[w].name) + '</div>' +
-        '<div class="preview-where">' + done + ' of its ' + entry.levels.length + ' levels solved</div>' +
         '<div class="preview-follows">' + (previous.length > 0
             ? 'Follows ' + escapeHtml(previous.join(', ')) : 'Follows no other world') + '</div>' +
-        difficultiesHtml(worldStates(entry), function (K) { return worldGateBlockers(w, K, unlockData); });
+        difficultiesHtml(worldStates(entry), function (K) { return worldGateBlockers(w, K, unlockData); },
+                         worldCounts(entry));
 }
 
 // Hovering with a mouse.  A touchscreen fakes mouse events after a tap, which mustn't count as
@@ -2649,9 +2678,8 @@ function toggleCompletedAt(level, d) {
             difficulty: completed ? d - 1 : Math.max(past.difficulty || 0, d),
         }));
     }
-    // Re-render every level (this completion feeds the unlock rules) and the count on this world's box.
+    // Re-render every level (this completion feeds the unlock rules), and the map.
     updateLevelSelect(null);
-    refreshWorldProgress(level.worldPaneIndex);
 }
 
 // The index in `list` (LEVELS, or one world's stages) of the thing with this name, as a `previous`
@@ -3819,9 +3847,10 @@ function refreshCustomWorld() {
             customRowEls.push({ el: row, custom: cl });
         });
     }
+    // Its box on the map has no difficulty marks, just a count of the ones solved.
     if(customNodeEl) {
-        const prog = customNodeEl.querySelector('.world-progress');
-        if(prog) { prog.innerText = list.filter(function (c) { return c.completed[0]; }).length + '/' + list.length; }
+        customNodeEl.querySelector('.world-node-marks').innerHTML = '<span class="world-progress">' +
+            list.filter(function (c) { return c.completed[0]; }).length + '/' + list.length + '</span>';
     }
 }
 
@@ -5721,9 +5750,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const value = { complete: true, difficulty: Math.max(difficulty, past.difficulty || 0), times: times };
                     localStorage.setItem(key, JSON.stringify(value));
                     // Re-render the level buttons (this level is now complete, and others may have
-                    // unlocked or re-locked), and update the progress count on this world's box.
+                    // unlocked or re-locked), and the map.
                     updateLevelSelect(null);
-                    refreshWorldProgress(currentLevel.worldPaneIndex);
                     // If a new world just opened at some difficulty, tell the player.
                     announceNewlyUnlockedWorlds(beforeGates);
                     if(SERVER) {

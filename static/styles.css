@@ -627,7 +627,13 @@ body.arranging { cursor: progress; }
 
 .world-node-marks {
     display: flex;
+    align-items: center;
     gap: 2px;
+}
+
+/* The count of levels done, beside the difficulty it counts at. */
+.world-progress {
+    margin: 0 3px 0 1px;
 }
 
 .world-node .lvmark {
