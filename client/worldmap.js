@@ -9,8 +9,9 @@
 // same ones -- two worlds following Implication and Disjunction both, say.  Rather than a line from
 // each of those to each of these, crossing each other, the lines of such a shared set meet at a
 // junction, one line from each world waited on in and one to each waiting world out: "all of
-// these open all of those".  A world waiting on a set nothing else does, or a set of only one
-// world, just gets its own lines.
+// these open all of those".  A world waiting on those and more besides takes a line from the
+// junction too, and its own lines from the rest.  Any other line goes straight from the world
+// waited on to the world waiting (see junctionsFor).
 //
 // This module only does the geometry, so that it can be tried out without a page: main.js draws it.
 
@@ -99,9 +100,9 @@ export function layoutWorldMap(groups) {
 //   to go up or down -- which puts worlds beside the ones they're joined to, and so
 //   keeps the lines short and straight.  It starts from each column in the order of the middles of
 //   what it's joined to in the column before (the "barycenter" heuristic, swept back and forth),
-//   and improves on that by trying out each swap of two neighbours in a column, each column turned
-//   upside down, and each column turned upside down together with every column after it, for as
-//   long as any of those makes it better.
+//   and improves on that by trying out changes to it -- moving one thing elsewhere in its column,
+//   turning columns upside down, and moving a long line to the top or bottom of the columns it
+//   crosses (see orderColumns) -- for as long as any of them makes it better.
 //
 //   Height.  A column of worlds is stacked with no more than NODE_SEP between them, so that the map
 //   is no taller than it has to be, and moved up or down as a whole to where its lines have least
@@ -122,30 +123,18 @@ function layoutGroup(group) {
     const worldItem = new Map();
     group.forEach((w) => worldItem.set(String(w.id), item('world', NODE_HEIGHT, { id: w.id })));
 
-    // Gather the worlds waiting on each set of worlds, in the order they come, and join them: through
-    // a junction for a set of two or more waited on by two or more, and straight otherwise.
-    const sets = new Map();
-    group.forEach(function (w) {
-        const previous = w.previous.filter((p) => ids.has(String(p)));
-        if(previous.length === 0) { return; }
-        const k = previous.map(String).sort().join('\u0000');
-        if(!sets.has(k)) { sets.set(k, { sources: previous, targets: [] }); }
-        sets.get(k).targets.push(w.id);
-    });
-    const junctions = [];
+    // The lines: through the junctions junctionsFor picks, and straight for the rest.
     const wanted = [];
     const worldEnd = (id) => ({ end: { world: id }, item: worldItem.get(String(id)) });
-    sets.forEach(function (set) {
-        if(set.sources.length >= 2 && set.targets.length >= 2) {
-            const j = junctions.length;
-            const jEnd = { end: { junction: j }, item: item('junction', 2 * JUNCTION_RADIUS, {}) };
-            junctions.push({ sources: set.sources, targets: set.targets });
-            set.sources.forEach((s) => wanted.push({ from: worldEnd(s), to: jEnd }));
-            set.targets.forEach((t) => wanted.push({ from: jEnd, to: worldEnd(t) }));
-        } else {
-            set.sources.forEach((s) => set.targets.forEach((t) => wanted.push({ from: worldEnd(s), to: worldEnd(t) })));
-        }
+    const { junctions, direct } = junctionsFor(group.map((w) => ({
+        id: w.id, previous: w.previous.filter((p) => ids.has(String(p))),
+    })));
+    junctions.forEach(function (junction, j) {
+        const jEnd = { end: { junction: j }, item: item('junction', 2 * JUNCTION_RADIUS, {}) };
+        junction.sources.forEach((s) => wanted.push({ from: worldEnd(s), to: jEnd }));
+        junction.targets.forEach((t) => wanted.push({ from: jEnd, to: worldEnd(t) }));
     });
+    direct.forEach((d) => wanted.push({ from: worldEnd(d.source), to: worldEnd(d.target) }));
 
     // Columns: a world two after the last of what it follows, a junction one after the last of what
     // comes into it, and so a world one after its junction.  (Should levels.js ever have worlds
@@ -178,7 +167,7 @@ function layoutGroup(group) {
     for(var r = 0; r <= lastRank; r++) { columns.push([]); }
     items.forEach((it) => columns[it.rank].push(it));
 
-    orderColumns(columns);
+    orderColumns(columns, wanted.map((w) => w.chain.slice(1, -1)).filter((line) => line.length >= 2));
     placeHeights(columns, FINAL_SWEEPS);
 
     // Where each column is across: the worlds' columns evenly spaced, and the others halfway between.
@@ -232,6 +221,51 @@ function layoutGroup(group) {
     };
 }
 
+// Which junctions to draw, for worlds `group` ({ id, previous }, each `previous` being of worlds in
+// the group): { junctions, direct }, a list of { sources, targets } -- a junction, the worlds whose
+// lines come into it and those its lines go out to -- and a list of { source, target }, the lines
+// straight from one world to another.
+//
+// A junction stands for a set of two or more worlds, and every world waiting on all of those (among
+// others, maybe) takes a line from it rather than one from each; it's only worth drawing for two or
+// more of them.  Which sets to make junctions of is a matter of covering each world's `previous`
+// with as few lines as can be.  They're picked one at a time, each the set that saves the most
+// lines of those not yet drawn -- a set of s worlds waited on by t, as a junction, replacing s * t
+// lines by s + t -- and even a set that saves none, as Implication and Disjunction waited on by
+// two others do, for the crossings it saves.  The sets tried are each world's own `previous`, as
+// far as it isn't already drawn, and what any two of those have in common.
+function junctionsFor(group) {
+    const junctions = [];
+    // What of each world's `previous` isn't drawn yet.
+    const left = group.map((w) => ({ id: w.id, previous: w.previous.slice() }));
+    const key = (set) => set.map(String).sort().join('\u0000');
+    for(;;) {
+        const tried = new Map();
+        const consider = function (set) {
+            if(set.length >= 2 && !tried.has(key(set))) { tried.set(key(set), set); }
+        };
+        left.forEach((w) => consider(w.previous));
+        left.forEach((a, i) => left.slice(i + 1).forEach(function (b) {
+            consider(a.previous.filter((p) => b.previous.some((q) => String(q) === String(p))));
+        }));
+        var best = null;
+        tried.forEach(function (set) {
+            const users = left.filter((w) => set.every((p) => w.previous.some((q) => String(q) === String(p))));
+            if(users.length < 2) { return; }
+            const saves = set.length * users.length - (set.length + users.length);
+            if(!best || saves > best.saves) { best = { set: set, users: users, saves: saves }; }
+        });
+        if(!best) { break; }
+        junctions.push({ sources: best.set, targets: best.users.map((w) => w.id) });
+        best.users.forEach(function (w) {
+            w.previous = w.previous.filter((p) => !best.set.some((q) => String(q) === String(p)));
+        });
+    }
+    const direct = [];
+    left.forEach((w) => w.previous.forEach((p) => direct.push({ source: p, target: w.id })));
+    return { junctions: junctions, direct: direct };
+}
+
 // How far apart the middles of two things one above the other in a column must be: half of each,
 // and NODE_SEP between two boxes or junctions, or LINE_SEP where either is a line passing through.
 function separation(a, b) {
@@ -239,8 +273,8 @@ function separation(a, b) {
 }
 
 // Put the things in each column in order (see layoutGroup): each column's list is rearranged in
-// place, top to bottom.
-function orderColumns(columns) {
+// place, top to bottom.  `lines` is the waypoints of each line that crosses more than one column.
+function orderColumns(columns, lines) {
     const index = (col) => col.forEach((it, i) => { it.order = i; });
     const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
     // Sort a column by the middle of what each thing in it is joined to on one side, keeping the
@@ -268,8 +302,8 @@ function orderColumns(columns) {
     var bestTravel = null;
     const reindex = (from, to) => { for(var r = from; r < to; r++) { index(columns[r]); } };
     const attempt = function (change, from, to) {
-        // Every change tried is its own undoing: a swap, or turning columns upside down.
         if(bestTravel === null) { bestTravel = travel(columns); }
+        const saved = columns.slice(from, to).map((col) => col.slice());
         change();
         reindex(from, to);
         // The gaps between columns whose crossings the change can have altered.
@@ -287,23 +321,41 @@ function orderColumns(columns) {
             const t = travel(columns);
             if(t < bestTravel - 1e-6) { bestTravel = t; return true; }
         }
-        change();
+        saved.forEach((col, i) => { columns[from + i].splice(0, col.length, ...col); });
         reindex(from, to);
         gaps.forEach((r, i) => { crossed[r] = before[i]; });
         return false;
     };
+    // The changes tried: moving one thing to another place in its column; turning a column upside
+    // down, or it and every column after it; and moving the waypoints of a line that crosses more
+    // than one column all to the top of their columns, or all to the bottom -- which no number of
+    // smaller changes might get to, each on the way adding a crossing that only the rest take away.
+    const move = (col, i, k) => () => { col.splice(k, 0, col.splice(i, 1)[0]); };
     const reverse = (from, to) => () => { for(var r = from; r < to; r++) { columns[r].reverse(); } };
+    const toEnd = (line, top) => () => {
+        line.forEach(function (it) {
+            const col = columns[it.rank];
+            col.splice(col.indexOf(it), 1);
+            if(top) { col.unshift(it); } else { col.push(it); }
+        });
+    };
     for(var round = 0; round < 50; round++) {
         var improved = false;
         for(var r = 0; r < columns.length; r++) {
             const col = columns[r];
-            for(var i = 0; i + 1 < col.length; i++) {
-                const swap = ((k) => () => { const t = col[k]; col[k] = col[k + 1]; col[k + 1] = t; })(i);
-                if(attempt(swap, r, r + 1)) { improved = true; }
+            for(var i = 0; i < col.length; i++) {
+                for(var k = 0; k < col.length; k++) {
+                    if(k !== i && attempt(move(col, i, k), r, r + 1)) { improved = true; }
+                }
             }
             if(col.length > 1 && attempt(reverse(r, r + 1), r, r + 1)) { improved = true; }
             if(r > 0 && attempt(reverse(r, columns.length), r, columns.length)) { improved = true; }
         }
+        lines.forEach(function (line) {
+            const from = line[0].rank, to = line[line.length - 1].rank + 1;
+            if(attempt(toEnd(line, true), from, to)) { improved = true; }
+            if(attempt(toEnd(line, false), from, to)) { improved = true; }
+        });
         if(!improved) { break; }
     }
 }

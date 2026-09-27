@@ -376,6 +376,23 @@ test.describe('The map, for other relations between the worlds', () => {
         expect(m.scrollHeight).toBeGreaterThan(m.clientHeight);
     });
 
+    test('gives a world following those worlds and more a line from their junction', async ({ page }) => {
+        const olorin = await open(page);
+        const ws = worlds();
+        expect(ws.length, 'this needs at least five worlds').toBeGreaterThanOrEqual(5);
+        // The first two worlds follow nothing, the last follows both of them and the third, and the
+        // rest follow just those two.
+        const last = ws.length - 1;
+        await relate(olorin, ws, (i) => (i < 2 ? [] : i === last ? [ws[0], ws[1], ws[2]] : [ws[0], ws[1]]));
+        const { follows, lines } = await drawn(page);
+        expect(follows[ws[last].number]).toEqual([ws[0].number, ws[1].number, ws[2].number].sort((a, b) => a - b));
+        // Into the last world: one line from the junction, and one from the third world.
+        const into = lines.filter((l) => l.target === String(ws[last].number)).map((l) => l.source);
+        expect(into.filter((s) => s.startsWith('j')).length).toBe(1);
+        expect(into.filter((s) => !s.startsWith('j')).sort()).toEqual([String(ws[2].number)]);
+        expectFollowersRight(await boxes(page), follows);
+    });
+
     test('joins worlds all following the same worlds through a junction', async ({ page }) => {
         const olorin = await open(page);
         const ws = worlds();
