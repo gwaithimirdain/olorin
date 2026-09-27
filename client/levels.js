@@ -44,9 +44,10 @@
 //
 //   bonus: true         Extra credit: this stage's levels are left out of its world's totals, so
 //                       the percentages that open worlds and difficulties (>= 80% of the previous
-//                       world, >= 50% of the next one, ...) are of the non-bonus levels only.
-//                       Solving a bonus level can then never open a world, nor be needed to.  Its
-//                       own stage still counts normally, so the stage rules (a stage needing its
+//                       world, >= 50% of the next one, ...) are of the non-bonus levels only.  But
+//                       a bonus level solved counts towards them all the same, in place of a level
+//                       that isn't: it is never needed to open anything, but can help to.  Its own
+//                       stage still counts normally, so the stage rules (a stage needing its
 //                       predecessors, a level needing the ones before it) treat it like any other.
 //
 // A level is { parameters, variables, hypotheses, conclusion }: the statement it asks you to prove.

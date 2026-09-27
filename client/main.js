@@ -1924,7 +1924,7 @@ function updateWorldMap() {
     // all the worlds coming into it are, and so are the lines out of it.
     const met = function (i) {
         const wd = unlockData[worldPanes[i].world];
-        return moreNeeded(wd.done[0], wd.total, 0.8) === 0;
+        return moreNeeded(wd.done[0], wd.total[0], 0.8) === 0;
     };
     const junctionMet = layout.junctions.map(function (j) { return j.sources.every(met); });
     const endMet = function (end) { return end.junction === undefined ? met(end.world) : junctionMet[end.junction]; };
@@ -1977,47 +1977,27 @@ function worldStates(entry) {
     });
 }
 
-// How many of a world's levels are complete at each difficulty (at it or above), and of how many:
-// { done, total }, each indexed by difficulty.  A bonus stage's levels count, as they're the
-// player's to solve too.  An `autoComplete` level counts only at novice: above that it completes
-// itself, so it would be a count of nothing done.
-function worldCounts(entry) {
-    const done = [0, 0, 0];
-    const total = [0, 0, 0];
-    unlockData[entry.world].stages.forEach(function (sd, s) {
-        sd.levelDiff.forEach(function (d, c) {
-            const auto = LEVELS[entry.world].stages[s].levels[c].autoComplete;
-            for(var K = 0; K < 3; K++) {
-                if(K > 0 && auto) { continue; }
-                total[K]++;
-                if(d >= K) { done[K]++; }
-            }
-        });
-    });
-    return { done: done, total: total };
-}
-
 // The difficulty a world is being worked at, whose count its box on the map shows: the highest one
 // it is open at (`states` being worldStates'), as long as it has been done enough at each one below
-// -- the 80% of rule 1, which opens the worlds after it, and which like rule 1 is of its non-bonus
-// levels (autoComplete ones included) -- to be moving on from them.  So a world
+// -- the 80% of rule 1, which opens the worlds after it -- to be moving on from them.  So a world
 // counts its novice levels until it is 80% done at novice and open at adept, and then counts its
 // adept ones, and so on.  A world not open at all counts at novice.
 function workingDifficulty(entry, states) {
     const wd = unlockData[entry.world];
     var K = 0;
-    while(K < 2 && states[K + 1] !== 'locked' && moreNeeded(wd.done[K], wd.total, 0.8) === 0) { K++; }
+    while(K < 2 && states[K + 1] !== 'locked' && moreNeeded(wd.done[K], wd.total[K], 0.8) === 0) { K++; }
     return K;
 }
 
 // Mark a world's box on the map for how far the player has got in it (see worldStates): for each
 // difficulty, a star, an open padlock or a closed one, with a "done/total" count of its levels
-// beside the one it's being worked at (see workingDifficulty); a world not open even at novice is
-// greyed.  Like a level's button, its top edge takes the color of the highest difficulty it is
+// beside the one it's being worked at (see workingDifficulty) -- counted as the unlock rules count
+// them (see computeUnlockData), so "done" can be more than "total" with bonus levels solved; a
+// world not open even at novice is greyed.  Like a level's button, its top edge takes the color of the highest difficulty it is
 // complete at.
 function markWorldNode(entry) {
     const states = worldStates(entry);
-    const counts = worldCounts(entry);
+    const counts = unlockData[entry.world];
     const working = workingDifficulty(entry, states);
     entry.node.querySelector('.world-node-marks').innerHTML = states.map(function (state, K) {
         return difficultyMark(state, K) + (K === working
@@ -2168,8 +2148,8 @@ function statementHtml(def) {
 
 // How something stands at each difficulty, as the panel shows it: each one's mark and state, and for
 // one that's locked, what remains to be done to unlock it.  `blockers(K)` is that list at K.
-// `counts`, if given, is how many levels are solved at each difficulty and of how many (as
-// worldCounts gives them), for a world.
+// `counts`, if given, is how many levels are solved at each difficulty and of how many, for a world
+// (its unlockData, whose `done` and `total` these are).
 function difficultiesHtml(states, blockers, counts) {
     // A level is solved at a difficulty; a world, all of whose levels are, is complete there.
     const said = { completed: counts ? 'complete' : 'solved', unlocked: 'open', locked: 'locked' };
@@ -2210,7 +2190,7 @@ function worldPreviewHtml(entry) {
         '<div class="preview-follows">' + (previous.length > 0
             ? 'Follows ' + escapeHtml(previous.join(', ')) : 'Follows no other world') + '</div>' +
         difficultiesHtml(worldStates(entry), function (K) { return worldGateBlockers(w, K, unlockData); },
-                         worldCounts(entry));
+                         unlockData[w]);
 }
 
 // Hovering with a mouse.  A touchscreen fakes mouse events after a tap, which mustn't count as
@@ -2435,13 +2415,6 @@ function moreLevels(n) {
     return n + ' more level' + (n === 1 ? '' : 's');
 }
 
-// A world as a lock's tooltip names it, noting when its percentage leaves out a bonus stage.
-function worldLabel(w) {
-    const world = LEVELS[w];
-    return world.name + (world.stages.some(function (st) { return st.bonus; })
-                         ? ' (not counting bonus stages)' : '');
-}
-
 // A stage as a lock's tooltip names it: its number, and its name as plain text if it has one.
 function stageLabel(w, s) {
     const div = document.createElement('div');
@@ -2456,16 +2429,17 @@ function stageLabel(w, s) {
 //
 // Which worlds a world follows is its `previous` list of names in levels.js (see
 // computeUnlockData); each gate then asks about ALL the worlds it names, so a world following two
-// others waits for both.  The percentages are of each world's non-bonus
-// levels; a `bonus` stage is left out of the totals entirely, so solving one can never open a world.
+// others waits for both.  The percentages are of each world's non-bonus levels, less its
+// autoComplete ones above novice, and a bonus level solved counts towards them (see
+// computeUnlockData).
 function worldGateBlockers(w, K, data) {
     const world = data[w];
     const blockers = [];
     // Complete enough of world `v` at difficulty `k` to reach the fraction `p`, if it hasn't yet.
     function need(v, k, p) {
-        const n = moreNeeded(data[v].done[k], data[v].total, p);
+        const n = moreNeeded(data[v].done[k], data[v].total[k], p);
         if(n > 0) {
-            blockers.push('Complete ' + moreLevels(n) + ' of ' + worldLabel(v) + ' at ' + DIFFICULTIES[k]);
+            blockers.push('Complete ' + moreLevels(n) + ' of ' + LEVELS[v].name + ' at ' + DIFFICULTIES[k]);
         }
     }
     // A course's students have the game's own worlds at novice from the start, so that the term's
@@ -2518,7 +2492,7 @@ function unlockBlockers(w, s, c, K, data) {
     //    first stage has none by default.  (computeUnlockData resolves the names to indices.)
     for(var pi = 0; pi < stage.previous.length; pi++) {
         const ps = stage.previous[pi];
-        const n = moreNeeded(world.stages[ps].done[K], world.stages[ps].total, 0.7);
+        const n = moreNeeded(world.stages[ps].done[K], world.stages[ps].total[K], 0.7);
         if(n > 0) { blockers.push('Complete ' + moreLevels(n) + ' of ' + stageLabel(w, ps) + ' at ' + diff); }
     }
     // 5. All but (at most) 2 of the levels before this one in the stage are complete at K -- so a
@@ -2708,7 +2682,7 @@ function computeUnlockData(res) {
         }).filter(function (i) {
             return worldShown(LEVELS[i]) && sameCourseSide(world, LEVELS[i]);
         });
-        const wd = { total: 0, done: [0, 0, 0], stages: [], previous: previous, followers: [] };
+        const wd = { total: [0, 0, 0], done: [0, 0, 0], stages: [], previous: previous, followers: [] };
         world.stages.forEach(function (stage, s) {
             // `previous` is the indices of the stages in this world that are this one's rule-4
             // prerequisites (see unlockBlockers): the ones it names, defaulting to the stage right
@@ -2718,24 +2692,32 @@ function computeUnlockData(res) {
                       return indexNamed(world.stages, name, 'stage of "' + world.name + '"');
                   })
                   : s > 0 ? [s - 1] : [];
-            const sd = { total: 0, done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
+            const sd = { total: [0, 0, 0], done: [0, 0, 0], levelDiff: [], levelTimes: [], hasHint: [],
                          previous: previous };
+            // What the percentages are of, and what counts towards them, at each difficulty K:
+            //
             // A `bonus` stage is extra credit: its levels are left out of the world's totals, so the
-            // inter-world percentages (rules 1-3) are fractions of the non-bonus levels only.  They
-            // still count for their own stage, so the stage rules (4-6) treat them like any other.
-            const counts = !stage.bonus;
+            // inter-world percentages (rules 1-3) are fractions of the non-bonus levels -- but one
+            // solved counts towards them all the same, in place of a level that isn't.  So a bonus
+            // level is never needed to open anything, but may help to.  They count for their own
+            // stage like any other, so the stage rules (4-6) treat them like any other.
+            //
+            // An `autoComplete` level completes itself above novice (see applyAutoCompletions), so
+            // there it is left out of every percentage, world and stage alike: neither needed, nor
+            // counting towards anything.  At novice it's solved like any other.
             stage.levels.forEach(function (level) {
                 const p = getPast(res, level);
                 const cd = p.complete ? p.difficulty : -1;
                 sd.levelDiff.push(cd);
                 sd.levelTimes.push(p.times || null);
                 sd.hasHint.push(!!level.hint);
-                sd.total++;
-                if(counts) { wd.total++; }
                 for(var K = 0; K <= 2; K++) {
+                    if(K > 0 && level.autoComplete) { continue; }
+                    sd.total[K]++;
+                    if(!stage.bonus) { wd.total[K]++; }
                     if(cd >= K) {
                         sd.done[K]++;
-                        if(counts) { wd.done[K]++; }
+                        wd.done[K]++;
                     }
                 }
             });

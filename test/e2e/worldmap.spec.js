@@ -12,7 +12,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { worlds, courseWorlds, courseCodes, inWorld, completions, worldGateSeeds } = require('../lib/levels');
+const { worlds, courseWorlds, courseCodes, inWorld, completions, worldGateSeeds, countedAt } = require('../lib/levels');
 
 const COURSE = courseWorlds()[0];
 const CODE = COURSE && courseCodes().find((c) => COURSE.courses.includes(c.course));
@@ -131,12 +131,13 @@ test.describe('The map of worlds', () => {
 });
 
 // Each box counts the world's levels done, at the difficulty the world is being worked at: the
-// highest it is open at, once it is 80% done at the one below.  Above novice, a level that completes
-// itself there (`autoComplete`) isn't counted, done or not.
+// highest it is open at, once it is 80% done at the one below.  It counts them as the unlock rules
+// do: out of the world's non-bonus levels, less, above novice, those that complete themselves there
+// (`autoComplete`).
 test.describe("A world's count of levels done", () => {
     const FIRST = worlds().find((w) => w.previous.length === 0);
     // The levels counted above novice.
-    const MANUAL = FIRST.levels.filter((l) => !l.autoComplete);
+    const MANUAL = countedAt(FIRST, 1);
     const count = (page, w) => page.evaluate((n) => {
         const c = document.querySelector(`#worldMap .world-node[data-world="${n}"] .world-progress`);
         return { difficulty: Number(c.dataset.difficulty), text: c.innerText };
@@ -145,20 +146,20 @@ test.describe("A world's count of levels done", () => {
     test('is at novice for a new player', async ({ page }) => {
         await open(page);
         for (const w of worlds()) {
-            expect(await count(page, w), w.name).toEqual({ difficulty: 0, text: `0/${w.levels.length}` });
+            expect(await count(page, w), w.name).toEqual({ difficulty: 0, text: `0/${w.counted.length}` });
         }
     });
 
     test('stays at novice for a world done at novice but not open at adept', async ({ page }) => {
-        const olorin = await open(page, { seeds: completions(inWorld(FIRST.number), 0) });
+        const olorin = await open(page, { seeds: completions(FIRST.counted, 0) });
         expect((await olorin.levelStates(FIRST.levels[FIRST.levels.length - 1].name))[1]).toBe('locked');
-        const n = FIRST.levels.length;
+        const n = FIRST.counted.length;
         expect(await count(page, FIRST)).toEqual({ difficulty: 0, text: `${n}/${n}` });
     });
 
     test('moves on to adept once the world is done enough at novice and open at adept', async ({ page }) => {
         const olorin = await open(page, {
-            seeds: completions(inWorld(FIRST.number), 0).concat(worldGateSeeds(FIRST.number, 1)),
+            seeds: completions(FIRST.counted, 0).concat(worldGateSeeds(FIRST.number, 1)),
         });
         const solved = [];
         for (const l of MANUAL) {
@@ -175,10 +176,17 @@ test.describe("A world's count of levels done", () => {
         if (auto.length > 0) expect(autoDone).toBeGreaterThan(0);
     });
 
+    test('counts a bonus level solved, over the non-bonus levels it is out of', async ({ page }) => {
+        const bonus = worlds().find((w) => w.counted.length < w.levels.length);
+        test.skip(!bonus, 'levels.js has no bonus stage');
+        await open(page, { seeds: completions(bonus.levels, 0) });
+        expect((await count(page, bonus)).text).toBe(`${bonus.levels.length}/${bonus.counted.length}`);
+    });
+
     test('is given at every difficulty in the panel, for the world showing', async ({ page }) => {
-        await open(page, { seeds: completions(inWorld(FIRST.number), 0) });
+        await open(page, { seeds: completions(FIRST.counted, 0) });
         await page.click(`#worldMap .world-node[data-world="${FIRST.number}"]`);
-        const n = FIRST.levels.length, m = MANUAL.length;
+        const n = FIRST.counted.length, m = MANUAL.length;
         const rows = await page.evaluate(() => Array.from(document.querySelectorAll('#previewContent .preview-count'))
             .map((c) => c.innerText));
         expect(rows).toEqual([`: ${n} of ${n} levels solved`, `: 0 of ${m} levels solved`, `: 0 of ${m} levels solved`]);
