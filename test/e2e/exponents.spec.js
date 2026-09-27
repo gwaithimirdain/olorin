@@ -210,8 +210,7 @@ test.describe('The √ symbol', () => {
     test('has a palette button, on every box that has a palette', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.openChooser();
-        await page.click('#customLevel');
+        await olorin.openCustomDialog();
         await page.fill('#customName', '');
         await page.fill('#parameters', '');
         await page.fill('#variables', 'x ∈ ℝ');

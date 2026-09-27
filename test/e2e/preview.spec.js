@@ -1,12 +1,13 @@
-// The level chooser's preview panel: what's under the pointer, without opening it.
+// The level chooser's preview panel: the level under the pointer, without opening it.
 //
-// A level under the pointer shows its statement -- its parameters and variables, its hypotheses over
-// a line, and its conclusion under it -- and how it stands at each difficulty; so does a saved custom
-// level, and a world's box on the map shows how that world stands.  Clicking still opens a level.
-// With nothing under the pointer the panel is blank, but a level counts as under the pointer out to
-// halfway across the gap to the next, so moving from one to the next doesn't blank it in between.
-// On a touchscreen, pressing and holding does what hovering does, and lifting the finger then opens
-// nothing.
+// A level under the pointer shows its statement -- its variables (not its parameters, which the level
+// doesn't show either), its hypotheses over a line, and its conclusion under it -- and how it stands
+// at each difficulty; so does a saved custom level.  Clicking still opens a level.  With no level
+// under the pointer, the panel shows how the world whose levels are showing stands, or, for the
+// Custom world, a button to make a new one.  A level counts as under the pointer out to halfway
+// across the gap to the next, so moving from one to the next doesn't go back to the world in
+// between.  On a touchscreen, pressing and holding does what hovering does, and lifting the finger
+// then opens nothing.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin, worldNodeOf } = require('../helpers/olorin');
@@ -35,13 +36,16 @@ async function open(page, seeds = []) {
     return olorin;
 }
 
-// What the panel shows: its title, and the text of each part of a statement in it.
+// What the panel shows: what sort of thing ('level', 'world', or 'new' for the Custom world's New
+// button), its title, and the text of each part of a statement in it.
 function panel(page) {
     return page.evaluate(() => {
-        const p = document.getElementById('levelPreview');
+        const p = document.getElementById('previewContent');
         const texts = (sel) => Array.from(p.querySelectorAll(sel)).map((e) => e.innerText);
+        const newShown = getComputedStyle(document.getElementById('customNew')).display !== 'none';
         return {
-            blank: p.innerHTML === '',
+            showing: p.querySelector('.preview-statement') ? 'level'
+                : p.querySelector('.preview-follows') ? 'world' : newShown ? 'new' : 'nothing',
             title: texts('.preview-title')[0],
             context: texts('.preview-context')[0],
             hypotheses: texts('.preview-hypothesis'),
@@ -56,9 +60,11 @@ function panel(page) {
 const box = (page, sel) => page.locator(sel).boundingBox();
 
 test.describe('The preview panel', () => {
-    test('is blank until something is under the pointer', async ({ page }) => {
-        await open(page);
-        expect((await panel(page)).blank).toBe(true);
+    test('shows the world whose levels are showing, until a level is under the pointer', async ({ page }) => {
+        const olorin = await open(page);
+        const p = await panel(page);
+        expect(p.showing).toBe('world');
+        expect([p.title]).toEqual(await olorin.shownWorlds());
     });
 
     test("shows the statement of the level under the pointer, and how it stands", async ({ page }) => {
@@ -68,7 +74,9 @@ test.describe('The preview panel', () => {
         expect(p.title).toBe('Level ' + FULL.name);
         expect(p.hypotheses).toEqual(FULL.hypotheses);
         expect(p.conclusion).toBe(FULL.conclusion);
-        FULL.parameters.concat(FULL.variables).forEach((x) => expect(p.context).toContain(x));
+        FULL.variables.forEach((x) => expect(p.context).toContain(x));
+        // No parameters, which would be declared with a colon ("P : Type").
+        expect(p.context).not.toContain(':');
         expect(p.states).toEqual(await olorin.levelStates(FULL.name));
     });
 
@@ -83,12 +91,12 @@ test.describe('The preview panel', () => {
         expect(p.blockers.length).toBeGreaterThan(0);
     });
 
-    test('goes blank once nothing is under the pointer', async ({ page }) => {
+    test('goes back to the world once no level is under the pointer', async ({ page }) => {
         const olorin = await open(page);
         await olorin.previewLevel(FULL.name);
         const header = await box(page, '#worlds .world:not([style*="none"]) .world-header');
         await page.mouse.move(header.x + 5, header.y + header.height / 2);
-        await expect.poll(async () => (await panel(page)).blank).toBe(true);
+        await expect.poll(async () => (await panel(page)).showing).toBe('world');
     });
 
     test('keeps showing a level while the pointer crosses the gap to the next', async ({ page }) => {
@@ -97,16 +105,16 @@ test.describe('The preview panel', () => {
         const a = await box(page, `#worlds .level[data-name="${FIRST_OF_PAIR.name}"]`);
         const b = await box(page, `#worlds .level[data-name="${NEXT.name}"]`);
         const y = a.y + a.height / 2;
-        // Step across the gap between them a pixel at a time, never leaving the panel blank.
+        // Step across the gap between them a pixel at a time, never leaving the level for the world.
         for (let x = a.x + a.width - 1; x <= b.x + 1; x++) {
             await page.mouse.move(x, y);
-            expect((await panel(page)).blank, `blank at x = ${x}`).toBe(false);
+            expect((await panel(page)).showing, `at x = ${x}`).toBe('level');
         }
         expect((await panel(page)).title).toBe('Level ' + NEXT.name);
-        // ...and that's not just the moment's grace before it blanks: in the gap, it stays.
+        // ...and that's not just the moment's grace before it goes back: in the gap, it stays.
         await page.mouse.move((a.x + a.width + b.x) / 2, y);
         await page.waitForTimeout(400);
-        expect((await panel(page)).blank).toBe(false);
+        expect((await panel(page)).showing).toBe('level');
     });
 
     test('leaves clicking to open the level', async ({ page }) => {
@@ -116,19 +124,29 @@ test.describe('The preview panel', () => {
         await page.click(`#worlds .level[data-name="${first.name}"] .level-number`);
         await page.waitForFunction((n) => document.getElementById('currentLevel').innerText.includes(n), first.name);
         await olorin.dismissHints();
-        // And the chooser, reopened, starts blank again.
+        // And the chooser, reopened, starts on the world again.
         await olorin.openChooser();
-        expect((await panel(page)).blank).toBe(true);
+        expect((await panel(page)).showing).toBe('world');
     });
 
-    test("shows how a world stands, for its box on the map", async ({ page }) => {
+    test('shows how the world whose levels are showing stands, and what it waits on', async ({ page }) => {
         await open(page);
-        await page.hover(`#worldMap .world-node[data-world="${LATER.number}"]`);
-        await expect.poll(async () => (await panel(page)).title).toBe(LATER.name);
+        await page.click(`#worldMap .world-node[data-world="${LATER.number}"]`);
         const p = await panel(page);
+        expect(p.showing).toBe('world');
+        expect(p.title).toBe(LATER.name);
         LATER.previous.forEach((n) => expect(p.follows).toContain(worlds().find((w) => w.number === n).name));
         expect(p.states[0]).toBe('locked');
         expect(p.blockers.length).toBeGreaterThan(0);
+    });
+
+    test("doesn't show another world for the pointer's being over its box", async ({ page }) => {
+        await open(page);
+        await page.click(`#worldMap .world-node[data-world="${LATER.number}"]`);
+        const other = worlds().find((w) => w.number !== LATER.number);
+        await page.hover(`#worldMap .world-node[data-world="${other.number}"]`);
+        await page.waitForTimeout(300);
+        expect((await panel(page)).title).toBe(LATER.name);
     });
 
     test("shows a saved custom level's statement", async ({ page }) => {
@@ -142,6 +160,18 @@ test.describe('The preview panel', () => {
         const p = await panel(page);
         expect(p.hypotheses).toEqual(['P∧Q']);
         expect(p.conclusion).toBe('Q∧P');
+        // ...and, off it, goes back to the New button.
+        await page.mouse.move(0, 0);
+        await expect.poll(async () => (await panel(page)).showing).toBe('new');
+    });
+
+    test('has a New button in the Custom world, which makes a custom level', async ({ page }) => {
+        const olorin = await open(page);
+        expect(await page.isVisible('#customLevel')).toBe(false);
+        await page.click('#worldMap .world-node[data-world="custom"]');
+        expect((await panel(page)).showing).toBe('new');
+        await page.click('#customLevel');
+        expect(await olorin.isVisible('#levelSelectBG')).toBe(true);
     });
 
     test('updates when what it shows changes', async ({ page }) => {
@@ -199,19 +229,19 @@ test.describe('On a touchscreen', () => {
         const b = await middle(page, `#worlds .level[data-name="${NEXT.name}"]`);
         await f.down(a);
         await page.waitForTimeout(100);
-        expect((await panel(page)).blank).toBe(true); // not held long enough yet
+        expect((await panel(page)).showing).toBe('world'); // not held long enough yet
         await expect.poll(async () => (await panel(page)).title).toBe('Level ' + FIRST_OF_PAIR.name);
         await f.move({ x: (a.x + b.x) / 2, y: a.y });
         await f.move(b);
         await expect.poll(async () => (await panel(page)).title).toBe('Level ' + NEXT.name);
         await f.up();
-        await expect.poll(async () => (await panel(page)).blank).toBe(true);
+        await expect.poll(async () => (await panel(page)).showing).toBe('world');
         await page.waitForTimeout(300);
         expect(await olorin.isVisible('#levelChooseBG')).toBe(true);
         expect(await olorin.currentLevelName()).toBe('');
     });
 
-    test('a tap still opens the level, with nothing shown', async ({ page }) => {
+    test('a tap still opens the level', async ({ page }) => {
         // Outside test mode: there, a level's difficulty marks are buttons of their own (see
         // testmode.spec.js), and the browser takes a tap near one for a tap on it.
         await page.addInitScript(() => localStorage.setItem('visited', 'true'));
@@ -221,7 +251,6 @@ test.describe('On a touchscreen', () => {
         await page.tap(worldNodeOf(first.name));
         await page.tap(`#worlds .level[data-name="${first.name}"] .level-number`);
         await page.waitForFunction((n) => document.getElementById('currentLevel').innerText.includes(n), first.name);
-        expect((await panel(page)).blank).toBe(true);
     });
 
     test('a drag that starts on a level scrolls, rather than showing it', async ({ page }) => {
@@ -233,7 +262,7 @@ test.describe('On a touchscreen', () => {
         await f.down(a);
         await f.move({ x: a.x, y: a.y - 40 });
         await page.waitForTimeout(700);
-        expect((await panel(page)).blank).toBe(true);
+        expect((await panel(page)).showing).toBe('world');
         await f.up();
     });
 });

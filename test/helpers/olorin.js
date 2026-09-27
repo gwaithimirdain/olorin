@@ -177,6 +177,14 @@ class Olorin {
         await this.page.click(worldNodeOf(name));
     }
 
+    // Open the dialog for making a custom level, as a player does: its New button is in the chooser
+    // with the Custom world showing.
+    async openCustomDialog() {
+        await this.openChooser();
+        await this.page.click('#worldMap .world-node[data-world="custom"]');
+        await this.page.click('#customLevel');
+    }
+
     // The worlds the chooser is showing the levels of (just one), by the name in each one's header.
     shownWorlds() {
         return this.page.evaluate(() => Array.from(document.querySelectorAll('#worlds .world'))
@@ -188,8 +196,7 @@ class Olorin {
     // `name`, the dialog's Name field saves it to the Custom world on submit.
     async buildCustom(opts = {}) {
         const { name = '', parameters = 'P : Type', variables = '', hypotheses = 'P', conclusion = 'P' } = opts;
-        await this.openChooser();
-        await this.page.click('#customLevel');
+        await this.openCustomDialog();
         await this.page.fill('#customName', name);
         await this.page.fill('#parameters', parameters);
         await this.page.fill('#variables', variables);

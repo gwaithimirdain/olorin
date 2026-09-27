@@ -501,7 +501,7 @@ body.arranging { cursor: progress; }
 }
 
 #worldMap {
-    max-height: 30vh;
+    max-height: 32vh;
     overflow: auto;
 }
 
@@ -609,6 +609,8 @@ body.arranging { cursor: progress; }
 
 .world-node-name {
     max-width: 100%;
+    /* Room for the descenders, which the overflow cut-off (for the ellipsis) would otherwise clip. */
+    line-height: 1.3;
     font-size: 13px;
     font-weight: bold;
     white-space: nowrap;
@@ -682,6 +684,9 @@ body.arranging { cursor: progress; }
     order: -1;
     border-left: none;
     border-bottom: 2px solid #cccccc;
+}
+
+#levelChooseModal.preview-over #previewContent {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto 1fr;
@@ -704,6 +709,11 @@ body.arranging { cursor: progress; }
 .preview-title {
     font-size: 18px;
     font-weight: bold;
+}
+
+#customNew p {
+    color: #555555;
+    margin: 6px 0 12px;
 }
 
 .preview-where, .preview-follows {
@@ -1025,9 +1035,9 @@ body.arranging { cursor: progress; }
    from one to the next: the levels (and the preview panel) have whatever room is left under the
    map, and scroll in it if they need more. */
 #levelChooseModal {
-    box-sizing: border-box;
-    height: 90vh;
-    max-height: 90%;
+    /* 90% of the window, the 20px of padding all round included (its width, set by sizeChooser, is
+       that of what's inside it, which has to fit exactly). */
+    height: calc(90vh - 40px);
     position: relative;
     display: flex;
     flex-direction: column;

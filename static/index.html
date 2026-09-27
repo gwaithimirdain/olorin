@@ -196,8 +196,17 @@
         </div>
         <div id="chooserBody">
           <div id="worlds"></div>
-          <!-- What's under the pointer, without opening it: filled in by renderPreview. -->
-          <div id="levelPreview"></div>
+          <!-- The level under the pointer, without opening it, or else the world showing: filled in
+               by renderPreview. -->
+          <div id="levelPreview">
+            <div id="previewContent"></div>
+            <!-- In the Custom world, a way to make a new one. -->
+            <div id="customNew">
+              <div class="preview-title">Custom levels</div>
+              <p>Levels of your own: give the statement to prove, and then prove it. Name one to save it here.</p>
+              <button id="customLevel" style="font-size: 16px">New</button>
+            </div>
+          </div>
         </div>
         <div id="chooseLevelButtons">
           <!-- Difficulty is now chosen per level (a level opens at its highest unlocked difficulty),
@@ -210,7 +219,6 @@
           </div>
           <div style="text-align: center; margin-top: 20px">
             <button id="cancelChooseLevel" style="font-size: 16px; display: none">Cancel</button>
-            <button id="customLevel" style="font-size: 16px">Custom</button>
             <button id="clearHistory" style="font-size: 16px">Clear History</button>
             <button id="about" style="font-size: 16px">About</button>
             <br/>

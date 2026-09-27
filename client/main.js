@@ -1845,6 +1845,8 @@ function setWorld(newWorld) {
     });
     document.getElementById("worlds").scrollTop = 0;
     scrollMapToWorld(newWorld);
+    // With no level under the pointer, the preview panel shows the world.
+    renderPreview();
 }
 
 // Scroll the map, if need be, to bring a world's box into view.  Only the map itself is scrolled:
@@ -2002,17 +2004,18 @@ function markWorldNode(entry) {
 }
 
 // ===== The preview panel =====
-// Beside the levels in the chooser is a panel showing what's under the pointer, without opening it:
-// a level's statement (its parameters, variables and hypotheses over a line, and its conclusion
-// under it) and how it stands at each difficulty, with what remains to be done to unlock any that
-// are locked; a saved custom level's statement likewise; or, for a world's box on the map, how that
-// world stands.  Clicking still opens the level.  With nothing under the pointer the panel is blank.
+// Beside the levels in the chooser is a panel showing the level under the pointer, without opening
+// it: its statement (its variables and hypotheses over a line, and its conclusion under it -- not
+// its parameters, which the level itself doesn't show either) and how it stands at each difficulty,
+// with what remains to be done to unlock any that are locked; or a saved custom level's statement
+// likewise.  Clicking still opens the level.  With no level under the pointer, the panel shows how
+// the world whose levels are showing stands; or, for the Custom world, a button to make a new one.
 //
 // So that it doesn't flicker as the pointer goes from one level to the next, a level counts as under
 // the pointer out to halfway across the gap to the next one, and the panel waits a moment before
-// going blank.  On a touchscreen, which has no hovering, pressing and holding does the same:
-// the panel shows what's under the finger, sliding it along shows the others, and lifting it clears
-// the panel without opening anything, while a tap still opens the level.
+// going back to the world.  On a touchscreen, which has no hovering, pressing and holding does the
+// same: the panel shows what's under the finger, sliding it along shows the others, and lifting it
+// goes back to the world without opening anything, while a tap still opens the level.
 //
 // Where there's room the panel stands beside the levels; where there isn't (a tablet, say) it sits
 // over them, below the map, where a finger holding a level doesn't cover it.
@@ -2021,7 +2024,7 @@ const PREVIEW_WIDTH = 340;
 const PREVIEW_GAP = 16;
 // How far past its edges a level counts as under the pointer: half the gap between two levels.
 const HOVER_MARGIN = 6;
-// How long the panel waits, once nothing is under the pointer, before going blank.
+// How long the panel waits, once no level is under the pointer, before going back to the world.
 const PREVIEW_CLEAR_DELAY = 150;
 // How long a press on a touchscreen has to be held to show the panel, and how far the finger may
 // wander before then without its being taken for a scroll instead.
@@ -2044,18 +2047,18 @@ function sizeChooser() {
 }
 window.addEventListener("resize", sizeChooser);
 
-// What the panel is showing -- { level }, { custom } (a saved custom level) or { world } (an entry of
-// worldPanes) -- or null when it's blank; and the timer that will blank it.
+// The level the panel is showing -- { level }, or { custom } for a saved custom level -- or null
+// when it's showing the world; and the timer that will take it back to the world.
 var previewTarget = null;
 var previewClearTimer = null;
 
 // Whether two things the panel might show are the same thing.
 function samePreview(a, b) {
     if(!a || !b) { return a === b; }
-    return a.level === b.level && a.custom === b.custom && a.world === b.world;
+    return a.level === b.level && a.custom === b.custom;
 }
 
-// Show something in the panel (see previewTarget), or blank it with null, at once.
+// Show a level in the panel (see previewTarget), or, with null, the world, at once.
 function showPreview(target) {
     if(previewClearTimer) { clearTimeout(previewClearTimer); previewClearTimer = null; }
     if(samePreview(target, previewTarget)) { return; }
@@ -2063,8 +2066,8 @@ function showPreview(target) {
     renderPreview();
 }
 
-// Show something under the pointer in the panel, or, with null, blank it after a moment -- unless
-// something else comes under the pointer first.
+// Show the level under the pointer in the panel, or, with null, go back to the world after a moment
+// -- unless another level comes under the pointer first.
 function hoverPreview(target) {
     if(target) { showPreview(target); return; }
     if(previewTarget && !previewClearTimer) {
@@ -2079,31 +2082,26 @@ function hoverPreview(target) {
 // Draw the panel for what it's showing -- again, whenever that may have changed (a level being
 // completed, say).
 function renderPreview() {
-    const panel = document.getElementById("levelPreview");
     const t = previewTarget;
-    panel.innerHTML = !t ? '' : t.level ? levelPreviewHtml(t.level) : t.custom ? customPreviewHtml(t.custom)
-        : worldPreviewHtml(t.world);
+    const entry = worldPanes[currentWorld];
+    const custom = !t && !!entry && !!entry.custom;
+    document.getElementById("previewContent").innerHTML = t
+        ? (t.level ? levelPreviewHtml(t.level) : customPreviewHtml(t.custom))
+        : (entry && !custom ? worldPreviewHtml(entry) : '');
+    document.getElementById("customNew").style.display = custom ? '' : 'none';
 }
 
-// The thing at a point of the window (client coordinates) that the panel can show, or null: a world's
-// box on the map, or one of the levels of the world showing.  Only what can be seen counts, so a
+// The level at a point of the window (client coordinates) that the panel can show, or null: one of
+// the levels of the world showing (or a saved custom level).  Only what can be seen counts, so a
 // level scrolled out of view isn't found where it would be.  A level counts out to HOVER_MARGIN past
 // its edges; where two do, the one whose middle is nearer wins.
 function previewTargetAt(x, y) {
     const within = function (r, m) { return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m; };
-    var candidates;
-    if(within(document.getElementById("worldMap").getBoundingClientRect(), 0)) {
-        candidates = worldPanes.filter(function (e) { return !e.custom; })
-            .map(function (e) { return { el: e.node, target: { world: e } }; });
-    } else if(within(document.getElementById("worlds").getBoundingClientRect(), 0)) {
-        const entry = worldPanes[currentWorld];
-        if(!entry) { return null; }
-        candidates = entry.custom
-            ? customRowEls.map(function (c) { return { el: c.el, target: { custom: c.custom } }; })
-            : entry.levels.map(function (l) { return { el: l.button, target: { level: l } }; });
-    } else {
-        return null;
-    }
+    const entry = worldPanes[currentWorld];
+    if(!entry || !within(document.getElementById("worlds").getBoundingClientRect(), 0)) { return null; }
+    const candidates = entry.custom
+          ? customRowEls.map(function (c) { return { el: c.el, target: { custom: c.custom } }; })
+          : entry.levels.map(function (l) { return { el: l.button, target: { level: l } }; });
     var best = null, bestDistance = Infinity;
     candidates.forEach(function (c) {
         const r = c.el.getBoundingClientRect();
@@ -2120,22 +2118,20 @@ function formulaHtml(text) {
     return escapeHtml(text).replace(/([∧∨⇒⇔→,])/g, '$1<wbr>');
 }
 
-// A level's statement, as the panel shows it: its parameters and variables (those of one type
-// together, as "P, Q : Type"), its hypotheses, a line, and its conclusion.  `def` is a built-in
-// level or a saved custom one.
+// A level's statement, as the panel shows it: its variables (those of one type together, as
+// "x, y ∈ ℤ"), its hypotheses, a line, and its conclusion.  Not its parameters, which aren't shown
+// in the level itself either.  `def` is a built-in level or a saved custom one.
 function statementHtml(def) {
     const decls = [];
-    const declare = function (name, sep, ty) {
+    def.variables.forEach(function (v) {
         const last = decls[decls.length - 1];
-        if(last && last.sep === sep && last.ty === ty) { last.names.push(name); }
-        else { decls.push({ names: [name], sep: sep, ty: ty }); }
-    };
-    def.parameters.forEach(function (p) { declare(p.name, ':', p.ty); });
-    def.variables.forEach(function (v) { declare(v.name, '∈', v.ty); });
+        if(last && last.ty === v.ty) { last.names.push(v.name); }
+        else { decls.push({ names: [v.name], ty: v.ty }); }
+    });
     var html = '<div class="preview-statement">';
     if(decls.length > 0) {
         html += '<div class="preview-context">' + decls.map(function (d) {
-            return '<span class="preview-decl">' + formulaHtml(d.names.join(', ') + ' ' + d.sep + ' ' + d.ty) + '</span>';
+            return '<span class="preview-decl">' + formulaHtml(d.names.join(', ') + ' ∈ ' + d.ty) + '</span>';
         }).join(' ') + '</div>';
     }
     def.hypotheses.forEach(function (h) { html += '<div class="preview-hypothesis">' + formulaHtml(h.ty) + '</div>'; });
@@ -2198,7 +2194,7 @@ levelChooseModal.addEventListener("mousemove", function (e) {
     if(!touchedRecently()) { hoverPreview(previewTargetAt(e.clientX, e.clientY)); }
 });
 levelChooseModal.addEventListener("mouseleave", function () { hoverPreview(null); });
-// Focusing a level or a world's box from the keyboard shows it too.
+// Focusing a level from the keyboard shows it too.
 levelChooseModal.addEventListener("focusin", function (e) {
     if(touchedRecently()) { return; }
     const r = e.target.getBoundingClientRect();
@@ -3797,7 +3793,7 @@ function refreshCustomWorld() {
     if(list.length === 0) {
         const empty = document.createElement("div");
         empty.className = "custom-empty";
-        empty.innerText = "No saved custom levels yet. Build one with Custom or Edit, then Save it.";
+        empty.innerText = "No saved custom levels yet. Build one with New or Edit, then Save it.";
         customRowsContainer.appendChild(empty);
     } else {
         list.forEach(function (cl) {

@@ -230,8 +230,7 @@ test.describe('All three', () => {
     test('have a way to be typed: the ordinary bar key becomes ∣', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.openChooser();
-        await page.click('#customLevel');
+        await olorin.openCustomDialog();
         const typed = async (text) => {
             await page.fill('#conclusion', '');
             await page.locator('#conclusion').pressSequentially(text);

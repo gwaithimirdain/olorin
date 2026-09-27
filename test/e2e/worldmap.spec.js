@@ -86,6 +86,14 @@ test.describe('The map of worlds', () => {
         expect(shown.sort()).toEqual(worlds().map((w) => String(w.number)).concat(['custom']).sort());
     });
 
+    test('has room in each box for what is written in it', async ({ page }) => {
+        await open(page);
+        const cramped = await page.evaluate(() => Array.from(document.querySelectorAll(
+            '#worldMap .world-node, #worldMap .world-node-name')).filter((e) => e.scrollHeight > e.clientHeight)
+            .map((e) => e.innerText));
+        expect(cramped).toEqual([]);
+    });
+
     test('draws exactly the worlds each world follows', async ({ page }) => {
         await open(page);
         expect((await drawn(page)).follows).toEqual(declared(worlds()));
@@ -149,6 +157,22 @@ test.describe("Clicking a world's box", () => {
         expect(await size()).toEqual(small);
         await page.click('#worldMap .world-node[data-world="custom"]');
         expect(await size()).toEqual(small);
+    });
+
+    test('has room across for the longest stage', async ({ page }) => {
+        const olorin = await open(page);
+        const longest = (w) => Math.max(...[...new Set(w.levels.map((l) => l.stage))]
+            .map((s) => w.levels.filter((l) => l.stage === s).length));
+        const widest = worlds().slice().sort((a, b) => longest(b) - longest(a))[0];
+        await olorin.showWorldOf(widest.levels[0].name);
+        const cut = await page.evaluate(() => {
+            const pane = document.getElementById('worlds');
+            const right = pane.getBoundingClientRect().left + pane.clientWidth;
+            return Array.from(pane.querySelectorAll('.level[data-name]'))
+                .filter((b) => b.offsetParent && b.getBoundingClientRect().right > right)
+                .map((b) => b.dataset.name);
+        });
+        expect(cut).toEqual([]);
     });
 
     test('Custom shows the saved custom levels', async ({ page }) => {

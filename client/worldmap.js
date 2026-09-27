@@ -18,13 +18,13 @@ import dagre from '@dagrejs/dagre';
 
 // The size of a world's box on the map, and of a junction's dot.
 export const NODE_WIDTH = 104;
-export const NODE_HEIGHT = 40;
+export const NODE_HEIGHT = 46;
 export const JUNCTION_RADIUS = 4;
 
 // Space around the whole map, between worlds in the same layer, between layers, and between the
 // separately laid-out groups (see layoutWorldMap).
 const MARGIN = 12;
-const NODE_SEP = 10;
+const NODE_SEP = 8;
 const RANK_SEP = 24;
 const GROUP_GAP = 64;
 

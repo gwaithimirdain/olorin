@@ -504,8 +504,7 @@ test.describe('Shortcut sequences', () => {
     test.beforeEach(async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.openChooser();
-        await page.click('#customLevel');
+        await olorin.openCustomDialog();
     });
 
     test('leave the cursor after what they inserted, not at the end of the box', async ({ page }) => {
@@ -560,8 +559,7 @@ test.describe('The symbol palette', () => {
     test.beforeEach(async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
-        await olorin.openChooser();
-        await page.click('#customLevel');
+        await olorin.openCustomDialog();
     });
 
     // What the row is for: it wrapped onto a second line before the dropdowns took the bulk of it.
