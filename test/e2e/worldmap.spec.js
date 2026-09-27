@@ -132,6 +132,27 @@ test.describe('The map of worlds', () => {
         gaps.forEach((g) => expect(g.through || g.gap <= 9, `${g.between}: ${g.gap}px`).toBe(true));
     });
 
+    test("doesn't draw a line through any box but the two it joins", async ({ page }) => {
+        await open(page);
+        const hits = await page.evaluate(() => {
+            const boxes = Array.from(document.querySelectorAll('#worldMap .world-node')).map((n) => ({
+                world: n.dataset.world, left: n.offsetLeft, right: n.offsetLeft + n.offsetWidth,
+                top: n.offsetTop, bottom: n.offsetTop + n.offsetHeight }));
+            const found = [];
+            document.querySelectorAll('#worldMapEdges .map-edge').forEach(function (p) {
+                const length = p.getTotalLength();
+                for (let s = 0; s <= length; s += 1) {
+                    const pt = p.getPointAtLength(s);
+                    const hit = boxes.find((b) => b.world !== p.dataset.source && b.world !== p.dataset.target
+                        && pt.x > b.left - 2 && pt.x < b.right + 2 && pt.y > b.top - 2 && pt.y < b.bottom + 2);
+                    if (hit) { found.push(`${p.dataset.source}->${p.dataset.target} through ${hit.world}`); break; }
+                }
+            });
+            return found;
+        });
+        expect(hits).toEqual([]);
+    });
+
     test("greys the worlds a new player can't open yet", async ({ page }) => {
         await open(page);
         const bs = await boxes(page);

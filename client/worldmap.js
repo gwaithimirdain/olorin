@@ -32,10 +32,6 @@ const GROUP_GAP = 64;
 // tall map it isn't somewhere below what the chooser shows of it.
 const MAX_CENTRING = 100;
 
-// How far along its straight stretches a line may start bending towards its next height: the
-// curves are drawn as long as that allows, since there's only a short hop between columns.
-const MAX_BEND = 40;
-
 // How many times placeHeights goes back and forth over the columns: a few, to compare orders by, and
 // more for the heights the map is drawn with.
 const SEARCH_SWEEPS = 8;
@@ -77,7 +73,7 @@ export function layoutWorldMap(groups) {
         l.edges.forEach(function (e) {
             const shift = (end) => end.junction === undefined ? end : { junction: end.junction + base };
             edges.push({ source: shift(e.source), target: shift(e.target),
-                         path: pathThrough(e.points.map((p) => ({ x: p.x + dx, y: p.y + dy }))) });
+                         path: smoothPath(e.points.map((p) => ({ x: p.x + dx, y: p.y + dy }))) });
         });
         left += l.width;
     });
@@ -205,19 +201,28 @@ function layoutGroup(group) {
     });
     const edges = wanted.map(function (w) {
         const points = [];
+        const gaps = [];
         w.chain.forEach(function (it, i) {
             const x = colX(it.rank);
             if(it.kind === 'world') {
                 // Out of the right side of the box it starts at, into the left of the one it ends at.
                 points.push({ x: x + (i === 0 ? 1 : -1) * NODE_WIDTH / 2, y: y(it) });
-            } else if(it.kind === 'waypoint' && it.rank % 2 === 0) {
-                // Level across a column of worlds, so as to keep between their boxes.
-                points.push({ x: x - NODE_WIDTH / 2, y: y(it) }, { x: x + NODE_WIDTH / 2, y: y(it) });
-            } else {
+            } else if(it.kind === 'junction') {
                 points.push({ x: x, y: y(it) });
+            } else if(it.rank % 2 === 0) {
+                // Through the middle of the way left for it between the boxes of a column of worlds
+                // it crosses -- and not so near either box at the column's edges as to clip a corner
+                // (see routeLine).  (Its waypoints between the columns, which only kept a place for
+                // it there while the map was being laid out, it needn't go through.)
+                points.push({ x: x, y: y(it) });
+                const col = columns[it.rank];
+                const above = col[it.order - 1], below = col[it.order + 1];
+                const clear = (n) => (n.kind === 'waypoint' ? 0 : n.size / 2 + LINE_SEP / 2);
+                gaps.push({ x: x, top: above ? y(above) + clear(above) : -Infinity,
+                            bottom: below ? y(below) - clear(below) : Infinity });
             }
         });
-        return { source: w.from.end, target: w.to.end, points: points };
+        return { source: w.from.end, target: w.to.end, points: routeLine(points, gaps) };
     });
     const lastWorldRank = lastRank + (lastRank % 2);
     return {
@@ -387,35 +392,64 @@ function placeHeights(columns, sweeps) {
     }
 }
 
-// An SVG path through a line's points, running level between them and bending smoothly from one
-// height to the next.  A line goes through a point in every column it crosses, many of them at the
-// height of the one before, and changes height in the short hop between two columns; so the path is
-// built from those level stretches, each change of height being drawn as a curve that
-// takes up to MAX_BEND of the stretch on either side of it to bend in.
-function pathThrough(points) {
-    // The level stretches, left to right.
-    const runs = [];
-    points.forEach(function (p) {
-        const last = runs[runs.length - 1];
-        if(last && Math.abs(last.y - p.y) < 0.5) { last.x1 = p.x; }
-        else { runs.push({ x0: p.x, x1: p.x, y: p.y }); }
+// The points a line is drawn through (see smoothPath), from `points`: those it has to go through, and,
+// where the curve through just those would come too near a box at an edge of a column of worlds
+// that it crosses, a point there too, as near as it may.  `gaps` is the way left for it through
+// each such column, { x, top, bottom }: the middle of the column across, and how high and low it may
+// go there.
+function routeLine(points, gaps) {
+    var pts = points;
+    for(var round = 0; round < 3; round++) {
+        const extra = [];
+        gaps.forEach(function (g) {
+            [g.x - NODE_WIDTH / 2, g.x + NODE_WIDTH / 2].forEach(function (x) {
+                if(pts.some((p) => Math.abs(p.x - x) < 0.5)) { return; }
+                const y = curveAt(pts, x);
+                const kept = Math.min(g.bottom, Math.max(g.top, y));
+                if(Math.abs(kept - y) > 0.5) { extra.push({ x: x, y: kept }); }
+            });
+        });
+        if(extra.length === 0) { break; }
+        pts = pts.concat(extra).sort((a, b) => a.x - b.x);
+    }
+    return pts;
+}
+
+// The slopes of the curve smoothPath draws through `points` at each of them: level at the ends, where
+// it leaves a box and comes into one, and otherwise the slope from the point before to the point after
+// (a "Catmull-Rom" curve), so that it goes on its way without levelling off and waving about.
+function slopes(points) {
+    const n = points.length;
+    return points.map(function (p, i) {
+        if(i === 0 || i === n - 1) { return 0; }
+        const a = points[i - 1], b = points[i + 1];
+        return b.x === a.x ? 0 : (b.y - a.y) / (b.x - a.x);
     });
-    // How much of each stretch the bends at its ends may take: half of it at most, so the bends at
-    // its two ends don't overlap -- except the first stretch and the last, which have a bend at only
-    // one end, and can give it all of their length.
-    const bend = runs.map(function (r, i) {
-        const ends = (i > 0 ? 1 : 0) + (i < runs.length - 1 ? 1 : 0);
-        return Math.min(MAX_BEND, Math.abs(r.x1 - r.x0) / Math.max(1, ends));
-    });
+}
+
+// Where the curve through `points` is at x.  Each piece of it, between two points, is a cubic whose
+// control points are evenly spaced across, so its x goes evenly with the parameter along it.
+function curveAt(points, x) {
+    const slope = slopes(points);
+    for(var i = 0; i + 1 < points.length; i++) {
+        const a = points[i], b = points[i + 1];
+        if(x < a.x || x > b.x || b.x === a.x) { continue; }
+        const t = (x - a.x) / (b.x - a.x), u = 1 - t, third = (b.x - a.x) / 3;
+        return u * u * u * a.y + 3 * u * u * t * (a.y + slope[i] * third) +
+            3 * u * t * t * (b.y - slope[i + 1] * third) + t * t * t * b.y;
+    }
+    return points[x < points[0].x ? 0 : points.length - 1].y;
+}
+
+// An SVG path through a line's points, left to right: one smooth curve (see slopes).
+function smoothPath(points) {
+    const slope = slopes(points);
     const fmt = (x, y) => Math.round(x * 10) / 10 + ',' + Math.round(y * 10) / 10;
-    var d = 'M' + fmt(runs[0].x0, runs[0].y);
-    runs.forEach(function (r, i) {
-        const next = runs[i + 1];
-        if(!next) { d += ' L' + fmt(r.x1, r.y); return; }
-        const from = r.x1 - bend[i];
-        const to = next.x0 + bend[i + 1];
-        const mid = (from + to) / 2;
-        d += ' L' + fmt(from, r.y) + ' C' + fmt(mid, r.y) + ' ' + fmt(mid, next.y) + ' ' + fmt(to, next.y);
-    });
-    return d;
+    var path = 'M' + fmt(points[0].x, points[0].y);
+    for(var i = 0; i + 1 < points.length; i++) {
+        const a = points[i], b = points[i + 1], third = (b.x - a.x) / 3;
+        path += ' C' + fmt(a.x + third, a.y + slope[i] * third) + ' ' + fmt(b.x - third, b.y - slope[i + 1] * third) +
+            ' ' + fmt(b.x, b.y);
+    }
+    return path;
 }
