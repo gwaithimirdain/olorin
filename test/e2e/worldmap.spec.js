@@ -135,6 +135,22 @@ test.describe("Clicking a world's box", () => {
         expect(await olorin.shownWorlds()).toEqual([last.name]);
     });
 
+    test('leaves the chooser the size it was, however many levels the world has', async ({ page }) => {
+        const olorin = await open(page);
+        const stages = (w) => new Set(w.levels.map((l) => l.stage)).size;
+        const byStages = worlds().slice().sort((a, b) => stages(a) - stages(b));
+        const size = async () => {
+            const b = await page.locator('#levelChooseModal').boundingBox();
+            return { width: b.width, height: b.height };
+        };
+        await olorin.showWorldOf(byStages[0].levels[0].name);
+        const small = await size();
+        await olorin.showWorldOf(byStages[byStages.length - 1].levels[0].name);
+        expect(await size()).toEqual(small);
+        await page.click('#worldMap .world-node[data-world="custom"]');
+        expect(await size()).toEqual(small);
+    });
+
     test('Custom shows the saved custom levels', async ({ page }) => {
         const olorin = await open(page);
         await page.click('#worldMap .world-node[data-world="custom"]');

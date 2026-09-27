@@ -1021,7 +1021,12 @@ body.arranging { cursor: progress; }
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
+/* The chooser keeps one size, whichever world's levels it's showing, rather than jumping about
+   from one to the next: the levels (and the preview panel) have whatever room is left under the
+   map, and scroll in it if they need more. */
 #levelChooseModal {
+    box-sizing: border-box;
+    height: 90vh;
     max-height: 90%;
     position: relative;
     display: flex;
