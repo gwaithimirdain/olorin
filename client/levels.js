@@ -581,7 +581,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     hypotheses: [ ],
-                    conclusion: { ty: "(x-y=0)∨(y≠x)" },
+                    conclusion: { ty: "(x−y=0)∨(y≠x)" },
                     hint: "deceqHint",
                 },
                 {
@@ -2845,7 +2845,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ (n²-1)/(n+2)) ↗∞" },
+                    conclusion: { ty: "lim (n ↦ (n²−1)/(n+2)) ↗∞" },
                 },
                 {
                     parameters: [ { name: "s", ty: "ℕ → ℝ" } ],
