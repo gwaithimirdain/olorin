@@ -63,8 +63,8 @@ function proofRules(state) {
 }
 
 // The rules a proof uses that `palette` doesn't offer -- empty when the proof is playable on the
-// level.  `palette` is the level's rules (its stage's plus its own `extrarules`), or the rules the
-// app's palette is actually showing.
+// level.  `palette` is the level's rules (its stage's plus its own `extrarules`, minus its
+// `withoutrules`), or the rules the app's palette is actually showing.
 const unavailableRules = (state, palette) => proofRules(state).filter((r) => !palette.includes(r));
 
 // The statement an exported proof was made on, or null if it doesn't carry one (proofs exported

@@ -37,9 +37,12 @@ function levelRecord(saveable, legacySaveables, stage, level, x, y, z) {
         world: x + 1,
         stage: y + 1,
         index: z + 1,
-        // The palette this level offers: its stage's rules plus any of its own.
-        rules: stage.rules.concat(level.extrarules || []),
+        // The palette this level offers: its stage's rules plus any of its own, minus any it
+        // withholds.
+        rules: stage.rules.concat(level.extrarules || [])
+            .filter((r) => !(level.withoutrules || []).includes(r)),
         extrarules: level.extrarules || [],
+        withoutrules: level.withoutrules || [],
         saveable: saveable(level),
         // DEPRECATED (see client/levels.js): the statements this level was stored under
         // before it was last restated, for the levels that moved; empty otherwise.

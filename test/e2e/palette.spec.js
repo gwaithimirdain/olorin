@@ -1,6 +1,6 @@
 // Which rules a level's palette offers: its stage's `rules`, plus any the level itself lists in
-// `extrarules` -- for a level that needs a box the rest of its stage doesn't.  And that every
-// block in it says what it does, on hovering.
+// `extrarules` -- for a level that needs a box the rest of its stage doesn't -- less any it lists in
+// `withoutrules`.  And that every block in it says what it does, on hovering.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -62,6 +62,49 @@ test.describe("A level's extra rules", () => {
 
         const id = await olorin.dragRule('andI', 400, 300);
         expect((await olorin.nodes()).find((n) => n.id === id).rule).toBe('andI');
+    });
+});
+
+// A level whose stage offers at least two rules, to withhold one and check the other stays.
+const NARROWED = find((l) => l.rules.length > 1 && inStage(l.world, l.stage).length > 1,
+    'in a stage that offers at least two rules, and holds more than one level');
+const NARROWED_SIBLING = inStage(NARROWED.world, NARROWED.stage).find((l) => l.name !== NARROWED.name);
+
+test.describe("A level's withheld rules", () => {
+    let olorin;
+
+    test.beforeEach(async ({ page }) => {
+        olorin = new Olorin(page);
+        await olorin.open();
+    });
+
+    test('are taken out of the palette its stage offers', async () => {
+        await olorin.selectLevel(NARROWED.name);
+        const stageRules = await olorin.paletteRules();
+        const withheld = NARROWED.rules[0];
+        expect(stageRules).toContain(withheld);
+
+        await olorin.setLevelOption(NARROWED.world, NARROWED.stage, NARROWED.index, 'withoutrules', [withheld]);
+        await olorin.selectLevel(NARROWED.name);
+        expect(await olorin.paletteRules()).toEqual(stageRules.filter((r) => r !== withheld));
+    });
+
+    test('win over the level\'s own extra rules', async () => {
+        await olorin.setLevelOption(NARROWED.world, NARROWED.stage, NARROWED.index, 'extrarules', EXTRA);
+        await olorin.setLevelOption(NARROWED.world, NARROWED.stage, NARROWED.index, 'withoutrules', [EXTRA[0]]);
+        await olorin.selectLevel(NARROWED.name);
+        const rules = await olorin.paletteRules();
+        expect(rules).not.toContain(EXTRA[0]);
+        expect(rules).toContain(EXTRA[1]);
+    });
+
+    test('are the declaring level\'s alone, not its stage\'s', async () => {
+        await olorin.selectLevel(NARROWED_SIBLING.name);
+        const before = await olorin.paletteRules();
+
+        await olorin.setLevelOption(NARROWED.world, NARROWED.stage, NARROWED.index, 'withoutrules', [NARROWED.rules[0]]);
+        await olorin.selectLevel(NARROWED_SIBLING.name);
+        expect(await olorin.paletteRules()).toEqual(before);
     });
 });
 

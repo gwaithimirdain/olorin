@@ -84,7 +84,7 @@ class Olorin {
         );
     }
 
-    // Set (null clears) one of a level's own options -- 'extrarules' -- by 1-based world, stage and
+    // Set (null clears) one of a level's own options -- 'extrarules' or 'withoutrules' -- by 1-based world, stage and
     // level number.  A level's palette is built when it is opened, so open it after setting this.
     setLevelOption(world, stage, level, option, value) {
         return this.page.evaluate(

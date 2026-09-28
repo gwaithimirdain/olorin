@@ -55,7 +55,7 @@ for (const l of stating) {
     if (missing.length) {
         die(`${file} uses ${missing.join(', ')}, which level ${l.name} doesn't offer.\n`
             + `Its palette is ${l.rules.join(', ') || '(empty)'} -- its stage's rules plus its own `
-            + 'extrarules (see client/levels.js).');
+            + 'extrarules, minus its withoutrules (see client/levels.js).');
     }
 }
 

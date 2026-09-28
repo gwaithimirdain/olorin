@@ -55,7 +55,13 @@
 //   extrarules: [ "id", ...]
 //                       Palette rules this level offers on top of the ones its stage lists, for a
 //                       level that needs a box the rest of its stage doesn't.  The stage's own
-//                       rules always remain available.
+//                       rules always remain available, unless the level also lists them in
+//                       `withoutrules`.
+//
+//   withoutrules: [ "id", ...]
+//                       The opposite: palette rules this level withholds, even though its stage
+//                       lists them, for a level that should be proved without a box the rest of
+//                       its stage offers.
 //
 //   maxrules: N         A budget: at most N blocks may be used, not counting the variable,
 //                       hypothesis and conclusion blocks the level starts with.  The running count

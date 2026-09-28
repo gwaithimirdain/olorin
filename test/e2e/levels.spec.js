@@ -11,7 +11,7 @@
 //
 // A proof is only a proof of the level if the player could have built it there, so each test also
 // checks the fixture against the palette the app actually offers on that level -- its stage's
-// `rules` plus the level's own `extrarules` (see client/levels.js).  Fixtures are filed by
+// `rules` plus the level's own `extrarules`, minus its `withoutrules` (see client/levels.js).  Fixtures are filed by
 // statement, so one can be shared by two levels stating the same thing in different stages, and a
 // level's palette can be narrowed long after its proof was captured; either way the proof stops
 // being reachable on the level and the test says so, instead of restoring blocks no player could

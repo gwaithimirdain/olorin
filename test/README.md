@@ -42,7 +42,7 @@ test/
 loads that level's fixture proof, restores it, and asserts the app marks it complete — so a
 correct proof for every covered level is guaranteed to keep working across rule/typechecker/restore
 changes. It also checks the proof against the palette the level actually offers (its stage's
-`rules` plus the level's own `extrarules`): restore doesn't consult the palette, so without this a
+`rules` plus the level's own `extrarules`, minus its `withoutrules`): restore doesn't consult the palette, so without this a
 fixture could "prove" a level with a block no player could place there — which is what would happen
 if a stage's rules were narrowed, or if two levels stating the same thing (they share one fixture)
 offered different rules. `add-fixture.js` refuses such a proof, and `--list` reports any already
