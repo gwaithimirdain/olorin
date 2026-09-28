@@ -197,18 +197,12 @@ test.describe('Arrange', () => {
         await olorin.redo();
         expect(await olorin.nodes()).toEqual(arranged);
     });
-    test('widens a bracket enough for the labels inside its uprights not to meet', async ({ page }) => {
+    test.describe('a bracket too narrow for the labels inside its uprights', () => {
         const BRACKETS = ['impI', 'allI', 'negI', 'cnegI', 'natInd', 'orE', 'iffI', 'natE'];
         const FIXED = fixedRules();
-        // The labels beside a bracket's ports show only on ports with nothing wired to them, so
-        // unwire one's assumptions and subgoals, and squeeze it as narrow as a bracket can be made
-        // by hand.  Whether its labels then meet depends on how long they are, so try brackets until
-        // one whose labels do.
-        const candidates = arrangeCases().flatMap((c) => c.state.nodes
-            .filter((n) => BRACKETS.includes(n.rule))
-            .map((n) => ({ c, id: n.id })));
+
         // The rectangles of the labels on a bracket's own ports, as { x, y, w, h }.
-        const labelsOn = (id) => page.evaluate((id) => {
+        const labelsOn = (page, id) => page.evaluate((id) => {
             const box = document.getElementById(id).getBoundingClientRect();
             return Array.from(document.querySelectorAll(
                 '#canvas .upperOutputLabel, #canvas .lowerOutputLabel, #canvas .middleOutputLabel, '
@@ -220,28 +214,71 @@ test.describe('Arrange', () => {
         }, id);
         const meeting = (rs) => rs.some((a, i) => rs.slice(i + 1).some((b) =>
             a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h));
+        const widthOf = (page, id) => page.evaluate((id) => document.getElementById(id).offsetWidth, id);
 
-        const olorin = new Olorin(page);
-        let opened = null, found = null;
-        for (const { c, id } of candidates) {
-            if (opened !== (c.level.code || '')) {
-                await olorin.open({ code: c.level.code });
-                opened = c.level.code || '';
+        // Restore a proof with one of its brackets unwired from its assumptions and subgoals (the
+        // labels beside a bracket's ports show only on ports with nothing wired to them), and saved
+        // as narrow as a bracket can be made by hand.  Whether its labels then meet depends on how
+        // long they are, so try brackets until the typecheck after restoring has had to widen one.
+        // Returns its id on the page.
+        async function widenedBracket(page, olorin) {
+            let opened = null;
+            for (const c of arrangeCases()) {
+                for (const n of c.state.nodes.filter((n) => BRACKETS.includes(n.rule))) {
+                    if (opened !== (c.level.code || '')) {
+                        await olorin.open({ code: c.level.code });
+                        opened = c.level.code || '';
+                    }
+                    const state = JSON.parse(JSON.stringify(c.state));
+                    state.connections = state.connections.filter((w) =>
+                        !(w.source.vertex === n.id && w.source.sort === 'assumption')
+                        && !(w.target.vertex === n.id && w.target.sort === 'subgoal'));
+                    state.nodes.find((m) => m.id === n.id).width = '100px';
+                    await loadCase(olorin, { ...c, state });
+                    // Restoring renumbers the blocks, but puts back the player's own in the order saved.
+                    const own = (ns) => ns.filter((m) => !FIXED.includes(m.rule));
+                    const id = own(await olorin.nodes())[own(state.nodes).findIndex((m) => m.id === n.id)].id;
+                    if (await widthOf(page, id) > 100) { return id; }
+                }
             }
-            const state = JSON.parse(JSON.stringify(c.state));
-            state.connections = state.connections.filter((w) =>
-                !(w.source.vertex === id && w.source.sort === 'assumption')
-                && !(w.target.vertex === id && w.target.sort === 'subgoal'));
-            state.nodes.find((n) => n.id === id).width = '100px';
-            await loadCase(olorin, { ...c, state });
-            // Restoring renumbers the blocks, but puts back the player's own in the order saved.
-            const own = (ns) => ns.filter((n) => !FIXED.includes(n.rule));
-            const onPage = own(await olorin.nodes())[own(state.nodes).findIndex((n) => n.id === id)].id;
-            if (meeting(await labelsOn(onPage))) { found = onPage; break; }
+            return null;
         }
-        expect(found).not.toBeNull();
 
-        await olorin.arrange();
-        expect(meeting(await labelsOn(found))).toBe(false);
+        test('is widened as soon as a typecheck puts its labels there', async ({ page }) => {
+            const olorin = new Olorin(page);
+            const id = await widenedBracket(page, olorin);
+            expect(id).not.toBeNull();
+            expect(meeting(await labelsOn(page, id))).toBe(false);
+            // And saved so.
+            const saved = await page.evaluate(() =>
+                JSON.parse(localStorage.getItem(window.__olorin.savedProofKey())));
+            expect(saved.nodes.find((n) => n.id === id).width).toBe((await widthOf(page, id)) + 'px');
+        });
+
+        test('is widened by arranging', async ({ page }) => {
+            const olorin = new Olorin(page);
+            const id = await widenedBracket(page, olorin);
+            expect(id).not.toBeNull();
+            // Squeeze it again behind the typecheck's back.
+            await page.evaluate((id) => window.__olorin.setWidth(id, '100px'), id);
+            expect(meeting(await labelsOn(page, id))).toBe(true);
+            await olorin.arrange();
+            expect(meeting(await labelsOn(page, id))).toBe(false);
+        });
+
+        test('cannot be resized narrower than that by hand', async ({ page }) => {
+            const olorin = new Olorin(page);
+            const id = await widenedBracket(page, olorin);
+            expect(id).not.toBeNull();
+            const least = await widthOf(page, id);
+            // Drag its right-hand resize handle far off to the left.
+            const handle = await page.locator('#' + id + ' .resize-handle-right').boundingBox();
+            await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(handle.x - 600, handle.y + handle.height / 2, { steps: 20 });
+            await page.mouse.up();
+            expect(await widthOf(page, id)).toBeGreaterThanOrEqual(least - 1);
+            expect(meeting(await labelsOn(page, id))).toBe(false);
+        });
     });
 });
