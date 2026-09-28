@@ -93,8 +93,9 @@ function portSide(port) { return port.side === 'lower' ? 'lower' : 'upper'; }
 // ------------------------------------------------------------------------------------------------
 // 1. Scopes
 
-// Work out which region each block goes in.  Returns { place, ancestors }: a Map from block id to
-// region, and a function giving the regions a region is inside (see below).
+// Work out which region each block goes in.  Returns { place, ancestors, allowed }: a Map from block
+// id to region, a function giving the regions a region is inside (see below), and one saying whether
+// a block could have gone in a region (had it been drawn there).
 function assignRegions(model) {
     const blocks = model.blocks;
     const byId = new Map(blocks.map((b) => [b.id, b]));
@@ -161,15 +162,20 @@ function assignRegions(model) {
         });
         return [b.id, { below: below, above: above }];
     }));
-    // The regions a block is drawn inside, as things stand.
+    // The regions a block is drawn inside, as things stand.  A block drawn in one branch of a
+    // bracket counts as drawn in its other branch too: it was put inside that bracket, and if the
+    // wires say it can't be in the branch it was drawn in, the other is where it was meant to go --
+    // not outside the bracket altogether, where it would have to sit on the wrong side of the bar
+    // from what uses it.
     function drawnIn(b) {
         const r = rays.get(b.id);
         const out = new Set([ROOT]);
         const add = (region) => ancestors(region).forEach((a) => out.add(a));
-        if(r.below) { add(regionOf(r.below.id, 'upper')); }
+        const addBracket = (k) => k.branches.forEach((side) => add(regionOf(k.id, side)));
+        if(r.below) { addBracket(r.below); }
         if(r.above) {
-            add(r.above.branches.includes('lower') ? regionOf(r.above.id, 'lower')
-                : place.get(r.above.id));
+            if(r.above.branches.includes('lower')) { addBracket(r.above); }
+            else { add(place.get(r.above.id)); }
         }
         return out;
     }
@@ -197,6 +203,8 @@ function assignRegions(model) {
         return common[0];
     }
 
+    // For each block, the least and most it can be inside (see below).
+    const range = new Map();
     for(var round = 0; round < 2 * blocks.length + 5; round++) {
         var moved = false;
         blocks.forEach(function (b) {
@@ -211,6 +219,7 @@ function assignRegions(model) {
             // The innermost region holding everything that uses it: the most it can be inside.
             const uses = consumers(b);
             const most = uses.length > 0 ? lca(uses) : null;
+            range.set(b.id, { least: least, most: most });
             // Between those, wherever the player drew it.
             var best = least, bestDepth = leastDepth;
             drawnIn(b).forEach(function (r) {
@@ -226,7 +235,13 @@ function assignRegions(model) {
         });
         if(!moved) { break; }
     }
-    return { place: place, ancestors: ancestors };
+    // Whether a block could have gone in a region, if it had been drawn there.
+    const allowed = function (id, r) {
+        const g = range.get(id);
+        if(!g || insideOf(r, id) || !within(r, g.least)) { return false; }
+        return g.most === null || within(g.most, r);
+    };
+    return { place: place, ancestors: ancestors, allowed: allowed };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -408,15 +423,24 @@ function buildConstraints(model, scopes, S) {
                 out.push(before(at.bottom(u), at.top(l), gy))));
             return out;
         };
+        // Whether block `i` could have gone in the `side` branch of bracket `k`.
+        const couldGoIn = (i, k, side) => (blocks[k].branches || []).includes(side)
+              && scopes.allowed(blocks[i].id, regionOf(blocks[k].id, side));
         const options = [
             { sys: cx, list: [before(at.right(a), at.left(b), sp.gapX)], gap: B.left - A.right - sp.gapX },
             { sys: cx, list: [before(at.right(b), at.left(a), sp.gapX)], gap: A.left - B.right - sp.gapX },
-            { sys: cy, list: stack(a, b), gap: B.top - A.bottom - gy },
-            { sys: cy, list: stack(b, a), gap: A.top - B.bottom - gy },
+            // A block above a bracket, between its uprights, is in the subproof above its bar, as
+            // far as telling where the player put it goes (and below one, in the subproof below it):
+            // so a block that could go in that subproof, but hasn't, mustn't end up there, or
+            // arranging it again would take it for one that had.  It goes beside it instead.
+            { sys: cy, list: stack(a, b), gap: B.top - A.bottom - gy,
+              misread: couldGoIn(a, b, 'upper') || couldGoIn(b, a, 'lower') },
+            { sys: cy, list: stack(b, a), gap: A.top - B.bottom - gy,
+              misread: couldGoIn(b, a, 'upper') || couldGoIn(a, b, 'lower') },
         ];
         // The way that needs the least moving, and among ways that need none, the one with most
-        // room to spare.
-        options.sort((p, q) => q.gap - p.gap);
+        // room to spare -- but one that would be misread only if there's no other way.
+        options.sort((p, q) => (p.misread ? 1 : 0) - (q.misread ? 1 : 0) || q.gap - p.gap);
         options.some((o) => o.sys.addAll(o.list));
     });
 

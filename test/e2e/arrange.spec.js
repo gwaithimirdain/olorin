@@ -197,6 +197,34 @@ test.describe('Arrange', () => {
         await olorin.redo();
         expect(await olorin.nodes()).toEqual(arranged);
     });
+    test('puts a block drawn in the wrong branch of a bracket in the branch that uses it', async ({ page }) => {
+        // In this proof, casing on whether x≤0 or 0<x, the case on x+y is drawn above the bar of the
+        // case on x, but what it proves is used only below it (in the case on y, inside the case
+        // 0<x): drawn inside that bracket, it belongs in the branch that uses it, not outside.
+        const olorin = new Olorin(page);
+        const c = arrangeCases().find((x) => x.name === 'subsubproof');
+        await olorin.open({ code: c.level.code });
+        await loadCase(olorin, c);
+        const [nodes, conns] = [await olorin.nodes(), await olorin.connections()];
+        const rule = Object.fromEntries(nodes.map((n) => [n.id, n]));
+        const into = (id, label) => conns.find((w) => w.target.vertex === id && w.target.label === label);
+        // The case on x is the ∨-elimination proving the conclusion; the case on x+y is the one
+        // whose disjunction comes from comparing an expression (x+y) with something.
+        const outer = conns.find((w) => rule[w.target.vertex].rule === 'conclusion').source.vertex;
+        const inner = nodes.find((n) => {
+            if(n.rule !== 'orE') { return false; }
+            const cmp = into(n.id, undefined);
+            if(!cmp || rule[cmp.source.vertex].rule !== 'tord') { return false; }
+            const x = into(cmp.source.vertex, 'x');
+            return x && rule[x.source.vertex].rule === 'expr';
+        }).id;
+        expect(rule[outer].rule).toBe('orE');
+
+        await olorin.arrange();
+        const blocks = Object.fromEntries((await olorin.layoutModel()).blocks.map((b) => [b.id, b]));
+        expect(blocks[inner].y).toBeGreaterThanOrEqual(blocks[outer].y + blocks[outer].h);
+    });
+
     test.describe('a bracket too narrow for the labels inside its uprights', () => {
         const BRACKETS = ['impI', 'allI', 'negI', 'cnegI', 'natInd', 'orE', 'iffI', 'natE'];
         const FIXED = fixedRules();
