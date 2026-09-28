@@ -4612,6 +4612,10 @@ const BRACKET_BRANCHES = {
     impI: ['upper'], allI: ['upper'], negI: ['upper'], cnegI: ['upper'], natInd: ['upper'],
     orE: ['upper', 'lower'], iffI: ['upper', 'lower'], natE: ['upper', 'lower'],
 };
+// The radius of a port's dot, and the least room between what's inside a bracket's two uprights (see
+// layoutModel).
+const PORT_RADIUS = 7;
+const BRACKET_LABEL_GAP = 12;
 // How long the blocks take to slide into place, in milliseconds.
 const ARRANGE_DURATION = 500;
 
@@ -4633,20 +4637,31 @@ function layoutModel() {
         if(FIXED_RULES.includes(entry.rule)) { block.root = true; }
         // What the block covers, counting the type labels shown beside its ports.
         const ext = { left: 0, top: 0, right: 0, bottom: h };
+        // On a bracket, what sits inside each upright: the ports, and the labels beside them, which
+        // run in from the left-hand upright and in from the right-hand one, and mustn't meet.
+        const inside = { left: [], right: [] };
         block.ports = instance.getEndpoints(el).map(function (ep, i) {
             portIndex.set(ep, i);
             const p = ep.parameters;
             const loc = instance.router.getEndpointLocation(ep);
             // On a bracket, the ports on the right-hand upright move with its right edge.
             const right = !!branches && (p.sort === 'subgoal' || p.sort === 'output');
+            if(branches && !p.hidden && (p.sort === 'assumption' || p.sort === 'subgoal')) {
+                const dot = { x: loc.curX - PORT_RADIUS, y: loc.curY - PORT_RADIUS, w: 2 * PORT_RADIUS, h: 2 * PORT_RADIUS };
+                (right ? inside.right : inside.left).push(dot);
+            }
             const ovl = ep.getOverlay("customLabel");
             if(ovl && ovl.canvas && !p.hidden) {
-                const r = rectOf(ovl.canvas);
+                // (The overlay itself is only a holder, of no size: the label is positioned in it.)
+                const r = rectOf(ovl.canvas.firstElementChild || ovl.canvas);
                 if(r.w > 0 && r.h > 0) {
                     ext.left = Math.min(ext.left, r.x - x);
                     ext.top = Math.min(ext.top, r.y - y);
                     ext.right = Math.max(ext.right, r.x + r.w - (x + w));
                     ext.bottom = Math.max(ext.bottom, r.y + r.h - y);
+                    if(branches && (p.sort === 'assumption' || p.sort === 'subgoal')) {
+                        (right ? inside.right : inside.left).push(r);
+                    }
                 }
             }
             return {
@@ -4655,6 +4670,20 @@ function layoutModel() {
             };
         });
         block.extent = ext;
+        // How wide a bracket has to be for nothing inside its left-hand upright to meet anything
+        // inside its right-hand one at the same height: what's inside the left one reaches so far
+        // from its left edge, and what's inside the right one so far from its right edge.
+        if(branches) {
+            var least = 0;
+            inside.left.forEach(function (a) {
+                inside.right.forEach(function (b) {
+                    if(a.y < b.y + b.h && b.y < a.y + a.h) {
+                        least = Math.max(least, (a.x + a.w - x) + (x + w - b.x) + BRACKET_LABEL_GAP);
+                    }
+                });
+            });
+            if(least > 0) { block.minWidth = Math.ceil(least); }
+        }
         return block;
     });
     const wires = instance.getConnections().map(function (c) {

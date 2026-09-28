@@ -340,7 +340,8 @@ function buildConstraints(model, scopes, S) {
     const cx = new Constraints(xs.length), cy = new Constraints(ys.length);
 
     // Brackets can't get too narrow.
-    S.rightVar.forEach(function (r, i) { cx.add(i, r, BRACKET_MIN_W); });
+    // (And some have to be wider, for what's inside their uprights not to meet: see minWidth.)
+    S.rightVar.forEach(function (r, i) { cx.add(i, r, Math.max(BRACKET_MIN_W, blocks[i].minWidth || 0)); });
 
     // Every block inside every subproof it belongs to: between the uprights, and above the bar (or
     // below it).
@@ -1186,6 +1187,8 @@ function extent(L) {
 //   blocks: [{ id, x, y, w, h,
 //              branches: for a bracket, the branches it has (['upper'] or ['upper', 'lower']),
 //              root: true for a block that is never inside a subproof (hypotheses and the like),
+//              minWidth: for a bracket, the least it can be as wide as, for what's inside its two
+//                        uprights (ports and their labels) not to meet,
 //              ports: [{ sort, label, side, dx, dy, right }] -- where each port is on the block:
 //                     dy below its top, and dx right of its left edge, or for a port that moves
 //                     with a bracket's right edge (`right`), right of that,
