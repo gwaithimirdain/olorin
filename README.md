@@ -108,6 +108,19 @@ The unlock rules never reach across the line between the game and a course: a co
 
 Higher difficulties are earned differently there, for the same reason.  In the game proper a difficulty is opened a world at a time, by the worlds behind it; a course has none, so its own work is what opens it: one of its worlds opens at a difficulty once it is 80% complete at the difficulty below, and a level of it opens at a difficulty once that level has been solved at the difficulty below.
 
+## Assignments
+
+An instructor can hand out a selection of the game's levels as an **assignment**, with no server and no change to `levels.js`.
+
+* **Create Assignment** (in the level chooser) picks the levels — from the game, or from saved custom levels — with a title and the difficulty they are to be solved at, and produces a file (`.assignment.json`) to hand out.
+* A student opens the file with **Load Assignment**.  The assignment appears in their chooser as a world of its own, with the levels grouped as the stages they came from and those stages' rules.  Progress is kept in the browser, separately from the game's own copies of the same levels.
+* **Submit** (on the assignment's world) asks for the student's name and produces a submission file holding their proofs.
+* **Grade** takes the submission files of one assignment and checks every proof again, at the difficulty it was made at.  A file that only claims a level is complete, or a proof using a block the level doesn't offer, gets no credit.  The marks come out as a table (click a mark to see the proof) and as a CSV in the same form as the server's grades page: 0 for a level not completed, otherwise 1, 2 or 3 for the difficulty it was completed at.
+
+Grading goes by the instructor's own copy of the assignment (so it must be in their chooser), not the copy in a submission, which a student could have changed; a submission whose copy differs is marked.  The **Edit** tool appears only on assignments the instructor created in their own browser, not on one loaded from a file.  Handing out an edited assignment replaces the old one on the student's side, keeping their progress on the levels that stayed.
+
+The file formats are defined in `client/assignments.js`; the rest is the Assignments section of `client/main.js`.
+
 ## Olorin server
 
 The above instructions compile a version of Olorin that runs entirely client-side in the user's browser, saving the list of completed levels locally in the browser.  There is also a version that stores that information on a server associated with the user's email address; this is intended mainly for students in a class, so that the instructor can download a spreadsheet of grades by student and level.  To compile this version of Olorin, simply change the definition `SERVER = false` in `client/main.js` to say `true` instead, and proceed as above.
