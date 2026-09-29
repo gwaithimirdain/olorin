@@ -2964,6 +2964,13 @@ if (TEST_MODE) {
         arranging: () => arrangeWaiting !== null || arrangeFrame !== null,
         // How many changes there are to undo, and to redo.
         undoDepth: () => ({ undo: undoStack.length, redo: redoStack.length }),
+        // Set a box's width, as its style gives it, without anything else that goes with a change
+        // (no typecheck, nothing saved).
+        setWidth: (id, width) => {
+            const el = document.getElementById(id);
+            el.style.width = width;
+            instance.revalidate(el);
+        },
         // Whether arrangements are being worked out in a worker, rather than on the page itself.
         arrangeWorker: () => arrangeWorker !== null,
         // Whether the proof currently reads as complete (the conclusion turns a color).
@@ -4037,6 +4044,9 @@ let currentResizable = null;  // Which element is being resized
 let lastX = 0;
 let resizingLocked = false;
 let resizeLockX = 0;
+// The narrowest the bracket being resized can be made: not so narrow that the labels inside its
+// uprights meet (see bracketMinWidth).
+let resizeMin = 100;
 
 // Make a node resizable
 function makeResizable(element) {
@@ -4049,6 +4059,7 @@ function makeResizable(element) {
         e.preventDefault();
         isResizingRight = true;
         currentResizable = element;
+        resizeMin = Math.max(100, bracketMinWidth(element));
         lastX = e.clientX;
         resizingLocked = false;
         resizeLockX = 0;
@@ -4059,6 +4070,7 @@ function makeResizable(element) {
         e.preventDefault();
         isResizingLeft = true;
         currentResizable = element;
+        resizeMin = Math.max(100, bracketMinWidth(element));
         lastX = e.clientX;
         resizingLocked = false;
         resizeLockX = 0;
@@ -4073,12 +4085,12 @@ document.addEventListener('mousemove', (e) => {
         const currentLeft = parseInt(style.left, 10);
         var newWidth = currentWidth + dx;
         if(resizingLocked) {
-            newWidth = 100;
+            newWidth = resizeMin;
             if(e.clientX > resizeLockX) {
                 resizingLocked = false;
             }
-        } else if(newWidth < 100) {
-            newWidth = 100;
+        } else if(newWidth < resizeMin) {
+            newWidth = resizeMin;
             resizingLocked = true;
             resizeLockX = e.clientX;
         }
@@ -4094,14 +4106,14 @@ document.addEventListener('mousemove', (e) => {
         // Also shift left, so the right edge stays put
         var newLeft = currentLeft + dx;
         if(resizingLocked) {
-            newWidth = 100;
+            newWidth = resizeMin;
             newLeft = currentLeft;
             if(e.clientX < resizeLockX) {
                 resizingLocked = false;
             }
-        } else if(newWidth < 100) {
-            newWidth = 100;
-            newLeft = currentLeft;
+        } else if(newWidth < resizeMin) {
+            newWidth = resizeMin;
+            newLeft = currentLeft + currentWidth - resizeMin;
             resizingLocked = true;
             resizeLockX = e.clientX;
         }
@@ -4612,8 +4624,67 @@ const BRACKET_BRANCHES = {
     impI: ['upper'], allI: ['upper'], negI: ['upper'], cnegI: ['upper'], natInd: ['upper'],
     orE: ['upper', 'lower'], iffI: ['upper', 'lower'], natE: ['upper', 'lower'],
 };
+// The radius of a port's dot, and the least room between what's inside a bracket's two uprights (see
+// layoutModel).
+const PORT_RADIUS = 7;
+const BRACKET_LABEL_GAP = 12;
 // How long the blocks take to slide into place, in milliseconds.
 const ARRANGE_DURATION = 500;
+
+// Where the type label shown beside a port is, in the canvas's coordinates, or null if it shows none.
+function portLabelRect(ep) {
+    const ovl = ep.getOverlay("customLabel");
+    if(!ovl || !ovl.canvas || ep.parameters.hidden) { return null; }
+    // (The overlay itself is only a holder, of no size: the label is positioned in it.)
+    const r = (ovl.canvas.firstElementChild || ovl.canvas).getBoundingClientRect();
+    if(r.width === 0 || r.height === 0) { return null; }
+    const origin = canvas.getBoundingClientRect();
+    return { x: r.x - origin.x, y: r.y - origin.y, w: r.width, h: r.height };
+}
+
+// How wide a bracket has to be for nothing inside its left-hand upright to meet anything inside its
+// right-hand one at the same height -- the ports there, and the labels beside them, which run in from
+// either side: what's inside the left one reaches so far from its left edge, and what's inside the
+// right one so far from its right edge.  0 if nothing inside them is at the same height.
+function bracketMinWidth(box) {
+    const x = box.offsetLeft, w = box.offsetWidth;
+    const inside = { left: [], right: [] };
+    instance.getEndpoints(box).forEach(function (ep) {
+        const p = ep.parameters;
+        if(p.hidden || (p.sort !== 'assumption' && p.sort !== 'subgoal')) { return; }
+        const side = p.sort === 'subgoal' ? inside.right : inside.left;
+        const loc = instance.router.getEndpointLocation(ep);
+        side.push({ x: loc.curX - PORT_RADIUS, y: loc.curY - PORT_RADIUS, w: 2 * PORT_RADIUS, h: 2 * PORT_RADIUS });
+        const r = portLabelRect(ep);
+        if(r) { side.push(r); }
+    });
+    var least = 0;
+    inside.left.forEach(function (a) {
+        inside.right.forEach(function (b) {
+            if(a.y < b.y + b.h && b.y < a.y + a.h) {
+                least = Math.max(least, (a.x + a.w - x) + (x + w - b.x) + BRACKET_LABEL_GAP);
+            }
+        });
+    });
+    return Math.ceil(least);
+}
+
+// Widen every bracket too narrow for the labels inside its uprights not to meet (see
+// bracketMinWidth), keeping its left edge where it is, as its right-hand resize handle would.
+// Returns whether it widened any.
+function widenBrackets() {
+    var widened = false;
+    nodes.forEach(function (x) {
+        if(!BRACKET_BRANCHES[x.rule]) { return; }
+        const least = bracketMinWidth(x.node);
+        if(least > x.node.offsetWidth) {
+            x.node.style.width = least + 'px';
+            instance.revalidate(x.node);
+            widened = true;
+        }
+    });
+    return widened;
+}
 
 // The diagram as client/arrange.js takes it: every block's geometry and ports, and every wire with
 // the size of its labels.  Coordinates are the canvas's, as the boxes' left/top are.
@@ -4639,15 +4710,12 @@ function layoutModel() {
             const loc = instance.router.getEndpointLocation(ep);
             // On a bracket, the ports on the right-hand upright move with its right edge.
             const right = !!branches && (p.sort === 'subgoal' || p.sort === 'output');
-            const ovl = ep.getOverlay("customLabel");
-            if(ovl && ovl.canvas && !p.hidden) {
-                const r = rectOf(ovl.canvas);
-                if(r.w > 0 && r.h > 0) {
-                    ext.left = Math.min(ext.left, r.x - x);
-                    ext.top = Math.min(ext.top, r.y - y);
-                    ext.right = Math.max(ext.right, r.x + r.w - (x + w));
-                    ext.bottom = Math.max(ext.bottom, r.y + r.h - y);
-                }
+            const r = portLabelRect(ep);
+            if(r) {
+                ext.left = Math.min(ext.left, r.x - x);
+                ext.top = Math.min(ext.top, r.y - y);
+                ext.right = Math.max(ext.right, r.x + r.w - (x + w));
+                ext.bottom = Math.max(ext.bottom, r.y + r.h - y);
             }
             return {
                 sort: p.sort, label: p.label, side: p.side,
@@ -4655,6 +4723,10 @@ function layoutModel() {
             };
         });
         block.extent = ext;
+        if(branches) {
+            const least = bracketMinWidth(el);
+            if(least > 0) { block.minWidth = least; }
+        }
         return block;
     });
     const wires = instance.getConnections().map(function (c) {
@@ -5545,6 +5617,15 @@ function continue_typechecking(nodes, edges, connections, result) {
             });
         });
         spreadWireLabels();
+    }
+
+    // The labels just put beside the ports of a bracket can be too wide for it; widen it until they
+    // aren't.  That is part of whatever change this typecheck is of, so it's undone with it, rather
+    // than on its own (which would put back a bracket with its labels on top of each other).
+    if(widenBrackets()) {
+        spreadWireLabels();
+        resizeCanvas();
+        if(undoCurrent !== null && !restoring && !suppressSave) { undoCurrent = undoSnapshot(); }
     }
 
     // Persist the current proof on every change, now that we know whether it's complete.
