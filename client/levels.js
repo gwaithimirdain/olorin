@@ -587,7 +587,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "x", ty: "ℤ" }, { name: "y", ty: "ℤ" } ],
                     hypotheses: [ ],
-                    conclusion: { ty: "(x-y=0)∨(y≠x)" },
+                    conclusion: { ty: "(x−y=0)∨(y≠x)" },
                     hint: "deceqHint",
                 },
                 {
@@ -1632,8 +1632,8 @@ export const LEVELS = [
                 },
                 {
                     parameters: [ ],
-                    variables: [ { name: "a", ty: "ℤ" } ],
-                    hypotheses: [ { ty: "∀x∈ℤ,(a·x²+3·x=3·a·x²+6·a·x−x²)" } ],
+                    variables: [ { name: "a", ty: "ℝ" } ],
+                    hypotheses: [ { ty: "∀x∈ℝ,(a·x²+3·x=3·a·x²+6·a·x−x²)" } ],
                     conclusion: { ty: "a=1/2" },
                 },
                 {
@@ -2851,7 +2851,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "lim (n ↦ (n²-1)/(n+2)) ↗∞" },
+                    conclusion: { ty: "lim (n ↦ (n²−1)/(n+2)) ↗∞" },
                 },
                 {
                     parameters: [ { name: "s", ty: "ℕ → ℝ" } ],
