@@ -513,6 +513,10 @@ body.arranging { cursor: progress; }
     cursor: pointer;
     font-size: 14px;
     white-space: nowrap;
+    /* An assignment's chip carries its title, which can be long. */
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .world-chip.active {
@@ -882,6 +886,150 @@ body.arranging { cursor: progress; }
 #customScroll textarea,
 #customScroll input {
     box-sizing: border-box;
+}
+
+/* An assignment's world (see the Assignments section of main.js): under the sticky header, who
+   set it and at what difficulty, and the things that can be done with it. */
+.assignment-byline {
+    text-align: center;
+    font-family: sans-serif;
+    font-size: 13px;
+    color: #666666;
+}
+
+.assignment-tools {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 0 6px;
+}
+
+.assignment-tools button {
+    font-size: 13px;
+}
+
+/* The assignment builder lists every level to pick from, a stage to a line. */
+#assignmentModal {
+    max-height: 80%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 700px;
+    overflow: hidden;
+}
+
+#assignmentScroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#assignmentModal > h3 {
+    margin-top: 0;
+}
+
+#assignmentScroll p {
+    margin-bottom: 6px;
+}
+
+#assignmentScroll input[type="text"] {
+    box-sizing: border-box;
+}
+
+#assignmentDifficulty {
+    display: flex;
+    gap: 20px;
+    font-family: sans-serif;
+}
+
+.picker-world {
+    font-family: sans-serif;
+    font-weight: bold;
+    margin-top: 10px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #cccccc;
+}
+
+.picker-stage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 10px;
+    padding: 3px 0;
+    font-family: sans-serif;
+    font-size: 14px;
+}
+
+.picker-all {
+    min-width: 120px;
+    font-weight: bold;
+    /* The stage names carry the logic symbols; see .stage-label. */
+    font-family: "DejaVu Sans", "Noto Sans Symbols2", "Segoe UI Symbol", sans-serif;
+}
+
+.picker-level {
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+/* The grading table: a row per student, a mark per level. */
+#gradeModal {
+    max-height: 85%;
+    display: flex;
+    flex-direction: column;
+    width: 750px;
+}
+
+#gradeProgress {
+    font-family: sans-serif;
+    font-size: 13px;
+    color: #666666;
+    margin-top: 8px;
+    min-height: 1.2em;
+}
+
+#gradeScroll {
+    flex: 1;
+    overflow: auto;
+    margin-top: 6px;
+}
+
+#gradeTable {
+    border-collapse: collapse;
+    font-family: sans-serif;
+    font-size: 14px;
+}
+
+#gradeTable th,
+#gradeTable td {
+    border: 1px solid #cccccc;
+    padding: 3px 6px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+#gradeTable td:first-child {
+    text-align: left;
+}
+
+.grade-mark {
+    font-size: 18px;
+}
+
+.grade-viewable {
+    cursor: pointer;
+}
+
+.grade-viewable:hover {
+    background-color: #f0f0f0;
+}
+
+.grade-cross {
+    color: #cc0000;
+}
+
+.grade-none {
+    color: #aaaaaa;
 }
 
 #ascribeModal {

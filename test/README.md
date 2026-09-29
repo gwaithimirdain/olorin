@@ -17,6 +17,7 @@ test/
   lib/fixtures.js         # Store/find proof fixtures by a hash of the level's statement
   lib/testmode.js         # The password ?test takes (read from client/main.js)
   lib/arrange.js          # The proofs the Arrange button is tried on (fixtures/proofs + arrange)
+  lib/assignments.js      # Assignments for the tests to hand the app
   generate-fixtures.js    # Auto-solve levels and write verified proof fixtures
   add-fixture.js          # File a hand-made proof (an exported JSON) as a fixture
   arrange-gallery.js      # Before/after pictures of the Arrange button on every case, for tuning it
@@ -34,6 +35,8 @@ test/
                           #   tidy layout, is saved and undoable, and leaves a tidy layout be
     undo.spec.js          # Undo/Redo: every change undone in turn and redone, one step per
                           #   change, across pans and Clear; cancelled dialogs aren't changes
+    assignments.spec.js   # Assignments: loaded from a file, played as a world of their own,
+                          #   built in the builder, handed in, and graded by re-checking
 ```
 
 ## Per-level proof fixtures

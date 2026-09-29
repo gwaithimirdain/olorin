@@ -1,5 +1,8 @@
 import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector, BezierConnector, EVENT_CONNECTION, EVENT_CONNECTION_MOVED, EVENT_CONNECTION_MOUSEOVER, EVENT_CONNECTION_MOUSEOUT, EVENT_CONNECTION_TAP, EVENT_ELEMENT_TAP, EVENT_DRAG_START, EVENT_DRAG_MOVE, EVENT_DRAG_STOP } from "@jsplumb/browser-ui"
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
+import { isAssignment, assignmentCopy, assignmentLevel, assignmentLevels, statementKey,
+         statementText, paletteOf, makeAssignment, makeSubmission, isSubmission, gradesCsv,
+         fileSlug, DIFFICULTIES as DIFFICULTY_NAMES } from "./assignments.js"
 import { SERVER } from "./config.js"
 import { arrange } from "./arrange.js"
 
@@ -244,6 +247,8 @@ var suppressChecking = false;
 // "Typechecking..." overlay still up and the proof stuck until the page is reloaded.  So a change
 // arriving mid-round is noted here and checked once the round it interrupted has landed.
 var typecheckPending = false;
+// Who is waiting for the round in flight to land (see whenTypecheckSettles).
+var typecheckWaiters = [];
 var typecheckAgain = false;
 // Whether the player has cancelled the round in flight.  The round can't simply be abandoned (see
 // above), so it runs to the end, with Z3 interrupted and every question it asks from then on
@@ -292,6 +297,15 @@ var currentCustom = null;
 // References to the dynamically-built "Custom" world pane, populated by refreshCustomWorld.
 var customRowsContainer = null;
 var customChipEl = null;
+// The assignment level currently open, as { entry, s, l } -- the stored assignment (an entry of the
+// localStorage "assignments" list) and the level's stage and position in it -- or null when on
+// anything else.  Like currentCustom, it is what completions and saved proofs are filed by (see
+// the Assignments section).
+var currentAssignment = null;
+// The proof under review, when grading has opened someone else's proof to look at: its level's
+// definition and palette, as { def, rules }.  It belongs to no list, so nothing done on it is
+// recorded or saved; it is only what reopenCurrentLevel puts back.  Null otherwise.
+var currentReview = null;
 
 // A counter (in localStorage "time") incremented on each level completion; per-difficulty
 // completion times are recorded against it so a higher difficulty can be re-locked for a while
@@ -1740,14 +1754,18 @@ function makeLevelSelect(res) {
     customPane.appendChild(customRowsContainer);
     worlds.appendChild(customPane);
 
-    const customWorldNum = worldPanes.length;
     customChipEl = document.createElement("div");
     customChipEl.className = "world-chip";
     customChipEl.innerHTML = 'Custom <span class="world-progress"></span>';
-    customChipEl.onclick = function () { setWorld(customWorldNum); };
+    const customEntry = { name: "Custom", pane: customPane, chip: customChipEl, levels: [], custom: true };
+    // By lookup rather than by the index it has now: the assignment worlds go in ahead of it, and
+    // come and go (see refreshAssignmentWorlds).
+    customChipEl.onclick = function () { setWorld(worldPanes.indexOf(customEntry)); };
     worldIndex.appendChild(customChipEl);
-    worldPanes.push({ name: "Custom", pane: customPane, chip: customChipEl, levels: [], custom: true });
+    worldPanes.push(customEntry);
     refreshCustomWorld();
+    // The assignments this player holds each get a world of their own, ahead of Custom.
+    refreshAssignmentWorlds();
 
     document.getElementById("levelChooseModal").style.width = (maxcols * 80 + 30) + 'px';
 
@@ -2562,6 +2580,7 @@ function savedProofKey(d) {
     // Saved custom levels key by their unique id; built-in levels by their statement.  An unsaved
     // custom level has nowhere to save to.
     if(currentCustom) { return "proof:" + d + ":custom:" + currentCustom.id; }
+    if(currentAssignment) { return assignmentProofKey(currentAssignment, d); }
     if(currentLevel) { return "proof:" + d + ":" + JSON.stringify(saveable(currentLevel)); }
     return null;
 }
@@ -2904,6 +2923,8 @@ function createImportedCustom(state) {
 // Switch to a saved custom level and rebuild an imported proof in it.
 function restoreProofIntoCustom(state, cl) {
     currentCustom = cl;
+    currentAssignment = null;
+    currentReview = null;
     currentLevel = undefined;
     currentLevelButton = undefined;
     restoreProof(state);
@@ -2997,6 +3018,12 @@ if (TEST_MODE) {
                     stroke: ep.getPaintStyle().stroke,
                 };
             })),
+        // The assignments this player holds, as stored: [{ assignment, progress }].
+        assignments: () => loadAssignments(),
+        // What the last grading found: the assignment it was of, and each submission's verdicts.
+        grades: () => ({ assignment: gradedAssignment, graded: graded }),
+        // Resolves once the typecheck in flight (if any) has landed and been drawn.
+        typecheckSettled: () => whenTypecheckSettles(),
         // The localStorage key a level's completion is recorded under, by name.
         completionKey: (name) => {
             const lvl = allLevels.find((l) => l.name === name);
@@ -3038,6 +3065,8 @@ document.getElementById("cancelChooseLevel").onclick = clearLevelSelect;
 
 // Open a level (switching worlds in the chooser if needed) -- used by the completion pop-up.
 function goToLevel(level) {
+    // An assignment's level (see nextAssignmentTargets) opens through its assignment.
+    if(level.entry) { openAssignmentLevel(level.entry, level.s, level.l); return; }
     if(level.worldIndex !== currentWorld) { setWorld(level.worldIndex); }
     chooseLevel(level);
 }
@@ -3051,6 +3080,7 @@ function isLevelSelectable(level) { return levelStatesOf(level)[0] !== 'locked';
 // The two candidate targets for the completion pop-up's "Next": the next level in sequence (if
 // it's unlocked at all), and the next "active" level scanning forward and wrapping around.
 function computeNextTargets() {
+    if(currentAssignment) { return nextAssignmentTargets(currentAssignment); }
     const i = allLevels.indexOf(currentLevel);
     if(i < 0) { return { seq: null, active: null }; }
     var seq = null;
@@ -3145,6 +3175,9 @@ clearHistory.onclick = function () {
         localStorage.clear();
         localStorage.setItem("visited",true);
         updateLevelSelect(null);
+        // The saved custom levels and the assignments went with everything else.
+        refreshCustomWorld();
+        refreshAssignmentWorlds();
         setWorld(0);
         if(SERVER) {
             document.getElementById("levelChooseBG").style.display = "none";
@@ -3333,7 +3366,13 @@ function customStates(cl) {
 // Show the lower-left "Save" button only when a custom level is loaded (built-in currentLevel unset
 // but a definition is present).
 function updateSaveButtonVisibility() {
-    document.getElementById("saveLevel").style.display = (!currentLevel && currentLevelDef) ? '' : 'none';
+    document.getElementById("saveLevel").style.display = isCustomOpen() ? '' : 'none';
+}
+
+// Whether what is open is a custom level, saved or not: the only kind the Save button applies to.
+// An assignment's level is filed by its assignment, and a proof under review is nobody's.
+function isCustomOpen() {
+    return !currentLevel && !currentAssignment && !currentReview && !!currentLevelDef;
 }
 
 // Record that a saved custom level was completed at a difficulty (persisting it and re-rendering).
@@ -3351,7 +3390,7 @@ function markCustomCompleted(cl, d) {
 // Prompt for a name and save the current custom level: stored as unlocked at the current difficulty
 // (and all lower).  Re-saving under an existing name updates that level's definition.
 function saveCustomLevel() {
-    if(currentLevel || !currentLevelDef) { return; }
+    if(!isCustomOpen()) { return; }
     const suggested = currentCustom ? currentCustom.name : "";
     const input = prompt("Name for this custom level:", suggested);
     if(input === null) { return; }
@@ -3388,13 +3427,12 @@ function storeCustomLevelNamed(name, def, unlockDifficulty) {
 // Save the current custom level under the given (already non-empty) name, without prompting.  Used
 // by the Save button (via saveCustomLevel) and by the custom dialog's optional Name field.
 function saveCustomLevelNamed(name) {
-    if(currentLevel || !currentLevelDef) { return; }
+    if(!isCustomOpen()) { return; }
     const cl = storeCustomLevelNamed(name, levelDefCopy(currentLevelDef), difficulty);
     currentCustom = cl;
     document.getElementById("currentLevel").innerText = "Level: " + cl.name;
     updateSaveButtonVisibility();
-    document.getElementById("saveLevelAfterComplete").style.display =
-        (!currentLevel && currentLevelDef) ? '' : 'none';
+    document.getElementById("saveLevelAfterComplete").style.display = isCustomOpen() ? '' : 'none';
     refreshCustomWorld();
     autosave(); // keep the current proof under the now-saved level's key
 }
@@ -3410,6 +3448,8 @@ function openCustomLevel(cl, skipSavedPrompt, keepDifficulty) {
     }
     if(!setLevel(levelDefCopy(cl), "all")) { return; }
     currentCustom = cl;
+    currentAssignment = null;
+    currentReview = null;
     currentLevel = undefined;
     currentLevelButton = undefined;
     document.getElementById("currentLevel").innerText = "Level: " + cl.name;
@@ -3423,6 +3463,8 @@ function openCustomLevel(cl, skipSavedPrompt, keepDifficulty) {
 // if no level is open at all.
 function reopenCurrentLevel() {
     if(currentCustom) { openCustomLevel(currentCustom, true, true); }
+    else if(currentAssignment) { openAssignmentLevel(currentAssignment.entry, currentAssignment.s, currentAssignment.l, true, true); }
+    else if(currentReview) { setLevel(currentReview.def, currentReview.rules); }
     else if(currentLevel) { selectCurrentLevel(currentLevel, true); }
     else if(currentLevelDef) { setLevel(levelDefCopy(currentLevelDef), "all"); }
     else { return false; }
@@ -3479,6 +3521,785 @@ function refreshCustomWorld() {
     }
 }
 
+// ===== Assignments =====
+//
+// An assignment is an instructor's own selection of levels -- taken from the game, or from their
+// saved custom levels -- handed to students as a file, and handed back as a submission the
+// instructor grades here (see client/assignments.js for what those files hold).  Each one a
+// player holds is a world of its own in the chooser, ahead of Custom: its stages of levels, with
+// the palettes their stages give them, all open at the assignment's difficulty (and any lower),
+// and a level's next difficulty opening as it is completed, as a saved custom level's does.
+//
+// The list lives in localStorage "assignments" as [{ assignment, progress, own }]: the assignment
+// as received, progress[s][l] = [novice, adept, master] completed for each of its levels, and
+// whether it was made here (by the builder) rather than loaded from a file -- only one made here
+// can be edited here, and grading goes by the copy here (see gradeSubmissions).  A level's saved
+// proofs are filed by the assignment and the level's statement, so that a re-shared assignment
+// with the same id (an instructor's edit) keeps what was done on the levels it kept.
+
+function loadAssignments() {
+    try { return JSON.parse(localStorage.getItem("assignments")) || []; }
+    catch(e) { return []; }
+}
+function storeAssignments(list) {
+    localStorage.setItem("assignments", JSON.stringify(list));
+}
+
+// The localStorage key of a proof saved on an assignment level at a difficulty.
+function assignmentProofKey(cur, d) {
+    const level = cur.entry.assignment.stages[cur.s].levels[cur.l];
+    return "proof:" + d + ":assignment:" + cur.entry.assignment.id + ":" + statementKey(level);
+}
+
+// Put an assignment in the list, in place of any with the same id, and return its stored entry.
+// The progress on a level it kept (by statement) carries over; on one it dropped, it goes.  It
+// is the player's own if it was made here (`own`), or replaces one that was.
+function storeAssignment(a, own) {
+    const list = loadAssignments();
+    const i = list.findIndex(function (e) { return e.assignment.id === a.id; });
+    const before = {};
+    if(i >= 0) {
+        assignmentLevels(list[i].assignment).forEach(function (x) {
+            before[statementKey(x.level)] = list[i].progress[x.s][x.l];
+        });
+    }
+    const entry = {
+        assignment: a,
+        progress: a.stages.map(function (stage) {
+            return stage.levels.map(function (level) {
+                return before[statementKey(level)] || [false, false, false];
+            });
+        }),
+        own: !!own || (i >= 0 && !!list[i].own),
+    };
+    if(i >= 0) { list[i] = entry; } else { list.push(entry); }
+    storeAssignments(list);
+    return entry;
+}
+
+// Take an assignment in (from a file, or with `own` from the builder), give it its world, and
+// scroll the chooser to it.
+function addAssignment(a, own) {
+    const entry = storeAssignment(a, own);
+    refreshAssignmentWorlds();
+    const i = worldPanes.findIndex(function (e) { return e.assignment && e.assignment.id === a.id; });
+    if(i >= 0) { setWorld(i); }
+    return entry;
+}
+
+// Forget an assignment (with confirmation), and the proofs made on its levels.
+function deleteAssignment(entry) {
+    const a = entry.assignment;
+    if(!confirm('Remove the assignment "' + a.title + '" and the proofs you made on it?')) { return; }
+    storeAssignments(loadAssignments().filter(function (e) { return e.assignment.id !== a.id; }));
+    const prefix = ":assignment:" + a.id + ":";
+    Object.keys(localStorage).forEach(function (key) {
+        if(key.startsWith("proof:") && key.includes(prefix)) { localStorage.removeItem(key); }
+    });
+    if(currentAssignment && currentAssignment.entry.assignment.id === a.id) {
+        currentAssignment = null;
+        updateSaveButtonVisibility();
+    }
+    refreshAssignmentWorlds();
+}
+
+// The state of each difficulty of an assignment level: open up to the assignment's difficulty,
+// and each higher one once the one below it is completed, as customStates has a custom level.
+function assignmentLevelStates(entry, s, l) {
+    const done = entry.progress[s][l];
+    const states = [];
+    for(var K = 0; K < 3; K++) {
+        if(done[K]) { states.push('completed'); }
+        else if(K <= entry.assignment.difficulty || (K >= 1 && done[K - 1])) { states.push('unlocked'); }
+        else { states.push('locked'); }
+    }
+    return states;
+}
+
+// Whether a level of an assignment has been done as the assignment asks: completed at its
+// difficulty or above.  What the chip counts, and what "Next Unsolved" looks past.
+function assignmentLevelDone(entry, s, l) {
+    return entry.progress[s][l].some(function (c, K) { return c && K >= entry.assignment.difficulty; });
+}
+
+// Open a level of an assignment at its highest unlocked difficulty, or (with keepDifficulty) at
+// the one currently set, for re-opening the level we're already on.  Returns whether it opened.
+function openAssignmentLevel(entry, s, l, skipSavedPrompt, keepDifficulty) {
+    const a = entry.assignment;
+    const stage = a.stages[s];
+    const level = stage.levels[l];
+    if(!keepDifficulty) {
+        const states = assignmentLevelStates(entry, s, l);
+        var d = 0;
+        for(var i = 0; i < 3; i++) { if(states[i] !== 'locked') { d = i; } }
+        setDifficulty(d);
+    }
+    if(!setLevel(playableLevel(level), paletteOf(stage, level))) { return false; }
+    currentAssignment = { entry: entry, s: s, l: l };
+    currentCustom = null;
+    currentReview = null;
+    currentLevel = undefined;
+    currentLevelButton = undefined;
+    updateSaveButtonVisibility();
+    document.getElementById("currentLevel").innerText = "Level: " + a.title + " " + (s + 1) + "-" + (l + 1);
+    if(!skipSavedPrompt) {
+        offerSavedProof(null);
+        // A level taken from the game brought its hint along; show it until the level is done once.
+        if(currentHint && !entry.progress[s][l].some(Boolean)) { showHint(); }
+    }
+    return true;
+}
+
+// An assignment level as setLevel is given it: its definition, less a hint that isn't one of the
+// page's hints (a file could name any element, and Show Hint would show it).
+function playableLevel(level) {
+    const def = assignmentLevel(level);
+    if(def.hint !== undefined) {
+        const el = document.getElementById(def.hint);
+        if(!el || !el.classList.contains("hint")) { delete def.hint; }
+    }
+    return def;
+}
+
+// Record that an assignment level was completed at a difficulty, and re-render its world.
+function markAssignmentCompleted(cur, d) {
+    cur.entry.progress[cur.s][cur.l][d] = true;
+    const list = loadAssignments();
+    const stored = list.find(function (e) { return e.assignment.id === cur.entry.assignment.id; });
+    if(stored) {
+        stored.progress[cur.s][cur.l][d] = true;
+        storeAssignments(list);
+    }
+    refreshAssignmentWorlds();
+}
+
+// The "Next" targets from an assignment level (see computeNextTargets): the level after it in the
+// assignment, and the next one not yet done as the assignment asks, scanning on and wrapping
+// around.  As goToLevel expects them: { entry, s, l }.
+function nextAssignmentTargets(cur) {
+    // One object per level, so that the two targets are the same object when they are the same
+    // level (configureNextButtons folds them into one button then).
+    const all = assignmentLevels(cur.entry.assignment).map(function (x) { return { entry: cur.entry, s: x.s, l: x.l }; });
+    const i = all.findIndex(function (x) { return x.s === cur.s && x.l === cur.l; });
+    const seq = i + 1 < all.length ? all[i + 1] : null;
+    var active = null;
+    for(var k = 1; k < all.length; k++) {
+        const x = all[(i + k) % all.length];
+        if(!assignmentLevelDone(cur.entry, x.s, x.l)) { active = x; break; }
+    }
+    return { seq: seq, active: active };
+}
+
+// (Re)build the assignment worlds -- one pane and index chip each, ahead of Custom -- from the
+// stored list.  Nothing to do before the chooser exists: makeLevelSelect calls this once it does.
+function refreshAssignmentWorlds() {
+    if(!customRowsContainer) { return; }
+    const worldIndex = document.getElementById('worldIndex');
+    const worlds = document.getElementById("worlds");
+    const customPane = customRowsContainer.parentElement;
+    // Take down the last rendering's.
+    worldPanes = worldPanes.filter(function (e) {
+        if(!e.assignment) { return true; }
+        e.pane.remove();
+        e.chip.remove();
+        return false;
+    });
+    const entries = loadAssignments().map(buildAssignmentWorld);
+    entries.forEach(function (e) {
+        worlds.insertBefore(e.pane, customPane);
+        worldIndex.insertBefore(e.chip, customChipEl);
+    });
+    const customIndex = worldPanes.findIndex(function (e) { return e.custom; });
+    worldPanes.splice.apply(worldPanes, [customIndex, 0].concat(entries));
+    if(currentWorld >= worldPanes.length) { currentWorld = 0; }
+    highlightWorldChip(currentWorld);
+}
+
+// One assignment's world: a pane of its stages, headed by its title and the things that can be
+// done with it, and its chip.  The chip counts the levels done as the assignment asks.
+function buildAssignmentWorld(entry) {
+    const a = entry.assignment;
+    const pane = document.createElement("div");
+    pane.className = "world assignment-world";
+    pane.dataset.assignment = a.id;
+
+    const header = document.createElement("div");
+    header.className = "world-header";
+    header.innerText = a.title;
+    pane.appendChild(header);
+
+    const byline = document.createElement("div");
+    byline.className = "assignment-byline";
+    byline.innerText = "Assignment" + (a.author ? " by " + a.author : "") + " · " + DIFFICULTY_NAMES[a.difficulty];
+    pane.appendChild(byline);
+
+    const tools = document.createElement("div");
+    tools.className = "assignment-tools";
+    const tool = function (label, title, onclick) {
+        const b = document.createElement("button");
+        b.innerText = label;
+        b.title = title;
+        b.onclick = onclick;
+        tools.appendChild(b);
+    };
+    tool("Submit", "Gather your proofs on this assignment into a file to hand in", function () { submitAssignment(entry); });
+    tool("Share", "The file that gives this assignment to someone else", function () { shareAssignment(a); });
+    // Only an assignment made here is edited here: a student's copy of the instructor's is
+    // theirs to solve, not to change (and grading goes by the instructor's own copy anyway).
+    if(entry.own) { tool("Edit", "Change this assignment's levels or difficulty", function () { openAssignmentBuilder(entry); }); }
+    tool("Remove", "Take this assignment out of your chooser", function () { deleteAssignment(entry); });
+    pane.appendChild(tools);
+
+    var done = 0;
+    var total = 0;
+    a.stages.forEach(function (stage, s) {
+        const grid = document.createElement("div");
+        grid.className = "stage";
+        const label = document.createElement("div");
+        label.className = "stage-label";
+        label.innerText = stage.name;
+        grid.appendChild(label);
+        stage.levels.forEach(function (level, l) {
+            const b = document.createElement("button");
+            const name = (s + 1) + '-' + (l + 1);
+            b.dataset.name = name;
+            b.title = statementText(level);
+            renderLevelButton(b, name, assignmentLevelStates(entry, s, l), null);
+            b.addEventListener('click', function () { openAssignmentLevel(entry, s, l); });
+            grid.appendChild(b);
+            total++;
+            if(assignmentLevelDone(entry, s, l)) { done++; }
+        });
+        pane.appendChild(grid);
+    });
+
+    const chip = document.createElement("div");
+    chip.className = "world-chip";
+    chip.dataset.assignment = a.id;
+    chip.innerHTML = escapeHtml(a.title) + ' <span class="world-progress">' + done + '/' + total + '</span>';
+    const paneEntry = { name: a.title, pane: pane, chip: chip, levels: [], assignment: a };
+    chip.onclick = function () { setWorld(worldPanes.indexOf(paneEntry)); };
+    return paneEntry;
+}
+
+// --- Sharing: the modal that shows a file's text, to copy or download ---
+
+// What the Download button saves: { name, content }.
+var shareFile = null;
+
+function showShare(opts) {
+    document.getElementById("shareHeading").innerText = opts.heading;
+    document.getElementById("shareText").innerText = opts.text;
+    document.getElementById("shareValue").value = opts.value;
+    shareFile = { name: opts.filename, content: opts.download };
+    document.getElementById("copyShare").innerText = "Copy to clipboard";
+    document.getElementById("shareBG").style.display = "flex";
+}
+
+document.getElementById("doneShare").onclick = function () {
+    document.getElementById("shareBG").style.display = "none";
+};
+document.getElementById("copyShare").onclick = function () {
+    const textarea = document.getElementById("shareValue");
+    const copyButton = document.getElementById("copyShare");
+    const done = function () { copyButton.innerText = "Copied!"; setTimeout(function () { copyButton.innerText = "Copy to clipboard"; }, 1500); };
+    if(navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value).then(done, function () { textarea.select(); document.execCommand("copy"); done(); });
+    } else {
+        textarea.select();
+        document.execCommand("copy");
+        done();
+    }
+};
+document.getElementById("downloadShare").onclick = function () {
+    if(shareFile) { downloadFile(shareFile.name, shareFile.content); }
+};
+
+// Save text as a file, by the usual way of getting a browser to pop up a save-as dialog.
+function downloadFile(name, content) {
+    const blob = new Blob([content], { type: 'application/octet-stream' });
+    const a = document.createElement("a");
+    a.style = "display: none";
+    document.body.appendChild(a);
+    const url = window.URL.createObjectURL(blob);
+    a.href = url;
+    a.download = name;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.remove();
+}
+
+// Show an assignment's file, to download or copy.
+function shareAssignment(a) {
+    const text = JSON.stringify(a);
+    showShare({
+        heading: "Share “" + a.title + "”",
+        text: "Download this file and hand it out; anyone who opens it with “Load Assignment” " +
+            "has the assignment in their chooser.  (Its text can be pasted there just as well.)",
+        value: text,
+        filename: fileSlug(a.title) + ".assignment.json",
+        download: text + "\n",
+    });
+}
+
+// --- Handing in ---
+
+// The proof to hand in for a level: the one saved at the highest difficulty it was done at, or
+// failing that the one at the highest difficulty anything was saved at, or none.  Each carries
+// whether the game had it complete; grading checks that for itself.
+function bestProofOf(entry, s, l) {
+    const cur = { entry: entry, s: s, l: l };
+    var partial = null;
+    for(var d = 2; d >= 0; d--) {
+        const saved = localStorage.getItem(assignmentProofKey(cur, d));
+        if(!saved) { continue; }
+        var state;
+        try { state = JSON.parse(saved); } catch(e) { continue; }
+        if(!proofHasProgress(state)) { continue; }
+        if(state.complete) { return { difficulty: d, complete: true, proof: state }; }
+        if(!partial) { partial = { difficulty: d, complete: false, proof: state }; }
+    }
+    return partial || { difficulty: entry.assignment.difficulty, complete: false, proof: null };
+}
+
+// Gather the player's proofs on an assignment into a submission, under their name, to copy or
+// download.  The name is remembered for the next one.
+function submitAssignment(entry) {
+    const input = prompt("Your name, as your instructor should see it:", localStorage.getItem("student") || "");
+    if(input === null) { return; }
+    const student = input.trim();
+    if(!student) { return; }
+    localStorage.setItem("student", student);
+    const a = entry.assignment;
+    const results = a.stages.map(function (stage, s) {
+        return stage.levels.map(function (level, l) { return bestProofOf(entry, s, l); });
+    });
+    const started = results.flat().filter(function (r) { return r.proof; }).length;
+    const submission = makeSubmission({ assignment: a, student: student, results: results });
+    showShare({
+        heading: "Submit “" + a.title + "”",
+        text: "This file holds your proofs on " + started + " of the assignment's " + results.flat().length +
+            " levels.  Download it, or copy the text, and hand it in however your instructor asked.",
+        value: JSON.stringify(submission),
+        filename: fileSlug(student) + "-" + fileSlug(a.title) + ".submission.json",
+        download: JSON.stringify(submission) + "\n",
+    });
+}
+
+// --- Loading: from a file, chosen or pasted in ---
+
+// The assignment a text holds: an assignment file's.
+async function assignmentFromText(text) {
+    var obj;
+    try { obj = JSON.parse(text); }
+    catch(e) { throw new Error("That is not an assignment file."); }
+    if(!isAssignment(obj)) { throw new Error("That file is not an assignment this version of Olorin can open."); }
+    return assignmentCopy(obj);
+}
+
+document.getElementById("loadAssignment").onclick = function () {
+    document.getElementById("assignmentText").value = "";
+    document.getElementById("assignmentFile").value = "";
+    document.getElementById("levelChooseBG").style.display = "none";
+    document.getElementById("assignmentLoadBG").style.display = "flex";
+    document.getElementById("assignmentText").focus();
+};
+document.getElementById("cancelAssignmentLoad").onclick = function () {
+    document.getElementById("assignmentLoadBG").style.display = "none";
+    document.getElementById("levelChooseBG").style.display = "flex";
+};
+document.getElementById("submitAssignmentLoad").onclick = function () {
+    const file = document.getElementById("assignmentFile").files[0];
+    const pasted = document.getElementById("assignmentText").value;
+    const text = file ? file.text() : Promise.resolve(pasted);
+    text.then(assignmentFromText).then(function (a) {
+        document.getElementById("assignmentLoadBG").style.display = "none";
+        addAssignment(a);
+        document.getElementById("levelChooseBG").style.display = "flex";
+    }, function (err) {
+        alert(err.message);
+    });
+};
+
+// --- The builder: picking the levels of an assignment ---
+
+// The id of the assignment the builder is editing, or null when it is making a new one.
+var builderId = null;
+
+// Open the builder: empty, or filled in from an assignment to edit.
+function openAssignmentBuilder(entry) {
+    const a = entry ? entry.assignment : null;
+    builderId = a ? a.id : null;
+    document.getElementById("assignmentTitle").value = a ? a.title : "";
+    document.getElementById("assignmentAuthor").value = a ? (a.author || "") : (localStorage.getItem("author") || "");
+    const d = a ? a.difficulty : 0;
+    document.querySelectorAll('input[name="assignmentDifficulty"]').forEach(function (radio) {
+        radio.checked = parseInt(radio.value) === d;
+    });
+    const picked = new Set(a ? assignmentLevels(a).map(function (x) { return statementKey(x.level); }) : []);
+    buildAssignmentPicker(picked);
+    document.getElementById("submitAssignment").innerText = a ? "Save" : "Create";
+    document.getElementById("levelChooseBG").style.display = "none";
+    document.getElementById("assignmentBuildBG").style.display = "flex";
+}
+
+// Lay out every level there is to pick from -- the game's worlds this player has, stage by stage,
+// and their saved custom levels -- as checkboxes, with those in `picked` (by statement) checked.
+// A stage's own checkbox picks or drops the whole stage.
+function buildAssignmentPicker(picked) {
+    const picker = document.getElementById("assignmentPicker");
+    picker.innerHTML = '';
+    const addRow = function (title, items) {
+        const row = document.createElement("div");
+        row.className = "picker-stage";
+        const all = document.createElement("label");
+        all.className = "picker-all";
+        const allBox = document.createElement("input");
+        allBox.type = "checkbox";
+        all.appendChild(allBox);
+        all.appendChild(document.createTextNode(" " + title));
+        row.appendChild(all);
+        const boxes = items.map(function (item) {
+            const label = document.createElement("label");
+            label.className = "picker-level";
+            label.title = item.title;
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.className = "picker-pick";
+            box.dataset.key = item.key;
+            Object.keys(item.data).forEach(function (k) { box.dataset[k] = item.data[k]; });
+            box.checked = picked.has(item.key);
+            box.onchange = function () { allBox.checked = boxes.every(function (b) { return b.checked; }); };
+            label.appendChild(box);
+            label.appendChild(document.createTextNode(item.label));
+            row.appendChild(label);
+            return box;
+        });
+        allBox.checked = boxes.every(function (b) { return b.checked; });
+        allBox.onchange = function () { boxes.forEach(function (b) { b.checked = allBox.checked; }); };
+        picker.appendChild(row);
+    };
+    LEVELS.forEach(function (world, x) {
+        if(!worldShown(world)) { return; }
+        const heading = document.createElement("div");
+        heading.className = "picker-world";
+        heading.innerText = world.name;
+        picker.appendChild(heading);
+        world.stages.forEach(function (stage, y) {
+            addRow(stage.name || "(no name)", stage.levels.map(function (level, z) {
+                return {
+                    key: statementKey(level),
+                    label: (x + 1) + '-' + (y + 1) + '-' + (z + 1),
+                    title: statementText(level),
+                    data: { world: x, stage: y, level: z },
+                };
+            }));
+        });
+    });
+    const customs = loadCustomLevels();
+    if(customs.length > 0) {
+        const heading = document.createElement("div");
+        heading.className = "picker-world";
+        heading.innerText = "Custom levels";
+        picker.appendChild(heading);
+        addRow("Custom", customs.map(function (cl) {
+            return { key: statementKey(cl), label: cl.name, title: statementText(cl), data: { custom: cl.id } };
+        }));
+    }
+}
+
+// The name an assignment's stage takes from the stage its levels came from: the stage's own, as
+// the chooser shows it -- which is nothing at all for a stage that has none, there as here.
+function assignmentStageName(world, stage) {
+    return stage.name;
+}
+
+document.getElementById("submitAssignment").onclick = function () {
+    const title = document.getElementById("assignmentTitle").value.trim();
+    if(!title) { alert("Give the assignment a title."); return; }
+    const author = document.getElementById("assignmentAuthor").value.trim();
+    const checked = document.querySelector('input[name="assignmentDifficulty"]:checked');
+    const difficulty = checked ? parseInt(checked.value) : 0;
+    // The picked levels, grouped into stages by the stage they came from (in the order the first
+    // of each was met), each stage with that stage's palette; custom levels make a stage of their
+    // own, with the whole palette, as they have on their own.
+    const stages = [];
+    const byKey = {};
+    const customs = loadCustomLevels();
+    document.querySelectorAll('#assignmentPicker input.picker-pick:checked').forEach(function (box) {
+        var key, stage, level;
+        if(box.dataset.custom !== undefined) {
+            const cl = customs.find(function (c) { return c.id === box.dataset.custom; });
+            if(!cl) { return; }
+            key = "custom";
+            stage = { name: "Custom", rules: "all", levels: [] };
+            level = cl;
+        } else {
+            const world = LEVELS[parseInt(box.dataset.world)];
+            const src = world.stages[parseInt(box.dataset.stage)];
+            key = box.dataset.world + "-" + box.dataset.stage;
+            stage = { name: assignmentStageName(world, src), rules: src.rules.slice(), levels: [] };
+            level = src.levels[parseInt(box.dataset.level)];
+        }
+        if(!byKey[key]) { byKey[key] = stage; stages.push(stage); }
+        byKey[key].levels.push(assignmentLevel(level));
+    });
+    if(stages.length === 0) { alert("Pick at least one level."); return; }
+    localStorage.setItem("author", author);
+    const a = makeAssignment({ id: builderId || undefined, title: title, author: author, difficulty: difficulty, stages: stages });
+    document.getElementById("assignmentBuildBG").style.display = "none";
+    addAssignment(a, true);
+    document.getElementById("levelChooseBG").style.display = "flex";
+    shareAssignment(a);
+};
+document.getElementById("createAssignment").onclick = function () { openAssignmentBuilder(null); };
+document.getElementById("cancelAssignment").onclick = function () {
+    document.getElementById("assignmentBuildBG").style.display = "none";
+    document.getElementById("levelChooseBG").style.display = "flex";
+};
+
+// --- Grading ---
+
+// The last grading: the assignment it was of, and for each submission what the checks made of
+// each level, as [{ student, differs, levels: [{ started, complete, difficulty, stray }] }] in
+// assignmentLevels order -- `differs` being whether the submission's copy of the assignment
+// isn't the instructor's.  What the CSV is written from, and the test seam reads.
+var gradedAssignment = null;
+var graded = [];
+
+// Resolves once the typecheck in flight has landed and been drawn -- or at once, if none is.
+function whenTypecheckSettles() {
+    return new Promise(function (resolve) {
+        if(!typecheckPending) { resolve(); return; }
+        typecheckWaiters.push(resolve);
+    });
+}
+
+// Check a proof on an assignment level, as the game would: set the level up, rebuild the proof on
+// it at the difficulty it was made at, and see whether the goal turns a color.  Beyond what
+// typechecking asks -- which never looks at the palette, since a restored proof could not have
+// been built through it -- a block the level's palette doesn't offer fails the proof too.  The
+// level is opened as a review (see currentReview): nothing about it is saved or recorded, and the
+// level label says whose proof it is (`label`) rather than naming a level of the player's.
+async function checkProof(stage, level, state, label) {
+    const rules = paletteOf(stage, level);
+    currentReview = { def: playableLevel(level), rules: rules };
+    currentLevel = undefined;
+    currentLevelButton = undefined;
+    currentCustom = null;
+    currentAssignment = null;
+    updateSaveButtonVisibility();
+    document.getElementById("currentLevel").innerText = "Reviewing: " + label;
+    if(!setLevel(currentReview.def, rules)) {
+        return { started: true, complete: false, difficulty: 0, stray: [], error: "Narya refused the level's statement" };
+    }
+    // A proof is rebuilt from the blocks it names, so those have to be blocks: any element on
+    // the page could be named, and a block that isn't one could not be built or would not be a
+    // proof.  A file that names one, or that can't be rebuilt for any other reason, fails its
+    // level rather than the whole grading, and leaves the diagram as a fresh level.
+    const blocks = Array.from(document.querySelectorAll('#palette .rule')).map(function (el) { return el.id; });
+    const unknown = (state.nodes || []).map(function (n) { return n.rule; })
+          .filter(function (r) { return !FIXED_RULES.includes(r) && !blocks.includes(r); });
+    if(unknown.length > 0) {
+        return { started: true, complete: false, difficulty: 0, stray: [],
+                 error: "Names blocks that don't exist: " + Array.from(new Set(unknown)).join(", ") };
+    }
+    // Checked at the difficulty the proof says it was made at, and at novice if it doesn't say
+    // one that exists: what the wires need to say depends on it.
+    const d = Number.isInteger(state.difficulty) && state.difficulty >= 0 && state.difficulty <= 2 ? state.difficulty : 0;
+    try {
+        restoreProof(Object.assign({}, state, { difficulty: d }));
+    } catch(e) {
+        restoring = false;
+        setLevel(currentReview.def, rules);
+        return { started: true, complete: false, difficulty: d, stray: [], error: "The proof could not be rebuilt: " + e.message };
+    }
+    await whenTypecheckSettles();
+    const used = nodes.filter(function (x) { return !FIXED_RULES.includes(x.rule); }).map(function (x) { return x.rule; });
+    const stray = rules === "all" ? [] : used.filter(function (r) { return !rules.includes(r); });
+    // The pop-up is for the player who finished the level, not for a check of somebody's proof.
+    document.getElementById("levelCompleteBanner").classList.remove("shown");
+    return {
+        started: true,
+        complete: proofIsComplete() && stray.length === 0,
+        difficulty: difficulty,
+        stray: Array.from(new Set(stray)),
+    };
+}
+
+// The submissions a pasted text or a file holds: one, or a JSON array of them.
+function submissionsFromText(text) {
+    var obj;
+    try { obj = JSON.parse(text); }
+    catch(e) { throw new Error("That is not a submission file."); }
+    const list = Array.isArray(obj) ? obj : [obj];
+    if(list.length === 0 || !list.every(isSubmission)) {
+        throw new Error("That is not a submission file this version of Olorin can grade.");
+    }
+    return list;
+}
+
+// Grade submissions -- all of one assignment, the first one's -- checking every proof in turn on
+// the diagram, and lay the verdicts out as a table.
+//
+// The assignment graded is the instructor's own copy, from their list, not the copy a submission
+// carries: a student's copy is theirs to change, and a proof of some easier statement put in a
+// level's place must not pass for that level.  So each of the instructor's levels is graded on
+// the proof the submission holds for that statement, wherever the submission's copy has it, or
+// as not started if it holds none; and a submission whose copy isn't the instructor's is marked.
+async function gradeSubmissions(submissions) {
+    const id = submissions[0].assignment.id;
+    const other = submissions.find(function (s) { return s.assignment.id !== id; });
+    if(other) {
+        throw new Error('These submissions are of different assignments ("' + submissions[0].assignment.title +
+                        '" and "' + other.assignment.title + '"): grade one assignment at a time.');
+    }
+    const entry = loadAssignments().find(function (e) { return e.assignment.id === id; });
+    if(!entry) {
+        throw new Error('These submissions are of "' + submissions[0].assignment.title + '", which is not in ' +
+                        'your chooser.  Load its file first: grading goes by the assignment as you have it, ' +
+                        'not as a submission says it is.');
+    }
+    const a = entry.assignment;
+    const levels = assignmentLevels(a);
+    const progress = document.getElementById("gradeProgress");
+    const total = submissions.length * levels.length;
+    var n = 0;
+    gradedAssignment = a;
+    graded = [];
+    for(const sub of submissions) {
+        const results = submittedProofs(sub);
+        const verdicts = [];
+        for(const x of levels) {
+            n++;
+            progress.innerText = "Checking " + n + " of " + total + " (" + sub.student + ", " + x.name + ")...";
+            const r = results[statementKey(x.level)];
+            verdicts.push(r
+                          ? await checkProof(x.stage, x.level, r.proof, sub.student + ", " + a.title + " " + x.name)
+                          : { started: false, complete: false, difficulty: 0, stray: [] });
+        }
+        const differs = JSON.stringify(assignmentCopy(sub.assignment)) !== JSON.stringify(a);
+        graded.push({ student: sub.student, differs: differs, levels: verdicts, results: results });
+    }
+    progress.innerText = "Checked " + total + " proofs.  Click a mark to look at that proof.";
+    renderGradeTable();
+}
+
+// The proofs a submission holds, by the statement of the level each is for (as the submission's
+// own copy of the assignment states it): { difficulty, complete, proof } for each level that has
+// one.  Of two levels stating the same thing, the first with a proof is taken.
+function submittedProofs(sub) {
+    const out = {};
+    sub.assignment.stages.forEach(function (stage, s) {
+        stage.levels.forEach(function (level, l) {
+            const r = sub.results[s][l];
+            const key = statementKey(level);
+            if(r && r.proof && !out[key]) { out[key] = r; }
+        });
+    });
+    return out;
+}
+
+// The table of verdicts: a row per student (marked where the submission's copy of the assignment
+// isn't the instructor's), a mark per level -- a star in the color of the difficulty it was
+// completed at, a cross for a proof that didn't hold up, a dash for a level never started -- and
+// how many were completed as the assignment asks.
+function renderGradeTable() {
+    const a = gradedAssignment;
+    const levels = assignmentLevels(a);
+    const table = document.getElementById("gradeTable");
+    table.innerHTML = '';
+    const head = document.createElement("tr");
+    ["Student"].concat(levels.map(function (x) { return x.name; }), ["Done"]).forEach(function (text, i) {
+        const th = document.createElement("th");
+        th.innerText = text;
+        if(i > 0 && i <= levels.length) { th.title = levels[i - 1].stage.name + ": " + statementText(levels[i - 1].level); }
+        head.appendChild(th);
+    });
+    table.appendChild(head);
+    graded.forEach(function (g) {
+        const tr = document.createElement("tr");
+        const name = document.createElement("td");
+        name.innerText = g.student;
+        if(g.differs) {
+            name.innerText += " ⚠";
+            name.title = "This submission's copy of the assignment is not yours: an older version, or edited.  " +
+                "The marks are for your levels, on the proofs it holds for their statements.";
+        }
+        tr.appendChild(name);
+        var done = 0;
+        g.levels.forEach(function (v, i) {
+            const td = document.createElement("td");
+            td.className = "grade-mark";
+            if(v.complete) {
+                td.innerHTML = '<span style="color:' + COLORS[v.difficulty][1].backgroundColor + '">★</span>';
+                td.title = "Complete at " + DIFFICULTY_NAMES[v.difficulty];
+                if(v.difficulty >= a.difficulty) { done++; }
+            } else if(v.started) {
+                td.innerHTML = '<span class="grade-cross">✗</span>';
+                td.title = v.error ? v.error
+                    : v.stray.length > 0 ? "Uses blocks the level doesn't offer: " + v.stray.join(", ")
+                    : "Not complete at " + DIFFICULTY_NAMES[v.difficulty];
+            } else {
+                td.innerHTML = '<span class="grade-none">–</span>';
+                td.title = "Not started";
+            }
+            if(v.started) {
+                td.classList.add("grade-viewable");
+                td.onclick = function () { reviewProof(g, i); };
+            }
+            tr.appendChild(td);
+        });
+        const count = document.createElement("td");
+        count.innerText = done + "/" + levels.length;
+        tr.appendChild(count);
+        table.appendChild(tr);
+    });
+    document.getElementById("downloadCsv").style.display = '';
+}
+
+// Open one graded proof on the diagram, to look it over: the grading modal closes.
+function reviewProof(g, i) {
+    const x = assignmentLevels(gradedAssignment)[i];
+    document.getElementById("gradeBG").style.display = "none";
+    checkProof(x.stage, x.level, g.results[statementKey(x.level)].proof, g.student + ", " + gradedAssignment.title + " " + x.name);
+}
+
+document.getElementById("gradeAssignment").onclick = function () {
+    document.getElementById("gradeText").value = "";
+    document.getElementById("gradeFiles").value = "";
+    document.getElementById("gradeProgress").innerText = "";
+    document.getElementById("gradeTable").innerHTML = '';
+    document.getElementById("downloadCsv").style.display = 'none';
+    document.getElementById("levelChooseBG").style.display = "none";
+    document.getElementById("gradeBG").style.display = "flex";
+};
+document.getElementById("doneGrade").onclick = function () {
+    document.getElementById("gradeBG").style.display = "none";
+    if(!currentLevelDef) { document.getElementById("levelChooseBG").style.display = "flex"; }
+};
+document.getElementById("submitGrade").onclick = function () {
+    const button = document.getElementById("submitGrade");
+    const files = Array.from(document.getElementById("gradeFiles").files);
+    const pasted = document.getElementById("gradeText").value.trim();
+    const texts = files.length > 0
+          ? Promise.all(files.map(function (f) { return f.text(); }))
+          : Promise.resolve(pasted ? [pasted] : []);
+    button.disabled = true;
+    texts.then(function (list) {
+        if(list.length === 0) { throw new Error("Choose the submission files, or paste one in."); }
+        return gradeSubmissions(list.flatMap(submissionsFromText));
+    }).catch(function (err) {
+        alert(err.message);
+    }).then(function () {
+        button.disabled = false;
+    });
+};
+document.getElementById("downloadCsv").onclick = function () {
+    if(!gradedAssignment) { return; }
+    downloadFile(fileSlug(gradedAssignment.title) + "-grades.csv", gradesCsv(gradedAssignment, graded));
+};
+
 document.getElementById("saveLevel").onclick = saveCustomLevel;
 document.getElementById("saveLevelAfterComplete").onclick = saveCustomLevel;
 
@@ -3502,6 +4323,8 @@ function selectCurrentLevel(level, skipSavedPrompt) {
     currentLevel = level;
     currentLevelButton = level.button;
     currentCustom = null;
+    currentAssignment = null;
+    currentReview = null;
     updateSaveButtonVisibility();
     document.getElementById("currentLevel").innerText = "Level: " + level.name;
     // If there's an autosaved proof for this level, offer to reload it, and pop up its hint (if
@@ -5249,6 +6072,11 @@ function continue_typechecking(nodes, edges, connections, result) {
     typecheckPending = false;
     typecheckCancelled = false;
     if(typecheckAgain) { typecheck(); return; }
+    // This answer is about the proof as it stands, so anyone waiting for that can have it -- once
+    // it is drawn, which the rest of this function does, so after it rather than here.
+    const settled = typecheckWaiters;
+    typecheckWaiters = [];
+    setTimeout(function () { settled.forEach(function (resolve) { resolve(); }); }, 0);
 
     lastDiagnostics = result.diagnostics || [];
     const diagram = document.getElementById('diagram');
@@ -5459,6 +6287,12 @@ function continue_typechecking(nodes, edges, connections, result) {
                     proofRegisteredComplete = true;
                     markCustomCompleted(currentCustom, difficulty);
                 }
+            } else if(currentAssignment) {
+                // An assignment's level: the same, against the assignment it belongs to.
+                if(!proofRegisteredComplete) {
+                    proofRegisteredComplete = true;
+                    markAssignmentCompleted(currentAssignment, difficulty);
+                }
             }
             // The proof is complete: show the (non-modal) completion pop-up at the top, tinted to
             // match the current difficulty (the same color as the conclusion box), with smart
@@ -5467,8 +6301,7 @@ function continue_typechecking(nodes, edges, connections, result) {
             configureNextButtons();
             document.getElementById("levelCompleteText").innerText =
                 hasBlockBudget() ? "Level Complete! Blocks used: " + blockTally() : "Level Complete!";
-            document.getElementById("saveLevelAfterComplete").style.display =
-                (!currentLevel && currentLevelDef) ? '' : 'none';
+            document.getElementById("saveLevelAfterComplete").style.display = isCustomOpen() ? '' : 'none';
             const banner = document.getElementById("levelCompleteBanner");
             banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
             banner.classList.add("shown");
@@ -5699,6 +6532,8 @@ document.getElementById("submitLevel").onclick = function () {
     currentLevel = undefined;
     currentLevelButton = undefined;
     currentCustom = null;
+    currentAssignment = null;
+    currentReview = null;
     updateSaveButtonVisibility();
     document.getElementById("currentLevel").innerText = "Level: Custom";
     // If the player named the level, save it to the Custom list right away.
