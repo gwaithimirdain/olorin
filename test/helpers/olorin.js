@@ -197,6 +197,138 @@ class Olorin {
         }, name);
     }
 
+    // ===== Assignments (see the Assignments section of client/main.js) =====
+
+    // The titles of the assignment worlds in the chooser, in order.
+    assignmentTitles() {
+        return this.page.evaluate(() =>
+            Array.from(document.querySelectorAll('#worlds .assignment-world .world-header')).map((h) => h.innerText));
+    }
+
+    // The assignments the app has stored, as [{ assignment, progress }].
+    assignments() {
+        return this.page.evaluate(() => window.__olorin.assignments());
+    }
+
+    // The selector of an assignment's world pane, by its title.
+    _assignmentPane(title) {
+        return this.page.evaluate((t) => {
+            const pane = Array.from(document.querySelectorAll('#worlds .assignment-world'))
+                  .find((p) => p.querySelector('.world-header').innerText === t);
+            return pane ? `#worlds .assignment-world[data-assignment="${pane.dataset.assignment}"]` : null;
+        }, title);
+    }
+
+    // Open a level of an assignment by the assignment's title and the level's "stage-level" name.
+    async openAssignmentLevel(title, name) {
+        await this.openChooser();
+        const pane = await this._assignmentPane(title);
+        await this.page.click(`${pane} .level[data-name="${name}"] .level-number`);
+        await this.page.waitForFunction(
+            ({ t, n }) => document.getElementById('currentLevel').innerText === `Level: ${t} ${n}`,
+            { t: title, n: name },
+        );
+        await this.dismissHints();
+    }
+
+    // The per-difficulty ['locked'|'unlocked'|'completed'] states an assignment level's button
+    // shows (needs the chooser open).
+    async assignmentLevelStates(title, name) {
+        const pane = await this._assignmentPane(title);
+        return this.page.evaluate((sel) =>
+            Array.from(document.querySelectorAll(`${sel} .lvmark`)).map((m) =>
+                m.innerText === '★' ? 'completed' : m.classList.contains('locked') ? 'locked' : 'unlocked'),
+        `${pane} .level[data-name="${name}"]`);
+    }
+
+    // The "done/total" count on an assignment's chip.
+    async assignmentProgress(title) {
+        const pane = await this._assignmentPane(title);
+        const id = pane.match(/"([^"]+)"/)[1];
+        return this.page.evaluate((i) =>
+            document.querySelector(`#worldIndex .world-chip[data-assignment="${i}"] .world-progress`).innerText, id);
+    }
+
+    // The labels of an assignment's tools, in order ("Edit" only on one made here).
+    async assignmentTools(title) {
+        await this.openChooser();
+        const pane = await this._assignmentPane(title);
+        return this.page.evaluate((sel) =>
+            Array.from(document.querySelectorAll(`${sel} .assignment-tools button`)).map((b) => b.innerText), pane);
+    }
+
+    // Press one of an assignment's tools -- "Submit", "Share", "Edit" or "Remove" -- by label.
+    async assignmentTool(title, label) {
+        await this.openChooser();
+        const pane = await this._assignmentPane(title);
+        await this.page.evaluate(({ sel, l }) => {
+            Array.from(document.querySelectorAll(`${sel} .assignment-tools button`)).find((b) => b.innerText === l).click();
+        }, { sel: pane, l: label });
+    }
+
+    // Read what the Share modal is showing (an assignment's or a submission's JSON), and close it.
+    async shareValue() {
+        await this.page.waitForSelector('#shareBG', { state: 'visible' });
+        const value = await this.page.inputValue('#shareValue');
+        await this.page.click('#doneShare');
+        return value;
+    }
+
+    // Hand an assignment in under a student's name, and return the submission JSON.
+    async submitAssignment(title, student) {
+        this.setPromptText(student);
+        await this.assignmentTool(title, 'Submit');
+        return this.shareValue();
+    }
+
+    // Load an assignment from its file's JSON, pasted in.
+    async loadAssignmentText(text) {
+        await this.openChooser();
+        await this.page.click('#loadAssignment');
+        await this.page.fill('#assignmentText', text);
+        await this.page.click('#submitAssignmentLoad');
+    }
+
+    // Build an assignment through the builder, picking built-in levels by their "w-s-l" names and
+    // custom levels by name, and return the file text it shows.
+    async buildAssignment({ title, author = '', difficulty = 0, levels = [], customs = [], edit }) {
+        await this.openChooser();
+        if (edit) { await this.assignmentTool(edit, 'Edit'); } else { await this.page.click('#createAssignment'); }
+        await this.page.fill('#assignmentTitle', title);
+        await this.page.fill('#assignmentAuthor', author);
+        await this.page.check(`input[name="assignmentDifficulty"][value="${difficulty}"]`);
+        await this.page.evaluate(({ ls, cs }) => {
+            document.querySelectorAll('#assignmentPicker input.picker-pick').forEach((box) => {
+                const name = box.dataset.custom !== undefined
+                      ? box.parentElement.innerText.trim()
+                      : `${+box.dataset.world + 1}-${+box.dataset.stage + 1}-${+box.dataset.level + 1}`;
+                const want = box.dataset.custom !== undefined ? cs.includes(name) : ls.includes(name);
+                if (box.checked !== want) { box.click(); }
+            });
+        }, { ls: levels, cs: customs });
+        await this.page.click('#submitAssignment');
+        return this.shareValue();
+    }
+
+    // Grade pasted submission JSON, and return what grading found (see window.__olorin.grades).
+    async gradeText(text) {
+        await this.openChooser();
+        await this.page.click('#gradeAssignment');
+        await this.page.fill('#gradeText', text);
+        await this.page.click('#submitGrade');
+        await this.page.waitForFunction(
+            () => document.getElementById('gradeProgress').innerText.startsWith('Checked'),
+            null, { timeout: 60000 });
+        return this.page.evaluate(() => window.__olorin.grades());
+    }
+
+    // The grading table, each row's cells as text.
+    gradeRows() {
+        return this.page.evaluate(() =>
+            Array.from(document.querySelectorAll('#gradeTable tr')).map((tr) =>
+                Array.from(tr.children).map((td) => td.innerText)));
+    }
+
     // Whether the level hint overlay is currently showing.
     hintVisible() {
         return this.page.isVisible('#hintBG');

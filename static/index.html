@@ -195,6 +195,9 @@
           <div style="text-align: center; margin-top: 20px">
             <button id="cancelChooseLevel" style="font-size: 16px; display: none">Cancel</button>
             <button id="customLevel" style="font-size: 16px">Custom</button>
+            <button id="createAssignment" style="font-size: 16px" title="Pick levels to hand out as an assignment">Create Assignment</button>
+            <button id="loadAssignment" style="font-size: 16px" title="Open an assignment from its file">Load Assignment</button>
+            <button id="gradeAssignment" style="font-size: 16px" title="Check the proofs students handed in on an assignment">Grade</button>
             <button id="clearHistory" style="font-size: 16px">Clear History</button>
             <button id="about" style="font-size: 16px">About</button>
             <br/>
@@ -260,6 +263,90 @@
           <button id="backLevel" style="font-size: 16px">Back</button>
           <button id="cancelSetLevel" style="font-size: 16px; display: none">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Assignments (see the Assignments section of client/main.js).  The builder picks the levels
+         of one; Load takes one in from its file; Share shows the file to download or copy (it
+         serves a submission too); Grade checks the submissions handed in. -->
+    <div id="assignmentBuildBG" class="modalbg">
+      <div class="modal" id="assignmentModal">
+        <h3 style="text-align: center">Make an assignment</h3>
+        <div id="assignmentScroll">
+          <p>
+            Pick the levels for your students, from the game's own and from your custom levels.  They
+            get the assignment as a world of its own, its levels grouped as the stages they came from and
+            with those stages' rules, all open at the difficulty you choose.  Hand it out as the file
+            this makes; each student hands in a file with their proofs, which <b>Grade</b> checks.
+          </p>
+          <p><b>Title.</b></p>
+          <input type="text" id="assignmentTitle" style="width: 100%"/>
+          <p><b>Your name</b> (optional), shown to students with the assignment.</p>
+          <input type="text" id="assignmentAuthor" style="width: 100%"/>
+          <p><b>Difficulty.</b>
+            The levels open at this difficulty, and count as done once solved at it (or above).
+          </p>
+          <div id="assignmentDifficulty">
+            <label><input type="radio" name="assignmentDifficulty" value="0" checked/> Novice</label>
+            <label><input type="radio" name="assignmentDifficulty" value="1"/> Adept</label>
+            <label><input type="radio" name="assignmentDifficulty" value="2"/> Master</label>
+          </div>
+          <p><b>Levels.</b>
+            Hover a level for the statement it asks for.  A stage's own box picks the whole stage.
+          </p>
+          <div id="assignmentPicker"></div>
+        </div>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="submitAssignment" style="font-size: 16px">Create</button>
+          <button id="cancelAssignment" style="font-size: 16px">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="assignmentLoadBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center">Load an assignment</h3>
+        <p>Choose the assignment file, or paste its text below.</p>
+        <textarea id="assignmentText" style="width: 100%; font-family: monospace; box-sizing: border-box" rows="6"></textarea>
+        <p><input type="file" id="assignmentFile" accept=".json,application/json"/></p>
+        <div style="text-align: center">
+          <button id="submitAssignmentLoad" style="font-size: 16px">Load</button>
+          <button id="cancelAssignmentLoad" style="font-size: 16px">Cancel</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="shareBG" class="modalbg">
+      <div class="modal">
+        <h3 style="text-align: center" id="shareHeading"></h3>
+        <p id="shareText"></p>
+        <textarea id="shareValue" style="width: 100%; font-family: monospace; box-sizing: border-box" rows="6" readonly></textarea>
+        <div style="text-align: center">
+          <button id="copyShare" style="font-size: 16px">Copy to clipboard</button>
+          <button id="downloadShare" style="font-size: 16px">Download file</button>
+          <button id="doneShare" style="font-size: 16px">Close</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <div id="gradeBG" class="modalbg">
+      <div class="modal" id="gradeModal">
+        <h3 style="text-align: center">Grade an assignment</h3>
+        <p>
+          Choose the submission files your students handed in (all of one assignment), or paste one in.
+          The assignment must be in your chooser (load its file if it isn't): every proof is checked
+          again here, against the assignment as you have it and at the difficulty the proof was made
+          at, so the marks are Olorin's rather than the files'.
+        </p>
+        <p><input type="file" id="gradeFiles" accept=".json,application/json" multiple/></p>
+        <textarea id="gradeText" style="width: 100%; font-family: monospace; box-sizing: border-box" rows="4" placeholder="...or paste a submission here"></textarea>
+        <div style="text-align: center; margin-top: 10px">
+          <button id="submitGrade" style="font-size: 16px">Grade</button>
+          <button id="downloadCsv" style="font-size: 16px; display: none">Download CSV</button>
+          <button id="doneGrade" style="font-size: 16px">Close</button><br/>
+        </div>
+        <div id="gradeProgress"></div>
+        <div id="gradeScroll"><table id="gradeTable"></table></div>
       </div>
     </div>
 
@@ -394,7 +481,7 @@
             Olorin is a game where you prove theorems in classical predicate logic by connecting boxes with wires.
             It's a fun collection of puzzles, and also an educational tool for learning to write proofs.
             There are over three hundred levels, divided into "worlds" with several stages each, and three difficulty settings.
-            You can also create and solve custom levels.
+            You can also create and solve custom levels, and an instructor can pick levels out as an assignment to hand to students as a file, and grade what they hand back.
           </p>
           <p class="about">
             If you're just getting started, you should probably close this box now and try it out, <b>starting from level 1-1-1 on Novice difficulty</b> and proceeding in order.
