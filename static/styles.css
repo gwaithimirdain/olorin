@@ -125,7 +125,7 @@ body.arranging { cursor: progress; }
 }
 
 .basic {
-    background-color: #dddddd;
+    background-color: var(--block-color);
     padding: 0px 8px 0px 8px;
     border-radius: 5px;
     border-style: solid;
@@ -153,6 +153,25 @@ body.arranging { cursor: progress; }
     text-align: left;
 }
 
+/* Block colors, by the connective or quantifier whose rule a block is: both the rule that proves
+   it and the one that uses it.  The pieces of a container rule inherit the color from the
+   container.  These keep clear of the difficulty colors (green, blue, purple), of blue (values),
+   and of red (errors).  Givens, goals, and the arithmetic blocks stay grey. */
+
+.rule {
+    --block-color: #dddddd;
+}
+
+[data-rule="andI"], [data-rule="andE"] { --block-color: #ffd966; }
+[data-rule="orI1"], [data-rule="orI2"], [data-rule="orE"] { --block-color: #ffa95e; }
+[data-rule="impI"], [data-rule="impE"] { --block-color: #7fd4c3; }
+[data-rule="iffI"], [data-rule="iffE1"], [data-rule="iffE2"] { --block-color: #aee3d9; }
+[data-rule="negI"], [data-rule="negE"], [data-rule="cnegI"] { --block-color: #f2a5a5; }
+[data-rule="allI"], [data-rule="allE"] { --block-color: #d4b48c; }
+[data-rule="exI"], [data-rule="exE"], [data-rule="uexI"], [data-rule="uexE"] { --block-color: #d6cf86; }
+[data-rule="topI"] { --block-color: #ffffff; }
+[data-rule="botE"] { --block-color: #555555; color: #ffffff; }
+
 /* A bunch of classes for the sligthly kludgy pieces of binding rules */
 
 .assumption {
@@ -164,7 +183,7 @@ body.arranging { cursor: progress; }
     border-width: 1px;
     top: -2px;
     position: absolute;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 .singleleft {
@@ -182,7 +201,7 @@ body.arranging { cursor: progress; }
     border-width: 1px;
     border-radius: 0px 0px 5px 5px;
     position: absolute;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 .bottom {
@@ -206,7 +225,7 @@ body.arranging { cursor: progress; }
     top: -2px;
     right: -2px;
     position: absolute;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 .singleright {
@@ -263,7 +282,7 @@ body.arranging { cursor: progress; }
     position: absolute;
     bottom: 1px;
     right: 18px;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 .bottomleft {
@@ -273,7 +292,7 @@ body.arranging { cursor: progress; }
     position: absolute;
     bottom: 1px;
     left: 10px;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 .midright {
@@ -281,7 +300,7 @@ body.arranging { cursor: progress; }
     height: 20px;
     position: absolute;
     right: 18px;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 .midleft {
@@ -289,7 +308,7 @@ body.arranging { cursor: progress; }
     height: 20px;
     position: absolute;
     left: 18px;
-    background-color: #dddddd;
+    background-color: var(--block-color);
 }
 
 /* Dragging boxes from the palette */
