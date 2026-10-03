@@ -1645,7 +1645,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀<₁",
-            rules: [ "allI", "allE", "expr", "alg", "asc", "omega", ],
+            rules: [ "allI", "allE", "expr", "alg", "asc", "omega", "tord", "deceq" ],
             levels: [
                 {
                     parameters: [ ],
@@ -1806,7 +1806,7 @@ export const LEVELS = [
             ],
           },
           { name: "∀₊∨<",
-            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "omega" ],
+            rules: [ "allI", "allE", "orI1", "orI2", "orE", "expr", "algplus", "asc", "tord", "deceq", "omega" ],
             levels: [
                 {
                     parameters: [ ],
