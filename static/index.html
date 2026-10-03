@@ -196,6 +196,9 @@
             <button id="cancelChooseLevel" style="font-size: 16px; display: none">Cancel</button>
             <button id="customLevel" style="font-size: 16px">Custom</button>
             <button id="clearHistory" style="font-size: 16px">Clear History</button>
+            <button id="exportProgress" style="font-size: 16px" title="Save your progress to a file, as a backup">Export Progress</button>
+            <button id="importProgress" style="font-size: 16px" title="Restore your progress from an exported file">Import Progress</button>
+            <input type="file" id="importProgressFile" accept=".json,application/json" style="display: none"/>
             <button id="about" style="font-size: 16px">About</button>
             <br/>
           </div>
@@ -360,6 +363,21 @@
         <div style="text-align: center; margin-top: 20px">
           <button id="copyExport" style="font-size: 16px">Copy to clipboard</button>
           <button id="doneExport" style="font-size: 16px">Close</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shown (at most once a day) on completing a level, when this browser may delete the saved
+         progress on its own. -->
+    <div id="storageWarningBG" class="modalbg">
+      <div class="modal" style="width: 500px">
+        <h3 style="text-align: center">Back up your progress</h3>
+        <p id="storageWarningReason"></p>
+        <p>To be safe, use the <b>Export Progress</b> button (under Select Level) every so often to save
+          your progress to a file.  If it is ever lost, <b>Import Progress</b> brings it back.</p>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="storageWarningExport" style="font-size: 16px">Export Progress Now</button>
+          <button id="storageWarningOK" style="font-size: 16px">OK</button><br/>
         </div>
       </div>
     </div>

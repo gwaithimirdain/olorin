@@ -1540,10 +1540,12 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
                won't refine the goal of a disconnected fragment).  We must handle them here: this
                whole synthesis runs outside check's ambient Reporter handler, so an unhandled emit
                would abort the command via History.do_command, deleting its metavariables and leaving
-               dangling references ("undefined metavariable" anomaly). *)
+               dangling references ("undefined metavariable" anomaly).  Like those reported from
+               check's own handler, they aren't fatal, so they don't mark the wire as in error;
+               this includes hints such as "match encountered outside case tree". *)
               match d.message with
               | No_holes_allowed _ -> Diagnostic.add hole_diagnostics true d
-              | _ -> Diagnostic.add diagnostics true d)
+              | _ -> Diagnostic.add diagnostics false d)
             ~fatal:(fun d ->
               match d.message with
               | Extern { error = Explain.Extern.(Ill_scoped_connection | Cyclic_term); _ }

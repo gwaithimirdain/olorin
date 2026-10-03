@@ -3002,6 +3002,12 @@ if (TEST_MODE) {
             const lvl = allLevels.find((l) => l.name === name);
             return lvl ? JSON.stringify(saveable(lvl)) : null;
         },
+        // Pretend the browser might delete our storage, for this reason, warning about it every
+        // `days` days (a null reason: it won't, the default in test mode), to test the warning that
+        // follows a completion.
+        setStorageRisk: (reason, days) => {
+            storageRisk = () => Promise.resolve(reason === null ? null : { reason: reason, days: days });
+        },
         // Set (null clears) one of a stage's unlock options -- "previous" or "bonus" -- by 1-based
         // world and stage number, and re-render.  Lets those rules be tested whether or not a stage
         // in levels.js currently declares them.
@@ -3152,6 +3158,142 @@ clearHistory.onclick = function () {
             document.getElementById("loginBG").style.display = "flex";
         }
     }
+};
+
+// "Export Progress" and "Import Progress" back up everything the game keeps in localStorage --
+// completed levels, saved proofs, custom levels, settings -- to a file and restore it, since a
+// browser can wipe a site's storage on its own (Safari after a week away, clear-on-exit settings,
+// low disk space).  A logged-in student's completions live on the server, so these are hidden there.
+const PROGRESS_FORMAT = "olorin-progress";
+// Login details belong to this browser, not to the progress being moved around.
+const PROGRESS_SKIPPED_KEYS = ["email", "course"];
+if(SERVER) {
+    document.getElementById("exportProgress").style.display = "none";
+    document.getElementById("importProgress").style.display = "none";
+}
+function exportProgress() {
+    flushScrollSave();
+    const data = {};
+    for(var i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if(!PROGRESS_SKIPPED_KEYS.includes(key)) { data[key] = localStorage.getItem(key); }
+    }
+    const file = { format: PROGRESS_FORMAT, version: 1, exported: new Date().toISOString(), data: data };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "olorin-progress-" + file.exported.slice(0, 10) + ".json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+}
+document.getElementById("exportProgress").onclick = exportProgress;
+const importProgressFile = document.getElementById("importProgressFile");
+document.getElementById("importProgress").onclick = function () {
+    importProgressFile.value = "";
+    importProgressFile.click();
+};
+importProgressFile.onchange = function () {
+    const chosen = importProgressFile.files[0];
+    if(!chosen) { return; }
+    chosen.text().then(function (text) {
+        var file = null;
+        try { file = JSON.parse(text); } catch(e) { }
+        if(!file || file.format !== PROGRESS_FORMAT || typeof file.data !== "object" || file.data === null
+           || !Object.values(file.data).every(function (v) { return typeof v === "string"; })) {
+            alert("That file isn't an exported Olorin progress file.");
+            return;
+        }
+        if(file.version !== 1) {
+            alert("That progress file is from a newer version of Olorin.  Reload the page to get the latest version, and try again.");
+            return;
+        }
+        if(!confirm("This will replace all your current progress with the progress saved in this file!  Are you sure?")) {
+            return;
+        }
+        // A pending scroll-save would otherwise write the open proof back over the imported one as
+        // the page unloads.
+        clearTimeout(scrollSaveTimer);
+        scrollSaveTimer = null;
+        const kept = {};
+        PROGRESS_SKIPPED_KEYS.forEach(function (key) {
+            const v = localStorage.getItem(key);
+            if(v !== null) { kept[key] = v; }
+        });
+        localStorage.clear();
+        Object.entries(kept).forEach(function ([key, v]) { localStorage.setItem(key, v); });
+        Object.entries(file.data).forEach(function ([key, v]) {
+            if(!PROGRESS_SKIPPED_KEYS.includes(key)) { localStorage.setItem(key, v); }
+        });
+        // Start over from the restored storage, as on a fresh visit (which also migrates any
+        // records an older file kept under their legacy keys).
+        location.reload();
+    });
+};
+
+// Ask the browser not to evict our storage when it's short of space.  Chrome decides by itself
+// (granting it to sites that are bookmarked, installed, or used a lot) and Firefox asks the player,
+// so this waits until there is progress worth keeping.  Resolves to whether it was granted.
+function requestPersistentStorage() {
+    if(!navigator.storage || !navigator.storage.persist) { return Promise.resolve(false); }
+    return navigator.storage.persisted().then(function (persisted) {
+        return persisted || navigator.storage.persist();
+    }).catch(function () { return false; });
+}
+
+// Persistence doesn't stop Safari (which is every browser on an iPhone or iPad) from deleting the
+// storage of a site not used in a week of browsing.  A web app opened from the Home Screen keeps its
+// own count of days, of days it is actually used, so it is spared.
+function isSafariTab() {
+    const ua = navigator.userAgent;
+    const standalone = navigator.standalone === true
+          || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Android/.test(ua) && !standalone;
+}
+
+// Whether this browser might delete the saved progress: null if it shouldn't, or else why it might,
+// and how many days to wait before saying so again.  Safari's weekly deletion is a real danger, so
+// it's mentioned daily; a browser merely not promising to keep the progress (as Chrome won't, for a
+// site it doesn't yet think important) deletes it only when short of space, so that's weekly.
+// Tests replace this (see window.__olorin), since what a headless browser answers isn't up to them.
+var storageRisk = function () {
+    if(isSafariTab()) {
+        return Promise.resolve({
+            reason: "Safari deletes the progress a website has saved if you go about a week of using Safari without visiting it.  (On an iPhone or iPad, this applies to every browser, but not to Olorin opened from an icon added to the Home Screen.)",
+            days: 1,
+        });
+    }
+    return requestPersistentStorage().then(function (persistent) {
+        return persistent ? null : {
+            reason: "Your browser hasn't agreed to keep Olorin's saved progress permanently, so it might delete it, for instance if your device runs low on space.  (In some browsers, bookmarking Olorin helps.)",
+            days: 7,
+        };
+    });
+};
+if(TEST_MODE) { storageRisk = function () { return Promise.resolve(null); }; }
+
+// After a completion, warn the player if the progress they're making might be deleted -- but only
+// every so many days (see storageRisk), rather than on every level.  "storageWarned" is the
+// timestamp of the local midnight starting the day of the last warning.
+function warnIfStorageAtRisk() {
+    storageRisk().then(function (risk) {
+        if(!risk) { return; }
+        const today = new Date().setHours(0, 0, 0, 0);
+        // Rounded, since a day with a daylight-saving change isn't 24 hours long.
+        const days = Math.round((today - parseInt(localStorage.getItem("storageWarned"))) / 86400000);
+        if(days < risk.days) { return; }
+        localStorage.setItem("storageWarned", today.toString());
+        document.getElementById("storageWarningReason").innerText = risk.reason;
+        document.getElementById("storageWarningBG").style.display = "flex";
+    });
+}
+document.getElementById("storageWarningOK").onclick = function () {
+    document.getElementById("storageWarningBG").style.display = "none";
+};
+document.getElementById("storageWarningExport").onclick = function () {
+    document.getElementById("storageWarningBG").style.display = "none";
+    exportProgress();
 };
 
 var pendingDowngrade = null;
@@ -5441,6 +5583,7 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const key = JSON.stringify(saveable(currentLevel));
                     const value = { complete: true, difficulty: Math.max(difficulty, past.difficulty || 0), times: times };
                     localStorage.setItem(key, JSON.stringify(value));
+                    warnIfStorageAtRisk();
                     // Re-render the level buttons (this level is now complete, and others may have
                     // unlocked or re-locked), and update this world's index-chip progress count.
                     updateLevelSelect(null);

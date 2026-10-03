@@ -239,3 +239,29 @@ test.describe('The wire-error tooltip', () => {
         expect(await olorin.wireTooltip()).toContain('algebra block');
     });
 });
+
+// Narya's hints aren't problems with the proof.  Ascribing a type to the output of ⊥-elimination
+// is a match outside a case tree, so Narya hints that it's wrapping it in a let-binding; that
+// mustn't turn the wire red.
+test('a Narya hint is not reported as an error', async ({ page }) => {
+    const olorin = new Olorin(page);
+    await olorin.open();
+    await olorin.buildCustom({ parameters: 'P : Type', variables: '', hypotheses: '⊥', conclusion: 'P' });
+    await olorin.restore({
+        complete: false,
+        difficulty: 1,
+        nodes: [
+            { id: 'hyp7', rule: 'hypothesis', left: '50px', top: '474px', value: '⊥' },
+            { id: 'concl7', rule: 'conclusion', left: '1425px', top: '449px', value: 'P' },
+            { id: 'rule9', rule: 'botE', left: '244px', top: '385px' },
+            { id: 'rule10', rule: 'asc', left: '419px', top: '501px', value: 'P', width: 'fit-content' },
+        ],
+        connections: [
+            { source: { vertex: 'hyp7', sort: 'output' }, target: { vertex: 'rule9', sort: 'input' } },
+            { source: { vertex: 'rule9', sort: 'output' }, target: { vertex: 'rule10', sort: 'input' }, ty: 'P' },
+        ],
+    });
+    const diagnostics = await olorin.diagnostics();
+    expect(diagnostics.filter((d) => d.code === 'H0403' && d.isfatal)).toEqual([]);
+    expect(diagnostics.filter((d) => d.isfatal && d.locs.some((l) => l.isEdge))).toEqual([]);
+});
