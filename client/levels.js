@@ -792,7 +792,7 @@ export const LEVELS = [
             ],
           },
           { name: "∧∨⇒₂",
-            rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2" ],
+            rules: [ "andE", "andI", "impE", "impI", "orE", "orI1", "orI2", "asc" ],
             bonus: true,
             levels: [
                 {
