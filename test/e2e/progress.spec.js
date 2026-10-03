@@ -107,3 +107,93 @@ test.describe('Progress export / import', () => {
         expect(await storage(olorin.page)).toEqual(before);
     });
 });
+
+// Completing a level warns the player to export, when the browser might delete their progress --
+// once a day or once a week at most, depending on the danger.
+test.describe('Storage warning', () => {
+    let olorin;
+
+    test.beforeEach(async ({ page }) => {
+        olorin = new Olorin(page);
+        await olorin.open();
+    });
+
+    // Complete LEVEL afresh: open it, or if it's already open, clear its proof to start over.
+    async function complete() {
+        if ((await olorin.currentLevelName()) === LEVEL.name) {
+            await olorin.clear();
+        } else {
+            await olorin.selectLevel(LEVEL.name);
+        }
+        // Reopening a level numbers its boxes afresh, so find them rather than naming them.
+        const nodes = await olorin.nodes();
+        const hyp = nodes.find((n) => n.rule === 'hypothesis').id;
+        const concl = nodes.find((n) => n.rule === 'conclusion').id;
+        await olorin.connect({ vertex: hyp, sort: 'output' }, { vertex: concl, sort: 'input' });
+        expect(await olorin.isComplete()).toBe(true);
+    }
+
+    const shown = (page) => page.isVisible('#storageWarningBG');
+
+    test('is not shown when storage is safe', async () => {
+        await complete();
+        await olorin.page.waitForTimeout(200);
+        expect(await shown(olorin.page)).toBe(false);
+    });
+
+    // Pretend the last warning was `days` days ago.
+    function warnedDaysAgo(days) {
+        return olorin.page.evaluate((days) => {
+            const then = new Date();
+            then.setDate(then.getDate() - days);
+            localStorage.setItem('storageWarned', then.setHours(0, 0, 0, 0).toString());
+        }, days);
+    }
+
+    test('is shown with the reason, once a day', async () => {
+        await olorin.page.evaluate(() => window.__olorin.setStorageRisk('Because of reasons.', 1));
+        await complete();
+        await olorin.page.waitForSelector('#storageWarningBG', { state: 'visible' });
+        expect(await olorin.page.innerText('#storageWarningReason')).toBe('Because of reasons.');
+        await olorin.page.click('#storageWarningOK');
+        expect(await shown(olorin.page)).toBe(false);
+
+        // Not again today.
+        await complete();
+        await olorin.page.waitForTimeout(200);
+        expect(await shown(olorin.page)).toBe(false);
+
+        // But again the next day.
+        await warnedDaysAgo(1);
+        await complete();
+        await olorin.page.waitForSelector('#storageWarningBG', { state: 'visible' });
+    });
+
+    test('can be shown only once a week', async () => {
+        await olorin.page.evaluate(() => window.__olorin.setStorageRisk('Because of reasons.', 7));
+        await complete();
+        await olorin.page.waitForSelector('#storageWarningBG', { state: 'visible' });
+        await olorin.page.click('#storageWarningOK');
+
+        await warnedDaysAgo(6);
+        await complete();
+        await olorin.page.waitForTimeout(200);
+        expect(await shown(olorin.page)).toBe(false);
+
+        await warnedDaysAgo(7);
+        await complete();
+        await olorin.page.waitForSelector('#storageWarningBG', { state: 'visible' });
+    });
+
+    test('its button exports progress', async () => {
+        await olorin.page.evaluate(() => window.__olorin.setStorageRisk('Because of reasons.', 1));
+        await complete();
+        await olorin.page.waitForSelector('#storageWarningBG', { state: 'visible' });
+        const [download] = await Promise.all([
+            olorin.page.waitForEvent('download'),
+            olorin.page.click('#storageWarningExport'),
+        ]);
+        expect(download.suggestedFilename()).toMatch(/^olorin-progress-.*\.json$/);
+        expect(await shown(olorin.page)).toBe(false);
+    });
+});

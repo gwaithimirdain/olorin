@@ -367,6 +367,21 @@
       </div>
     </div>
 
+    <!-- Shown (at most once a day) on completing a level, when this browser may delete the saved
+         progress on its own. -->
+    <div id="storageWarningBG" class="modalbg">
+      <div class="modal" style="width: 500px">
+        <h3 style="text-align: center">Back up your progress</h3>
+        <p id="storageWarningReason"></p>
+        <p>To be safe, use the <b>Export Progress</b> button (under Select Level) every so often to save
+          your progress to a file.  If it is ever lost, <b>Import Progress</b> brings it back.</p>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="storageWarningExport" style="font-size: 16px">Export Progress Now</button>
+          <button id="storageWarningOK" style="font-size: 16px">OK</button><br/>
+        </div>
+      </div>
+    </div>
+
     <div id="importBG" class="modalbg">
       <div class="modal" style="width: 600px">
         <h3 style="text-align: center">Import proof</h3>
