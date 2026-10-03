@@ -3154,6 +3154,88 @@ clearHistory.onclick = function () {
     }
 };
 
+// "Export Progress" and "Import Progress" back up everything the game keeps in localStorage --
+// completed levels, saved proofs, custom levels, settings -- to a file and restore it, since a
+// browser can wipe a site's storage on its own (Safari after a week away, clear-on-exit settings,
+// low disk space).  A logged-in student's completions live on the server, so these are hidden there.
+const PROGRESS_FORMAT = "olorin-progress";
+// Login details belong to this browser, not to the progress being moved around.
+const PROGRESS_SKIPPED_KEYS = ["email", "course"];
+if(SERVER) {
+    document.getElementById("exportProgress").style.display = "none";
+    document.getElementById("importProgress").style.display = "none";
+}
+document.getElementById("exportProgress").onclick = function () {
+    flushScrollSave();
+    const data = {};
+    for(var i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if(!PROGRESS_SKIPPED_KEYS.includes(key)) { data[key] = localStorage.getItem(key); }
+    }
+    const file = { format: PROGRESS_FORMAT, version: 1, exported: new Date().toISOString(), data: data };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "olorin-progress-" + file.exported.slice(0, 10) + ".json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+};
+const importProgressFile = document.getElementById("importProgressFile");
+document.getElementById("importProgress").onclick = function () {
+    importProgressFile.value = "";
+    importProgressFile.click();
+};
+importProgressFile.onchange = function () {
+    const chosen = importProgressFile.files[0];
+    if(!chosen) { return; }
+    chosen.text().then(function (text) {
+        var file = null;
+        try { file = JSON.parse(text); } catch(e) { }
+        if(!file || file.format !== PROGRESS_FORMAT || typeof file.data !== "object" || file.data === null
+           || !Object.values(file.data).every(function (v) { return typeof v === "string"; })) {
+            alert("That file isn't an exported Olorin progress file.");
+            return;
+        }
+        if(file.version !== 1) {
+            alert("That progress file is from a newer version of Olorin.  Reload the page to get the latest version, and try again.");
+            return;
+        }
+        if(!confirm("This will replace all your current progress with the progress saved in this file!  Are you sure?")) {
+            return;
+        }
+        // A pending scroll-save would otherwise write the open proof back over the imported one as
+        // the page unloads.
+        clearTimeout(scrollSaveTimer);
+        scrollSaveTimer = null;
+        const kept = {};
+        PROGRESS_SKIPPED_KEYS.forEach(function (key) {
+            const v = localStorage.getItem(key);
+            if(v !== null) { kept[key] = v; }
+        });
+        localStorage.clear();
+        Object.entries(kept).forEach(function ([key, v]) { localStorage.setItem(key, v); });
+        Object.entries(file.data).forEach(function ([key, v]) {
+            if(!PROGRESS_SKIPPED_KEYS.includes(key)) { localStorage.setItem(key, v); }
+        });
+        // Start over from the restored storage, as on a fresh visit (which also migrates any
+        // records an older file kept under their legacy keys).
+        location.reload();
+    });
+};
+
+// Ask the browser not to evict our storage when it's short of space.  Chrome decides by itself
+// (granting it to sites that are bookmarked, installed, or used a lot) and Firefox asks the player,
+// so this waits until there is progress worth keeping.  It does not stop Safari's deletion of the
+// storage of sites not visited for a week; only exporting the progress protects against that.
+function requestPersistentStorage() {
+    if(!navigator.storage || !navigator.storage.persist) { return; }
+    navigator.storage.persisted().then(function (persisted) {
+        if(!persisted) { return navigator.storage.persist(); }
+    }).catch(function () { });
+}
+
 var pendingDowngrade = null;
 document.getElementById("reduceDifficulty").onclick = function () {
     if(difficulty === 0) { return; }
@@ -5441,6 +5523,7 @@ function continue_typechecking(nodes, edges, connections, result) {
                     const key = JSON.stringify(saveable(currentLevel));
                     const value = { complete: true, difficulty: Math.max(difficulty, past.difficulty || 0), times: times };
                     localStorage.setItem(key, JSON.stringify(value));
+                    requestPersistentStorage();
                     // Re-render the level buttons (this level is now complete, and others may have
                     // unlocked or re-locked), and update this world's index-chip progress count.
                     updateLevelSelect(null);
