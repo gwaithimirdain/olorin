@@ -6,10 +6,10 @@
 //   previous: [ "name", ...]
 //                       Which worlds this one follows, by name.  All three of the rules that open a
 //                       world ask about every world named, and about the whole relation: this world
-//                       opens at a difficulty once every world it follows is >= 80% complete at
-//                       that difficulty, every world THEY follow is >= 50% complete one difficulty
-//                       higher, and every world that follows THIS one is >= 50% complete one
-//                       difficulty lower.  Every world must have this list, even the first, whose is
+//                       opens at a difficulty once enough of every world it follows is complete
+//                       at that difficulty, enough of every world THEY follow one difficulty
+//                       higher, and enough of every world that follows THIS one one difficulty
+//                       lower (how much is enough is set in unlock-rules.js).  Every world must have this list, even the first, whose is
 //                       [] (it follows nothing); a name that isn't a world's is an error.
 //
 // It may also carry:
@@ -25,8 +25,8 @@
 //                       course starts at the first level of its own first world.  Its worlds do
 //                       gate each other, as any worlds of the same kind do.  Its higher
 //                       difficulties are earned by its own work rather than by the worlds behind
-//                       it, which it hasn't got: a world of a course opens at a difficulty once it
-//                       is 80% complete at the one below, and a level of it once that level has
+//                       it, which it hasn't got: a world of a course opens at a difficulty once
+//                       enough of it is complete at the one below, and a level of it once that level has
 //                       been solved at the one below.
 //
 // A stage is { name, rules, levels }: its label in the chooser, the palette rules its levels may
@@ -35,16 +35,16 @@
 //   previous: [ "name", ...]
 //                       Which stages of this world this stage's "previous stage" unlock requirement
 //                       asks about, by name, instead of the default (just the stage before it, and
-//                       none for the first stage).  Each stage named must be >= 70% complete at a
-//                       difficulty before this stage's levels unlock at it.  Name a stage further
+//                       none for the first stage).  Enough of each stage named must be complete
+//                       at a difficulty before this stage's levels unlock at it.  Name a stage further
 //                       back when this one continues it rather than its immediate neighbour (two
 //                       independent tracks side by side), name several to require them all, or use
 //                       [] for no stage prerequisite at all.  Only this world's stages are looked
 //                       at; a name that isn't exactly one of theirs is an error.
 //
 //   bonus: true         Extra credit: this stage's levels are left out of its world's totals, so
-//                       the percentages that open worlds and difficulties (>= 80% of the previous
-//                       world, >= 50% of the next one, ...) are of the non-bonus levels only.
+//                       the fractions that open worlds and difficulties (of the previous world, of
+//                       the next one, ...) are of the non-bonus levels only.
 //                       Solving a bonus level can then never open a world, nor be needed to.  Its
 //                       own stage still counts normally, so the stage rules (a stage needing its
 //                       predecessors, a level needing the ones before it) treat it like any other.

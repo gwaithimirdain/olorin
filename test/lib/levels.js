@@ -18,15 +18,27 @@
 const fs = require('fs');
 const path = require('path');
 
-function loadLevelsModule() {
-    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'client', 'levels.js'), 'utf8');
+// Evaluate a pure-data client module, returning the named top-level bindings.
+function loadClientModule(file, names) {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'client', file), 'utf8');
     const transformed = src
         .replace(/export\s+const\s+/g, 'const ')
         .replace(/export\s+function\s+/g, 'function ')
-        + '\nreturn { LEVELS, COURSE_CODES, saveable, legacySaveables };';
+        + '\nreturn { ' + names.join(', ') + ' };';
     // eslint-disable-next-line no-new-func
     return new Function(transformed)();
 }
+
+function loadLevelsModule() {
+    return loadClientModule('levels.js', ['LEVELS', 'COURSE_CODES', 'saveable', 'legacySaveables']);
+}
+
+// The numbers in the unlock rules (client/unlock-rules.js), so tests can follow them rather than
+// hardcoding them.
+const UNLOCK = loadClientModule('unlock-rules.js', [
+    'PREVIOUS_WORLD_FRACTION', 'FOLLOWING_WORLD_FRACTION', 'EARLIER_WORLD_FRACTION',
+    'PREVIOUS_STAGE_FRACTION', 'SKIPPABLE_EARLIER_LEVELS', 'RECENT_COMPLETION_WINDOW',
+]);
 
 // The record the tests see for one level of levels.js.  `name` is the "world-stage-level" id the
 // app shows (1-indexed), `saveable` is the level identity used as its localStorage key, and the
@@ -306,9 +318,10 @@ function thresholdCount(total, frac) {
 // Seeds that open world `w` at difficulty `K` -- rules 1-3, read as the app's worldGatesPass reads
 // them, over the declared relation rather than over world order:
 //
-//   1. every world this one follows is >= 80% complete at K
-//   2. every world that follows this one is >= 50% complete at K-1 (unless K is 0)
-//   3. every world followed by a world this one follows is >= 50% at K+1 (unless K is 2)
+//   1. every world this one follows is PREVIOUS_WORLD_FRACTION complete at K
+//   2. every world that follows this one is FOLLOWING_WORLD_FRACTION complete at K-1 (unless K is 0)
+//   3. every world followed by a world this one follows is EARLIER_WORLD_FRACTION complete at K+1
+//      (unless K is 2)
 //
 // A world named by more than one requirement is seeded at the highest difficulty asked of it, so a
 // weaker requirement can't undo a stronger one.
@@ -322,10 +335,10 @@ function worldGateSeeds(w, K) {
         });
     };
     prereqWorlds(w).forEach(function (p) {
-        atLeast(p, 0.8, K);
-        if (K < 2) prereqWorlds(p.number).forEach((q) => atLeast(q, 0.5, K + 1));
+        atLeast(p, UNLOCK.PREVIOUS_WORLD_FRACTION, K);
+        if (K < 2) prereqWorlds(p.number).forEach((q) => atLeast(q, UNLOCK.EARLIER_WORLD_FRACTION, K + 1));
     });
-    if (K > 0) followerWorlds(w).forEach((f) => atLeast(f, 0.5, K - 1));
+    if (K > 0) followerWorlds(w).forEach((f) => atLeast(f, UNLOCK.FOLLOWING_WORLD_FRACTION, K - 1));
     return [...need].map(([key, d]) => [key, JSON.stringify({ complete: true, difficulty: d })]);
 }
 
@@ -352,5 +365,5 @@ module.exports = {
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, wrappableStatementLevel,
     hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, legacyCompletionKeys, completions, thresholdCount, prereqs,
-    prereqSeeds,
+    prereqSeeds, UNLOCK,
 };

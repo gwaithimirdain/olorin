@@ -2,6 +2,8 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 import { arrange } from "./arrange.js"
+import { PREVIOUS_WORLD_FRACTION, FOLLOWING_WORLD_FRACTION, EARLIER_WORLD_FRACTION, PREVIOUS_STAGE_FRACTION,
+         SKIPPABLE_EARLIER_LEVELS, RECENT_COMPLETION_WINDOW } from "./unlock-rules.js"
 
 const DIFFICULTIES = ['Novice', 'Adept', 'Master'];
 
@@ -2074,22 +2076,25 @@ function worldGateBlockers(w, K, data) {
     // A course's students have the game's own worlds at novice from the start, so that the term's
     // work is the course's worlds and the rest is theirs to draw on.
     if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return blockers; }
-    // 1a. A course's world opens at a difficulty once it is itself >= 80% complete at the one
-    //     below.  Rules 1-3 are all about other worlds, and a course has no game behind it to have
-    //     played through (nothing outside it gates it, and it gates nothing outside), so what earns
-    //     its next difficulty is its own work -- at rule 1's percentage, pointed at itself.
-    if(K > 0 && !outsideCourses(LEVELS[w])) { need(w, K - 1, 0.8); }
-    // 1. Every world this one follows is >= 80% complete at difficulty K.
-    world.previous.forEach(function (p) { need(p, K, 0.8); });
-    // 2. Every world that follows this one is >= 50% complete at K-1 (unless K is 0).
-    if(K > 0) { world.followers.forEach(function (f) { need(f, K - 1, 0.5); }); }
-    // 3. Every world followed by a world this one follows is >= 50% complete at K+1 (unless K=2).
+    // 1a. A course's world opens at a difficulty once it is itself PREVIOUS_WORLD_FRACTION
+    //     complete at the one below.  Rules 1-3 are all about other worlds, and a course has no
+    //     game behind it to have played through (nothing outside it gates it, and it gates nothing
+    //     outside), so what earns its next difficulty is its own work -- at rule 1's percentage,
+    //     pointed at itself.
+    if(K > 0 && !outsideCourses(LEVELS[w])) { need(w, K - 1, PREVIOUS_WORLD_FRACTION); }
+    // 1. Every world this one follows is PREVIOUS_WORLD_FRACTION complete at difficulty K.
+    world.previous.forEach(function (p) { need(p, K, PREVIOUS_WORLD_FRACTION); });
+    // 2. Every world that follows this one is FOLLOWING_WORLD_FRACTION complete at K-1 (unless K
+    //    is 0).
+    if(K > 0) { world.followers.forEach(function (f) { need(f, K - 1, FOLLOWING_WORLD_FRACTION); }); }
+    // 3. Every world followed by a world this one follows is EARLIER_WORLD_FRACTION complete at
+    //    K+1 (unless K=2).
     //    A course drops this one: its students haven't the whole game behind them, and asking them
     //    to go up a difficulty in an earlier world to open a later one is a run-up they don't have
     //    the term for.
     if(COURSE === null && K < 2) {
         world.previous.forEach(function (p) {
-            data[p].previous.forEach(function (q) { need(q, K + 1, 0.5); });
+            data[p].previous.forEach(function (q) { need(q, K + 1, EARLIER_WORLD_FRACTION); });
         });
     }
     // Two worlds can share a world they follow, which would otherwise be asked for twice.
@@ -2114,22 +2119,23 @@ function unlockBlockers(w, s, c, K, data) {
     if(COURSE !== null && K === 0 && outsideCourses(LEVELS[w])) { return []; }
     // Rules 1-3: the world must be open at this difficulty.
     const blockers = worldGateBlockers(w, K, data);
-    // 4. Each of this stage's prerequisite stages is >= 70% complete at K.  By default that's the
-    //    single stage right before it; a stage can instead declare `previous: [...]` in levels.js,
-    //    naming the stages of its world it requires -- to look past the stage in between (for two
-    //    independent tracks), to require several, or [] for no stage prerequisite at all.  The
-    //    first stage has none by default.  (computeUnlockData resolves the names to indices.)
+    // 4. Each of this stage's prerequisite stages is PREVIOUS_STAGE_FRACTION complete at K.  By
+    //    default that's the single stage right before it; a stage can instead declare
+    //    `previous: [...]` in levels.js, naming the stages of its world it requires -- to look past
+    //    the stage in between (for two independent tracks), to require several, or [] for no stage
+    //    prerequisite at all.  The first stage has none by default.  (computeUnlockData resolves
+    //    the names to indices.)
     for(var pi = 0; pi < stage.previous.length; pi++) {
         const ps = stage.previous[pi];
-        const n = moreNeeded(world.stages[ps].done[K], world.stages[ps].total, 0.7);
+        const n = moreNeeded(world.stages[ps].done[K], world.stages[ps].total, PREVIOUS_STAGE_FRACTION);
         if(n > 0) { blockers.push('Complete ' + moreLevels(n) + ' of ' + stageLabel(w, ps) + ' at ' + diff); }
     }
-    // 5. All but (at most) 2 of the levels before this one in the stage are complete at K -- so a
-    //    stage's first three levels are available as soon as it opens.
+    // 5. All but (at most) SKIPPABLE_EARLIER_LEVELS of the levels before this one in the stage are
+    //    complete at K -- so a stage's first few levels are available as soon as it opens.
     var completedBefore = 0;
     for(var i = 0; i < c; i++) { if(stage.levelDiff[i] >= K) { completedBefore++; } }
-    if(completedBefore < c - 2) {
-        blockers.push('Complete ' + (c - 2 - completedBefore) +
+    if(completedBefore < c - SKIPPABLE_EARLIER_LEVELS) {
+        blockers.push('Complete ' + (c - SKIPPABLE_EARLIER_LEVELS - completedBefore) +
                       ' more of the levels before this one in its stage at ' + diff);
     }
     // 6. (Novice only) every earlier level in this stage that has a hint is completed -- so you
@@ -2178,9 +2184,6 @@ function lockTooltip(level, K) {
     return 'To unlock ' + DIFFICULTIES[K] + ':\n' +
         blockers.map(function (b) { return '• ' + b; }).join('\n');
 }
-
-// How many completions must pass before a just-completed difficulty stops re-locking the next.
-const RECENT_COMPLETION_WINDOW = 10;
 
 // The state of each of a level's three difficulties: 'completed', 'unlocked', or 'locked'.
 function levelDifficultyStates(level, past, data) {

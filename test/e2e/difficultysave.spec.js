@@ -4,7 +4,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { find, completionKey, prereqSeeds } = require('../lib/levels');
+const { find, completionKey, prereqSeeds, UNLOCK } = require('../lib/levels');
 const { hasFixture, readFixture, readFixtureText } = require('../lib/fixtures');
 
 // Levels are picked out of levels.js by what these tests need of them -- never by id, which shifts
@@ -65,17 +65,21 @@ test.describe('Per-difficulty saved proofs', () => {
         expect(await olorin.isComplete()).toBe(false);
     });
 
-    // Make MANUAL reachable at Adept: the next world >= 50% novice (rule 2), the earlier stages of
-    // its own world complete at adept (rule 4), and its stage predecessors complete at adept (rule 5).
-    // Rule 8 also wants MANUAL itself solved at novice, which each test seeds with its own times.
+    // Make MANUAL reachable at Adept: enough of the next world at novice (rule 2), the earlier
+    // stages of its own world complete at adept (rule 4), and its stage predecessors complete at
+    // adept (rule 5).  Rule 8 also wants MANUAL itself solved at novice, which each test seeds with
+    // its own times.
     const reachAdept = () => prereqSeeds(MANUAL, 1);
+    // The global completion count to seed: far enough past MANUAL's novice, at time 5, that rule 7
+    // no longer holds its Adept shut.
+    const NOW = String(5 + UNLOCK.RECENT_COMPLETION_WINDOW + 15);
 
     test('reducing difficulty and re-solving re-locks the higher difficulty for a while', async ({ page }) => {
         const olorin = new Olorin(page);
-        // Its novice was completed long ago (time 5 of 30), so Adept is unlocked.
+        // Its novice was completed long ago (at time 5, long before NOW), so Adept is unlocked.
         await olorin.seed([
             ['difficulty', '1'],
-            ['time', '30'],
+            ['time', NOW],
             [completionKey(MANUAL), JSON.stringify({ complete: true, difficulty: 0, times: { 0: 5 } })],
             ...reachAdept(),
         ]);
@@ -93,11 +97,11 @@ test.describe('Per-difficulty saved proofs', () => {
 
     test('downgrading and loading the saved lower-difficulty proof also re-locks the higher one', async ({ page }) => {
         const olorin = new Olorin(page);
-        // Its novice was completed long ago (time 5 of 30), so Adept is unlocked; a saved novice
+        // Its novice was completed long ago (at time 5, long before NOW), so Adept is unlocked; a saved novice
         // proof exists to restore.
         await olorin.seed([
             ['difficulty', '1'],
-            ['time', '30'],
+            ['time', NOW],
             [completionKey(MANUAL), JSON.stringify({ complete: true, difficulty: 0, times: { 0: 5 } })],
             ['proof:0:' + completionKey(MANUAL), manualProofRaw],
             ...reachAdept(),
@@ -113,7 +117,7 @@ test.describe('Per-difficulty saved proofs', () => {
 
         // Loading the saved complete novice proof counts as a fresh solve -> Adept re-locked.
         expect((await olorin.levelStates(MANUAL.name))[1]).toBe('locked');
-        // But a re-load doesn't advance the global completion counter (still 30).
-        expect(await page.evaluate(() => localStorage.getItem('time'))).toBe('30');
+        // But a re-load doesn't advance the global completion counter (still NOW).
+        expect(await page.evaluate(() => localStorage.getItem('time'))).toBe(NOW);
     });
 });

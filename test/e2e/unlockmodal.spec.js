@@ -5,26 +5,27 @@
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 const { worlds, world, followerWorlds, worldGateSeeds, oneWireLevel, completions,
-        thresholdCount } = require('../lib/levels');
+        thresholdCount, UNLOCK } = require('../lib/levels');
 const { hasFixture, readFixture } = require('../lib/fixtures');
 
 // Levels and worlds are chosen structurally, never by id or by position: which worlds completing
 // one opens is the declared `previous` relation, not the order the worlds appear in.
 
 // For the novice announcement: a level proved by one wire, and a world that follows its world --
-// which finishing 80% of that world opens (rule 1).
+// which finishing PREVIOUS_WORLD_FRACTION of that world opens (rule 1).
 const FIRST = oneWireLevel();
 const OPENED = followerWorlds(FIRST.world)[0];
 // A world's percentage is of its non-bonus levels, and this is the fewest of them that reach
-// rule 1's 80%; one less stays below it.
+// rule 1's fraction; one less stays below it.
 const W1 = world(FIRST.world).counted;
-const W1_MOST = thresholdCount(W1.length, 0.8);
+const W1_MOST = thresholdCount(W1.length, UNLOCK.PREVIOUS_WORLD_FRACTION);
 
 // For the adept announcement: the first world follows no world, so rules 1 and 3 ask nothing of it
-// and its Adept is gated by rule 2 alone -- every world that follows it at >= 50% novice.  Pushing
-// the last of those over that half therefore opens it at Adept, and it is the first Adept unlock.
+// and its Adept is gated by rule 2 alone -- every world that follows it FOLLOWING_WORLD_FRACTION
+// complete at novice.  Pushing the last of those over that fraction therefore opens it at Adept,
+// and it is the first Adept unlock.
 const TARGET = worlds()[0];
-const half = (w) => thresholdCount(w.counted.length, 0.5);
+const half = (w) => thresholdCount(w.counted.length, UNLOCK.FOLLOWING_WORLD_FRACTION);
 // The world to push over: one that follows TARGET and whose own first level has a captured proof,
 // so the test can just restore it (an opener has no stage or predecessor gates of its own).
 const CROSSER = followerWorlds(TARGET.number).find((w) => hasFixture(w.levels[0]));
