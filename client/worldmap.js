@@ -26,7 +26,12 @@ export const JUNCTION_RADIUS = 4;
 const MARGIN = 12;
 const NODE_SEP = 8;
 const LINE_SEP = 14;
-const COLUMN_GAP = 48;
+const COLUMN_GAP = 72;
+
+// How lines leave and come into boxes and junctions: straight and level for STUB, and then still
+// nearly level for LEVEL_ARM of the way on before they bend (see pieces).
+const STUB = 8;
+const LEVEL_ARM = 0.5;
 const GROUP_GAP = 64;
 
 // How far down a group smaller than the tallest may be moved, to centre it: no further, so that in a
@@ -74,7 +79,7 @@ export function layoutWorldMap(groups) {
         l.edges.forEach(function (e) {
             const shift = (end) => end.junction === undefined ? end : { junction: end.junction + base };
             edges.push({ source: shift(e.source), target: shift(e.target),
-                         path: smoothPath(e.points.map((p) => ({ x: p.x + dx, y: p.y + dy }))) });
+                         path: smoothPath(e.points.map((p) => Object.assign({}, p, { x: p.x + dx, y: p.y + dy }))) });
         });
         left += l.width;
     });
@@ -211,7 +216,7 @@ function layoutGroup(group) {
                             bottom: below ? y(below) - clear(below) : Infinity });
             }
         });
-        return { source: w.from.end, target: w.to.end, points: routeLine(points, gaps) };
+        return { source: w.from.end, target: w.to.end, points: routeLine(withStubs(points), gaps) };
     });
     const lastWorldRank = lastRank + (lastRank % 2);
     return {
@@ -467,41 +472,65 @@ function routeLine(points, gaps) {
     return pts;
 }
 
-// The slopes of the curve smoothPath draws through `points` at each of them: level at the ends, where
-// it leaves a box and comes into one, and otherwise the slope from the point before to the point after
-// (a "Catmull-Rom" curve), so that it goes on its way without levelling off and waving about.
-function slopes(points) {
+// A line's points with a short straight stretch added at each end, so that it comes out of a box (or
+// a junction's dot) level, and goes into one level, before it bends -- where there's room for it.
+// The ends, and the stretches' far ends, are marked `level` (see pieces).
+function withStubs(points) {
     const n = points.length;
-    return points.map(function (p, i) {
-        if(i === 0 || i === n - 1) { return 0; }
+    const first = Object.assign({}, points[0], { level: true });
+    const last = Object.assign({}, points[n - 1], { level: true });
+    const middle = points.slice(1, n - 1);
+    const room = (a, b) => STUB > 0 && Math.abs(b.x - a.x) > 3 * STUB;
+    const out = [first];
+    if(room(first, points[1])) { out.push({ x: first.x + STUB, y: first.y, level: true }); }
+    out.push(...middle);
+    if(room(points[n - 2], last)) { out.push({ x: last.x - STUB, y: last.y, level: true }); }
+    out.push(last);
+    return out;
+}
+
+// The curve through a line's points, as the cubic pieces between each two: for each, its ends and
+// its two control points, { a, c1, c2, b }.  At a point marked `level` (an end, or the far end of a
+// straight stretch at one) the curve is level, and stays nearly so for LEVEL_ARM of the way to the
+// next point before it bends.  Anywhere else it takes the slope from the point before to the point
+// after (a "Catmull-Rom" curve), so that it goes on its way without levelling off and waving about.
+function pieces(points) {
+    const n = points.length;
+    const slope = points.map(function (p, i) {
+        if(p.level || i === 0 || i === n - 1) { return 0; }
         const a = points[i - 1], b = points[i + 1];
         return b.x === a.x ? 0 : (b.y - a.y) / (b.x - a.x);
     });
+    const arm = (p, i, h) => (p.level || i === 0 || i === n - 1 ? LEVEL_ARM : 1 / 3) * h;
+    const out = [];
+    for(var i = 0; i + 1 < n; i++) {
+        const a = points[i], b = points[i + 1], h = b.x - a.x;
+        const ka = arm(a, i, h), kb = arm(b, i + 1, h);
+        out.push({ a: a, b: b, c1: { x: a.x + ka, y: a.y + slope[i] * ka },
+                   c2: { x: b.x - kb, y: b.y - slope[i + 1] * kb } });
+    }
+    return out;
 }
 
-// Where the curve through `points` is at x.  Each piece of it, between two points, is a cubic whose
-// control points are evenly spaced across, so its x goes evenly with the parameter along it.
+// Where the curve through `points` is at x.
 function curveAt(points, x) {
-    const slope = slopes(points);
-    for(var i = 0; i + 1 < points.length; i++) {
-        const a = points[i], b = points[i + 1];
-        if(x < a.x || x > b.x || b.x === a.x) { continue; }
-        const t = (x - a.x) / (b.x - a.x), u = 1 - t, third = (b.x - a.x) / 3;
-        return u * u * u * a.y + 3 * u * u * t * (a.y + slope[i] * third) +
-            3 * u * t * t * (b.y - slope[i + 1] * third) + t * t * t * b.y;
+    const piece = pieces(points).find((p) => x >= p.a.x && x <= p.b.x && p.b.x > p.a.x);
+    if(!piece) { return points[x < points[0].x ? 0 : points.length - 1].y; }
+    const at = (t, k) => {
+        const u = 1 - t;
+        return u * u * u * piece.a[k] + 3 * u * u * t * piece.c1[k] + 3 * u * t * t * piece.c2[k] + t * t * t * piece.b[k];
+    };
+    // Its x goes steadily on along it, so the point at x can be found by halving.
+    var lo = 0, hi = 1;
+    for(var step = 0; step < 30; step++) {
+        const mid = (lo + hi) / 2;
+        if(at(mid, 'x') < x) { lo = mid; } else { hi = mid; }
     }
-    return points[x < points[0].x ? 0 : points.length - 1].y;
+    return at((lo + hi) / 2, 'y');
 }
 
-// An SVG path through a line's points, left to right: one smooth curve (see slopes).
+// An SVG path through a line's points, left to right: one smooth curve (see pieces).
 function smoothPath(points) {
-    const slope = slopes(points);
-    const fmt = (x, y) => Math.round(x * 10) / 10 + ',' + Math.round(y * 10) / 10;
-    var path = 'M' + fmt(points[0].x, points[0].y);
-    for(var i = 0; i + 1 < points.length; i++) {
-        const a = points[i], b = points[i + 1], third = (b.x - a.x) / 3;
-        path += ' C' + fmt(a.x + third, a.y + slope[i] * third) + ' ' + fmt(b.x - third, b.y - slope[i + 1] * third) +
-            ' ' + fmt(b.x, b.y);
-    }
-    return path;
+    const fmt = (p) => Math.round(p.x * 10) / 10 + ',' + Math.round(p.y * 10) / 10;
+    return 'M' + fmt(points[0]) + pieces(points).map((p) => ' C' + fmt(p.c1) + ' ' + fmt(p.c2) + ' ' + fmt(p.b)).join('');
 }
