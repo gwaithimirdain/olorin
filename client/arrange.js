@@ -415,6 +415,16 @@ function buildConstraints(model, scopes, S) {
            && cx.addAll([before(at.right(a), at.left(b), sp.gapX)])) { return; }
         if(implied(at.right(b), at.left(a)) >= 0
            && cx.addAll([before(at.right(b), at.left(a), sp.gapX)])) { return; }
+        // A block wired straight to a bracket goes beside it, on the side the wire says, never
+        // above or below it, even where the player had it there: a block feeding the bracket goes
+        // to its left, and one fed by it to its right.
+        if(blocks[a].branches || blocks[b].branches) {
+            const feeds = (s, t) => wires.some((w) => w.s === s && w.t === t);
+            if(feeds(a, b) && !feeds(b, a)
+               && cx.addAll([before(at.right(a), at.left(b), sp.gapX)])) { return; }
+            if(feeds(b, a) && !feeds(a, b)
+               && cx.addAll([before(at.right(b), at.left(a), sp.gapX)])) { return; }
+        }
         const scope = cluster[a].length > 1 || cluster[b].length > 1;
         const gy = scope ? sp.scopeGap : sp.gapY;
         const stack = (upper, lower) => {

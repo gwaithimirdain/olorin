@@ -66,6 +66,16 @@ test.describe('Arrange', () => {
             }).map((w) => [w.src.block, w.tgt.block]);
             expect(backward).toEqual([]);
 
+            // A block wired straight to a bracket in the same subproof is beside the bracket, not
+            // above or below it: to its left if it feeds the bracket, and to its right if the
+            // bracket feeds it.
+            const besides = model.wires.map((w) => [byId[w.src.block], byId[w.tgt.block]])
+                .filter(([s, t]) => s !== t && (s.branches || t.branches)
+                        && plan.regions[s.id] === plan.regions[t.id])
+                .filter(([s, t]) => s.x + s.w > t.x + 1 && t.x + t.w > s.x + 1)
+                .map(([s, t]) => [s.id, t.id]);
+            expect(besides).toEqual([]);
+
             // Every block of a subproof between its bracket's uprights and on its side of the bar.
             const strays = Object.entries(plan.regions).filter(([id, region]) => {
                 if (!region) return false;

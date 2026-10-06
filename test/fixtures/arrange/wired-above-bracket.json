@@ -1,0 +1,106 @@
+{
+  "level": {
+    "parameters": [
+      {
+        "name": "P",
+        "ty": "Type"
+      }
+    ],
+    "variables": [],
+    "hypotheses": [
+      {
+        "ty": "P\u2228P"
+      }
+    ],
+    "conclusion": {
+      "ty": "P"
+    }
+  },
+  "complete": true,
+  "difficulty": 0,
+  "view": {
+    "x": 13,
+    "y": 0
+  },
+  "counters": {
+    "counter": 1,
+    "paramCounter": 2,
+    "varCounter": 0,
+    "hypCounter": 2,
+    "conclCounter": 2
+  },
+  "nodes": [
+    {
+      "id": "hyp1",
+      "rule": "hypothesis",
+      "left": "582px",
+      "top": "208px",
+      "value": "P\u2228P"
+    },
+    {
+      "id": "concl1",
+      "rule": "conclusion",
+      "left": "1084px",
+      "top": "339px",
+      "value": "P"
+    },
+    {
+      "id": "rule0",
+      "rule": "orE",
+      "left": "354px",
+      "top": "320px",
+      "width": "516px",
+      "height": "80px"
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "vertex": "hyp1",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "output"
+      },
+      "target": {
+        "vertex": "concl1",
+        "sort": "input"
+      },
+      "connector": "Bezier"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "assumption",
+        "label": "left"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "subgoal",
+        "label": "left"
+      },
+      "connector": "Straight"
+    },
+    {
+      "source": {
+        "vertex": "rule0",
+        "sort": "assumption",
+        "label": "right"
+      },
+      "target": {
+        "vertex": "rule0",
+        "sort": "subgoal",
+        "label": "right"
+      },
+      "connector": "Straight"
+    }
+  ]
+}
