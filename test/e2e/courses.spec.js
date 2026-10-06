@@ -13,7 +13,7 @@
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 const { courseWorlds, courseCodes, worlds, world, inWorld, completions, worldGateSeeds,
-        worldCount, oneWireLevel, thresholdCount, UNLOCK } = require('../lib/levels');
+        worldCount, oneWireLevel, thresholdCount, UNLOCK, needsRule } = require('../lib/levels');
 
 const COURSE = courseWorlds()[0];
 const CODE = COURSE && courseCodes().find((c) => COURSE.courses.includes(c.course));
@@ -75,6 +75,7 @@ test.describe("A course's worlds", () => {
     // A course's world passes its own gates from the start, having none -- so a snapshot that
     // counted it would announce it, to a player who can't even see it.
     test('are never announced to a player who hasn\'t got them', async ({ page }) => {
+        needsRule(test, 1);
         const FIRST = oneWireLevel();
         const COUNTED = world(FIRST.world).counted;
         const olorin = new Olorin(page);
@@ -160,15 +161,16 @@ test.describe('The code a student was given', () => {
 });
 
 // A course has nothing behind it to have played through, so its own work is what earns its higher
-// difficulties: the world opens at one when it is PREVIOUS_WORLD_FRACTION complete at the one below (rule 1's
-// percentage, pointed at itself), and a level opens at one when that level has been solved at the
-// one below.  In the game proper the first of those comes from the worlds behind a world instead.
+// difficulties: the world opens at one when it is PREVIOUS_WORLD_FRACTION complete at the one
+// below (rule 1's fraction, pointed at itself), and a level opens at one when that level has been
+// solved at the one below.  In the game proper the first of those comes from the worlds behind a
+// world instead.
 test.describe('The difficulties of a course world', () => {
     const COUNTED = COURSE.counted;
-    // PREVIOUS_WORLD_FRACTION of it, which is what opens the next difficulty; the levels are listed in play order, so
-    // this is a prefix of them.
-    const most = (difficulty) =>
-        completions(COUNTED.slice(0, thresholdCount(COUNTED.length, UNLOCK.PREVIOUS_WORLD_FRACTION)), difficulty);
+    // PREVIOUS_WORLD_FRACTION of it, which is what opens the next difficulty; the levels are listed
+    // in play order, so this is a prefix of them.
+    const most = (difficulty) => completions(
+        COUNTED.slice(0, thresholdCount(COUNTED.length, UNLOCK.PREVIOUS_WORLD_FRACTION)), difficulty);
     // A level with one before it in its stage, so rule 5 has nothing to say about it and
     // what is being asked about is rule 8 alone.
     const SECOND = COURSE.levels[1];
@@ -180,6 +182,7 @@ test.describe('The difficulties of a course world', () => {
     });
 
     test('open at adept once enough of the world is done at novice', async ({ page }) => {
+        needsRule(test, 1);
         const olorin = new Olorin(page);
         // Solving this one level is not the world; the level itself is no longer the question.
         await olorin.seed(completions([COURSE.levels[0]], 0));
@@ -206,6 +209,7 @@ test.describe('The difficulties of a course world', () => {
     });
 
     test('and master waits on the same two things at adept', async ({ page }) => {
+        needsRule(test, 1);
         const olorin = new Olorin(page);
         // Enough of the world done at adept, but this level only at novice.
         await olorin.seed(most(1).concat(completions([COURSE.levels[0]], 0)));
@@ -235,15 +239,19 @@ test.describe('Rule 3, the difficulty above', () => {
     // novice (rule 8), and doesn't auto-complete (which it would do on opening, before chain()
     // puts the relation under test in place); it is in world 3's first stage, and the levels
     // before it there are done at adept, so no stage or level rule asks anything more of it.
+    // World 1's adept was all solved just now, so rule 7 keeps its master shut and none of its
+    // levels can auto-complete there, taking it past what rule 3 asks.
     const STAGE = inWorld(3).filter((l) => l.stage === inWorld(3)[0].stage);
     const LEVEL = STAGE.find((l) => !l.autoComplete);
     if (!LEVEL) throw new Error('This suite assumes a non-auto-completing level in world 3\'s first stage.');
     const seeds = [].concat(
-        completions(inWorld(1), 1), completions(inWorld(2), 1), completions(inWorld(4), 0),
+        completions(inWorld(1), 1, { times: { 1: 1 } }), [['time', '1']],
+        completions(inWorld(2), 1), completions(inWorld(4), 0),
         completions(STAGE.filter((l) => l.index < LEVEL.index), 1), completions([LEVEL], 0));
     const adept = async (olorin) => (await olorin.levelStates(LEVEL.name))[1];
 
     test('holds a world back for a player without a code', async ({ page }) => {
+        needsRule(test, 3);
         const olorin = new Olorin(page);
         await olorin.seed(seeds);
         await olorin.open();

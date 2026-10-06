@@ -5,7 +5,7 @@
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 const { worlds, world, followerWorlds, worldGateSeeds, oneWireLevel, completions,
-        thresholdCount, UNLOCK } = require('../lib/levels');
+        thresholdCount, UNLOCK, needsRule } = require('../lib/levels');
 const { hasFixture, readFixture } = require('../lib/fixtures');
 
 // Levels and worlds are chosen structurally, never by id or by position: which worlds completing
@@ -34,15 +34,17 @@ const SOLVE = CROSSER && CROSSER.levels[0];
 for (const [ok, what] of [
     [OPENED, 'some world follows the first level\'s world'],
     [CROSSER, 'some world follows the first world and has a fixture proof for its first level'],
-    [SOLVE && half(CROSSER) >= 2, 'that world needs at least two levels to reach half complete'],
+    [SOLVE && (UNLOCK.FOLLOWING_WORLD_FRACTION === 0 || half(CROSSER) >= 2),
+     'that world needs at least two levels to reach rule 2\'s fraction'],
 ]) {
     if (!ok) throw new Error(`This suite assumes ${what}; update its selectors for levels.js.`);
 }
 
 test.describe('Unlock announcement', () => {
     test('opening a new world is announced (without a difficulty explanation for novice)', async ({ page }) => {
+        needsRule(test, 1);
         const olorin = new Olorin(page);
-        // One short of world 1's 80% (excluding the level we'll solve); finishing it reaches the
+        // One short of world 1's rule 1 fraction (excluding the level we'll solve); finishing it reaches the
         // threshold, which opens the next world (rule 1).
         await olorin.seed(completions(W1.filter((l) => l !== FIRST).slice(0, W1_MOST - 1), 0));
         await olorin.open();
@@ -58,6 +60,7 @@ test.describe('Unlock announcement', () => {
     });
 
     test('the first unlock at a new difficulty includes that difficulty\'s explanation', async ({ page }) => {
+        needsRule(test, 2);
         const olorin = new Olorin(page);
         await olorin.seed(
             // Enough of TARGET to open CROSSER at novice, so the level we solve is reachable.

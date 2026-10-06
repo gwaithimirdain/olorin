@@ -309,6 +309,19 @@ const completions = (levels, difficulty, extra) =>
 // The fewest of `total` completed levels that reach fraction `frac`, computed the same way the app
 // gates worlds (`done / total >= frac`), so tests don't hardcode level counts.  `thresholdCount`
 // just-unlocks; `thresholdCount(total, frac) - 1` is the largest count that stays below the gate.
+// Whether rule `n` (1-4) of the unlock rules asks for anything: its fraction can be set to 0, and
+// then it holds nothing back.
+const RULE_FRACTIONS = {
+    1: UNLOCK.PREVIOUS_WORLD_FRACTION, 2: UNLOCK.FOLLOWING_WORLD_FRACTION,
+    3: UNLOCK.EARLIER_WORLD_FRACTION, 4: UNLOCK.PREVIOUS_STAGE_FRACTION,
+};
+const ruleOn = (n) => RULE_FRACTIONS[n] > 0;
+
+// Skip the test calling it when rule `n` is switched off, for a test of what that rule holds back.
+function needsRule(test, n) {
+    test.skip(!ruleOn(n), `rule ${n}'s fraction is 0, so it holds nothing back`);
+}
+
 function thresholdCount(total, frac) {
     let need = 0;
     while (need / total < frac) need++;
@@ -365,5 +378,5 @@ module.exports = {
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, wrappableStatementLevel,
     hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, legacyCompletionKeys, completions, thresholdCount, prereqs,
-    prereqSeeds, UNLOCK,
+    prereqSeeds, UNLOCK, ruleOn, needsRule,
 };
