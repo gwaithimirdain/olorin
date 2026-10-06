@@ -127,7 +127,12 @@ client `*.js` changed) before re-testing, since the suite serves the built bundl
 
 Most gestures are genuine browser events:
 
-- **Level selection / buttons / hint dismissal** — real clicks.
+- **Level selection / buttons / hint dismissal** — real clicks.  The chooser shows one world's
+  levels at a time, picked by clicking that world's box on the map of worlds, so a test reaching
+  for a level's button goes through the page object's `showWorldOf(name)` first (`selectLevel`
+  does).
+- **The chooser's preview panel** — real hovering (`previewLevel(name)`), and, for pressing and
+  holding on a touchscreen, touch events sent through the Chrome DevTools Protocol.
 - **Palette drag-and-drop** — real HTML5 `dragstart`/`dragover`/`drop` events that share one
   `DataTransfer`, exactly the contract the app's drop handler reads.
 

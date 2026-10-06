@@ -153,6 +153,7 @@ function courseWorlds() {
                 stage: y + 1,
                 index: z + 1,
                 bonus: !!stage.bonus,
+                autoComplete: !!level.autoComplete,
                 saveable: saveable(level),
             })));
         // Which worlds it follows, resolved as the app resolves them: `previous` names them, and
@@ -162,8 +163,9 @@ function courseWorlds() {
             const prev = p >= 1 && LEVELS[p - 1];
             return prev && prev.courses && prev.courses.some((c) => world.courses.includes(c));
         });
-        // `counted` is the levels its percentages are of, a bonus stage's being left out as
-        // anywhere else -- which is what its own difficulties are gated on (see worldGatesPass).
+        // `counted` is the levels its percentages are of at novice, a bonus stage's being left out
+        // as anywhere else -- which is what its own difficulties are gated on (see worldGatesPass
+        // and countedAt).
         return [{
             number: x + 1,
             name: world.name,
@@ -209,8 +211,9 @@ const worldCount = () => worldNames().length;
 
 // Every world, with what the three inter-world gates read of it, resolved the way the app's
 // computeUnlockData does.  `previous` is which worlds this one follows, by number (levels.js names
-// them).  `counted` is the levels its percentages are of -- a `bonus` stage is left out of its
-// world's totals.
+// them).  `counted` is the levels its percentages are of at novice -- a `bonus` stage is left out
+// of its world's totals (though a bonus level solved counts towards them); see countedAt for the
+// other difficulties.
 //
 // Tests must go through this rather than assuming world w is followed by world w+1: worlds declare
 // their own lists, so the relation is not the order they appear in.
@@ -236,6 +239,10 @@ function worlds() {
 }
 
 const world = (w) => worlds().find((x) => x.number === w);
+// The levels a world's (or a course world's) percentages are of at difficulty K, as the app's
+// computeUnlockData counts them: its non-bonus levels, less, above novice, the autoComplete ones,
+// which complete themselves there.
+const countedAt = (w, K) => (K === 0 ? w.counted : w.counted.filter((l) => !l.autoComplete));
 // The worlds `w` follows (rules 1 and 3), and the worlds that follow it (rule 2).
 const prereqWorlds = (w) => world(w).previous.map(world);
 const followerWorlds = (w) => worlds().filter((x) => x.previous.includes(w));
@@ -340,12 +347,18 @@ function thresholdCount(total, frac) {
 // weaker requirement can't undo a stronger one.
 function worldGateSeeds(w, K) {
     const need = new Map();
+    // `target` at least `frac` complete at `difficulty` -- and so at each difficulty below it too, as
+    // it would be for a player: the levels counted at a difficulty can be fewer than those below it
+    // (the autoComplete ones drop out above novice), so enough at one isn't always enough below.
     const atLeast = (target, frac, difficulty) => {
         if (difficulty > 2) return;
-        target.counted.slice(0, thresholdCount(target.counted.length, frac)).forEach(function (l) {
-            const key = completionKey(l);
-            if (!need.has(key) || need.get(key) < difficulty) need.set(key, difficulty);
-        });
+        for (let k = 0; k <= difficulty; k++) {
+            const counted = countedAt(target, k);
+            counted.slice(0, thresholdCount(counted.length, frac)).forEach(function (l) {
+                const key = completionKey(l);
+                if (!need.has(key) || need.get(key) < k) need.set(key, k);
+            });
+        }
     };
     prereqWorlds(w).forEach(function (p) {
         atLeast(p, UNLOCK.PREVIOUS_WORLD_FRACTION, K);
@@ -374,7 +387,7 @@ const prereqSeeds = (level, difficulty) =>
 module.exports = {
     allLevels, courseLevels, fixtureLevels, worldNames, worldCount, courseWorlds, courseCodes,
     inWorld, inStage, stagesInWorld, prereqStages, find,
-    worlds, world, prereqWorlds, followerWorlds, worldGateSeeds,
+    worlds, world, countedAt, prereqWorlds, followerWorlds, worldGateSeeds,
     firstLevel, oneWireLevel, conjunctionLevel, iffIdentityLevel, wrappableStatementLevel,
     hintedLevel, otherLevel, nextLevel,
     isBuiltinStatement, completionKey, legacyCompletionKeys, completions, thresholdCount, prereqs,

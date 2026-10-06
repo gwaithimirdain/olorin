@@ -12,7 +12,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
-const { courseWorlds, courseCodes, worlds, world, inWorld, completions, worldGateSeeds,
+const { courseWorlds, courseCodes, countedAt, worlds, world, inWorld, completions, worldGateSeeds,
         worldCount, oneWireLevel, thresholdCount, UNLOCK, needsRule } = require('../lib/levels');
 
 const COURSE = courseWorlds()[0];
@@ -167,10 +167,12 @@ test.describe('The code a student was given', () => {
 // world instead.
 test.describe('The difficulties of a course world', () => {
     const COUNTED = COURSE.counted;
-    // PREVIOUS_WORLD_FRACTION of it, which is what opens the next difficulty; the levels are listed
-    // in play order, so this is a prefix of them.
-    const most = (difficulty) => completions(
-        COUNTED.slice(0, thresholdCount(COUNTED.length, UNLOCK.PREVIOUS_WORLD_FRACTION)), difficulty);
+    // PREVIOUS_WORLD_FRACTION of it at a difficulty, which is what opens the next; the levels are
+    // listed in play order, so this is a prefix of them.
+    const most = (difficulty) => {
+        const counted = countedAt(COURSE, difficulty);
+        return completions(counted.slice(0, thresholdCount(counted.length, UNLOCK.PREVIOUS_WORLD_FRACTION)), difficulty);
+    };
     // A level with one before it in its stage, so rule 5 has nothing to say about it and
     // what is being asked about is rule 8 alone.
     const SECOND = COURSE.levels[1];

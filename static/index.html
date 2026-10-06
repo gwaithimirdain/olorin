@@ -181,8 +181,33 @@
 
     <div id="levelChooseBG" class="modalbg">
       <div class="modal" id="levelChooseModal">
-        <div id="worldIndex"></div>
-        <div id="worlds"></div>
+        <!-- The map of worlds: which follows which, filled in by makeLevelSelect/updateWorldMap. -->
+        <div id="worldMapFrame">
+          <div id="worldMap">
+            <div id="worldMapCanvas">
+              <svg id="worldMapEdges" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+          </div>
+          <!-- Fades over whichever edges of the map have more of it to scroll to. -->
+          <div class="map-fade map-fade-left"></div>
+          <div class="map-fade map-fade-right"></div>
+          <div class="map-fade map-fade-top"></div>
+          <div class="map-fade map-fade-bottom"></div>
+        </div>
+        <div id="chooserBody">
+          <div id="worlds"></div>
+          <!-- The level under the pointer, without opening it, or else the world showing: filled in
+               by renderPreview. -->
+          <div id="levelPreview">
+            <div id="previewContent"></div>
+            <!-- In the Custom world, a way to make a new one. -->
+            <div id="customNew">
+              <div class="preview-title">Custom levels</div>
+              <p>Levels of your own: give the statement to prove, and then prove it. Name one to save it here.</p>
+              <button id="customLevel" style="font-size: 16px">New</button>
+            </div>
+          </div>
+        </div>
         <div id="chooseLevelButtons">
           <!-- Difficulty is now chosen per level (a level opens at its highest unlocked difficulty),
                so these global radios are hidden -- except in test mode, where a level opens at
@@ -194,7 +219,6 @@
           </div>
           <div style="text-align: center; margin-top: 20px">
             <button id="cancelChooseLevel" style="font-size: 16px; display: none">Cancel</button>
-            <button id="customLevel" style="font-size: 16px">Custom</button>
             <button id="clearHistory" style="font-size: 16px">Clear History</button>
             <button id="exportProgress" style="font-size: 16px" title="Save your progress to a file, as a backup">Export Progress</button>
             <button id="importProgress" style="font-size: 16px" title="Restore your progress from an exported file">Import Progress</button>
@@ -475,6 +499,11 @@
             If you are working on a higher difficulty setting and get stuck, you can downgrade the difficulty without losing your partial proof using the button in the upper-right corner; but then the harder difficulty for that level will re-lock until you complete some other levels.
           </p>
           <p class="about">
+            The levels are grouped into worlds, and the map at the top of the level-selection dialog shows which worlds follow which: a world opens once you have done enough of the worlds that lead to it.
+            Click a world on the map to see its levels.
+            To see a level's statement, or what remains to be done to unlock it, without opening it, hover over it (or, on a touchscreen, press and hold it).
+          </p>
+          <p class="about">
             It's worth noting that whether a given wire is colored red as "incorrect" in Novice and Adept modes can depend not only on that wire and its label, but on the other wires in the diagram.
             A wire in an incomplete proof may be colored black at first, but become red when <i>another</i> wire is added, since the second wire gives additional information about what must be carried by the first wire.
             A valid proof can also not contain cycles (loops), and of course a cycle usually involves more than one wire.
@@ -722,7 +751,7 @@
       </div>
       <div id="finiteHint" class="modal hint">
         <p>
-          The system 𝕊 of "surreal numbers" contains all the real numbers, and also "infinite" numbers like ω and "infinitesimal" numbers like 1/ω.
+          Recall that the system 𝕊 of "surreal numbers" contains all the real numbers, and also "infinite" numbers like ω and "infinitesimal" numbers like 1/ω.
           We say a surreal number is "finite" if its absolute value is less than some real number.
         </p>
         <p>
@@ -755,17 +784,6 @@
       <div id="infinitesimalHint" class="modal hint">
         <p>
           We say a surreal number is "infinitesimal" if its absolute value is less than all positive real numbers.
-        </p>
-        <p>
-          We write ℝ₊ to mean the set of positive real numbers.
-          For convenience, when the ∀ and ∃ blocks quantify over ℝ₊, they require or supply a proof of positivity along with the real number, on a port of its own.
-          We also enhance the algebra block so it can automatically deal with absolute values.
-          Thus, there's now no need to manually break up into cases in order to draw conclusions about absolute values.
-          But you should continue to write out all the necessary algebra steps on paper!
-        </p>
-        <p>
-          The enhanced algebra block can also automatically handle ∧s in its inputs and outputs, and ∨s in its outputs.
-          In particular, it subsumes the blocks "=∨≠", "?·?=0", and "≤∨>", all of which simply provide "algebraic facts" involving ∨.
         </p>
       </div>
       <div id="infinitesimalZeroHint" class="modal hint">

@@ -26,6 +26,7 @@ const { spawn } = require('child_process');
 const { chromium } = require('@playwright/test');
 const { allLevels, fixtureLevels } = require('./lib/levels');
 const { testQuery } = require('./lib/testmode');
+const { worldNodeOf } = require('./helpers/olorin');
 const { FIXTURE_DIR, writeFixture, coverage, hasFixture, readFixture, unavailableRules } =
     require('./lib/fixtures');
 
@@ -207,6 +208,7 @@ async function solveLevel(page, level) {
         const bg = document.getElementById('levelChooseBG');
         if (getComputedStyle(bg).display === 'none') document.getElementById('selectLevel').click();
     });
+    await page.click(worldNodeOf(level.name));
     await page.click(`#worlds .level[data-name="${level.name}"] .level-number`);
     await page.waitForFunction((n) => document.getElementById('currentLevel').innerText.includes(n), level.name);
     await dismissModals(page);

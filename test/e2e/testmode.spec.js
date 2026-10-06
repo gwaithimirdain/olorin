@@ -15,8 +15,10 @@ const FIRST = firstLevel();
 const AFTER_FIRST = inStage(FIRST.world, FIRST.stage)[1]; // gated on FIRST at novice (rule 6)
 
 // Double-click the mark for difficulty d (0 novice, 1 adept, 2 master) of a level's button.
-const toggle = (olorin, level, d) =>
-    olorin.page.dblclick(`#worlds .level[data-name="${level.name}"] .level-marks .lvmark >> nth=${d}`);
+const toggle = async (olorin, level, d) => {
+    await olorin.showWorldOf(level.name);
+    await olorin.page.dblclick(`#worlds .level[data-name="${level.name}"] .level-marks .lvmark >> nth=${d}`);
+};
 
 test.describe('Test mode', () => {
     let olorin;
@@ -70,6 +72,7 @@ test.describe('Test mode', () => {
     });
 
     test('clicking a mark does not open the level', async () => {
+        await olorin.showWorldOf(FIRST.name);
         await olorin.page.click(`#worlds .level[data-name="${FIRST.name}"] .level-marks .lvmark >> nth=0`);
         // The chooser stays open and no level was loaded.
         expect(await olorin.isVisible('#levelChooseBG')).toBe(true);

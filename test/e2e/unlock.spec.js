@@ -27,7 +27,7 @@
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
 const { allLevels, inWorld, inStage, stagesInWorld, prereqStages, firstLevel, completions,
-        completionKey, thresholdCount, worlds, world, followerWorlds,
+        completionKey, thresholdCount, worlds, world, countedAt, followerWorlds,
         worldGateSeeds, UNLOCK, ruleOn, needsRule } = require('../lib/levels');
 
 const FIRST = firstLevel();                            // all a fresh player has unlocked
@@ -130,7 +130,7 @@ test.describe('Per-difficulty unlocking', () => {
         // either: the player must solve it at least once.
         const olorin = await open(page, OPEN_ADEPT);
         expect(await olorin.levelStates(FIRST.name)).toEqual(['unlocked', 'locked', 'locked']);
-        expect(await olorin.lockTooltip(FIRST.name, 1)).toContain('Complete this level at Novice');
+        expect(await olorin.lockExplanation(FIRST.name, 1)).toContain('Complete this level at Novice');
     });
 
     test('rule 8: master waits for adept, however open the world is at master', async ({ page }) => {
@@ -141,7 +141,7 @@ test.describe('Per-difficulty unlocking', () => {
             .concat([['time', '100']])
             .concat(completions([MANUAL], 0, { times: { 0: 1 } })));
         expect((await olorin.levelStates(MANUAL.name)).slice(1)).toEqual(['unlocked', 'locked']);
-        expect(await olorin.lockTooltip(MANUAL.name, 2)).toContain('Complete this level at Adept');
+        expect(await olorin.lockExplanation(MANUAL.name, 2)).toContain('Complete this level at Adept');
     });
 
     test('auto-complete: once novice is solved, a trivial level completes its higher difficulties', async ({ page }) => {
@@ -171,6 +171,22 @@ test.describe('Per-difficulty unlocking', () => {
     test('rule 1: the following world is reachable at rule 1\'s fraction', async ({ page }) => {
         const olorin = await open(page, completions(W1.slice(0, W1_MOST), 0));
         expect((await olorin.levelStates(NEXT_WORLD.name))[0]).toBe('unlocked');
+    });
+
+    test('rule 1 above novice leaves out the levels that complete themselves there', async ({ page }) => {
+        needsRule(test, 1);
+        // Enough at adept of this world's levels that aren't autoComplete, and none of those that
+        // are: enough to open the world after it at adept (with rule 2's followers seeded too).
+        const auto = W1.filter((l) => l.autoComplete);
+        if (auto.length === 0) throw new Error('This test needs autoComplete levels in the first world.');
+        const manual = countedAt(world(FIRST.world), 1);
+        expect(thresholdCount(manual.length, UNLOCK.PREVIOUS_WORLD_FRACTION))
+            .toBeLessThan(thresholdCount(W1.length, UNLOCK.PREVIOUS_WORLD_FRACTION));
+        const olorin = await open(page, worldGateSeeds(NEXT.number, 1));
+        for (const l of auto) expect((await olorin.levelStates(l.name))[1], l.name).not.toBe('completed');
+        await olorin.openChooser();
+        const adept = page.locator(`#worldMap .world-node[data-world="${NEXT.number}"] .lvmark >> nth=1`);
+        expect(await adept.getAttribute('class')).not.toContain('locked');
     });
 
     test('rule 2: adept of a level needs enough of the worlds following it complete at novice', async ({ page }) => {
@@ -243,11 +259,12 @@ test.describe('Per-difficulty unlocking', () => {
     });
 });
 
-// Hovering a closed padlock says what remains to be done to open that difficulty.
-test.describe('A padlock\'s tooltip', () => {
+// With a level under the pointer, the chooser's preview panel says, for each difficulty of it that's
+// locked, what remains to be done to open it.
+test.describe('The preview of a locked difficulty', () => {
     test('names the hinted level still to be solved (rule 6)', async ({ page }) => {
         const olorin = await open(page);
-        const tip = await olorin.lockTooltip(AFTER_FIRST.name, 0);
+        const tip = await olorin.lockExplanation(AFTER_FIRST.name, 0);
         expect(tip).toMatch(/^To unlock Novice:\n/);
         expect(tip).toContain(`Complete level ${FIRST.name}, which introduces something new`);
     });
@@ -255,7 +272,7 @@ test.describe('A padlock\'s tooltip', () => {
     test('counts the levels still wanted in the world before (rule 1)', async ({ page }) => {
         needsRule(test, 1);
         const olorin = await open(page, completions(W1.slice(0, W1_MOST - 1), 0));
-        expect(await olorin.lockTooltip(NEXT_WORLD.name, 0))
+        expect(await olorin.lockExplanation(NEXT_WORLD.name, 0))
             .toContain(`Complete 1 more level of ${world(FIRST.world).name}`);
     });
 
@@ -265,14 +282,14 @@ test.describe('A padlock\'s tooltip', () => {
         const ago = Math.floor(UNLOCK.RECENT_COMPLETION_WINDOW / 2);
         const olorin = await open(page, rule7Base(10 + ago, 10));
         const n = UNLOCK.RECENT_COMPLETION_WINDOW - ago + 1;
-        expect(await olorin.lockTooltip(MANUAL.name, 1)).toBe(
+        expect(await olorin.lockExplanation(MANUAL.name, 1)).toBe(
             `To unlock Adept:\n• You solved this level at Novice too recently: complete ${n} more level${n === 1 ? '' : 's'} ` +
             'first (or every level at Novice)');
     });
 
     test('is absent once the difficulty is unlocked', async ({ page }) => {
         const olorin = await open(page, completions([FIRST], 0));
-        expect(await olorin.lockTooltip(AFTER_FIRST.name, 0)).toBeNull();
+        expect(await olorin.lockExplanation(AFTER_FIRST.name, 0)).toBeNull();
     });
 });
 
@@ -340,8 +357,9 @@ test.describe('Rule 4: a stage\'s "previous" list', () => {
 });
 
 // A `bonus` stage is extra credit: its levels are left out of its world's totals, so the
-// percentages that open worlds (rules 1-3) are of the non-bonus levels only.  The stage rules
-// (4-6) still treat it like any other stage.
+// percentages that open worlds (rules 1-3) are of the non-bonus levels only -- but a bonus level
+// solved counts towards them, in place of one that isn't.  The stage rules (4-6) still treat it
+// like any other stage.
 test.describe('A stage marked "bonus"', () => {
     const STAGES = stagesInWorld(FIRST.world);
     if (STAGES.some((st) => st.bonus)) {
@@ -372,16 +390,16 @@ test.describe('A stage marked "bonus"', () => {
         expect((await olorin.levelStates(NEXT_WORLD.name))[0]).toBe('unlocked');
     });
 
-    test('completing bonus levels does not help open the next world', async ({ page }) => {
+    test('a bonus level solved counts towards it, in place of one that is not', async ({ page }) => {
         needsRule(test, 1);
-        // One short of rule 1's fraction of the non-bonus levels, plus the whole bonus stage: enough
-        // to pass it for the world as a whole, but the bonus levels don't count.
-        const olorin = await open(page, completions(REST.slice(0, NEED_REST - 1), 0).concat(done(EXTRA)));
-        expect(NEED_REST - 1 + EXTRA.levels.length).toBeGreaterThanOrEqual(NEED_ALL);
+        // One short of rule 1's fraction of the non-bonus levels, and one bonus level: short of it
+        // for the whole world, but, with the bonus stage left out of the total, enough.
+        const olorin = await open(page, completions(REST.slice(0, NEED_REST - 1).concat([EXTRA.levels[0]]), 0));
+        expect((await olorin.levelStates(NEXT_WORLD.name))[0]).toBe('locked');
 
         await olorin.setStageOption(FIRST.world, EXTRA.number, 'bonus', true);
 
-        expect((await olorin.levelStates(NEXT_WORLD.name))[0]).toBe('locked');
+        expect((await olorin.levelStates(NEXT_WORLD.name))[0]).toBe('unlocked');
     });
 
     test('its own levels still unlock by the ordinary stage rules', async ({ page }) => {
