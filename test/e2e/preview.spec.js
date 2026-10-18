@@ -201,6 +201,41 @@ test.describe('The preview panel, placed', () => {
         const { preview, levels } = await where(page);
         expect(preview.y + preview.height).toBeLessThanOrEqual(levels.y);
     });
+
+    // In a short window it's the levels the height is wanted for, so the panel stays beside them,
+    // however narrow the window, and they have most of the chooser's height, the map shrinking.
+    for (const [width, height] of [[1366, 650], [900, 500]]) {
+        test(`beside the levels in a short window, ${width}x${height}, which have most of the height`, async ({ page }) => {
+            await page.setViewportSize({ width, height });
+            await open(page);
+            const { preview, levels } = await where(page);
+            expect(preview.x).toBeGreaterThanOrEqual(levels.x + levels.width);
+            const modal = await box(page, '#levelChooseModal');
+            expect(levels.height).toBeGreaterThanOrEqual(modal.height / 2);
+            expect(modal.x).toBeGreaterThanOrEqual(0);
+            expect(modal.x + modal.width).toBeLessThanOrEqual(width);
+        });
+    }
+
+    test('the levels scroll sideways when squeezed narrower than their stages', async ({ page }) => {
+        await page.setViewportSize({ width: 900, height: 500 });
+        await open(page);
+        const sideways = await page.evaluate(() => {
+            const w = document.getElementById('worlds');
+            return w.scrollWidth > w.clientWidth && getComputedStyle(w).overflowX === 'auto';
+        });
+        expect(sideways).toBe(true);
+    });
+
+    test("and don't where they have room", async ({ page }) => {
+        await page.setViewportSize({ width: 1400, height: 900 });
+        await open(page);
+        const sideways = await page.evaluate(() => {
+            const w = document.getElementById('worlds');
+            return w.scrollWidth > w.clientWidth;
+        });
+        expect(sideways).toBe(false);
+    });
 });
 
 test.describe('On a touchscreen', () => {

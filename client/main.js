@@ -1744,6 +1744,9 @@ function makeLevelSelect(res) {
     updateWorldMap();
 
     chooserGridWidth = maxcols * 80 + 30;
+    // As many columns as the widest stage needs, so that the levels scroll sideways only when
+    // they're squeezed narrower than that.
+    worlds.style.setProperty("--stage-columns", maxcols);
     sizeChooser();
 
     currentWorld = parseInt(localStorage.getItem("world")) || 0;
@@ -2034,11 +2037,18 @@ function markWorldNode(entry) {
 // same: the panel shows what's under the finger, sliding it along shows the others, and lifting it
 // goes back to the world without opening anything, while a tap still opens the level.
 //
-// Where there's room the panel stands beside the levels; where there isn't (a tablet, say) it sits
-// over them, below the map, where a finger holding a level doesn't cover it.
+// Where there's room the panel stands beside the levels.  Where there isn't, in a window tall
+// enough to spare the height (a tablet, say), it sits over them, below the map, where a finger
+// holding a level doesn't cover it; in a short one it stays beside them, narrower, and the levels
+// scroll sideways if they have to, since it's the levels the height is wanted for.
 
 const PREVIEW_WIDTH = 340;
+// How narrow the panel may get, beside the levels in a short window.
+const MIN_PREVIEW_WIDTH = 220;
 const PREVIEW_GAP = 16;
+// A window shorter than this is short of room for the levels under the map: the panel doesn't go
+// over them, and the buttons under them are made smaller.
+const SHORT_WINDOW = 700;
 // How far past its edges a level counts as under the pointer: half the gap between two levels.
 const HOVER_MARGIN = 6;
 // How long the panel waits, once no level is under the pointer, before going back to the world.
@@ -2053,14 +2063,21 @@ const LONG_PRESS_SLOP = 10;
 var chooserGridWidth = 0;
 
 // Size the chooser for its levels, with the preview panel beside them if the window has room for
-// both, and over them if not.
+// both, and over them if not -- unless the window is short, when the panel stays beside them,
+// narrowed to fit as far as it can be.
 function sizeChooser() {
     const modal = document.getElementById("levelChooseModal");
     // The modal's padding, and a margin of the window to either side of it.
     const room = window.innerWidth * 0.95 - 40;
-    const beside = room >= chooserGridWidth + PREVIEW_GAP + PREVIEW_WIDTH;
-    modal.classList.toggle("preview-over", !beside);
-    modal.style.width = (beside ? chooserGridWidth + PREVIEW_GAP + PREVIEW_WIDTH : chooserGridWidth) + 'px';
+    const short = window.innerHeight < SHORT_WINDOW;
+    const over = !short && room < chooserGridWidth + PREVIEW_GAP + PREVIEW_WIDTH;
+    const previewWidth = Math.max(MIN_PREVIEW_WIDTH,
+                                  Math.min(PREVIEW_WIDTH, room - chooserGridWidth - PREVIEW_GAP));
+    modal.classList.toggle("preview-over", over);
+    modal.classList.toggle("short", short);
+    modal.style.setProperty("--preview-width", previewWidth + 'px');
+    modal.style.width = (over ? chooserGridWidth
+                         : Math.min(chooserGridWidth + PREVIEW_GAP + previewWidth, room)) + 'px';
 }
 window.addEventListener("resize", sizeChooser);
 

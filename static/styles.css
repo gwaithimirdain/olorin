@@ -481,26 +481,33 @@ body.arranging { cursor: progress; }
     flex: 1;
     min-width: 0;
     min-height: 0;
-    overflow-x: clip;
-    overflow-y: auto;
+    /* Sideways too, for a short window, where the preview panel stays beside the levels even when
+       that leaves them narrower than their stages (see sizeChooser). */
+    overflow: auto;
     display: grid;
     /* Constrain the single column to the visible width (instead of growing to the widest content),
-       so full-width custom-level rows don't overflow and clip their right-hand marks/delete. */
+       so full-width custom-level rows don't overflow and push their right-hand marks/delete out of
+       sight. */
     grid-template-columns: minmax(0, 1fr);
     align-items: top;
 }
 
 /* The map of worlds, pinned above the selected world's levels: a box for each world, with lines
    from the worlds it follows.  However big it gets, it scrolls rather than crowding out the
-   levels. */
+   levels: it gives up its height to them (see #chooserBody) down to a row of worlds. */
 #worldMapFrame {
     position: relative;
-    flex-shrink: 0;
+    flex: 0 1 auto;
+    min-height: 70px;
+    display: flex;
+    flex-direction: column;
     border-bottom: 2px solid #cccccc;
     margin-bottom: 4px;
 }
 
 #worldMap {
+    flex: 0 1 auto;
+    min-height: 0;
     max-height: 32vh;
     overflow: auto;
 }
@@ -660,16 +667,17 @@ body.arranging { cursor: progress; }
 }
 
 /* The levels of the world showing, and the preview panel: side by side, or, where the chooser
-   hasn't room for that (see sizeChooser), the panel over the levels. */
+   hasn't room for that (see sizeChooser), the panel over the levels.  They have most of the
+   chooser's height, however short the window, the map shrinking to make room for them. */
 #chooserBody {
-    flex: 1;
+    flex: 1 0 60%;
     min-height: 0;
     display: flex;
     gap: 16px;
 }
 
 #levelPreview {
-    flex: 0 0 340px;
+    flex: 0 0 var(--preview-width, 340px);
     box-sizing: border-box;
     overflow-y: auto;
     padding: 8px 12px;
@@ -799,8 +807,10 @@ body.arranging { cursor: progress; }
 
 .stage {
     width: 100%;
+    /* Its padding inside that width, so that it doesn't make the levels scroll sideways. */
+    box-sizing: border-box;
     display: grid;
-    grid-template-columns: repeat(12, 70px);
+    grid-template-columns: repeat(var(--stage-columns, 12), 70px);
     grid-auto-rows: 50px;
     gap: 10px;
     padding: 5px;
@@ -1157,6 +1167,24 @@ body.arranging { cursor: progress; }
 #chooseLevelButtons {
     margin-left: auto;
     margin-right: auto;
+}
+
+#chooserActions {
+    text-align: center;
+    margin-top: 20px;
+}
+
+#chooserActions button {
+    font-size: 16px;
+}
+
+/* In a short window, the buttons under the levels take as little of the height as they can. */
+#levelChooseModal.short #chooserActions {
+    margin-top: 6px;
+}
+
+#levelChooseModal.short #chooserActions button {
+    font-size: 13px;
 }
 
 /* Difficulty choices */
