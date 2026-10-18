@@ -2078,7 +2078,7 @@ export const LEVELS = [
             ],
           },
           { name: "∃₊∀₊<",
-            rules: [ "allE", "allI", "exI", "exE", "expr", "algplus", "asc", "tord" ],
+            rules: [ "allE", "allI", "orI1", "orI2", "orE", "exI", "exE", "expr", "algplus", "asc", "tord" ],
             levels: [
                 {
                     parameters: [ ],
