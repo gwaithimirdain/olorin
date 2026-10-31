@@ -2136,7 +2136,7 @@ export const LEVELS = [
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "∃!x∈A,P(x)⇔((∃x∈A,P(x))∧∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y)))" },
+                    conclusion: { ty: "∃!x∈A,(P(x)⇔((∃x∈A,P(x))∧∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y))))" },
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
