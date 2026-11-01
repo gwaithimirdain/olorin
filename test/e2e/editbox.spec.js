@@ -269,6 +269,22 @@ test.describe('Ascription boxes', () => {
         expect(await nodeValue(olorin, id)).toBe('x=1');
     });
 
+    // The box shows the type as text, so a < in it can't be taken for the start of an HTML tag
+    // and swallow the rest of the type (as <x would be: < followed by a letter) -- neither when it
+    // is typed nor when a proof is imported.
+    test('a type containing < shows in full, typed or imported', async ({ page }) => {
+        const id = await olorin.dragRule('asc', 420, 240);
+        await enterAscription(page, '(x>0)∧(0<x)');
+        expect(await boxText(page, id)).toBe('🏷\u00a0(x>0)∧(0<x)');
+
+        const json = await olorin.exportText();
+        await olorin.clear();
+        await olorin.importText(json);
+        const asc = (await olorin.nodes()).find((n) => n.rule === 'asc');
+        expect(await boxText(page, asc.id)).toBe('🏷\u00a0(x>0)∧(0<x)');
+        expect(await page.locator(`#${asc.id} .closebutton`).count()).toBe(1);
+    });
+
     test('cancelling the prompt for a NEW box still removes it', async ({ page }) => {
         await olorin.dragRule('asc', 420, 240);
         await page.waitForSelector('#ascribeBG', { state: 'visible' });

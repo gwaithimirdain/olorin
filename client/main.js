@@ -3086,7 +3086,8 @@ function restoreNode(sn, boxId) {
     if(sn.value !== undefined) {
         if(entry) { entry.value = sn.value; }
         if(sn.rule === 'asc' || sn.rule === 'expr') {
-            box.innerHTML = (sn.rule === 'asc' ? "🏷&nbsp;" : "") + sn.value;
+            // textContent, not innerHTML: a type like y<c would otherwise be read as the start of a tag.
+            box.textContent = (sn.rule === 'asc' ? "🏷\u00a0" : "") + sn.value;
             box.style.width = 'fit-content';
             box.style.padding = "0px 8px 0px 8px";
             // Re-rendering the box blew away its close button, so add it back.
@@ -4257,7 +4258,8 @@ function submitAscription() {
             nodes[i].value = ty;
         }
     }
-    box.innerHTML = "🏷&nbsp;" + ascribe.value;
+    // textContent, not innerHTML: a type like y<c would otherwise be read as the start of a tag.
+    box.textContent = "🏷\u00a0" + ascribe.value;
     box.style.width = 'fit-content';
     // That blew away the close button, so we add it back.
     addBoxCloseButton(box);
@@ -4317,7 +4319,8 @@ function submitExpr() {
             nodes[i].value = e;
         }
     }
-    box.innerHTML = expr.value;
+    // textContent, not innerHTML: an expression like a<b would otherwise be read as the start of a tag.
+    box.textContent = expr.value;
     box.style.width = 'fit-content';
     // That blew away the close button, so we add it back.
     addBoxCloseButton(box);
@@ -6369,7 +6372,7 @@ function setLevel(level, rulesAllowed) {
     // The difference between variables and hypotheses is that variables are labeled with their name as well as a type, and they are colored.
     for(const v of variables) {
         const vbx = document.createElement("div");
-        vbx.innerHTML = v.name + "&nbsp;∈&nbsp;" + v.ty;
+        vbx.textContent = v.name + "\u00a0∈\u00a0" + v.ty;
         vbx.dataset.name = v.name;
         vbx.dataset.rule = "variable";
         vbx.style.position = 'absolute';
