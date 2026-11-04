@@ -2489,6 +2489,7 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
                     variables: [ ],
+                    extrarules: [ "asc" ],
                     hypotheses: [ { ty : "∃x∈A,⊤" } ],
                     conclusion: { ty: "∃x∈A,(P(x)⇒∀y∈A,P(y))" },
                 },
