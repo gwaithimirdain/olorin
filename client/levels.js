@@ -2189,7 +2189,7 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "∀x∈ℝ,((x≠3)⇒∃!y∈ℝ,(3·y/(y−2)=x))" },
+                    conclusion: { ty: "∀x∈ℝ,((x≠3)⇒∃!y∈ℝ,((y≠2)∧(3·y/(y−2)=x)))" },
                 },
                 {
                     parameters: [ ],
