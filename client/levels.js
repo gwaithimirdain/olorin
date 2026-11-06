@@ -2115,10 +2115,10 @@ export const LEVELS = [
       ],
     },
     { name: "Uniqueness world",
-      previous: ["Advanced quantifier world", "Equivalence world"],
+      previous: ["Advanced quantifier world"],
       stages: [
           { name: "∃!",
-            rules: [ "andI", "andE", "orE", "orI1", "orI2", "impI", "impE", "topI", "botE", "iffI", "iffE1", "iffE2", "allE", "allI", "exI", "exE", "uexI", "uexE", "algplus" ],
+            rules: [ "andI", "andE", "orE", "orI1", "orI2", "impI", "impE", "topI", "botE", "allE", "allI", "exI", "exE", "uexI", "uexE", "algplus" ],
             levels: [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
@@ -2147,8 +2147,14 @@ export const LEVELS = [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" }, { name: "Q", ty: "A→Type" }  ],
                     variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "(P∧∃!x∈A,⊤)⇔∃!x∈A,P" },
+                    hypotheses: [ { ty: "P∧∃!x∈A,⊤" } ],
+                    conclusion: { ty: "∃!x∈A,P" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" }, { name: "Q", ty: "A→Type" }  ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃!x∈A,P" } ],
+                    conclusion: { ty: "P∧∃!x∈A,⊤" },
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "B", ty: "Type" }, { name: "P", ty: "A×B → Type" } ],
@@ -2161,18 +2167,6 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ { ty: "∃!x∈A,(P∨Q(x))" } ],
                     conclusion: { ty: "(P∧∃!x∈A,⊤)∨(∃!x∈A,Q(x))" },
-                },
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "(∃!x∈A,P(x))⇔((∃x∈A,P(x))∧∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y)))" },
-                },
-                {
-                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
-                    variables: [ ],
-                    hypotheses: [ ],
-                    conclusion: { ty: "(∃!x∈A,P(x))⇔(∃x∈A,∀y∈A,(P(y)⇔(y=x)))" },
                 },
             ],
           },
@@ -2734,6 +2728,64 @@ export const LEVELS = [
                 },
             ],
           },
+      ],
+    },
+    { name: "Advanced uniqueness world",
+      previous: ["Uniqueness world", "Equivalence world", "Negation world"],
+      stages: [
+          { name: "∃!⇔",
+            rules: [ "andI", "andE", "orE", "orI1", "orI2", "impI", "impE", "iffI", "iffE1", "iffE2", "topI", "botE", "allE", "allI", "exI", "exE", "uexI", "uexE", "algplus", "negE", "cnegI" ],
+            levels: [
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃!x∈A,P(x)"} ],
+                    conclusion: { ty: "(∃x∈A,P(x))∧∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y))" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(∃x∈A,P(x))∧∀x∈A,∀y∈A,((P(x)∧P(y))⇒(x=y))" } ],
+                    conclusion: { ty: "∃!x∈A,P(x)"},
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃!x∈A,P(x)" } ],
+                    conclusion: { ty: "∃x∈A,∀y∈A,(P(y)⇔(y=x))" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃x∈A,∀y∈A,(P(y)⇔(y=x))" } ],
+                    conclusion: { ty: "∃!x∈A,P(x)" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃!x∈A,P(x)"} ],
+                    conclusion: { ty: "∃x∈A,(P(x)∧¬∃y∈A,(P(x)∧(y≠x)))" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃x∈A,(P(x)∧¬∃y∈A,(P(x)∧(y≠x)))" } ],
+                    conclusion: { ty: "∃!x∈A,P(x)"},
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∃!x∈A,P(x)"} ],
+                    conclusion: { ty: "(∃x∈A,P(x))∧¬∃x∈A,∃y∈A,((P(x)∧P(y))∧(x≠y))" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A → Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(∃x∈A,P(x))∧¬∃x∈A,∃y∈A,((P(x)∧P(y))∧(x≠y))" } ],
+                    conclusion: { ty: "∃!x∈A,P(x)"},
+                },
+            ],
+          }
       ],
     },
     { name: "Function world",
