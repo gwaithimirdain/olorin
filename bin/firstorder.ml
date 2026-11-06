@@ -207,7 +207,7 @@ notation \"lim\" s \"↗∞\" ≔ seqdiv_posinf s
 
 def injective (A B : Type) (f : A → B) : Type ≔ forall A (x₁ ↦ forall A (x₂ ↦ imp (eq B (f(x₁)) (f(x₂))) (eq A x₁ x₂)))
 def surjective (A B : Type) (f : A → B) : Type ≔ forall B (y ↦ exists A (x ↦ eq B (f(x)) y))
-def bijective (A B : Type) (f : A → B) : Type ≔ land (injective A B f) (surjective A B f)
+def bijective (A B : Type) (f : A → B) : Type ≔ forall B (y ↦ existsunique A (x ↦ eq B (f(x)) y))
 
 notation(0) f \"injects\" A \"into\" B ≔ injective A B f
 notation(0) f \"surjects\" A \"onto\" B ≔ surjective A B f
