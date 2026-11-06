@@ -2731,7 +2731,7 @@ export const LEVELS = [
       ],
     },
     { name: "Advanced uniqueness world",
-      previous: ["Uniqueness world", "Equivalence world", "Negation world"],
+      previous: ["Uniqueness world", "Equivalence world", "Negated quantifier world"],
       stages: [
           { name: "∃!⇔",
             rules: [ "andI", "andE", "orE", "orI1", "orI2", "impI", "impE", "iffI", "iffE1", "iffE2", "topI", "botE", "allE", "allI", "exI", "exE", "uexI", "uexE", "algplus", "negE", "cnegI" ],
