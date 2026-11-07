@@ -58,11 +58,11 @@
         </div>
         <div class="basic logical elim rule" id="iffE1" data-rule="iffE1" title="Use P⇔Q from left to right: give a proof of P, and get a proof of Q">⇔<sub>L→R</sub></div>
         <div class="basic logical elim rule" id="iffE2" data-rule="iffE2" title="Use P⇔Q from right to left: give a proof of Q, and get a proof of P">⇔<sub>R→L</sub></div>
-        <div class="basic logical intro rule" id="exI" data-rule="exI" title="Prove ∃x∈A,P(x): give an element x of A and a proof of P(x) -- and when A is ℝ₊ or [n], a proof of the condition 0&lt;x or x&lt;n that puts x in it"> ∃</div>
-        <div class="basic logical elim rule" id="exE" data-rule="exE" title="Use ∃x∈A,P(x): get an element x of A and a proof of P(x) -- and when A is ℝ₊ or [n], a proof of the condition 0&lt;x or x&lt;n that puts x in it">∃</div>
+        <div class="basic logical intro rule" id="exI" data-rule="exI" title="Prove ∃x∈A,P(x): give an element x of A and a proof of P(x) -- and for ∃x∈ℝ₊ or ∃x&lt;n, a proof of the condition 0&lt;x or x&lt;n"> ∃</div>
+        <div class="basic logical elim rule" id="exE" data-rule="exE" title="Use ∃x∈A,P(x): get an element x of A and a proof of P(x) -- and for ∃x∈ℝ₊ or ∃x&lt;n, a proof of the condition 0&lt;x or x&lt;n">∃</div>
         <div class="basic logical intro rule" id="uexI" data-rule="uexI" title="Prove ∃!x∈A,P(x): give an element x of A, a proof of P(x), and a proof that anything satisfying P is equal to x"> ∃!</div>
         <div class="basic logical elim rule" id="uexE" data-rule="uexE" title="Use ∃!x∈A,P(x): get an element x of A, a proof of P(x), and a proof that anything satisfying P is equal to x">∃!</div>
-        <div class="container rule" id="allI" data-rule="allI" title="Prove ∀x∈A,P(x): assume an element x of A -- and when A is ℝ₊ or [n], the condition 0&lt;x or x&lt;n that puts x in it -- then prove P(x)">
+        <div class="container rule" id="allI" data-rule="allI" title="Prove ∀x∈A,P(x): assume an element x of A -- and for ∀x∈ℝ₊ or ∀x&lt;n, the condition 0&lt;x or x&lt;n -- then prove P(x)">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
           <div class="singleright subgoal"><div class="subgoallabel">∀</div></div>
@@ -73,7 +73,7 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="basic logical elim rule" id="allE" data-rule="allE" title="Use ∀x∈A,P(x): give an element x of A -- and when A is ℝ₊ or [n], a proof of the condition 0&lt;x or x&lt;n that puts x in it -- and get P(x)">∀</div>
+        <div class="basic logical elim rule" id="allE" data-rule="allE" title="Use ∀x∈A,P(x): give an element x of A -- and for ∀x∈ℝ₊ or ∀x&lt;n, a proof of the condition 0&lt;x or x&lt;n -- and get P(x)">∀</div>
         <div class="basic logical elim rule" id="negE" data-rule="negE" title="Use ¬P: give a proof of P as well, and since the two contradict, get anything at all">¬</div>
         <div class="container rule" id="negI" data-rule="negI" title="Prove ¬P: assume P, then prove a contradiction (⊥)">
           <div class="bottom bar"></div>
@@ -126,7 +126,7 @@
           <div class="resize-handle-right"></div>
           <div class="resize-handle-left"></div>
         </div>
-        <div class="container rule" id="natInd" data-rule="natInd" title="Prove ∀n∈ℕ,P(n) by strong induction: assume a natural number n and that ∀k∈[n],P(k), then prove P(n)">
+        <div class="container rule" id="natInd" data-rule="natInd" title="Prove ∀n∈ℕ,P(n) by strong induction: assume a natural number n and that ∀k&lt;n,P(k), then prove P(n)">
           <div class="bottom bar"></div>
           <div class="singleleft assumption"></div>
           <div class="singleright subgoal"><div class="subgoallabel">∀ℕ</div></div>
@@ -954,8 +954,8 @@
         The ℤ→ℕ block converts an integer <i>x</i> together with a proof of <i>x</i>≥0 to a natural number that is equal to <i>x</i>.
       </div>
       <div id="belowHint" class="modal hint">
-        We use the notation [<i>n</i>] for the set of natural numbers less than <i>n</i>.
-        When the ∀ and ∃ blocks quantify over [<i>n</i>], they require or supply a proof that <i>x</i>&lt;<i>n</i> along with the natural number <i>x</i>, on a port of its own.
+        We write ∀<i>x</i>&lt;<i>n</i> and ∃<i>x</i>&lt;<i>n</i> to quantify over the natural numbers less than <i>n</i>.
+        When the ∀ and ∃ blocks quantify in this way, they require or supply a proof that <i>x</i>&lt;<i>n</i> along with the natural number <i>x</i>, on a port of its own.
       </div>
       <div id="natCasesHint" class="modal hint">
         Another essential fact is that every natural number is either zero or a successor.

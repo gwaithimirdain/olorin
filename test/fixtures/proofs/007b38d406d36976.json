@@ -1,15 +1,10 @@
 {
   "level": {
     "parameters": [],
-    "variables": [
-      {
-        "name": "n",
-        "ty": "ℕ"
-      }
-    ],
+    "variables": [],
     "hypotheses": [],
     "conclusion": {
-      "ty": "∀k∈[n],(k²<n²)"
+      "ty": "∀k<0,⊥"
     }
   },
   "complete": true,
@@ -19,77 +14,69 @@
     "y": 0
   },
   "counters": {
-    "counter": 92,
-    "paramCounter": 28,
-    "varCounter": 87,
-    "hypCounter": 65,
-    "conclCounter": 78
+    "counter": 2,
+    "paramCounter": 0,
+    "varCounter": 0,
+    "hypCounter": 0,
+    "conclCounter": 1
   },
   "nodes": [
     {
-      "id": "var86",
-      "rule": "variable",
-      "left": "50px",
-      "top": "10px",
-      "name": "n",
-      "value": "ℕ"
-    },
-    {
-      "id": "concl77",
+      "id": "concl0",
       "rule": "conclusion",
-      "left": "1354px",
+      "left": "1395px",
       "top": "449px",
-      "value": "∀k∈[n],(k²<n²)"
+      "value": "∀k<0,⊥"
     },
     {
-      "id": "rule90",
+      "id": "rule0",
       "rule": "allI",
-      "left": "429px",
-      "top": "661px",
+      "left": "369px",
+      "top": "667px",
       "names": [
-        "k"
+        "n"
       ],
-      "width": "798px",
+      "width": "1007px",
       "height": "70px"
     },
     {
-      "id": "rule91",
+      "id": "rule1",
       "rule": "algplus",
-      "left": "790px",
-      "top": "560px"
+      "left": "715px",
+      "top": "527px"
     }
   ],
   "connections": [
     {
       "source": {
-        "vertex": "rule90",
+        "vertex": "rule0",
         "sort": "output"
       },
       "target": {
-        "vertex": "concl77",
+        "vertex": "concl0",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule90",
+        "vertex": "rule0",
         "sort": "assumption",
         "label": "condition"
       },
       "target": {
-        "vertex": "rule91",
+        "vertex": "rule1",
         "sort": "input"
       },
       "connector": "Bezier"
     },
     {
       "source": {
-        "vertex": "rule91",
+        "vertex": "rule1",
         "sort": "output"
       },
       "target": {
-        "vertex": "rule90",
+        "vertex": "rule0",
         "sort": "subgoal"
       },
       "connector": "Bezier"

@@ -1,8 +1,8 @@
 // The quantifiers over a set that isn't a type of its own: ∀x∈ℝ₊ / ∃x∈ℝ₊ over the positive reals,
-// and ∀x∈[n] / ∃x∈[n] over the whole numbers below n.  They use the same blocks as the plain
+// and ∀x<n / ∃x<n over the whole numbers below n.  They use the same blocks as the plain
 // quantifiers, which carry the condition defining the set -- 0<x, or x<n -- on a port of its own
-// alongside the value port for x, shown only when the quantifier has such a condition.  [n]'s
-// elements are naturals, so being at least 0 comes with the element rather than with the
+// alongside the value port for x, shown only when the quantifier has such a condition.  The
+// elements below n are naturals, so being at least 0 comes with the element rather than with the
 // condition.  These drive them on custom levels, whose palette holds every rule.
 
 const { test, expect } = require('@playwright/test');
@@ -10,7 +10,9 @@ const { Olorin } = require('../helpers/olorin');
 
 const FAMILIES = [
     {
-        set: 'ℝ₊',
+        name: 'ℝ₊',
+        // How a quantifier binding v over the set is written, after the ∀ or ∃.
+        over: (v) => `${v}∈ℝ₊`,
         parameters: 'P : ℝ → Type',
         variables: '',
         elementSet: 'ℝ',
@@ -32,7 +34,8 @@ const FAMILIES = [
         nestedPrinted: '∀ε∈ℝ₊,∃δ∈ℝ₊,∀x∈ℝ,((∣x∣<δ)⇒(∣f(x)∣<ε))',
     },
     {
-        set: '[n]',
+        name: 'the naturals below n',
+        over: (v) => `${v}<n`,
         parameters: 'P : ℕ → Type',
         variables: 'n ∈ ℕ',
         elementSet: 'ℕ',
@@ -41,13 +44,13 @@ const FAMILIES = [
         rules: { allI: 'allI', allE: 'allE', exI: 'exI', exE: 'exE' },
         // x < n forces 0 < n, using the condition and the 0 ≤ x that comes of x being a natural --
         // which the block is told, and which used to have to be half of the condition.
-        arithmetic: { conclusion: '∀x∈[n],(0<n)' },
+        arithmetic: { conclusion: '∀x<n,(0<n)' },
         elimVariables: 'n ∈ ℕ\nk ∈ ℕ',
         elimCondition: 'k<n',
-        nested: '∀i∈[n],∃j∈[n],(i<j)',
+        nested: '∀i<n,∃j<n,(i<j)',
         nestedParameters: '',
         nestedVariables: 'n ∈ ℕ',
-        nestedPrinted: '∀i∈[n],∃j∈[n],(i<j)',
+        nestedPrinted: '∀i<n,∃j<n,(i<j)',
     },
 ];
 
@@ -78,15 +81,15 @@ async function conditionPort(olorin, vertex) {
 for (const f of FAMILIES) {
     const { allI, allE, exI, exE } = f.rules;
 
-    test.describe(`Quantifiers over ${f.set}`, () => {
+    test.describe(`Quantifiers over ${f.name}`, () => {
         // ∀x∈S,P x ⊢ ∀y∈S,P y, the long way round: introduce the quantifier and eliminate the
         // hypothesis at the very variable (and condition) the introduction just bound.
         async function universalLevel(olorin) {
             await olorin.buildCustom({
                 parameters: f.parameters,
                 variables: f.variables,
-                hypotheses: `∀x∈${f.set},P x`,
-                conclusion: `∀y∈${f.set},P y`,
+                hypotheses: `∀${f.over('x')},P x`,
+                conclusion: `∀${f.over('y')},P y`,
             });
             const intro = await dragBinder(olorin, allI, 500, 120, 'z');
             const elim = await olorin.dragRule(allE, 250, 350);
@@ -121,8 +124,8 @@ for (const f of FAMILIES) {
                 await olorin.buildCustom({
                     parameters: f.parameters,
                     variables: f.variables,
-                    hypotheses: `∀x∈${f.set},P x\n∃x∈${f.set},⊤`,
-                    conclusion: `∃x∈${f.set},P x`,
+                    hypotheses: `∀${f.over('x')},P x\n∃${f.over('x')},⊤`,
+                    conclusion: `∃${f.over('x')},P x`,
                 });
                 const ex = await dragBinder(olorin, exE, 250, 100, 'e');
                 const all = await olorin.dragRule(allE, 450, 250);
@@ -183,7 +186,7 @@ for (const f of FAMILIES) {
             await olorin.buildCustom({
                 parameters: f.parameters,
                 variables: f.elimVariables,
-                hypotheses: `∀x∈${f.set},P x\n${f.elimCondition}`,
+                hypotheses: `∀${f.over('x')},P x\n${f.elimCondition}`,
                 conclusion: 'P k',
             });
             const nodes = await olorin.nodes();
@@ -207,7 +210,7 @@ for (const f of FAMILIES) {
                 parameters: f.parameters,
                 variables: f.variables,
                 hypotheses: '',
-                conclusion: `∀y∈${f.set},P y`,
+                conclusion: `∀${f.over('y')},P y`,
             });
             const intro = await dragBinder(olorin, allI, 500, 120, 'z');
             // Until then, nothing says what the block quantifies over.
@@ -238,7 +241,7 @@ for (const f of FAMILIES) {
             const state = await olorin.serialize();
             // What the proof looked like then: blocks named for the set, with the condition port
             // named for what it said.
-            const old = f.set === 'ℝ₊'
+            const old = f.name === 'ℝ₊'
                 ? { rules: { allI: 'allposI', allE: 'allposE' }, label: 'positive' }
                 : { rules: { allI: 'allbelowI', allE: 'allbelowE' }, label: 'below' };
             state.nodes.forEach((n) => { n.rule = old.rules[n.rule] || n.rule; });
@@ -294,6 +297,36 @@ test('and padding it does not smuggle it past that check', async ({ page }) => {
     expect(await check(' 9')).toBe(false);
     // Padding an ordinary name is just padding, though: the name it spells is a fine one.
     expect(await check(' z ')).toBe(true);
+});
+
+// The bound of ∀x<n is a term like any other, ended by the comma, and the ∀x∈[n] it was once
+// written as still reads (DEPRECATED, with the `legacy` form in bin/firstorder.ml), so that a proof
+// saved with it in a typed box or a wire label still makes sense -- printed the new way.
+test.describe('Quantifiers below n', () => {
+    async function printed(olorin, page, variables, hypothesis, conclusion) {
+        await olorin.buildCustom({ parameters: '', variables, hypotheses: hypothesis, conclusion });
+        expect(await olorin.currentLevelName()).toBe('Custom');
+        await olorin.connect({ vertex: 'hyp0', sort: 'output' }, { vertex: 'concl0', sort: 'input' });
+        await olorin.waitForTypecheck();
+        return page.evaluate(() =>
+            Array.from(document.querySelectorAll('#canvas .connLabel')).map((e) => e.innerText));
+    }
+
+    test('take any term as their bound', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        const s = '∀k<n+1,∃j<2·n+2,(k<j)';
+        expect(await printed(olorin, page, 'n ∈ ℕ', s, s)).toEqual([s]);
+        expect(await olorin.isComplete()).toBe(true);
+    });
+
+    test('still read the old ∀x∈[n], and print it the new way', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.open();
+        expect(await printed(olorin, page, 'n ∈ ℕ', '∀k∈[n],∃j∈[n+1],(k<j)', '∀k<n,∃j<n+1,(k<j)'))
+            .toEqual(['∀k<n,∃j<n+1,(k<j)']);
+        expect(await olorin.isComplete()).toBe(true);
+    });
 });
 
 // A plain quantifier ranges over a whole type, so its condition is the trivial ⊤: the blocks never

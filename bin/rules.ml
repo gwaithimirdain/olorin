@@ -151,7 +151,7 @@ let rules =
             unordered = false;
           } );
       (* The quantifiers.  Each of them carries a condition on its variable alongside the variable
-         itself -- 0<x for ∀x∈ℝ₊, x<n for ∀x∈[n], and the trivial ⊤ for a plain ∀x∈A -- so the same
+         itself -- 0<x for ∀x∈ℝ₊, x<n for ∀x<n, and the trivial ⊤ for a plain ∀x∈A -- so the same
          four blocks work for all of them, with a port for the condition that the player sees only
          when there is something to it. *)
       ( "exE",
@@ -339,7 +339,7 @@ let rules =
             asc_pre = Some "ℕ";
           } );
       (* Strong induction on the natural numbers: to prove ∀n∈ℕ,P(n), prove P(n) for a natural
-         number n assuming ∀k∈[n],P(k).  The axiom's first argument is the P of the goal
+         number n assuming ∀k<n,P(k).  The axiom's first argument is the P of the goal
          "forall ℕ P", its second, so it takes that implicitly from the goal, and the step is a
          bracket binding n, on a value port, and assuming the inductive hypothesis. *)
       ( "natInd",

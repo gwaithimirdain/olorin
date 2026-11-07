@@ -2,7 +2,7 @@
 // (bin/rules.ml) applying the axiom ℕ.induction, whose first argument is the predicate P of the
 // goal ∀n∈ℕ,P(n) -- the axiom takes it implicitly from the goal, as the second argument of the
 // "forall" that goal is an application of -- and whose step is a bracket on the side of the block,
-// binding a natural number n on a value port and assuming the inductive hypothesis ∀k∈[n],P(k).
+// binding a natural number n on a value port and assuming the inductive hypothesis ∀k<n,P(k).
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -116,6 +116,6 @@ test.describe('The "natInd" block', () => {
             await induct(olorin, '∀n∈ℕ,(n≥0)');
             await olorin.waitForTypecheck();
             expect(await portLabels(olorin)).toEqual(
-                expect.arrayContaining(['j ∈ ℕ', '∀k∈[j],(0≤k)']));
+                expect.arrayContaining(['j ∈ ℕ', '∀k<j,(0≤k)']));
         });
 });

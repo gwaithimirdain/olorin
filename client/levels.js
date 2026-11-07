@@ -2604,14 +2604,26 @@ export const LEVELS = [
                     parameters: [ ],
                     variables: [ { name: "n", ty: "ℕ" } ],
                     hypotheses: [ ],
-                    conclusion: { ty: "∀k∈[n],(k²<n²)" },
+                    conclusion: { ty: "∀k<n,(k²<n²)" },
                     hint: "belowHint",
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ { name: "n", ty: "ℕ" } ],
+                        hypotheses: [ ],
+                        conclusion: { ty: "∀k∈[n],(k²<n²)" },
+                    }
                 },
                 {
                     parameters: [ ],
                     variables: [ ],
                     hypotheses: [ ],
-                    conclusion: { ty: "∀k∈[0],⊥" },
+                    conclusion: { ty: "∀k<0,⊥" },
+                    saveable: {
+                        parameters: [ ],
+                        variables: [ ],
+                        hypotheses: [ ],
+                        conclusion: { ty: "∀k∈[0],⊥" },
+                    }
                 },
                 {
                     parameters: [ ],
@@ -2997,8 +3009,9 @@ export function saveable(level) {
 
 // DEPRECATED.  What a level was stored under before its statement was written differently -- the
 // prefix minus went from ∸ to − in April 2025, the divisibility and congruence levels were
-// restated with the ∣ and ≡ notations in September 2026, and multiplication went from * to · the
-// same month -- for the levels that carry a `saveable` block above.  Records written before a
+// restated with the ∣ and ≡ notations in September 2026, multiplication went from * to · the
+// same month, and quantifying over the naturals below n went from ∀k∈[n] to ∀k<n in November
+// 2026 -- for the levels that carry a `saveable` block above.  Records written before a
 // change are still filed under the statement it replaced, so the client copies them to the current
 // key when it finds them (migrateLegacyRecords in main.js); nothing else consults them.
 //

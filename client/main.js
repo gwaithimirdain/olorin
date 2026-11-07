@@ -814,7 +814,7 @@ ready(() => {
 
 // Every quantifier carries a condition on the variable it binds, alongside the variable itself: the
 // one defining the set it ranges over when that isn't a type of its own -- 0<x for ℝ₊, the positive
-// reals, and x<n for [n], the whole numbers below n -- and the trivial ⊤ when it ranges over a whole
+// reals, and x<n for the whole numbers below n, as in ∀x<n -- and the trivial ⊤ when it ranges over a whole
 // type (see bin/firstorder.ml).  So each ∀ and ∃ block has a port for the condition, but the player
 // sees it only when there is something to it: when the last typecheck says the condition isn't ⊤,
 // or when something is wired to it anyway.  These are where each block's ports go, keyed by their
@@ -1106,9 +1106,9 @@ function addEndpointsForRule(box, id, restore) {
         if(!restore) { getVariable(box.id); }
         typecheck_now = false;
     } else if (id === 'natInd') {
-        // Strong induction on the natural numbers, shaped like ∀-introduction over [n]: a single
+        // Strong induction on the natural numbers, shaped like ∀-introduction: a single
         // bracket binding a natural number n, on a value port, and assuming the inductive
-        // hypothesis ∀k∈[n],P(k) on a port below it, whose subgoal is P(n).  What it proves is
+        // hypothesis ∀k<n,P(k) on a port below it, whose subgoal is P(n).  What it proves is
         // ∀n∈ℕ,P(n).  (The User rule "natInd" in bin/rules.ml.)
         instance.addEndpoint(box, {
             anchor: [0, 0.5, 1, 0, 22, -22],
@@ -3038,7 +3038,7 @@ function findEndpoint(el, sort, label) {
     return matches.find(function (ep) { return ep.connections.length === 0; }) || matches[0];
 }
 
-// The quantifiers over ℝ₊ and [n] used to have blocks of their own, whose condition ports were
+// The quantifiers over ℝ₊ and below n used to have blocks of their own, whose condition ports were
 // labeled by what the condition said.  A proof saved then is read as using the blocks every
 // quantifier shares now, with their condition ports.
 const LEGACY_QUANTIFIER_RULES = {
@@ -4770,7 +4770,7 @@ function forcedConnector(edge) {
     if(edge.source !== edge.target) { return null; }
     // A subgoal's label names the branch it belongs to, so an assumption reaches it when the
     // two agree.  A block with only one subgoal leaves it unlabelled, and then every
-    // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x∈[n] blocks
+    // assumption of the block reaches it whatever its own label -- the ∀x∈ℝ₊ and ∀x<n blocks
     // bind the condition defining their set on a labelled port beside the unlabelled one that
     // binds the variable.
     const from = edge.endpoints[0].parameters, to = edge.endpoints[1].parameters;
@@ -5820,7 +5820,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         // is 0, the lower where it is one more than the variable the block binds.  The match
         // refines the goal and the context of each branch without handing out an equation to wire
         // up (the Match rule "natE" in bin/rules.ml), so this is the only place that equation
-        // appears -- and it is what lets a wire whose label turns from [n] into [k+1] on its way
+        // appears -- and it is what lets a wire whose label turns from ∀x<n into ∀x<k+1 on its way
         // into the lower branch be read as the same statement rather than a different one.
         nodes.forEach(function (x) {
             if(x.rule !== 'natE') { return; }
