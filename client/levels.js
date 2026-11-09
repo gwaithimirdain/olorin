@@ -2619,6 +2619,7 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ ],
                     conclusion: { ty: "∀k<0,⊥" },
+                    hint: "belowHint2",
                     saveable: {
                         parameters: [ ],
                         variables: [ ],
