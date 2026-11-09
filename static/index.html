@@ -983,15 +983,21 @@
           The main part of the induction property is a rule similar to "prove ∀" for statements about all natural numbers, except that we also get to <i>assume</i> the statement we want is already known to be true about all smaller natural numbers.
           This assumption is called the <i>inductive hypothesis</i>.
         </p>
+        <img src="hints/induction.png" style="margin-left: auto; margin-right:auto; display:block"/>
         <p>
           Phrased in this way, the rule is sometimes called <i>strong induction</i>.
           We often combine it with the "use ℕ" rule, splitting the proof into a "base case" and an "inductive step", with the inductive hypothesis being used in the inductive step on the predecessor.
           This special case is "weak" or "ordinary" induction.
         </p>
+        <img src="hints/weak-induction.png" style="margin-left: auto; margin-right:auto; display:block"/>
         <p>
           Induction of all sorts is particularly useful when reasoning about a function that is defined by recursion.
           Here we give the defining equations of a recursive function as hypothesized equations.
         </p>
+      </div>
+      <div id="strongInductionHint" class="modal hint">
+        In some cases, however, we need more of the power of "strong" induction, applying the inductive hypothesis to something other than the immediate predecessor.
+        Often in this case we have to use the "use ℕ" rule more than once to extract multiple predecessors, leading also to multiple base cases.
       </div>
       <div id="convergenceHint" class="modal hint" style="width: 600px">
         A sequence (of real numbers) is a function from natural numbers to real numbers.

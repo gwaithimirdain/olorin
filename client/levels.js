@@ -2705,7 +2705,8 @@ export const LEVELS = [
                     parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
                     variables: [ ],
                     hypotheses: [ { ty: "f(0)=2" }, { ty: "f(1)=1" }, { ty: "∀n∈ℕ,(f(n+2)=2·f(n)+f(n+1))" } ],
-                    conclusion: { ty: "∀n∈ℕ,(f(n)=2^n+(−1)^n)" }
+                    conclusion: { ty: "∀n∈ℕ,(f(n)=2^n+(−1)^n)" },
+                    hint: "strongInductionHint",
                 },
                 {
                     parameters: [ { name: "f", ty: "ℕ→ℕ" } ],
