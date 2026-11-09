@@ -922,8 +922,9 @@
         The expression in an "expr" block does not have to involve any variables at all; it can be just a constant.
       </div>
       <div id="integralHint" class="modal hint" style="width: 600px">
-        Once we've proven a certain fact, we can then <i>use</i> that fact in other proofs without needing to re-prove it.
-        For example, we introduce a block "?·?=0" that applies the result of the previous level.
+        <p>
+          Once we've proven a certain fact, we can then <i>use</i> that fact in other proofs without needing to re-prove it.
+          For example, we introduce a block "?·?=0" that applies the result of the previous level.
         </p>
         <img src="hints/xy0.png" style="margin-left: auto; margin-right:auto; display:block"/>
       </div>
@@ -961,10 +962,15 @@
         Although the notation ∀<i>x</i>&lt;<i>n</i> doesn't explicitly indicate it, remember that it assumes <i>x</i> is a <i>natural number</i>, and hence in particular non-negative.
       </div>
       <div id="natCasesHint" class="modal hint">
-        Another essential fact is that every natural number is either zero or a successor.
-        We can't prove this with just algebra and logic; we need a new block.
-        Rather than state the axiom as an ∨ and require a separate case split, this block directly breaks the proof into cases based on whether the number is zero or a successor.
-        In the second case, we get a new natural number variable representing the predecessor.
+        <p>
+          Another essential fact is that every natural number is either zero or a successor.
+          We can't prove this with just algebra and logic; we need a new block.
+        </p>
+        <img src="hints/natE.png" style="margin-left: auto; margin-right:auto; display:block"/>
+        <p>
+          Rather than state the axiom as an ∨ and require a separate case split, this block directly breaks the proof into cases based on whether the number is zero or a successor.
+          In the second case, we get a new natural number variable representing the predecessor.
+        </p>
       </div>
       <div id="inductionHint" class="modal hint">
         <p>
