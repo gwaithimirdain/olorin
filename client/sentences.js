@@ -32,8 +32,8 @@ export const BLANK = "___";
 
 export const SENTENCES = {
     // What the level gives and asks for.
-    hypothesis: "By hypothesis, {output}.",
-    variable: "Let {output}∈{output.type} be given.",
+    hypothesis: "Suppose {output}.",
+    variable: "Suppose {output}∈{output.type}.",
     conclusion: "We want to prove {input}.",
 
     // Conjunction and disjunction.
@@ -42,30 +42,30 @@ export const SENTENCES = {
     orI1: "Since {input:left}, we have {output}.",
     orI2: "Since {input:right}, we have {output}.",
     orE: "Since {input}, we consider two cases.\n" +
-        "Case 1: assume {assumption:left}; we will prove {subgoal:left}.\n" +
-        "Case 2: assume {assumption:right}; we will prove {subgoal:right}.",
+        "Case 1: assume {assumption:left}; we will prove {subgoal:left}.\n...\n" +
+        "Case 2: assume {assumption:right}; we will prove {subgoal:right}.\n...",
 
     // Implication and equivalence.
     impI: "Assume {assumption}; we will prove {subgoal}.",
     impE: "Since {input:implication} and {input:antecedent}, we have {output}.",
     iffI: "We prove both directions.\n" +
-        "First, assume {assumption:ltor}; we will prove {subgoal:ltor}.\n" +
-        "Conversely, assume {assumption:rtol}; we will prove {subgoal:rtol}.",
+        "First, assume {assumption:ltor}; we will prove {subgoal:ltor}.\n...\n" +
+        "Conversely, assume {assumption:rtol}; we will prove {subgoal:rtol}.\n...",
     iffE1: "Since {input:implication} and {input:antecedent}, we have {output}.",
     iffE2: "Since {input:implication} and {input:antecedent}, we have {output}.",
 
     // The quantifiers.
-    allI: "Let {assumption}∈{assumption.type}[ with {assumption:condition}] be arbitrary; we will prove {subgoal}.",
-    allE: "Since {input:universal}, taking {input:element}[ with {input:condition}] we have {output}.",
-    exI: "Taking {input:element}∈{input:element.type}, we have {input:property}[ and {input:condition}], so {output}.",
+    allI: "Let {assumption}∈{assumption.type} be arbitrary[ such that {assumption:condition}]; we will prove {subgoal}.",
+    allE: "Since {input:universal} and {input:element}∈{input:element.type}[ with {input:condition}], we have {output}.",
+    exI: "Since {input:element}∈{input:element.type}[ and {input:condition}] satisfies {input:property}, we have {output}.",
     exE: "Since {input}, we can choose {output:element}∈{output:element.type}[ with {output:condition}] such that {output:property}.",
-    uexI: "Taking {input:element}∈{input:element.type}, we have {input:property} and {input:unique}, so {output}.",
+    uexI: "Since {input:element}∈{input:element.type} satisfies {input:property} and {input:unique}, we have {output}.",
     uexE: "Since {input}, we can choose {output:element}∈{output:element.type} such that {output:property} and {output:unique}.",
 
     // Negation and contradiction.
-    negI: "To prove {output}, suppose {assumption}; we will derive a contradiction.",
+    negI: "To prove {output}, assume for contradiction that {assumption}.",
     negE: "Since {input:negation} and {input:statement} contradict each other, we have {output}.",
-    cnegI: "To prove {output}, suppose for the sake of contradiction that {assumption}.",
+    cnegI: "To prove {output}, assume for contradiction that {assumption}.",
     botE: "We have reached a contradiction, so {output}.",
     topI: "{output} is always true.",
 
@@ -84,14 +84,14 @@ export const SENTENCES = {
     arch: "By the Archimedean property, we can choose {output:element}∈{output:element.type} such that {output:property}.",
     zton: "Since {input:nonneg}, we can choose {output:element}∈{output:element.type} such that {output:property}.",
     frac: "Since {input:x} is rational, we can choose integers {output:numerator} and {output:denominator} " +
-        "such that {output:atleastone}, {output:fraction} and {output:lowest}.",
-    omega: "Since ω is bigger than every real number, we have {output}.",
+        "such that {output:atleastone}, {output:fraction}, and {output:lowest}.",
+    omega: "Since ω is larger than every real number, we have {output}.",
 
     // The natural numbers.
-    natE: "We consider two cases for {input}.\n" +
-        "If {input}=0, we will prove {subgoal:zero}.\n" +
-        "If {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}, we will prove {subgoal:suc}.",
-    natInd: "We prove {output} by strong induction.\n" +
+    natE: "Since {input}∈{input.type}, there are two cases.\n" +
+        "Case 1: Assume {input}=0; we will prove {subgoal:zero}.\n....\n" +
+        "Case 2: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n...",
+    natInd: "We prove {output} by induction.\n" +
         "Let {assumption:n}∈{assumption:n.type} and assume {assumption:IH}; we will prove {subgoal:step}.",
 };
 
