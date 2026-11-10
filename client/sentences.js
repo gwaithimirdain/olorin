@@ -1,6 +1,6 @@
-// What each kind of block says in an English proof, as a template.  Hovering over a block on the
-// diagram (or tapping it, on a touchscreen) shows its sentence, filled in with the statements on
-// its own ports.  To change what a block says, edit its template here and rebuild.
+// What each kind of block says in an English proof, as a template.  On novice difficulty, hovering
+// over a block on the diagram (or tapping it, on a touchscreen) shows its sentence, filled in with
+// the statements on its own ports.  To change what a block says, edit its template here and rebuild.
 //
 // The name of each entry is the block's rule, as in the data-rule attributes of static/index.html.
 // A block with no entry here has no sentence, so it shows no tooltip on the diagram.  The entry
@@ -26,9 +26,6 @@
 // template naming a port that its block doesn't have shows the {...} as it is written, so that a
 // typo is easy to see; test/e2e/sentences.spec.js checks that there are none.  A "\n" in a template
 // starts a new line.
-//
-// The statements come from what the diagram is already showing at the current difficulty (see
-// recordStatements in client/main.js), so a sentence never gives away one the player has to work out.
 
 export const BLANK = "___";
 

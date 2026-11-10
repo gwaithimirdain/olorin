@@ -249,20 +249,18 @@ test.describe('A block\'s sentence', () => {
         expect(await sentenceOf(page, natE)).toBe('Cases on x.');
     });
 
-    test('gives away nothing that the difficulty hides', async ({ page }) => {
-        await olorin.seed([['difficulty', '1']]);
-        await openWithTemplates(olorin, page);
-        await olorin.buildCustom(IMPLICATION);
-        const { hyps } = await givens(olorin);
-        const impE = await olorin.dragRule('impE', 300, 150);
-        await olorin.connect({ vertex: hyps[0], sort: 'output' }, { vertex: impE, sort: 'input', label: 'implication' });
-        await olorin.waitForTypecheck();
-        await olorin.connect({ vertex: hyps[1], sort: 'output' }, { vertex: impE, sort: 'input', label: 'antecedent' });
-        await olorin.waitForTypecheck();
-        // Both wires start at givens, so their statements are on them; what comes out is the
-        // player's to work out, until they label a wire with it.
-        expect(await sentenceOf(page, impE)).toBe('Since P⇒Q and P, we have ___.');
-    });
+    for (const level of [1, 2]) {
+        test(`is not shown above novice (difficulty ${level})`, async ({ page }) => {
+            await olorin.seed([['difficulty', String(level)]]);
+            await openWithTemplates(olorin, page);
+            const impE = await provedByImpE(olorin);
+            expect(await page.evaluate(() => window.__olorin.difficulty())).toBe(level);
+            const c = await centre(page, impE);
+            await page.mouse.move(c.x, c.y);
+            await page.waitForTimeout(600);
+            await expect(tooltip(page)).toBeHidden();
+        });
+    }
 });
 
 test.describe('Hovering a block', () => {
@@ -329,6 +327,17 @@ test.describe('On a touchscreen', () => {
         await expect(tooltip(page)).toHaveText('Since P⇒Q and P, we have Q.');
         await page.waitForTimeout(500);
         await page.touchscreen.tap(c.x, c.y);
+        await expect(tooltip(page)).toBeHidden();
+    });
+
+    test('tapping a block above novice shows nothing', async ({ page }) => {
+        const olorin = new Olorin(page);
+        await olorin.seed([['difficulty', '1']]);
+        await openWithTemplates(olorin, page);
+        const impE = await provedByImpE(olorin);
+        const c = await centre(page, impE);
+        await page.touchscreen.tap(c.x, c.y);
+        await page.waitForTimeout(500);
         await expect(tooltip(page)).toBeHidden();
     });
 

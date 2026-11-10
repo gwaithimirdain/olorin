@@ -93,7 +93,7 @@ which reads the level out of the proof itself — there's no level name to type,
 
 ## Block sentences
 
-Hovering over a block on the diagram, or tapping it on a touchscreen, shows what that block says in an English proof, such as "Since P⇒Q and P, we have Q."  The sentence patterns are all in [`client/sentences.js`](client/sentences.js), one template per block, and the top of that file explains the format.  After editing them, run `npm run build` to update the app.
+On novice difficulty, hovering over a block on the diagram, or tapping it on a touchscreen, shows what that block says in an English proof, such as "Since P⇒Q and P, we have Q."  The sentence patterns are all in [`client/sentences.js`](client/sentences.js), one template per block, and the top of that file explains the format.  After editing them, run `npm run build` to update the app.
 
 ## Course worlds
 

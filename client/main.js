@@ -4754,9 +4754,11 @@ function hideWireTooltip() {
 const SENTENCE_DELAY_MS = 300;
 
 // The block that a sentence should be shown for when the pointer is over this element, if any.
+// Sentences are only for novice difficulty: above it, the player is working the statements out.
 // The middle of a bracket doesn't count as being over the bracket, or a sentence would pop up
 // every time the pointer crossed the empty space between the blocks of a subproof.
 function sentenceEntryAt(target) {
+    if(difficulty !== 0) { return null; }
     const box = target.closest('#canvas .rule');
     if(!box || (target === box && box.classList.contains('container'))) { return null; }
     const entry = nodes.find(function (x) { return x.id === box.id; });
@@ -5888,24 +5890,18 @@ function plainDiagnosticText(text) {
 }
 
 // Note down what each wire and port is known to carry, for the sentences of the blocks they belong
-// to (see blockSentence).  A sentence mustn't give away what the current difficulty makes the player
-// work out, so this takes only what the diagram itself would show: every wire and port on novice,
-// and otherwise only the wires that autoLabelWire labels, and the ports of the same kinds -- those
-// of the givens and the goal, whose statements are written on them anyway, and those carrying values.
-function recordStatements(labels, connections, autoLabelWire) {
+// to (see blockSentence).
+function recordStatements(labels, connections) {
     labels.forEach(function (label) {
         const said = { ty: label.ty, tm: label.tm };
         if(label.loc.isEdge) {
             const edge = connections[label.loc.id];
-            if(autoLabelWire(edge) && !edge.parameters.statement) { edge.parameters.statement = said; }
+            if(!edge.parameters.statement) { edge.parameters.statement = said; }
             return;
         }
         const entry = nodes.find(function (x) { return x.id === label.loc.id; });
         const key = portKey(label.loc);
-        if(entry && !entry.statements[key] && (difficulty === 0 || label.loc.hasValue ||
-           entry.rule === 'hypothesis' || entry.rule === 'variable' || entry.rule === 'conclusion')) {
-            entry.statements[key] = said;
-        }
+        if(entry && !entry.statements[key]) { entry.statements[key] = said; }
     });
 }
 
@@ -6016,7 +6012,7 @@ function continue_typechecking(nodes, edges, connections, result) {
         };
         // Before the placeholders below go in with the rest: those aren't statements of anything.
         // What a variable says where it is bound comes first, since the first one noted is kept.
-        recordStatements((result.bound || []).concat(labels), connections, autoLabelWire);
+        recordStatements((result.bound || []).concat(labels), connections);
         nodes.forEach(function (x) {
             instance.getEndpoints(x.node).forEach(function (endpoint) {
                 if(endpoint.parameters.primary) {
