@@ -226,6 +226,13 @@ test.describe('Hovering a block', () => {
         expect(await page.locator('#impE').getAttribute('title')).toBeTruthy();
     });
 
+    test('shows no description on a block that has no sentence', async ({ page }) => {
+        await olorin.buildCustom({ parameters: '', variables: 'x ∈ ℝ', hypotheses: '', conclusion: 'x = x' });
+        const expr = await olorin.dragRule('expr', 300, 150);
+        expect(await page.locator('#' + expr).getAttribute('title')).toBeNull();
+        expect(await page.locator('#expr').getAttribute('title')).toBeTruthy();
+    });
+
     test('puts the sentence away when the block is pressed', async ({ page }) => {
         const impE = await provedByImpE(olorin);
         const c = await centre(page, impE);
