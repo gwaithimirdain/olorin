@@ -57,9 +57,9 @@ export const SENTENCES = {
     allI: "Let {assumption}∈{assumption.type} be arbitrary[ such that {assumption:condition}]; we will prove {subgoal}.",
     allE: "Since {input:universal} and {input:element}∈{input:element.type}[ with {input:condition}], we have {output}.",
     exI: "Since {input:element}∈{input:element.type}[ and {input:condition}] satisfies {input:property}, we have {output}.",
-    exE: "Since {input}, we can choose {output:element}∈{output:element.type}[ with {output:condition}] such that {output:property}.",
+    exE: "Since {input}, let {output:element}∈{output:element.type}[ with {output:condition}] be such that {output:property}.",
     uexI: "Since {input:element}∈{input:element.type} satisfies {input:property} and {input:unique}, we have {output}.",
-    uexE: "Since {input}, we can choose {output:element}∈{output:element.type} such that {output:property} and {output:unique}.",
+    uexE: "Since {input}, let {output:element}∈{output:element.type} be such that {output:property} and {output:unique}.",
 
     // Negation and contradiction.
     negI: "To prove {output}, assume for contradiction that {assumption}.",
@@ -80,10 +80,10 @@ export const SENTENCES = {
     integral: "Since {input:xy0}, we have {output}.",
     deceq: "Comparing {input:x} and {input:y}, we have {output}.",
     tord: "Comparing {input:x} and {input:y}, we have {output}.",
-    arch: "By the Archimedean property, we can choose {output:element}∈{output:element.type} such that {output:property}.",
-    zton: "Since {input:nonneg}, we can choose {output:element}∈{output:element.type} such that {output:property}.",
-    frac: "Since {input:x} is rational, we can choose integers {output:numerator} and {output:denominator} " +
-        "such that {output:atleastone}, {output:fraction}, and {output:lowest}.",
+    arch: "By the Archimedean property, let {output:element}∈{output:element.type} be such that {output:property}.",
+    zton: "Since {input:nonneg}, let {output:element}∈{output:element.type} be such that {output:property}.",
+    frac: "Since {input:x} is rational, let {output:numerator}∈{output:numerator.type} and {output:denominator}∈{output:denominator.type} " +
+        "be such that {output:atleastone}, {output:fraction}, and {output:lowest}.",
     omega: "Since ω is larger than every real number, we have {output}.",
 
     // The natural numbers.
