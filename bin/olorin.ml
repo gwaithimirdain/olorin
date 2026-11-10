@@ -349,7 +349,10 @@ let rec vec_map_state : type a b n s. (a -> s -> b * s) -> (a, n) Vec.t -> s -> 
 
 (* Wrap up the data necessary to resolve a named term and then typecheck it. *)
 type context =
-  | Context : (mode, 'b, 's) status * (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope -> context
+  (* The flag says that the scope is certainly this context's own; see annotate_ctx_handler. *)
+  | Context :
+      (mode, 'b, 's) status * (mode, 'a, 'b) Ctx.t * (unit, 'a) Resolver.scope * bool
+      -> context
 
 (* Some nodes can introduce new names and give a way to re-bind them away.  This is basically doing a one-case match, but not explicitly capturing the subgoal with a bracket in the graph.  Instead, the subgoal extends as far as possible, e.g. to the outermost enclosing explicit bracket (match or abstraction) or to the overall goal. *)
 
@@ -1341,19 +1344,33 @@ let annotate_ctx_handler : type m a b s.
   match Modal.Mode.compare (Ctx.mode ctx) Omode.mode with
   | Neq -> ()
   | Eq -> (
-      match
+      let record_if ~exact (same : a Raw.check located -> a Raw.check located -> bool) =
         List.find_map
           (fun (Resolver.Scope (scopetm, scope)) ->
             match N.compare (Bwv.length scope) (Ctx.raw_length ctx) with
             | Neq -> None
             | Eq ->
-                (* The scope was recorded while resolving this very term, so the usual hit is one term
-               twice over; structural equality is the fallback for when it isn't. *)
-                if scopetm == ctxtm || scopetm = ctxtm then (
-                  contexts := Context (status, ctx, scope) :: !contexts;
+                if same scopetm ctxtm then (
+                  contexts := Context (status, ctx, scope, exact) :: !contexts;
                   Some ())
                 else None)
-          (Resolver.scopes_of ctxtm)
+          (Resolver.scopes_of ctxtm) in
+      (* The scope was recorded while resolving this very term, so the usual hit is one term twice
+         over -- though Narya may have rewrapped it in a new Synth by now; structural equality is
+         the fallback for when it isn't.  The order matters: the same term in two parallel branches
+         can be structurally equal under different scopes, and pairing a context with the other
+         branch's scope makes its variables mean the wrong things.  A context paired up that way
+         does no harm to something that is only looking for one that works, but it is marked. *)
+      let same_term (x : a Raw.check located) (y : a Raw.check located) =
+        x == y
+        ||
+        match (x.value, y.value) with
+        | Synth a, Synth b -> a == b
+        | _ -> false in
+      match
+        match record_if ~exact:true same_term with
+        | Some () -> Some ()
+        | None -> record_if ~exact:false ( = )
       with
       | None ->
           (* This could indicate a bug, but it also happens when new terms are constructed in the process of checking, such as with the expansion of numerals into constructors, so we don't report it as an error. *)
@@ -1438,7 +1455,7 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
     let binder_first contexts =
       if p.sort <> Assumption then contexts
       else
-        let binds (Context (_, _, scope)) =
+        let binds (Context (_, _, scope, _)) =
           match Bwv.to_list scope with
           | [] -> false
           | entries -> (
@@ -1457,8 +1474,8 @@ let synth_output_port (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.
             (distinct_diagnostics scoping_diagnostics, Option.value !always_ill_scoped ~default:[])
       | Context
           (type a b s)
-          ((status, ctx, scope) :
-            (mode, b, s) status * (mode, a, b) Ctx.t * (unit, a) Resolver.scope)
+          ((status, ctx, scope, _) :
+            (mode, b, s) status * (mode, a, b) Ctx.t * (unit, a) Resolver.scope * bool)
         :: contexts -> (
           (* Forbid cyclic scopes for coconstrs: if the scope involves any non-assumption ports from this vertex, skip it.  But we don't do this for variable nodes (those specified as "variables" in the overall level), even though technically we should, since those all go into the overall scope at the beginning and we don't have separate scopes and contexts adding them one by one. *)
           match
@@ -1659,6 +1676,36 @@ let downstream_vertices (fwd : fwd_graph) (v : Id.t) : IdSet.t =
    themselves, so the player can see which ones, rather than an error with no location at all) and
    synthesize the fragment again without them.  This runs only after the ordinary passes have
    finished, so it can never pre-empt a port that another pass would have done in full. *)
+(* Note down, through 'run', what a port carries at the place it is bound, if it is a variable that
+   something binds.  The contexts are newest first, so the last one with this port in its scope is
+   the first that was recorded after it was bound, before any case of a match inside could refine
+   it.  This asks for the variable alone, rather than going through check_of_output_port as
+   synth_output_port does: the bindables of an output that a match hands out would just bind it
+   again, and in a scope that already has it that counts as a cycle.  Anything that goes wrong only
+   costs the port this label, so it is discarded. *)
+let label_where_bound (run : (unit -> unit) -> unit) (contexts : context list) (p : Port.t) : unit =
+  let in_scope (Context (_, _, scope, exact)) =
+    exact && List.exists (fun ({ port; _ } : name) -> port = Some p) (Bwv.to_list scope) in
+  match List.rev (List.filter in_scope contexts) with
+  | [] -> ()
+  | Context
+      (type a b s)
+      ((status, ctx, scope, _) :
+        (mode, b, s) status * (mode, a, b) Ctx.t * (unit, a) Resolver.scope * bool)
+    :: _ ->
+      Reporter.try_with ~emit:(fun _ -> ()) ~fatal:(fun _ -> ()) @@ fun () ->
+      let tm = locate (Loc.make [ `Port p ]) (Named.Var (`Port p, None)) in
+      let stm, scopes =
+        Scopes.run ~init:Resolver.no_scopes @@ fun () ->
+        let stm =
+          RequireScoping.run ~env:{ bail_out = true; ill_scoped = ref [] } @@ fun () ->
+          Resolve.synth scope tm in
+        (stm, Scopes.get ()) in
+      Resolver.add_scopes scopes;
+      run @@ fun () ->
+      let _ = Check.synth status ctx stm in
+      ()
+
 let synth_cut_ports (run : (unit -> unit) -> unit) (vertices : Vertex.t IdMap.t)
     (fwd_graph : fwd_graph) (bwd_graph : bwd_graph) (contexts : context list ref)
     (ports : (Port.t * Diagnostic.js Js.t Dynarray.t * Port.t list) list)
@@ -1711,6 +1758,7 @@ let ok_checked () : js_checked Js.t =
     val mutable callback = Js.null
     val mutable error = Js.null
     val mutable labels = Js.array (Array.of_list [])
+    val mutable bound = Js.array (Array.of_list [])
     val mutable diagnostics = Js.array (Array.of_list [])
   end
 
@@ -1722,6 +1770,7 @@ let err_checked () : js_checked Js.t =
     val mutable callback = Js.null
     val mutable error = Js.some (Js.string (Buffer.contents errbuf))
     val mutable labels = Js.array (Array.of_list [])
+    val mutable bound = Js.array (Array.of_list [])
     val mutable diagnostics = Js.array (Array.of_list [])
   end
 
@@ -1867,6 +1916,8 @@ let start (parameters : Variable.js Js.t Js.js_array Js.t)
 let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.js_array Js.t) :
     js_checked Js.t =
   let labels : (Locable.t, deferred_label) Hashtbl.t = Hashtbl.create 20 in
+  (* What variables carry where they are bound; see the end of the check below. *)
+  let bound_labels : (Locable.t, deferred_label) Hashtbl.t = Hashtbl.create 20 in
   let diagnostics : Diagnostic.js Js.t Dynarray.t = Dynarray.create () in
   (* Typechecking fails with this error to the console. *)
   let failed msg : js_checked Js.t =
@@ -1875,6 +1926,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       val mutable callback = Js.null
       val mutable error = Js.some (Js.string msg)
       val mutable labels = Label.to_js_array (render_labels labels)
+      val mutable bound = Js.array (Array.of_list [])
 
       (* Since the error message is what will be displayed, we don't even pass the diagnostics. *)
       val mutable diagnostics = Js.array (Array.of_list [])
@@ -1950,7 +2002,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
     (* A single undoable command around the whole check; run_command_then_undo reverts everything it
        created (the holes from an incomplete proof), so we don't have to clean up by hand.  Its own
        return (hole positions) is irrelevant to us, so we stash the real result in a ref. *)
-    let result = ref (false, [], Hashtbl.create 0) in
+    let result = ref (false, [], Hashtbl.create 0, Hashtbl.create 0) in
     let _ : int option * (int * int * int) list =
       Global.run_command_then_undo ~holes_allowed:(Ok ()) @@ fun () ->
       (* Create the dummy "definition" constant in this command's origin (see const_ty). *)
@@ -2007,13 +2059,38 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
             contexts port_list diagnostics in
         (* Whatever is left may be held up by a single out-of-scope wire; try those again without it. *)
         let ports = synth_cut_ports run vertices fwd_graph bwd_graph contexts ports diagnostics in
+        (* A wired variable's label is what it was last checked as, which inside a case of a natE is
+           its statement as refined there.  A block's English sentence (client/sentences.js) needs
+           what the block actually assumes or hands out, so we also find that out, where it is bound
+           (see label_where_bound).  This goes in a table of its own and looks at no wires, since the
+           labels on the wires should still say what they carry where they are.  Only a natE
+           refines anything that a statement could mention, so other proofs can skip this. *)
+        let splits_natural =
+          IdMap.exists
+            (fun _ (v : Vertex.t) ->
+              match v.rule with
+              | Match { asc_pre = Some "ℕ"; _ } -> true
+              | _ -> false)
+            vertices in
+        let scratch_contexts = ref [] in
+        let run_at_binder f =
+          Annotate.run
+            ~ctx:{ handle = (fun p -> annotate_ctx_handler scratch_contexts p) }
+            ~tm:(fun p -> annotate_tm_handler bound_labels p)
+            ~ty:(fun p -> annotate_ty_handler bound_labels p)
+          @@ fun () -> f () in
+        if splits_natural then
+          List.iter
+            (fun ((p : Port.t), _, _) ->
+              if SourceMap.mem p fwd_graph then label_where_bound run_at_binder !contexts p)
+            port_list;
         (fatal_error, ports) in
       (* Print the labels here, inside the command whose terms they name. *)
       let fatal_error, ports = r in
-      result := (fatal_error, ports, render_labels labels);
+      result := (fatal_error, ports, render_labels labels, render_labels bound_labels);
       (* run_command_then_undo wants (offset, make_msg); we report holes ourselves, so neither. *)
       (None, fun _ -> None) in
-    let fatal_error, ports, labels = !result in
+    let fatal_error, ports, labels, bound = !result in
     (* Combine all the generated diagnostics. *)
     (* What's left after the cut sweep is pairs: the ports nothing could label, and why. *)
     List.iter (fun (_, ds) -> Dynarray.append diagnostics ds) ports;
@@ -2022,6 +2099,7 @@ let check (vertices : Vertex.js Js.t Js.js_array Js.t) (edges : Edge.js Js.t Js.
       val mutable callback = Js.null
       val mutable error = Js.null
       val mutable labels = Label.to_js_array labels
+      val mutable bound = Label.to_js_array bound
 
       (* And pass back the diagnostics to Javascript. *)
       val mutable diagnostics = Js.array (Dynarray.to_array diagnostics)
@@ -2081,6 +2159,7 @@ let _ =
           val mutable callback = Js.null
           val mutable error = Js.null
           val mutable labels = Js.array (Array.of_list [])
+          val mutable bound = Js.array (Array.of_list [])
           val mutable diagnostics = Js.array (Array.of_list [])
         end
 
@@ -2097,6 +2176,7 @@ let _ =
           val mutable callback = Js.null
           val mutable error = Js.null
           val mutable labels = Js.array (Array.of_list [])
+          val mutable bound = Js.array (Array.of_list [])
           val mutable diagnostics = Js.array (Array.of_list [])
         end
     end
