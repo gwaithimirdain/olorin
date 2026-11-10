@@ -1017,8 +1017,8 @@ function addRuleNode(id, boxId) {
     // A block Undo puts back has the id it had before.
     box.id = boxId || ('rule' + (counter++));
     // The palette's description of the block is for choosing one; once it is part of the proof,
-    // what it says in the proof takes over (see showBlockTooltip).
-    if(SENTENCES[id]) { box.removeAttribute('title'); }
+    // what it says in the proof, if anything, takes over (see showBlockTooltip).
+    box.removeAttribute('title');
     canvas.appendChild(box);
     // Register it with jsPlumb under that id right away.  Otherwise the first jsPlumb call to look
     // at it registers it -- and anything but adding an endpoint (asking for its endpoints, say)

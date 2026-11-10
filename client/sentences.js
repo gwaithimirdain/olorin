@@ -3,7 +3,7 @@
 // its own ports.  To change what a block says, edit its template here and rebuild.
 //
 // The name of each entry is the block's rule, as in the data-rule attributes of static/index.html.
-// A block with no entry here has no sentence, and keeps its palette description as its tooltip.
+// A block with no entry here has no sentence, so it shows no tooltip on the diagram.
 //
 // A template is ordinary text with these two things in it:
 //
