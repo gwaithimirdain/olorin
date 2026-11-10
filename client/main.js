@@ -4779,9 +4779,25 @@ function portSaying(entry, ep) {
     return said ? { text: ep.parameters.hasValue ? said.tm : said.ty, type: said.ty } : null;
 }
 
+// Whether this is a natE that splits the variable of the natInd it is wired straight into, so that
+// its two cases are the base case and the induction step of that induction.  Splitting some other
+// number there is an ordinary proof by cases.
+function isInductionCases(entry) {
+    if(entry.rule !== 'natE') { return false; }
+    const ports = instance.getEndpoints(entry.node);
+    const input = ports.find(function (ep) { return ep.parameters.sort === "input"; });
+    const output = ports.find(function (ep) { return ep.parameters.sort === "output"; });
+    return output.connections.some(function (out) {
+        return out.target.dataset.rule === 'natInd' && out.endpoints[1].parameters.label === "step" &&
+            input.connections.some(function (inp) {
+                return inp.source === out.target && inp.endpoints[0].parameters.label === "n";
+            });
+    });
+}
+
 // What a block says in an English proof, as filled in from its ports, or null if it has no sentence.
 function blockSentence(entry) {
-    const template = SENTENCES[entry.rule];
+    const template = SENTENCES[isInductionCases(entry) ? "natE in natInd" : entry.rule];
     if(!template) { return null; }
     const ports = instance.getEndpoints(entry.node);
     return renderSentence(template, function (sort, label) {

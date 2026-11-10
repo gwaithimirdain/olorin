@@ -3,7 +3,9 @@
 // its own ports.  To change what a block says, edit its template here and rebuild.
 //
 // The name of each entry is the block's rule, as in the data-rule attributes of static/index.html.
-// A block with no entry here has no sentence, so it shows no tooltip on the diagram.
+// A block with no entry here has no sentence, so it shows no tooltip on the diagram.  The entry
+// "natE in natInd" is for a natE that splits the variable of the natInd it is wired straight into,
+// whose two cases are the base case and the induction step.
 //
 // A template is ordinary text with these two things in it:
 //
@@ -91,6 +93,9 @@ export const SENTENCES = {
     natE: "Since {input}∈{input.type}, there are two cases.\n" +
         "Case 1: Assume {input}=0; we will prove {subgoal:zero}.\n....\n" +
         "Case 2: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n...",
+    "natE in natInd": "Since {input}∈{input.type}, there are two cases.\n" +
+        "Base case: Assume {input}=0; we will prove {subgoal:zero}.\n...\n" +
+        "Induction step: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n...",
     natInd: "We prove {output} by induction.\n" +
         "Let {assumption:n}∈{assumption:n.type} and assume {assumption:IH}; we will prove {subgoal:step}.",
 };

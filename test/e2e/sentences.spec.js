@@ -9,6 +9,28 @@ const { hasFixture, readFixture, proofRules } = require('../lib/fixtures');
 
 const IMPLICATION = { parameters: 'P : Type\nQ : Type', hypotheses: 'P ⇒ Q\nP', conclusion: 'Q' };
 
+// The wording of the real templates is for editing freely, so all but the first test below install
+// these instead: what they test is how a template gets filled in and shown.
+const TEMPLATES = {
+    hypothesis: 'By hypothesis, {output}.',
+    variable: 'Let {output}∈{output.type} be given.',
+    conclusion: 'We want to prove {input}.',
+    impE: 'Since {input:implication} and {input:antecedent}, we have {output}.',
+    impI: 'Assume {assumption}; we will prove {subgoal}.',
+    allI: 'Let {assumption}∈{assumption.type}[ with {assumption:condition}] be arbitrary; we will prove {subgoal}.',
+    alg: 'By algebra[ from {input}], we have {output}.',
+    zton: 'Choose {output:element}∈{output:element.type} such that {output:property}.',
+    natInd: 'Assume {assumption:IH}.',
+    natE: 'Cases on {input}.',
+    'natE in natInd': 'Induction on {input}.',
+};
+
+// Open the app, with those templates in place of the real ones.
+async function openWithTemplates(olorin, page, options) {
+    await olorin.open(options);
+    await page.evaluate((t) => Object.assign(window.__olorin.sentences(), t), TEMPLATES);
+}
+
 const sentenceOf = (page, id) => page.evaluate((i) => window.__olorin.sentence(i), id);
 const tooltip = (page) => page.locator('#blockTooltip');
 
@@ -66,7 +88,9 @@ test.describe('Sentence templates', () => {
                 const all = nodes();
                 return all[all.length - 1].id;
             };
-            for (const [rule, template] of Object.entries(sentences())) {
+            for (const [name, template] of Object.entries(sentences())) {
+                // "natE in natInd" is another sentence for the first block it names.
+                const rule = name.split(' ')[0];
                 const id = placed(rule);
                 if (id === null) { found.push(rule + ': no such block'); continue; }
                 const have = ports().filter((p) => p.vertex === id).map((p) => p.sort + ':' + (p.label || ''));
@@ -85,7 +109,7 @@ test.describe('A block\'s sentence', () => {
     let olorin;
     test.beforeEach(async ({ page }) => {
         olorin = new Olorin(page);
-        await olorin.open();
+        await openWithTemplates(olorin, page);
     });
 
     test('is filled in from the statements on its ports', async ({ page }) => {
@@ -162,12 +186,12 @@ test.describe('A block\'s sentence', () => {
             return rules.includes('natInd') && rules.includes('natE');
         });
         expect(level, 'no proof by strong induction that splits into cases').toBeTruthy();
-        await olorin.open({ code: level.code });
+        await openWithTemplates(olorin, page, { code: level.code });
         await olorin.selectLevel(level.name);
         await olorin.restore(readFixture(level));
         const natInd = (await olorin.nodes()).find((n) => n.rule === 'natInd');
         const name = natInd.names[0];
-        expect(await sentenceOf(page, natInd.id)).toMatch(new RegExp(`assume ∀\\S+<${name},`));
+        expect(await sentenceOf(page, natInd.id)).toMatch(new RegExp(`Assume ∀\\S+<${name},`));
     });
 
     test('states what a block hands out as it is handed out, not as a later case refines it', async ({ page }) => {
@@ -178,19 +202,56 @@ test.describe('A block\'s sentence', () => {
             return rules.includes('zton') && rules.includes('natE');
         });
         expect(level, 'no proof that splits into cases on the result of a ℤ→ℕ').toBeTruthy();
-        await olorin.open({ code: level.code });
+        await openWithTemplates(olorin, page, { code: level.code });
         await olorin.selectLevel(level.name);
         await olorin.restore(readFixture(level));
         const blocks = (await olorin.nodes()).filter((n) => n.rule === 'zton');
         expect(blocks.length).toBeGreaterThan(0);
         for (const b of blocks) {
-            expect(await sentenceOf(page, b.id)).toMatch(/choose (\S+)∈ℕ such that \S+=\1\.$/);
+            expect(await sentenceOf(page, b.id)).toMatch(/Choose (\S+)∈ℕ such that \S+=\1\.$/);
         }
+    });
+
+    // An induction on n, with a natE wired straight into its step.  Returns the natE, whose input
+    // is left for the test to wire, and the natInd.
+    async function inductionWithCases(page, variables) {
+        await olorin.buildCustom({ parameters: '', variables, hypotheses: '', conclusion: '∀n∈ℕ,(n=n)' });
+        const { concl } = await givens(olorin);
+        const natInd = await olorin.dragRule('natInd', 200, 100);
+        await nameVariable(page, 'n');
+        await olorin.waitForTypecheck();
+        const natE = await olorin.dragRule('natE', 300, 150);
+        await nameVariable(page, 'm');
+        await olorin.waitForTypecheck();
+        await olorin.connect({ vertex: natInd, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        return { natE, natInd };
+    }
+
+    test('calls the cases of a natE on the induction variable the base case and step', async ({ page }) => {
+        const { natE, natInd } = await inductionWithCases(page, '');
+        await olorin.connect({ vertex: natInd, sort: 'assumption', label: 'n' }, { vertex: natE, sort: 'input' });
+        await olorin.waitForTypecheck();
+        // Not yet wired into the induction's step, this is still just a proof by cases.
+        expect(await sentenceOf(page, natE)).toBe('Cases on n.');
+        await olorin.connect({ vertex: natE, sort: 'output' }, { vertex: natInd, sort: 'subgoal', label: 'step' });
+        await olorin.waitForTypecheck();
+        expect(await sentenceOf(page, natE)).toBe('Induction on n.');
+    });
+
+    test('leaves a natE on some other number an ordinary proof by cases', async ({ page }) => {
+        const { natE, natInd } = await inductionWithCases(page, 'x ∈ ℕ');
+        const x = (await olorin.nodes()).find((n) => n.rule === 'variable').id;
+        await olorin.connect({ vertex: x, sort: 'output' }, { vertex: natE, sort: 'input' });
+        await olorin.waitForTypecheck();
+        await olorin.connect({ vertex: natE, sort: 'output' }, { vertex: natInd, sort: 'subgoal', label: 'step' });
+        await olorin.waitForTypecheck();
+        expect(await sentenceOf(page, natE)).toBe('Cases on x.');
     });
 
     test('gives away nothing that the difficulty hides', async ({ page }) => {
         await olorin.seed([['difficulty', '1']]);
-        await olorin.open();
+        await openWithTemplates(olorin, page);
         await olorin.buildCustom(IMPLICATION);
         const { hyps } = await givens(olorin);
         const impE = await olorin.dragRule('impE', 300, 150);
@@ -208,7 +269,7 @@ test.describe('Hovering a block', () => {
     let olorin;
     test.beforeEach(async ({ page }) => {
         olorin = new Olorin(page);
-        await olorin.open();
+        await openWithTemplates(olorin, page);
     });
 
     test('shows its sentence, until the pointer leaves it', async ({ page }) => {
@@ -261,7 +322,7 @@ test.describe('On a touchscreen', () => {
 
     test('tapping a block shows its sentence, and tapping again puts it away', async ({ page }) => {
         const olorin = new Olorin(page);
-        await olorin.open();
+        await openWithTemplates(olorin, page);
         const impE = await provedByImpE(olorin);
         const c = await centre(page, impE);
         await page.touchscreen.tap(c.x, c.y);
@@ -273,7 +334,7 @@ test.describe('On a touchscreen', () => {
 
     test('tapping the background puts it away', async ({ page }) => {
         const olorin = new Olorin(page);
-        await olorin.open();
+        await openWithTemplates(olorin, page);
         const impE = await provedByImpE(olorin);
         const c = await centre(page, impE);
         await page.touchscreen.tap(c.x, c.y);
