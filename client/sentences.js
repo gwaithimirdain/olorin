@@ -91,13 +91,12 @@ export const SENTENCES = {
 
     // The natural numbers.
     natE: "Since {input}∈{input.type}, there are two cases.\n" +
-        "Case 1: Assume {input}=0; we will prove {subgoal:zero}.\n....\n" +
+        "Case 1: Assume {input}=0; we will prove {subgoal:zero}.\n...\n" +
         "Case 2: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n...",
     "natE in natInd": "Since {input}∈{input.type}, there are two cases.\n" +
         "Base case: Assume {input}=0; we will prove {subgoal:zero}.\n...\n" +
         "Induction step: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n...",
-    natInd: "We prove {output} by induction.\n" +
-        "Let {assumption:n}∈{assumption:n.type} and assume {assumption:IH}; we will prove {subgoal:step}.",
+    natInd: "Let {assumption:n}∈{assumption:n.type} and assume inductively {assumption:IH}; we will prove {subgoal:step}.",
 };
 
 const PLACEHOLDER = /\{(\w+)(?::(\w+))?(\.type)?\}/g;
