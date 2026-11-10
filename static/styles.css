@@ -1247,6 +1247,21 @@ body.arranging { cursor: progress; }
     box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+/* What a block says in an English proof: like a wire's error, but it isn't one. */
+#blockTooltip {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    max-width: 34em;
+    padding: 8px 10px;
+    background-color: #ffffff;
+    border: 2px solid #555555;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    pointer-events: none;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
+}
+
 /* labels on endpoints */
 
 .lowerInputLabel {

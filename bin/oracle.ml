@@ -39,6 +39,7 @@ module Callback = struct
 
               val mutable error = Js.null
               val mutable labels = Js.array (Array.of_list [])
+              val mutable bound = Js.array (Array.of_list [])
               val mutable diagnostics = Js.array (Array.of_list [])
             end)
     | _ -> None

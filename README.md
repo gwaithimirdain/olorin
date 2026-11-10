@@ -91,6 +91,10 @@ node test/add-fixture.js exported.json
 ```
 which reads the level out of the proof itself — there's no level name to type, and no way to file a proof under the wrong level.  Levels with no fixture yet are reported by the suite as a tracked TODO rather than a failure, so coverage grows a level at a time.  See [`test/README.md`](test/README.md) for the details.
 
+## Block sentences
+
+Hovering over a block on the diagram, or tapping it on a touchscreen, shows what that block says in an English proof, such as "Since P⇒Q and P, we have Q."  The sentence patterns are all in [`client/sentences.js`](client/sentences.js), one template per block, and the top of that file explains the format.  After editing them, run `npm run build` to update the app.
+
 ## Course worlds
 
 A world in `client/levels.js` may carry a `courses` list naming the courses it belongs to, which makes it that course's rather than the game's.  Which code lets a student into a course is the `COURSE_CODES` table beside the levels, mapping each code to the course it is for; a student opens the game with it in the URL, as `.../?code=math360fall2026`.

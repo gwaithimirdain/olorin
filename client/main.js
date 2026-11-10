@@ -2,6 +2,7 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 import { arrange } from "./arrange.js"
+import { SENTENCES, renderSentence } from "./sentences.js"
 import { PREVIOUS_WORLD_FRACTION, FOLLOWING_WORLD_FRACTION, EARLIER_WORLD_FRACTION, PREVIOUS_STAGE_FRACTION,
          SKIPPABLE_EARLIER_LEVELS, RECENT_COMPLETION_WINDOW } from "./unlock-rules.js"
 import { layoutWorldMap, NODE_WIDTH, NODE_HEIGHT, JUNCTION_RADIUS } from "./worldmap.js"
@@ -228,6 +229,15 @@ var pinnedConnectionId = null;
 // must be ignored rather than read as the user tapping again to toggle the pin back off.
 var lastTapConnectionId = null;
 var lastTapTime = 0;
+
+// The block whose sentence is showing, or about to be (see showBlockTooltip below); the timer that
+// will show it; where the pointer was last seen; and what kind of pointer last pressed something.
+var sentenceEntry = null;
+var sentenceTimer = null;
+var sentencePoint = null;
+var lastPointerType = null;
+// When a block was last tapped: a tap arrives twice on a touch device (see lastTapTime).
+var lastSentenceTap = 0;
 
 // difficulty setting
 var difficulty = 0;
@@ -710,12 +720,37 @@ ready(() => {
         if(e.shiftKey || e.target.closest('.closebutton') || !el.isConnected) { return; }
         instance.clearDragSelection();
         instance.addToDragSelection(el);
+        if(lastPointerType === 'touch') { tapForSentence(e); }
     });
     // Tapping/clicking anywhere that isn't a wire, its close button, or the tooltip unpins.
     document.addEventListener('click', (e) => {
         if(pinnedConnectionId != null && !e.target.closest('.jtk-connector, .closebutton, #wireTooltip')) {
             unpinConnection();
         }
+    });
+
+    // A mouse resting on a block shows its sentence after a moment, so that moving across the
+    // diagram doesn't set them all flashing; a press or a drag puts it away.  A touchscreen has no
+    // hovering, so there a tap shows it (see EVENT_ELEMENT_TAP above), and another tap puts it away.
+    document.addEventListener('pointerdown', function (e) {
+        lastPointerType = e.pointerType;
+        sentencePoint = e;
+        if(e.pointerType !== 'touch' || !sentenceEntryAt(e.target)) { hideBlockTooltip(); }
+    });
+    diagram.addEventListener('pointermove', function (e) {
+        if(e.pointerType === 'touch') { return; }
+        sentencePoint = e;
+        if(e.buttons !== 0) { hideBlockTooltip(); return; }
+        const entry = sentenceEntryAt(e.target);
+        if(entry === sentenceEntry) { return; }
+        hideBlockTooltip();
+        sentenceEntry = entry;
+        if(entry) {
+            sentenceTimer = setTimeout(function () { showBlockTooltip(entry, sentencePoint); }, SENTENCE_DELAY_MS);
+        }
+    });
+    diagram.addEventListener('pointerleave', function (e) {
+        if(e.pointerType !== 'touch') { hideBlockTooltip(); }
     });
 
     // When a palette box is dropped on the diagram, we add a copy of it as a new node at the dropped location.
@@ -755,7 +790,7 @@ ready(() => {
     // far as the player likes.  jsPlumb moves the whole drag selection but only announces the drag
     // once, so we collect the boxes it's carrying from the moves themselves, and take the pointer
     // from them too: it stays put while the canvas pans out from under it.
-    instance.bind(EVENT_DRAG_START, function (p) { startDragPan(p.e); });
+    instance.bind(EVENT_DRAG_START, function (p) { hideBlockTooltip(); startDragPan(p.e); });
     instance.bind(EVENT_DRAG_MOVE, function (p) {
         if(dragPan) {
             dragPan.boxes.add(p.el);
@@ -981,6 +1016,9 @@ function addRuleNode(id, boxId) {
     box.style.position = 'absolute';
     // A block Undo puts back has the id it had before.
     box.id = boxId || ('rule' + (counter++));
+    // The palette's description of the block is for choosing one; once it is part of the proof,
+    // what it says in the proof takes over (see showBlockTooltip).
+    if(SENTENCES[id]) { box.removeAttribute('title'); }
     canvas.appendChild(box);
     // Register it with jsPlumb under that id right away.  Otherwise the first jsPlumb call to look
     // at it registers it -- and anything but adding an endpoint (asking for its endpoints, say)
@@ -990,7 +1028,7 @@ function addRuleNode(id, boxId) {
     // Make it selectable for multi-element dragging.
     box.onmousedown = toggleDragSelected(box);
     // Add it to the master list of nodes.
-    nodes.push({id: box.id, rule: box.dataset.rule, node: box});
+    nodes.push({id: box.id, rule: box.dataset.rule, node: box, statements: {}});
     // Add a close button.  (Variable, hypothesis, and conclusion nodes aren't closeable.)
     addBoxCloseButton(box);
     // Count it right away: a box that opens a modal for its value (asc, expr, a bound variable)
@@ -3341,6 +3379,9 @@ if (TEST_MODE) {
         // What hovering each wire currently in error would say, in connection order.
         wireErrors: () => instance.getConnections()
             .map((c) => c.parameters.errorText).filter((t) => t !== undefined),
+        // Every block's sentence template, and what a block on the diagram says right now.
+        sentences: () => SENTENCES,
+        sentence: (id) => blockSentence(nodes.find((n) => n.id === id)),
         difficulty: () => difficulty,
         varnames: () => varnames.slice(),
         savedProofKey,
@@ -4695,7 +4736,11 @@ function showWireTooltip(conn, e) {
         x = r.left + r.width / 2;
         y = r.top + r.height / 2 + 16;
     }
-    // Keep it on screen (it's already displayed, so it can be measured).
+    placeTooltip(tip, x, y);
+}
+
+// Put a displayed tooltip at the given position, keeping it on screen.
+function placeTooltip(tip, x, y) {
     const tr = tip.getBoundingClientRect();
     tip.style.left = Math.max(4, Math.min(x, window.innerWidth - tr.width - 4)) + 'px';
     tip.style.top = Math.max(4, Math.min(y, window.innerHeight - tr.height - 4)) + 'px';
@@ -4703,6 +4748,78 @@ function showWireTooltip(conn, e) {
 
 function hideWireTooltip() {
     document.getElementById("wireTooltip").style.display = 'none';
+}
+
+// How long the mouse has to rest on a block before its sentence appears.
+const SENTENCE_DELAY_MS = 300;
+
+// The block that a sentence should be shown for when the pointer is over this element, if any.
+// The middle of a bracket doesn't count as being over the bracket, or a sentence would pop up
+// every time the pointer crossed the empty space between the blocks of a subproof.
+function sentenceEntryAt(target) {
+    const box = target.closest('#canvas .rule');
+    if(!box || (target === box && box.classList.contains('container'))) { return null; }
+    const entry = nodes.find(function (x) { return x.id === box.id; });
+    return (entry && SENTENCES[entry.rule]) ? entry : null;
+}
+
+// What a port has to say, if anything.  What the port itself is known to carry comes first: a wire's
+// label can be what its statement becomes where the wire ends up, as when it enters a case of a
+// "natE", and that is not what the block at its other end says.  Otherwise it is what's on a wire
+// connected to it -- in the player's own words, if they wrote that wire's label.  A value may be
+// known only from the wire even when its set is known from the port.  The input ports of a variadic
+// block share one key, so what's noted under it isn't about any particular one of them.
+function portSaying(entry, ep) {
+    const shared = VARIADIC_RULES[entry.rule] && ep.parameters.sort === "input";
+    const own = shared ? null : entry.statements[portKey({ id: entry.id, sort: ep.parameters.sort, label: ep.parameters.label })];
+    const known = [own].concat(ep.connections.map(function (c) {
+        return c.parameters.ty ? { ty: c.parameters.ty } : c.parameters.statement;
+    })).filter(Boolean);
+    const said = known.find(function (s) { return !ep.parameters.hasValue || s.tm; }) || known[0];
+    return said ? { text: ep.parameters.hasValue ? said.tm : said.ty, type: said.ty } : null;
+}
+
+// What a block says in an English proof, as filled in from its ports, or null if it has no sentence.
+function blockSentence(entry) {
+    const template = SENTENCES[entry.rule];
+    if(!template) { return null; }
+    const ports = instance.getEndpoints(entry.node);
+    return renderSentence(template, function (sort, label) {
+        const named = ports.filter(function (ep) {
+            return ep.parameters.sort === sort && (ep.parameters.label || "") === label;
+        });
+        if(named.length === 0) { return null; }
+        return named.filter(function (ep) { return !ep.parameters.hidden; })
+            .map(function (ep) { return portSaying(entry, ep); })
+            .filter(Boolean);
+    });
+}
+
+function showBlockTooltip(entry, point) {
+    const tip = document.getElementById("blockTooltip");
+    tip.textContent = blockSentence(entry);
+    tip.style.display = 'block';
+    placeTooltip(tip, point.clientX + 14, point.clientY + 16);
+}
+
+// A block has been tapped on a touchscreen: show its sentence, or put it away if it was showing.
+function tapForSentence(e) {
+    const now = Date.now();
+    if(now - lastSentenceTap < 300) { return; }
+    lastSentenceTap = now;
+    const entry = sentenceEntryAt(e.target);
+    const tappedAgain = entry !== null && entry === sentenceEntry;
+    hideBlockTooltip();
+    if(entry && !tappedAgain) {
+        sentenceEntry = entry;
+        showBlockTooltip(entry, sentencePoint);
+    }
+}
+
+function hideBlockTooltip() {
+    clearTimeout(sentenceTimer);
+    sentenceEntry = null;
+    document.getElementById("blockTooltip").style.display = 'none';
 }
 
 // Close whichever wire a tap has pinned open (see EVENT_CONNECTION_TAP above).
@@ -4864,6 +4981,7 @@ function typecheck() {
     cancel.innerText = "Cancel";
     document.getElementById("typecheckingBG").style.display = 'flex';
     hideWireTooltip();
+    hideBlockTooltip();
 
     console.log("typechecking with " + nodes.length + " nodes");
     var connctr = 0;
@@ -4886,6 +5004,8 @@ function typecheck() {
         }
         // Last time's error is no longer this wire's, whatever this typecheck decides.
         c.parameters.errorText = undefined;
+        // And so is what it was last known to carry.
+        c.parameters.statement = undefined;
         instance.revalidate(c.source);
 
         // Clear the label overlays.  For some reason, if we *delete* all the overlays here and then add later the ones we want, some of them don't get displayed until the nodes are dragged around.  So instead we set the label text of all existing overlays to empty here, and later we delete only the overlays with empty label text.
@@ -4926,6 +5046,7 @@ function typecheck() {
             }
             endpoint.connectorOverlays = [];
         });
+        x.statements = {};
         for(var d in x.node.dataset) {
             if(d.startsWith("label:")) {
                 delete x.node.dataset[d];
@@ -5631,6 +5752,7 @@ function stepHistory(from, to) {
     updateUndoButtons();
     unpinConnection();
     hideWireTooltip();
+    hideBlockTooltip();
     instance.clearDragSelection();
     putBackSnapshot(target, now);
 }
@@ -5749,6 +5871,28 @@ function plainDiagnosticText(text) {
         .trim();
 }
 
+// Note down what each wire and port is known to carry, for the sentences of the blocks they belong
+// to (see blockSentence).  A sentence mustn't give away what the current difficulty makes the player
+// work out, so this takes only what the diagram itself would show: every wire and port on novice,
+// and otherwise only the wires that autoLabelWire labels, and the ports of the same kinds -- those
+// of the givens and the goal, whose statements are written on them anyway, and those carrying values.
+function recordStatements(labels, connections, autoLabelWire) {
+    labels.forEach(function (label) {
+        const said = { ty: label.ty, tm: label.tm };
+        if(label.loc.isEdge) {
+            const edge = connections[label.loc.id];
+            if(autoLabelWire(edge) && !edge.parameters.statement) { edge.parameters.statement = said; }
+            return;
+        }
+        const entry = nodes.find(function (x) { return x.id === label.loc.id; });
+        const key = portKey(label.loc);
+        if(entry && !entry.statements[key] && (difficulty === 0 || label.loc.hasValue ||
+           entry.rule === 'hypothesis' || entry.rule === 'variable' || entry.rule === 'conclusion')) {
+            entry.statements[key] = said;
+        }
+    });
+}
+
 // A port, as the key of a lookup table: the two shapes a port arrives in -- a label's loc and an
 // edge's end -- name the vertex differently, so we take either.
 function portKey(port) {
@@ -5854,6 +5998,9 @@ function continue_typechecking(nodes, edges, connections, result) {
                     return (ishyp || isconcl || hasval);
                 });
         };
+        // Before the placeholders below go in with the rest: those aren't statements of anything.
+        // What a variable says where it is bound comes first, since the first one noted is kept.
+        recordStatements((result.bound || []).concat(labels), connections, autoLabelWire);
         nodes.forEach(function (x) {
             instance.getEndpoints(x.node).forEach(function (endpoint) {
                 if(endpoint.parameters.primary) {
@@ -6385,7 +6532,7 @@ function setLevel(level, rulesAllowed) {
         vbx.id = v.id;
         vbx.onmousedown = toggleDragSelected(vbx);
         canvas.appendChild(vbx);
-        nodes.push({id: vbx.id, name: v.name, rule: 'variable', node: vbx, value: v.ty});
+        nodes.push({id: vbx.id, name: v.name, rule: 'variable', node: vbx, value: v.ty, statements: {}});
         instance.addEndpoint(vbx, {
             anchor: "Right",
             source: true,
@@ -6412,7 +6559,7 @@ function setLevel(level, rulesAllowed) {
         hyp.id = h.id;
         hyp.onmousedown = toggleDragSelected(hyp);
         canvas.appendChild(hyp);
-        nodes.push({id: hyp.id, rule: 'hypothesis', node: hyp, value : h.ty});
+        nodes.push({id: hyp.id, rule: 'hypothesis', node: hyp, value : h.ty, statements: {}});
         instance.addEndpoint(hyp, {
             anchor: "Right",
             source: true,
@@ -6437,7 +6584,7 @@ function setLevel(level, rulesAllowed) {
     concl.style.left = (diagram.clientWidth - 50 - concl.clientWidth) + 'px';
     concl.style.top = ((diagram.clientHeight - concl.clientHeight) / 2) + 'px';
     conclusion_node = concl;
-    nodes.push({id: concl.id, rule: 'conclusion', node: concl, value: conclusion.ty});
+    nodes.push({id: concl.id, rule: 'conclusion', node: concl, value: conclusion.ty, statements: {}});
     instance.addEndpoint(concl, { anchor: "Left", target: true, parameters: {sort: "input"} });
 
     // Set the visible difficulty, and this level's block budget if it sets one.  The budget is
