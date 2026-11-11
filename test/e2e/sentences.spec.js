@@ -1,6 +1,7 @@
 // Tests for the sentences a block on the diagram shows when hovered or tapped: what it says in an
 // English proof, from the templates in client/sentences.js, filled in with the statements on its
-// own ports.
+// own ports.  And for the whole proof in English that a completed level offers, put together from
+// those sentences.
 
 const { test, expect } = require('@playwright/test');
 const { Olorin } = require('../helpers/olorin');
@@ -16,7 +17,7 @@ const TEMPLATES = {
     variable: 'Let {output}∈{output.type} be given.',
     conclusion: 'We want to prove {input}.',
     impE: 'Since {input:implication} and {input:antecedent}, we have {output}.',
-    impI: 'Assume {assumption}; we will prove {subgoal}.',
+    impI: 'Assume {assumption}; we will prove {subgoal}.\n{proof}',
     allI: 'Let {assumption}∈{assumption.type}[ with {assumption:condition}] be arbitrary; we will prove {subgoal}.',
     alg: 'By algebra[ from {input}], we have {output}.',
     zton: 'Choose {output:element}∈{output:element.type} such that {output:property}.',
@@ -32,6 +33,7 @@ async function openWithTemplates(olorin, page, options) {
 }
 
 const sentenceOf = (page, id) => page.evaluate((i) => window.__olorin.sentence(i), id);
+const writtenProof = (page) => page.evaluate(() => window.__olorin.writtenProof());
 const tooltip = (page) => page.locator('#blockTooltip');
 
 // The ids of a level's given blocks and its goal.
@@ -68,7 +70,7 @@ async function centre(page, id) {
 }
 
 test.describe('Sentence templates', () => {
-    test('name only ports that their blocks have', async ({ page }) => {
+    test('name only ports that their blocks have, and have a hole for each subgoal', async ({ page }) => {
         const olorin = new Olorin(page);
         await olorin.open();
         await olorin.buildCustom({ parameters: 'P : Type', variables: 'x ∈ ℝ', hypotheses: 'P', conclusion: 'P' });
@@ -94,9 +96,18 @@ test.describe('Sentence templates', () => {
                 const id = placed(rule);
                 if (id === null) { found.push(rule + ': no such block'); continue; }
                 const have = ports().filter((p) => p.vertex === id).map((p) => p.sort + ':' + (p.label || ''));
-                for (const m of template.matchAll(/\{(\w+)(?::(\w+))?(\.type)?\}/g)) {
-                    const name = m[1] + ':' + (m[2] || '');
-                    if (!have.includes(name)) { found.push(rule + ': ' + m[0]); }
+                const holes = [];
+                for (const line of template.split('\n')) {
+                    const hole = line.match(/^\{proof(?::(\w+))?\}$/);
+                    if (hole) { holes.push('subgoal:' + (hole[1] || '')); continue; }
+                    for (const m of line.matchAll(/\{(\w+)(?::(\w+))?(\.type)?\}/g)) {
+                        const name = m[1] + ':' + (m[2] || '');
+                        if (!have.includes(name)) { found.push(rule + ': ' + m[0]); }
+                    }
+                }
+                const subgoals = have.filter((p) => p.startsWith('subgoal:'));
+                if (holes.slice().sort().join() !== subgoals.slice().sort().join()) {
+                    found.push(rule + ': holes for ' + holes.join(', ') + ' but subgoals ' + subgoals.join(', '));
                 }
             }
             return found;
@@ -261,6 +272,118 @@ test.describe('A block\'s sentence', () => {
             await expect(tooltip(page)).toBeHidden();
         });
     }
+});
+
+test.describe('The proof in English', () => {
+    let olorin;
+    test.beforeEach(async ({ page }) => {
+        olorin = new Olorin(page);
+        await openWithTemplates(olorin, page);
+    });
+
+    test('says the givens, the goal, and then each block in order', async ({ page }) => {
+        await provedByImpE(olorin);
+        expect(await writtenProof(page)).toEqual([
+            { text: 'By hypothesis, P⇒Q.', depth: 0 },
+            { text: 'By hypothesis, P.', depth: 0 },
+            { text: 'We want to prove Q.', depth: 0 },
+            { text: 'Since P⇒Q and P, we have Q.', depth: 0 },
+        ]);
+    });
+
+    test('puts the proof of a bracket\'s subgoal in its hole, indented', async ({ page }) => {
+        await olorin.buildCustom({
+            parameters: 'P : Type\nQ : Type\nR : Type', hypotheses: 'P ⇒ Q\nQ ⇒ R', conclusion: 'P ⇒ R',
+        });
+        const { hyps, concl } = await givens(olorin);
+        const impI = await olorin.dragRule('impI', 250, 100);
+        // The second step is the further left, but it can't come first.
+        const second = await olorin.dragRule('impE', 300, 300);
+        const first = await olorin.dragRule('impE', 500, 300);
+        await olorin.connect({ vertex: hyps[0], sort: 'output' }, { vertex: first, sort: 'input', label: 'implication' });
+        await olorin.connect({ vertex: impI, sort: 'assumption' }, { vertex: first, sort: 'input', label: 'antecedent' });
+        await olorin.connect({ vertex: hyps[1], sort: 'output' }, { vertex: second, sort: 'input', label: 'implication' });
+        await olorin.connect({ vertex: first, sort: 'output' }, { vertex: second, sort: 'input', label: 'antecedent' });
+        await olorin.connect({ vertex: second, sort: 'output' }, { vertex: impI, sort: 'subgoal' });
+        await olorin.connect({ vertex: impI, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
+        expect((await writtenProof(page)).slice(3)).toEqual([
+            { text: 'Assume P; we will prove R.', depth: 0 },
+            { text: 'Since P⇒Q and P, we have Q.', depth: 1 },
+            { text: 'Since Q⇒R and Q, we have R.', depth: 1 },
+        ]);
+    });
+
+    test('puts a block in the subproof that uses it, even if it uses nothing assumed there', async ({ page }) => {
+        await olorin.buildCustom({
+            parameters: 'P : Type\nQ : Type\nR : Type', hypotheses: 'P ⇒ Q\nP', conclusion: 'R ⇒ Q',
+        });
+        const { hyps, concl } = await givens(olorin);
+        const impE = await olorin.dragRule('impE', 250, 150);
+        const impI = await olorin.dragRule('impI', 450, 100);
+        await olorin.connect({ vertex: hyps[0], sort: 'output' }, { vertex: impE, sort: 'input', label: 'implication' });
+        await olorin.connect({ vertex: hyps[1], sort: 'output' }, { vertex: impE, sort: 'input', label: 'antecedent' });
+        await olorin.connect({ vertex: impE, sort: 'output' }, { vertex: impI, sort: 'subgoal' });
+        await olorin.connect({ vertex: impI, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
+        expect((await writtenProof(page)).slice(3)).toEqual([
+            { text: 'Assume R; we will prove Q.', depth: 0 },
+            { text: 'Since P⇒Q and P, we have Q.', depth: 1 },
+        ]);
+    });
+
+    test('says a subgoal with nothing to prove is trivial', async ({ page }) => {
+        await olorin.buildCustom({ parameters: 'P : Type', hypotheses: '', conclusion: 'P ⇒ P' });
+        const { concl } = await givens(olorin);
+        const impI = await olorin.dragRule('impI', 300, 150);
+        await olorin.connect({ vertex: impI, sort: 'assumption' }, { vertex: impI, sort: 'subgoal' });
+        await olorin.connect({ vertex: impI, sort: 'output' }, { vertex: concl, sort: 'input' });
+        await olorin.waitForTypecheck();
+        expect(await olorin.isComplete()).toBe(true);
+        const trivial = await page.evaluate(() => window.__olorin.trivial());
+        expect(await writtenProof(page)).toEqual([
+            { text: 'We want to prove P⇒P.', depth: 0 },
+            { text: 'Assume P; we will prove P.', depth: 0 },
+            { text: trivial, depth: 1 },
+        ]);
+    });
+
+    test('is shown by a button on completing a level', async ({ page }) => {
+        await provedByImpE(olorin);
+        await page.click('#showWrittenProof');
+        await expect(page.locator('#writtenProof .writtenProofLine')).toHaveText([
+            'By hypothesis, P⇒Q.', 'By hypothesis, P.', 'We want to prove Q.', 'Since P⇒Q and P, we have Q.',
+        ]);
+        await page.click('#doneWrittenProof');
+        await expect(page.locator('#writtenProofBG')).toBeHidden();
+    });
+
+    test('is not offered above novice', async ({ page }) => {
+        await olorin.seed([['difficulty', '1']]);
+        await openWithTemplates(olorin, page);
+        await provedByImpE(olorin);
+        expect(await olorin.completeBannerVisible()).toBe(true);
+        await expect(page.locator('#showWrittenProof')).toBeHidden();
+    });
+
+    // With the real templates: every case of a proof that splits into them has its own proof.
+    test('fills in every hole of a real proof by cases', async ({ page }) => {
+        const level = fixtureLevels().filter(hasFixture).find((l) => proofRules(readFixture(l)).includes('orE'));
+        expect(level, 'no proof by cases on an ∨').toBeTruthy();
+        await olorin.open({ code: level.code });
+        await olorin.selectLevel(level.name);
+        await olorin.restore(readFixture(level));
+        expect(await olorin.isComplete()).toBe(true);
+        const lines = await writtenProof(page);
+        const cases = lines.map((l, i) => [l, i]).filter(([l]) => /^Case \d/.test(l.text));
+        expect(cases.length).toBeGreaterThanOrEqual(2);
+        for (const [c, i] of cases) {
+            expect(lines[i + 1].depth, 'the case after "' + c.text + '" has no proof').toBe(c.depth + 1);
+        }
+        expect(lines.map((l) => l.text).join('\n')).not.toMatch(/___|\{|\.\.\./);
+    });
 });
 
 test.describe('Hovering a block', () => {

@@ -1262,6 +1262,12 @@ body.arranging { cursor: progress; }
     box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+/* A line of the proof in English; its indentation, for a subproof, is set as it is shown. */
+.writtenProofLine {
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+}
+
 /* labels on endpoints */
 
 .lowerInputLabel {

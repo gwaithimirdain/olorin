@@ -163,6 +163,7 @@
 
     <div id="levelCompleteBanner">
       <span id="levelCompleteText">Level Complete!</span>
+      <button id="showWrittenProof" title="Show this proof written out in English" style="display: none">Proof in English</button>
       <button id="nextLevel">Next</button>
       <button id="nextUnsolved">Next Unsolved</button>
       <button id="saveLevelAfterComplete" style="display: none">Save</button>
@@ -387,6 +388,17 @@
         <div style="text-align: center; margin-top: 20px">
           <button id="copyExport" style="font-size: 16px">Copy to clipboard</button>
           <button id="doneExport" style="font-size: 16px">Close</button><br/>
+        </div>
+      </div>
+    </div>
+
+    <!-- The completed proof written out in English, from the sentences of its blocks. -->
+    <div id="writtenProofBG" class="modalbg">
+      <div class="modal" style="width: 600px">
+        <h3 style="text-align: center">The proof in English</h3>
+        <div id="writtenProof"></div>
+        <div style="text-align: center; margin-top: 20px">
+          <button id="doneWrittenProof" style="font-size: 16px">Close</button><br/>
         </div>
       </div>
     </div>

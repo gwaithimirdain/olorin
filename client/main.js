@@ -2,7 +2,7 @@ import { ready, newInstance, DotEndpoint, StraightConnector, FlowchartConnector,
 import { LEVELS, COURSE_CODES, saveable, legacySaveables } from "./levels.js"
 import { SERVER } from "./config.js"
 import { arrange } from "./arrange.js"
-import { SENTENCES, renderSentence } from "./sentences.js"
+import { SENTENCES, TRIVIAL, renderSentence, sentenceLines } from "./sentences.js"
 import { PREVIOUS_WORLD_FRACTION, FOLLOWING_WORLD_FRACTION, EARLIER_WORLD_FRACTION, PREVIOUS_STAGE_FRACTION,
          SKIPPABLE_EARLIER_LEVELS, RECENT_COMPLETION_WINDOW } from "./unlock-rules.js"
 import { layoutWorldMap, NODE_WIDTH, NODE_HEIGHT, JUNCTION_RADIUS } from "./worldmap.js"
@@ -3382,6 +3382,9 @@ if (TEST_MODE) {
         // Every block's sentence template, and what a block on the diagram says right now.
         sentences: () => SENTENCES,
         sentence: (id) => blockSentence(nodes.find((n) => n.id === id)),
+        // The whole proof in English, as the "Proof in English" button shows it.
+        writtenProof: () => writtenProof(),
+        trivial: () => TRIVIAL,
         difficulty: () => difficulty,
         varnames: () => varnames.slice(),
         savedProofKey,
@@ -4797,12 +4800,15 @@ function isInductionCases(entry) {
     });
 }
 
-// What a block says in an English proof, as filled in from its ports, or null if it has no sentence.
-function blockSentence(entry) {
-    const template = SENTENCES[isInductionCases(entry) ? "natE in natInd" : entry.rule];
-    if(!template) { return null; }
+// The template for what a block says in an English proof, or undefined if it says nothing.
+function sentenceTemplate(entry) {
+    return SENTENCES[isInductionCases(entry) ? "natE in natInd" : entry.rule];
+}
+
+// What a block has to say on its ports, for filling in its template (see renderSentence).
+function sentencePorts(entry) {
     const ports = instance.getEndpoints(entry.node);
-    return renderSentence(template, function (sort, label) {
+    return function (sort, label) {
         const named = ports.filter(function (ep) {
             return ep.parameters.sort === sort && (ep.parameters.label || "") === label;
         });
@@ -4810,8 +4816,152 @@ function blockSentence(entry) {
         return named.filter(function (ep) { return !ep.parameters.hidden; })
             .map(function (ep) { return portSaying(entry, ep); })
             .filter(Boolean);
-    });
+    };
 }
+
+// What a block says in an English proof, as filled in from its ports, or null if it has no sentence.
+function blockSentence(entry) {
+    const template = sentenceTemplate(entry);
+    return template ? renderSentence(template, sentencePorts(entry)) : null;
+}
+
+// The whole proof in English, put together from the sentences of its blocks: a list of lines
+// { text, depth }, where depth is how many subproofs deep the line is.  First come the givens and
+// the goal, and then the proof, in which the proof of each subgoal of a bracket goes in the hole
+// its template has for it -- or, if it has nothing to say, the TRIVIAL sentence does.
+//
+// Which part of the proof a block belongs in is worked out from the wiring, not from where it sits
+// on the diagram: it goes in the innermost part of the proof that holds everything using its
+// outputs.  So a block that only one case of an orE uses is part of that case, even if it uses
+// nothing that case assumes, and one that both cases use comes before them.  A block the goal
+// doesn't depend on is left out.  Within each part, every block comes after the blocks it uses, and
+// where that leaves a choice, the leftmost goes first (and then the topmost), as a proof is laid
+// out from left to right.
+function writtenProof() {
+    const byId = new Map(nodes.map(function (n) { return [n.id, n]; }));
+    // The wires out of each block's outputs, and into each block.  A wire out of an assumption is
+    // used inside the bracket it comes from, which says nothing about where the bracket goes.
+    const wiresOut = new Map(nodes.map(function (n) { return [n, []]; }));
+    const wiresIn = new Map(nodes.map(function (n) { return [n, []]; }));
+    instance.getConnections().forEach(function (c) {
+        const from = byId.get(c.source.id);
+        const to = byId.get(c.target.id);
+        if(!from || !to || c.endpoints[0].parameters.sort !== "output") { return; }
+        const wire = { from: from, to: to, sort: c.endpoints[1].parameters.sort, label: c.endpoints[1].parameters.label || "" };
+        wiresOut.get(from).push(wire);
+        wiresIn.get(to).push(wire);
+    });
+
+    // The blocks the goal depends on.
+    const goal = nodes.find(function (n) { return n.rule === 'conclusion'; });
+    const needed = new Set([goal]);
+    const search = [goal];
+    while(search.length > 0) {
+        wiresIn.get(search.pop()).forEach(function (w) {
+            if(!needed.has(w.from)) { needed.add(w.from); search.push(w.from); }
+        });
+    }
+
+    // Put them in order, each after the blocks it uses.
+    const order = [];
+    const unmet = new Map();
+    needed.forEach(function (n) { unmet.set(n, wiresIn.get(n).length); });
+    const ready = Array.from(needed).filter(function (n) { return unmet.get(n) === 0; });
+    const first = function (a, b) { return (a.node.offsetLeft - b.node.offsetLeft) || (a.node.offsetTop - b.node.offsetTop); };
+    while(ready.length > 0) {
+        ready.sort(first);
+        const n = ready.shift();
+        order.push(n);
+        wiresOut.get(n).forEach(function (w) {
+            if(!needed.has(w.to)) { return; }
+            unmet.set(w.to, unmet.get(w.to) - 1);
+            if(unmet.get(w.to) === 0) { ready.push(w.to); }
+        });
+    }
+
+    // The parts of the proof: the whole of it, and the proof of each subgoal of a bracket, which is
+    // inside the part the bracket is in.  Working back from the goal, every block that uses one
+    // has its part before the block itself is placed.
+    const whole = { outer: null, blocks: [] };
+    const partOf = new Map([[goal, whole]]);
+    const subproofs = new Map();
+    const subproof = function (bracket, label) {
+        const key = bracket.id + "|" + label;
+        if(!subproofs.has(key)) { subproofs.set(key, { outer: partOf.get(bracket), blocks: [] }); }
+        return subproofs.get(key);
+    };
+    const nesting = function (part) {
+        const parts = [];
+        for(var p = part; p; p = p.outer) { parts.unshift(p); }
+        return parts;
+    };
+    const innermostHolding = function (parts) {
+        return parts.map(nesting).reduce(function (shared, these) {
+            var i = 0;
+            while(i < shared.length && shared[i] === these[i]) { i++; }
+            return shared.slice(0, i);
+        }).pop();
+    };
+    order.slice().reverse().forEach(function (n) {
+        if(n === goal) { return; }
+        const part = innermostHolding(wiresOut.get(n).filter(function (w) { return needed.has(w.to); }).map(function (w) {
+            return w.sort === "subgoal" ? subproof(w.to, w.label) : partOf.get(w.to);
+        }));
+        partOf.set(n, part);
+        if(n.rule !== 'variable' && n.rule !== 'hypothesis') { part.blocks.unshift(n); }
+    });
+
+    // Say it all.
+    const lines = [];
+    const tell = function (part, depth) {
+        if(part) { part.blocks.forEach(function (n) { say(n, depth); }); }
+    };
+    const say = function (n, depth) {
+        const template = sentenceTemplate(n);
+        if(!template) { return; }
+        const told = new Set();
+        const prove = function (label) {
+            told.add(label);
+            const before = lines.length;
+            tell(subproofs.get(n.id + "|" + label), depth + 1);
+            if(lines.length === before) { lines.push({ text: TRIVIAL, depth: depth + 1 }); }
+        };
+        sentenceLines(template, sentencePorts(n)).forEach(function (line) {
+            if(line.proof === undefined) {
+                lines.push({ text: line.text, depth: depth });
+            } else {
+                prove(line.proof);
+            }
+        });
+        // A template that leaves out a subgoal's hole still has its proof told, after it.
+        instance.getEndpoints(n.node).forEach(function (ep) {
+            const label = ep.parameters.label || "";
+            if(ep.parameters.sort === "subgoal" && !told.has(label)) { prove(label); }
+        });
+    };
+    nodes.filter(function (n) { return n.rule === 'variable' || n.rule === 'hypothesis'; })
+        .forEach(function (n) { say(n, 0); });
+    say(goal, 0);
+    tell(whole, 0);
+    return lines;
+}
+
+// The "Proof in English" button of the completion pop-up shows the whole proof.
+document.getElementById("showWrittenProof").onclick = function() {
+    const shown = document.getElementById("writtenProof");
+    shown.replaceChildren();
+    writtenProof().forEach(function (line) {
+        const p = document.createElement("p");
+        p.className = "writtenProofLine";
+        p.style.marginLeft = (1.5 * line.depth) + "em";
+        p.textContent = line.text;
+        shown.appendChild(p);
+    });
+    document.getElementById("writtenProofBG").style.display = "flex";
+};
+document.getElementById("doneWrittenProof").onclick = function() {
+    document.getElementById("writtenProofBG").style.display = "none";
+};
 
 function showBlockTooltip(entry, point) {
     const tip = document.getElementById("blockTooltip");
@@ -6168,6 +6318,8 @@ function continue_typechecking(nodes, edges, connections, result) {
                 hasBlockBudget() ? "Level Complete! Blocks used: " + blockTally() : "Level Complete!";
             document.getElementById("saveLevelAfterComplete").style.display =
                 (!currentLevel && currentLevelDef) ? '' : 'none';
+            // The proof in English goes with the sentences on the blocks, which are only for novices.
+            document.getElementById("showWrittenProof").style.display = (difficulty === 0) ? '' : 'none';
             const banner = document.getElementById("levelCompleteBanner");
             banner.style.backgroundColor = COLORS[difficulty][1].backgroundColor;
             banner.classList.add("shown");
