@@ -41,7 +41,7 @@ export const ELLIPSIS = "...";
 
 // What the whole proof says for a subgoal whose proof has nothing to say, as when a bracket's
 // subgoal is wired straight from its own assumption.
-export const TRIVIAL = "This is trivial.";
+export const TRIVIAL = "This is an assumption.";
 
 export const SENTENCES = {
     // What the level gives and asks for.
@@ -54,21 +54,23 @@ export const SENTENCES = {
     andE: "Since {input}, we have both {output:fst} and {output:snd}.",
     orI1: "Since {input:left}, we have {output}.",
     orI2: "Since {input:right}, we have {output}.",
-    orE: "Since {input}, we consider two cases.\n" +
+    orE: "Since {input}, there are two cases.\n" +
         "Case 1: assume {assumption:left}; we will prove {subgoal:left}.\n{proof:left}\n" +
-        "Case 2: assume {assumption:right}; we will prove {subgoal:right}.\n{proof:right}",
+        "Case 2: assume {assumption:right}; we will prove {subgoal:right}.\n{proof:right}\n" +
+        "Therefore, {output}.",
 
     // Implication and equivalence.
-    impI: "Assume {assumption}; we will prove {subgoal}.\n{proof}",
+    impI: "Assume {assumption}; we will prove {subgoal}.\n{proof}\nTherefore, {output}.",
     impE: "Since {input:implication} and {input:antecedent}, we have {output}.",
     iffI: "We prove both directions.\n" +
         "First, assume {assumption:ltor}; we will prove {subgoal:ltor}.\n{proof:ltor}\n" +
-        "Conversely, assume {assumption:rtol}; we will prove {subgoal:rtol}.\n{proof:rtol}",
+        "Conversely, assume {assumption:rtol}; we will prove {subgoal:rtol}.\n{proof:rtol}\n" +
+        "Therefore, {output}.",
     iffE1: "Since {input:implication} and {input:antecedent}, we have {output}.",
     iffE2: "Since {input:implication} and {input:antecedent}, we have {output}.",
 
     // The quantifiers.
-    allI: "Let {assumption}∈{assumption.type} be arbitrary[ such that {assumption:condition}]; we will prove {subgoal}.\n{proof}",
+    allI: "Let {assumption}∈{assumption.type} be arbitrary[ such that {assumption:condition}]; we will prove {subgoal}.\n{proof}\nTherefore, {output}.",
     allE: "Since {input:universal} and {input:element}∈{input:element.type}[ with {input:condition}], we have {output}.",
     exI: "Since {input:element}∈{input:element.type}[ and {input:condition}] satisfies {input:property}, we have {output}.",
     exE: "Since {input}, let {output:element}∈{output:element.type}[ with {output:condition}] be such that {output:property}.",
@@ -76,10 +78,10 @@ export const SENTENCES = {
     uexE: "Since {input}, let {output:element}∈{output:element.type} be such that {output:property} and {output:unique}.",
 
     // Negation and contradiction.
-    negI: "To prove {output}, assume for contradiction that {assumption}.\n{proof}",
+    negI: "To prove {output}, assume for contradiction that {assumption}.\n{proof}\nThis is a contradiction, so {output}.",
     negE: "Since {input:negation} and {input:statement} contradict each other, we have {output}.",
-    cnegI: "To prove {output}, assume for contradiction that {assumption}.\n{proof}",
-    botE: "We have reached a contradiction, so {output}.",
+    cnegI: "To prove {output}, assume for contradiction that {assumption}.\n{proof}\nThis is a contradiction, so {output}.",
+    botE: "{input} is impossible, so {output}.",
     topI: "{output} is always true.",
 
     // Saying what a wire carries.
@@ -103,11 +105,14 @@ export const SENTENCES = {
     // The natural numbers.
     natE: "Since {input}∈{input.type}, there are two cases.\n" +
         "Case 1: Assume {input}=0; we will prove {subgoal:zero}.\n{proof:zero}\n" +
-        "Case 2: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n{proof:suc}",
+        "Case 2: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n{proof:suc}\n" +
+        "Therefore, {output}.",
     "natE in natInd": "Since {input}∈{input.type}, there are two cases.\n" +
         "Base case: Assume {input}=0; we will prove {subgoal:zero}.\n{proof:zero}\n" +
-        "Induction step: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n{proof:suc}",
-    natInd: "Let {assumption:n}∈{assumption:n.type} and assume inductively {assumption:IH}; we will prove {subgoal:step}.\n{proof:step}",
+        "Induction step: Assume {input}={assumption:pred}+1 for some {assumption:pred}∈{assumption:pred.type}; we will prove {subgoal:suc}.\n{proof:suc}\n" +
+        "Therefore, {output}.",
+    natInd: "Let {assumption:n}∈{assumption:n.type} and assume inductively {assumption:IH}; we will prove {subgoal:step}.\n{proof:step}\n" +
+        "By induction, {output}.",
 };
 
 const PLACEHOLDER = /\{(\w+)(?::(\w+))?(\.type)?\}/g;
