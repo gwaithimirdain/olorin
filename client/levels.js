@@ -2400,8 +2400,7 @@ export const LEVELS = [
                 },
             ]
           },
-          { name: "¬¬₂",
-            bonus: true,
+          { name: "LEM",
             rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE", "lem" ],
             levels: [
                 {
@@ -2441,6 +2440,48 @@ export const LEVELS = [
                     conclusion: { ty: "(P⇒Q)∨(Q⇒R)" },
                 },
             ]
+          },
+          { name: "¬¬₂",
+            bonus: true,
+            rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE" ],
+            levels: [
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "((P⇒Q)⇒P)⇒P" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(P⇒Q)∨(Q⇒P)" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" }, { name: "S", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "P⇒Q" }, { ty: "R⇒S" } ],
+                    conclusion: { ty: "(P⇒S)∨(R⇒Q)" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "(P∧Q)⇒R" } ],
+                    conclusion: { ty: "(P⇒R)∨(Q⇒R)" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(¬P⇒P)⇒P" },
+                },
+                {
+                    parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" }, { name: "R", ty: "Type" } ],
+                    variables: [ ],
+                    hypotheses: [ ],
+                    conclusion: { ty: "(P⇒Q)∨(Q⇒R)" },
+                },
+            ],
           },
       ],
     },
