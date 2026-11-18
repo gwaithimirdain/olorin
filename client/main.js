@@ -4277,7 +4277,7 @@ function cancelNewVariable() {
 const STATEMENT_BOXES = {
     asc: { prefix: "🏷\u00a0", title: "Label a wire", prompt: "Enter a statement for the label:",
            invalid: "Invalid ascription" },
-    lem: { prefix: "lem\u00a0", title: "Excluded middle", prompt: "Enter a statement P, to get P∨¬P:",
+    lem: { prefix: "LEM\u00a0", title: "Excluded middle", prompt: "Enter a statement P, to get P∨¬P:",
            invalid: "Invalid statement" },
 };
 

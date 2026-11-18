@@ -2402,7 +2402,7 @@ export const LEVELS = [
           },
           { name: "¬¬₂",
             bonus: true,
-            rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE" ],
+            rules: [ "impI", "impE", "cnegI", "negE", "andE", "andI", "orI1", "orI2", "orE", "lem" ],
             levels: [
                 {
                     parameters: [ { name: "P", ty: "Type" }, { name: "Q", ty: "Type" } ],
@@ -2448,7 +2448,7 @@ export const LEVELS = [
       previous: ["Negation world", "Universal world", "Existential world"],
       stages: [
           { name: "¬∀∃∨⊤⇒",
-            rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI" ],
+            rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI", "lem" ],
             levels: [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
@@ -2496,7 +2496,7 @@ export const LEVELS = [
             ]
           },
           { name: "¬∀∃=",
-            rules: [ "allE", "allI", "exE", "exI", "cnegI", "negE", "expr", "alg", "asc" ], // alg not algplus
+            rules: [ "allE", "allI", "exE", "exI", "cnegI", "negE", "expr", "alg", "asc", "lem" ], // alg not algplus
             levels: [
                 {
                     parameters: [ ],
