@@ -1238,18 +1238,16 @@ function addEndpointsForRule(box, id, restore) {
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "?"} });
     } else if (id === 'topI') {
         instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output", primary: "⊤"} });
-    } else if (id === 'asc') {
-        instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input"} });
-        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
-        // Double-clicking the box re-opens the dialog to edit the type it ascribes.
-        box.addEventListener('dblclick', function () { editAscription(box); });
-        if(!restore) {
-            document.getElementById("ascribeBG").style.display = "flex";
-            const ascribe = document.getElementById('ascribe');
-            ascribe.dataset.name = box.id;
-            ascribe.dataset.editing = "";
-            ascribe.focus();
+    } else if (id === 'asc' || id === 'lem') {
+        // Both ask for a statement: the one an ascription says its wire carries, and the P that
+        // excluded middle gives P∨¬P for.  Excluded middle has no input; its output is the axiom.
+        if(id === 'asc') {
+            instance.addEndpoint(box, { anchor: "Left", target: true, parameters: {sort: "input"} });
         }
+        instance.addEndpoint(box, { anchor: "Right", source: true, maxConnections: -1, parameters: {sort: "output"} });
+        // Double-clicking the box re-opens the dialog to edit the statement.
+        box.addEventListener('dblclick', function () { editAscription(box); });
+        if(!restore) { openStatementDialog(box, false); }
         typecheck_now = false;
     } else if (id === 'alg' || id === 'algplus' || id === 'algneq') {
         syncVariadicInputs(box);
@@ -3124,9 +3122,9 @@ function restoreNode(sn, boxId) {
     // Restore an ascription/expression value and re-render the box accordingly.
     if(sn.value !== undefined) {
         if(entry) { entry.value = sn.value; }
-        if(sn.rule === 'asc' || sn.rule === 'expr') {
+        if(STATEMENT_BOXES[sn.rule] || sn.rule === 'expr') {
             // textContent, not innerHTML: a type like y<c would otherwise be read as the start of a tag.
-            box.textContent = (sn.rule === 'asc' ? "🏷\u00a0" : "") + sn.value;
+            box.textContent = (STATEMENT_BOXES[sn.rule] ? STATEMENT_BOXES[sn.rule].prefix : "") + sn.value;
             box.style.width = 'fit-content';
             box.style.padding = "0px 8px 0px 8px";
             // Re-rendering the box blew away its close button, so add it back.
@@ -4148,12 +4146,12 @@ function deleteRule(box) {
 // any of them, say so -- without checking whether this particular variable is used there, since
 // the point is to prompt a look rather than to be exhaustive.
 function renameWarningText() {
-    const boxes = nodes.some(function (x) { return x.rule === 'asc' || x.rule === 'expr'; });
+    const boxes = nodes.some(function (x) { return STATEMENT_BOXES[x.rule] || x.rule === 'expr'; });
     const wires = difficulty > 0;
     if(!boxes && !wires) { return ""; }
     const places =
-        boxes && wires ? "your expression and ascription boxes, and the types you've written on wires"
-        : boxes ? "your expression and ascription boxes"
+        boxes && wires ? "the statements and expressions you've written in boxes, and the types you've written on wires"
+        : boxes ? "the statements and expressions you've written in boxes"
         : "the types you've written on wires";
     return "Renaming changes where the variable is bound, but not " + places +
         ".  If any of them mention the old name, you'll need to change them yourself.";
@@ -4273,28 +4271,47 @@ function cancelNewVariable() {
     variableBG.style.display = "none";
 }
 
-// Similarly, submit the modal box that prompts for an ascription
-// Re-open the ascription dialog on a box that already has a type, so it can be corrected in place
-// instead of deleting the box and wiring a new one up.  Double-clicking a box does this.
-function editAscription(box) {
+// The boxes the player writes a statement into, which share one dialog: an ascription, which says
+// what its wire carries, and excluded middle, which gives P∨¬P for the P written in it.  Each says
+// what it is asking for, and shows the statement after a prefix of its own.
+const STATEMENT_BOXES = {
+    asc: { prefix: "🏷\u00a0", title: "Label a wire", prompt: "Enter a statement for the label:",
+           invalid: "Invalid ascription" },
+    lem: { prefix: "lem\u00a0", title: "Excluded middle", prompt: "Enter a statement P, to get P∨¬P:",
+           invalid: "Invalid statement" },
+};
+
+// Open the statement dialog for the box, empty for a box just dropped, or holding what it says
+// already when `editing` -- in which case cancelling leaves the box alone, whereas cancelling a
+// brand-new one removes it.
+function openStatementDialog(box, editing) {
     const ascribe = document.getElementById('ascribe');
+    const kind = STATEMENT_BOXES[box.dataset.rule];
     const node = nodes.find(function (x) { return x.id === box.id; });
+    document.getElementById("ascribeTitle").textContent = kind.title;
+    document.getElementById("ascribePrompt").textContent = kind.prompt;
     ascribe.dataset.name = box.id;
-    // Cancelling an edit leaves the box alone; cancelling a brand-new one removes it.
-    ascribe.dataset.editing = "true";
-    ascribe.value = (node && node.value) || '';
+    ascribe.dataset.editing = editing ? "true" : "";
+    ascribe.value = editing ? ((node && node.value) || '') : '';
     document.getElementById("ascribeBG").style.display = "flex";
     ascribe.focus();
-    ascribe.select();
+    if(editing) { ascribe.select(); }
 }
+
+// Re-open the statement dialog on a box that already has one, so it can be corrected in place
+// instead of deleting the box and wiring a new one up.  Double-clicking a box does this.
+function editAscription(box) { openStatementDialog(box, true); }
+
+// Submit the statement dialog.
 
 function submitAscription() {
     const ascribeBG = document.getElementById("ascribeBG");
     const ascribe = document.getElementById('ascribe');
     const box = document.getElementById(ascribe.dataset.name);
     const ty = ascribe.value;
+    const kind = STATEMENT_BOXES[box.dataset.rule];
     if(!Narya.checkParse(ty).complete) {
-        alert("Invalid ascription");
+        alert(kind.invalid);
         return;
     }
     // We attach it to the node that asked for it, and label that node with it as well
@@ -4304,7 +4321,7 @@ function submitAscription() {
         }
     }
     // textContent, not innerHTML: a type like y<c would otherwise be read as the start of a tag.
-    box.textContent = "🏷\u00a0" + ascribe.value;
+    box.textContent = kind.prefix + ascribe.value;
     box.style.width = 'fit-content';
     // That blew away the close button, so we add it back.
     addBoxCloseButton(box);

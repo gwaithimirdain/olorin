@@ -457,7 +457,7 @@ test.describe('Boxes that bind a variable', () => {
         await page.click('#submitExpression');
 
         await page.dblclick('#' + id);
-        expect(await warning(page)).toContain('expression and ascription boxes');
+        expect(await warning(page)).toContain("the statements and expressions you've written in boxes");
         expect(await warning(page)).not.toContain('wires');
     });
 

@@ -48,6 +48,9 @@ type rule =
     }
   | Asc
   | Expr
+  (* A block with no inputs, whose single output is an axiom applied to a statement the player types
+     into the block: the law of excluded middle, which gives P∨¬P for whatever P they write. *)
+  | Statement of { const : string list }
   (* Algebra blocks, with flags.  If "plus" is on, then Z3 can decide an absolute value, a minimum or a maximum on its own; otherwise the hypotheses must settle each such case first.  If "neq" is on, then Z3 can solve inequalities as goals; otherwise it insists the user deal with them using proof by contradiction. *)
   | Algebra of { sort : [ `None | `Plus | `Neq ] }
   | Var
@@ -215,6 +218,7 @@ let rules =
       ("topI", Tuple { inputs = []; unordered = false });
       ("asc", Asc);
       ("expr", Expr);
+      ("lem", Statement { const = [ "lem" ] });
       ("alg", Algebra { sort = `None });
       ("algneq", Algebra { sort = `Neq });
       ("algplus", Algebra { sort = `Plus });

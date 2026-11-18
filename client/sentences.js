@@ -83,6 +83,7 @@ export const SENTENCES = {
     cnegI: "To prove {output}, assume for contradiction that {assumption}.\n{proof}\nThis is a contradiction, so {output}.",
     botE: "{input} is impossible, so {output}.",
     topI: "{output} is always true.",
+    lem: "By the law of excluded middle, {output}.",
 
     // Saying what a wire carries.
     asc: "That is, {output}.",

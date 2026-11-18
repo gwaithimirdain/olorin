@@ -978,6 +978,27 @@ let rec check_of_output_port ~(seen : IdSet.t) (vertices : Vertex.t IdMap.t) (gr
               term = Named.Synth (Asc (locate_opt tm.loc tm.value.term, locate tyloc ty));
             },
             variables )
+      | Statement { const } ->
+          let ty = source_vertex.value <||> "missing statement" in
+          (* As for an ascription, errors in the statement are reported on the output wire, which
+             mustn't be labeled with the statement itself, since what it carries is the axiom's
+             conclusion about it. *)
+          let tyloc = Loc.make ~content:ty ~annotate:false locables in
+          (* Like an ascription, the statement can use any variable in scope. *)
+          let ty =
+            Reporter.try_with ~fatal:(fun d -> Named.Synth (Fail d.message)) @@ fun () ->
+            Named.Embed (All, Parse.Term.final (Parse.Term.parse (Asai.Range.source tyloc))) in
+          let const =
+            Named.Const
+              (Scope.lookup const <||> "statement constant " ^ String.concat "." const ^ " not found")
+          in
+          ( without_bindables
+              (Synth
+                 (Named.App
+                    ( named_synth (locate_opt None const),
+                      named_arg (locate tyloc ty),
+                      locate_opt None `Explicit ))),
+            PortSet.empty )
       | Expr ->
           let e = source_vertex.value <||> "missing expression" in
           (* Get all the bindables and variables from all the input wires connected to this rule, and which of those variables are wired to it directly. *)

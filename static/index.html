@@ -99,6 +99,7 @@
         </div>
         <div class="basic logical rule" style="text-align: left" id="botE" data-rule="botE" title="Use ⊥: a contradiction proves anything, so get whatever you need">⊥</div>
         <div class="basic logical rule" style="text-align: right" id="topI" data-rule="topI" title="Prove ⊤, which asks for nothing at all">⊤</div>
+        <div class="basic logical rule" style="text-align: center" id="lem" data-rule="lem" title="Use the law of excluded middle: write any statement P, and get P∨¬P; double-click to change P">lem</div>
         <div class="basic logical rule" style="text-align: center" id="asc" data-rule="asc" title="Say what statement a wire carries, when Olorin can't work it out on its own; double-click to change it">🏷</div>
         <div class="basic logical rule" style="text-align: center; color: #0000ff" id="expr" data-rule="expr" title="Write an arithmetic expression for a blue value port: wire it to every variable the expression uses, and double-click to change it">expr</div>
         <div class="basic logical rule" style="text-align: center" id="alg" data-rule="alg" title="Prove an equation or inequality by algebra, from the ones wired into it">alg</div>
@@ -309,8 +310,8 @@
 
     <div id="ascribeBG" class="modalbg">
       <div class="modal" id="ascribeModal">
-        <h3 style="text-align: center">Label a wire</h3>
-        <p>Enter a statement for the label:</p>
+        <h3 style="text-align: center" id="ascribeTitle">Label a wire</h3>
+        <p id="ascribePrompt">Enter a statement for the label:</p>
         <input type="text" id="ascribe" style="width: 100%"/>
         <div id="ascPalette"></div>
         <div style="text-align: center; margin-top: 30px">

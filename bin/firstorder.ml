@@ -32,6 +32,7 @@ def exists (A : Type) (P : A → Type) : Type ≔ data [ exists. (element : A) (
 def prod (A B : Type) : Type ≔ sig ( fst : A, snd : B )
 def coprod (A B : Type) : Type ≔ data [ left. (_:A) | right. (_:B) ]
 axiom negneg (P : Type) : neg (neg P) → P
+axiom lem (P : Type) : lor P (neg P)
 
 axiom eq (A : Type) (x y : A) : Type
 def neq (A : Type) (x y : A) : Type ≔ sig ( negation : eq A x y → ⊥ )
