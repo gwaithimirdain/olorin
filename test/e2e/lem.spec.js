@@ -49,7 +49,7 @@ test.describe('Excluded middle', () => {
         await page.click('#submitAscribe');
         await olorin.waitForTypecheck();
 
-        expect(await boxText(page, id)).toBe('lem P');
+        expect(await boxText(page, id)).toBe('LEM P');
         expect((await olorin.nodes()).find((n) => n.id === id).value).toBe('P');
         // It has no inputs: its only port is its output.
         const ports = (await page.evaluate(() => window.__olorin.ports())).filter((p) => p.vertex === id);
@@ -125,7 +125,7 @@ test.describe('Excluded middle', () => {
         await page.fill('#ascribe', 'P');
         await page.click('#submitAscribe');
         await olorin.waitForTypecheck();
-        expect(await boxText(page, id)).toBe('lem P');
+        expect(await boxText(page, id)).toBe('LEM P');
         expect(await olorin.isComplete()).toBe(true);
     });
 
@@ -158,6 +158,6 @@ test.describe('Excluded middle', () => {
         expect(await olorin.isComplete()).toBe(true);
         const restored = (await olorin.nodes()).find((n) => n.rule === 'lem');
         expect(restored.value).toBe('P');
-        expect(await boxText(page, restored.id)).toBe('lem P');
+        expect(await boxText(page, restored.id)).toBe('LEM P');
     });
 });
