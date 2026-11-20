@@ -2490,7 +2490,7 @@ export const LEVELS = [
       previous: ["Negation world", "Universal world", "Existential world"],
       stages: [
           { name: "¬∀∃∨⊤⇒",
-            rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI", "lem" ],
+            rules: [ "cnegI", "negE", "allI", "allE", "exI", "exE", "andE", "andI", "orE", "orI1", "orI2", "orE", "topI", "impE", "impI", "lem" ],
             levels: [
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" } ],
@@ -2515,6 +2515,18 @@ export const LEVELS = [
                     variables: [ ],
                     hypotheses: [ { ty: "¬∀x∈A,P(x)" } ],
                     conclusion: { ty: "∃x∈A,¬P(x)" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" }, { name: "Q", ty: "A→Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∀x∈A,(P∧Q(x))" }, { ty : "∃x∈A,⊤" } ],
+                    conclusion: { ty: "P∧(∀x∈A,Q(x))" },
+                },
+                {
+                    parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "Type" }, { name: "Q", ty: "A→Type" } ],
+                    variables: [ ],
+                    hypotheses: [ { ty: "∀x∈A,(P∨Q(x))" } ],
+                    conclusion: { ty: "P∨(∀x∈A,Q(x))" },
                 },
                 {
                     parameters: [ { name: "A", ty: "Type" }, { name: "P", ty: "A→Type" }, { name: "Q", ty: "Type" } ],
